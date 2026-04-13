@@ -1,0 +1,85 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ── Helper Functions ──
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    // ── Players ──
+    match /players/{playerId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(playerId);
+      allow update: if isOwner(playerId);
+      allow delete: if false; // لا يمكن حذف الحساب
+    }
+    
+    // ── Teams ──
+    match /teams/{teamId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && 
+        resource.data.captainId == request.auth.uid;
+      allow delete: if false;
+    }
+    
+    // ── Matches ──
+    match /matches/{matchId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if false;
+    }
+    
+    // ── Tournaments ──
+    match /tournaments/{tournamentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() &&
+        resource.data.organizerId == request.auth.uid;
+      allow delete: if false;
+    }
+    
+    // ── Rating Events (read-only for players) ──
+    match /ratingEvents/{eventId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Server-side only
+    }
+    
+    // ── Encounter Logs ──
+    match /encounterLogs/{logId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Server-side only
+    }
+    
+    // ── Organizer Actions ──
+    match /organizerActions/{actionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if false;
+      allow delete: if false;
+    }
+    
+    // ── Fantasy Leagues ──
+    match /fantasyLeagues/{leagueId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if false;
+    }
+    
+    // ── Fantasy Teams ──
+    match /fantasyTeams/{teamId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() &&
+        resource.data.ownerId == request.auth.uid;
+      allow delete: if false;
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "876861689777",
+    "project_id": "el7reef-app",
+    "storage_bucket": "el7reef-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:876861689777:android:0d2a83f5ba8026f0c7f790",
+        "android_client_info": {
+          "package_name": "com.el7reef.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "876861689777-usq38c5t2sjhl96l9t8acpv2si04o9ug.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.el7reef.app",
+            "certificate_hash": "fc06cebdcc2d696ed55da03fef800c77ae608284"
+          }
+        },
+        {
+          "client_id": "876861689777-lp0e3lfrm6k9pe0njm5jtv1dkrqi85rv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCoOckdNHa1qXfaq64G6R9R2aXZN7-1l78"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "876861689777-lp0e3lfrm6k9pe0njm5jtv1dkrqi85rv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,62 @@
+name: el7reef
+description: "الشبكة الاجتماعية الشاملة لكرة القدم الشعبية"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # State Management
+  get: ^4.7.2
+
+  # Firebase
+  firebase_core: ^3.12.1
+  firebase_auth: ^5.6.1
+  cloud_firestore: ^5.6.5
+  firebase_storage: ^12.4.5
+  firebase_messaging: ^15.2.5
+  firebase_analytics: ^11.5.5
+
+  # UI & Animations
+  flutter_animate: ^4.5.2
+  lottie: ^3.3.1
+  shimmer: ^3.0.0
+  fl_chart: ^0.70.2
+  google_fonts: ^6.2.1
+  google_sign_in: ^6.2.2
+  cached_network_image: ^3.4.1
+  flutter_svg: ^2.0.17
+
+  # Maps & Location
+  google_maps_flutter: ^2.12.1
+  geolocator: ^13.0.2
+  geocoding: ^3.0.0
+
+  # Utilities
+  intl: ^0.20.2
+  uuid: ^4.5.1
+  share_plus: ^10.1.4
+  image_picker: ^1.1.2
+  connectivity_plus: ^6.1.4
+
+  # QR Code (Phase 6)
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^6.0.4
+
+  # Local Storage
+  shared_preferences: ^2.5.3
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

@@ -1,0 +1,41 @@
+/// Route name constants for EL7REEF
+abstract class AppRoutes {
+  static const String splash = '/splash';
+  static const String onboarding = '/onboarding';
+  static const String login = '/login';
+  static const String register = '/register';
+  static const String home = '/home';
+  static const String profile = '/profile';
+  static const String editProfile = '/profile/edit';
+  static const String playerProfile = '/player/:id';
+  static const String teamProfile = '/team/:id';
+  static const String createTeam = '/team/create';
+  static const String findMatch = '/match/find';
+  static const String createMatch = '/match/create';
+  static const String matchLobby = '/match/lobby/:id';
+  static const String matchDetails = '/match/details/:id';
+  static const String rating = '/rating/:matchId';
+  static const String mvpVote = '/rating/mvp/:matchId';
+  static const String createTournament = '/tournament/create';
+  static const String tournamentList = '/tournament/list';
+  static const String tournamentDetail = '/tournament/:id';
+  static const String tournamentBracket = '/tournament/:id/bracket';
+  static const String teamRegistration = '/tournament/:id/register';
+  static const String organizerDashboard = '/organizer/dashboard';
+  static const String scoreApproval = '/organizer/score/:matchId';
+  static const String goldenRating = '/organizer/golden-rating/:matchId';
+  static const String fantasyHome = '/fantasy';
+  static const String fantasyPickTeam = '/fantasy/pick/:leagueId';
+  static const String fantasyLeaderboard = '/fantasy/leaderboard/:leagueId';
+  static const String leaderboard = '/leaderboard';
+  static const String achievements = '/achievements';
+  // Phase 6 — Social & Identity
+  static const String username = '/profile/username';
+  static const String qrScanner = '/qr/scan';
+  static const String myQrCode = '/profile/qr';
+  static const String friends = '/social/friends';
+  static const String searchPlayers = '/social/search';
+  static const String activityFeed = '/social/feed';
+  static const String myTeams = '/teams';
+  static const String tournaments = '/tournaments';
+}

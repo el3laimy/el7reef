@@ -1,0 +1,143 @@
+import '../../core/enums/tournament_enums.dart';
+import 'tournament_assistant.dart';
+
+/// كيان الدورة — يمثل بطولة كرة القدم الشعبية
+class Tournament {
+  final String id;
+  final String organizerId;
+  final String name;
+  final String? description;
+  final String? location;
+  final TournamentFormat format;
+  final TournamentTeamSize teamSize;
+  final int maxTeams;
+  final int? prizePool;
+  final String? prizeDescription;
+  final TournamentStatus status;
+  final List<String> registeredTeamIds;
+  final List<TournamentAssistant> assistants;
+  final List<String> groupRoundIds;   // IDs لجولات المجموعات
+  final List<String> knockoutRoundIds; // IDs لجولات الإقصاء
+  final bool isFantasyEnabled;
+  final DateTime? registrationDeadline;
+  final DateTime? startDate;
+  final DateTime? endDate;
+  final DateTime createdAt;
+
+  const Tournament({
+    required this.id,
+    required this.organizerId,
+    required this.name,
+    this.description,
+    this.location,
+    required this.format,
+    required this.teamSize,
+    required this.maxTeams,
+    this.prizePool,
+    this.prizeDescription,
+    this.status = TournamentStatus.upcoming,
+    this.registeredTeamIds = const [],
+    this.assistants = const [],
+    this.groupRoundIds = const [],
+    this.knockoutRoundIds = const [],
+    this.isFantasyEnabled = true,
+    this.registrationDeadline,
+    this.startDate,
+    this.endDate,
+    required this.createdAt,
+  });
+
+  /// هل التسجيل مفتوح؟
+  bool get isRegistrationOpen => status == TournamentStatus.registration;
+
+  /// هل يمكن إضافة فريق جديد؟
+  bool get canRegister =>
+      isRegistrationOpen && registeredTeamIds.length < maxTeams;
+
+  /// عدد الفرق الحالي
+  int get teamCount => registeredTeamIds.length;
+
+  /// نسبة الامتلاء
+  double get fillRate => teamCount / maxTeams;
+
+  Tournament copyWith({
+    String? id,
+    String? organizerId,
+    String? name,
+    String? description,
+    String? location,
+    TournamentFormat? format,
+    TournamentTeamSize? teamSize,
+    int? maxTeams,
+    int? prizePool,
+    String? prizeDescription,
+    TournamentStatus? status,
+    List<String>? registeredTeamIds,
+    List<TournamentAssistant>? assistants,
+    List<String>? groupRoundIds,
+    List<String>? knockoutRoundIds,
+    bool? isFantasyEnabled,
+    DateTime? registrationDeadline,
+    DateTime? startDate,
+    DateTime? endDate,
+    DateTime? createdAt,
+  }) {
+    return Tournament(
+      id: id ?? this.id,
+      organizerId: organizerId ?? this.organizerId,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      location: location ?? this.location,
+      format: format ?? this.format,
+      teamSize: teamSize ?? this.teamSize,
+      maxTeams: maxTeams ?? this.maxTeams,
+      prizePool: prizePool ?? this.prizePool,
+      prizeDescription: prizeDescription ?? this.prizeDescription,
+      status: status ?? this.status,
+      registeredTeamIds: registeredTeamIds ?? this.registeredTeamIds,
+      assistants: assistants ?? this.assistants,
+      groupRoundIds: groupRoundIds ?? this.groupRoundIds,
+      knockoutRoundIds: knockoutRoundIds ?? this.knockoutRoundIds,
+      isFantasyEnabled: isFantasyEnabled ?? this.isFantasyEnabled,
+      registrationDeadline: registrationDeadline ?? this.registrationDeadline,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+}
+
+/// إدخال نتيجة مجموعة للترتيب
+class GroupStanding {
+  final String teamId;
+  final String teamName;
+  final int played;
+  final int wins;
+  final int draws;
+  final int losses;
+  final int goalsFor;
+  final int goalsAgainst;
+
+  const GroupStanding({
+    required this.teamId,
+    required this.teamName,
+    this.played = 0,
+    this.wins = 0,
+    this.draws = 0,
+    this.losses = 0,
+    this.goalsFor = 0,
+    this.goalsAgainst = 0,
+  });
+
+  int get points => (wins * 3) + draws;
+  int get goalDifference => goalsFor - goalsAgainst;
+
+  /// مقارنة للترتيب: نقاط → فارق أهداف → أهداف مسجلة
+  int compareTo(GroupStanding other) {
+    if (points != other.points) return other.points.compareTo(points);
+    if (goalDifference != other.goalDifference) {
+      return other.goalDifference.compareTo(goalDifference);
+    }
+    return other.goalsFor.compareTo(goalsFor);
+  }
+}
