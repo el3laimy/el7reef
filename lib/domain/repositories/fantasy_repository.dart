@@ -7,6 +7,12 @@ import '../entities/transfer_record.dart';
 abstract class FantasyRepository {
   /// جلب فريق فانتازي لمستخدم معين
   Future<FantasyTeam?> getFantasyTeam(String ownerPlayerId);
+
+  /// جلب ترتيب دوري معيّن بناءً على `leagueIds` داخل الفريق.
+  Future<List<FantasyTeam>> getLeagueLeaderboard(
+    String leagueId, {
+    int limit = 50,
+  });
   
   /// إنشاء فريق فانتازي جديد
   Future<void> createFantasyTeam(FantasyTeam team, List<FantasySlot> slots);
@@ -25,6 +31,9 @@ abstract class FantasyRepository {
 
   /// جلب قيمة وتصنيف لاعب في البورصة
   Future<PlayerFantasyValue?> getPlayerFantasyValue(String playerId);
+
+  /// جلب قائمة سوق اللاعبين المتاحين للفانتازي.
+  Future<List<PlayerFantasyValue>> getMarketValues({int limit = 100});
   
   /// تحديث قيمة وتصنيف لاعب (يستخدمه محرك الأسعار في الخلفية)
   Future<void> updatePlayerFantasyValue(PlayerFantasyValue value);

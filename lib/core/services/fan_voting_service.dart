@@ -20,18 +20,25 @@ class FanVotingService {
   /// إنشاء أو فتح جلسة التصويت لمباراة حالية
   Future<void> openSession(String matchId, {int durationMinutes = 90}) async {
     final now = DateTime.now();
-    final model = FanVotingSessionModel(
-      id: matchId,
-      matchId: matchId,
-      opensAt: now,
-      closesAt: now.add(Duration(minutes: durationMinutes)),
-      totalVotes: 0,
-      playerVotes: {},
-      winnerPlayerId: null,
-    );
+    await _firestore.runTransaction((transaction) async {
+      final sessionRef = _sessionsRef.doc(matchId);
+      final existingSession = await transaction.get(sessionRef);
+      if (existingSession.exists) {
+        return;
+      }
 
-    // نستخدم set مع merge لتجنب مسح أصوات موجودة لو تم استدعاؤها خطأ
-    await _sessionsRef.doc(matchId).set(model.toJson(), SetOptions(merge: false));
+      final model = FanVotingSessionModel(
+        id: matchId,
+        matchId: matchId,
+        opensAt: now,
+        closesAt: now.add(Duration(minutes: durationMinutes)),
+        totalVotes: 0,
+        playerVotes: {},
+        winnerPlayerId: null,
+      );
+
+      transaction.set(sessionRef, model.toJson());
+    });
   }
 
   /// جلب تفاصيل الجلسة

@@ -21,11 +21,13 @@ abstract class AppRoutes {
   static const String tournamentDetail = '/tournament/:id';
   static const String tournamentBracket = '/tournament/:id/bracket';
   static const String teamRegistration = '/tournament/:id/register';
-  static const String organizerDashboard = '/organizer/dashboard';
+  static const String organizerDashboard = '/organizer/dashboard/:tournamentId';
   static const String scoreApproval = '/organizer/score/:matchId';
   static const String goldenRating = '/organizer/golden-rating/:matchId';
   static const String fantasyHome = '/fantasy';
   static const String fantasyPickTeam = '/fantasy/pick/:leagueId';
+  static const String fantasyTeam = '/fantasy/team/:leagueId';
+  static const String fantasyTransfers = '/fantasy/transfers/:leagueId';
   static const String fantasyLeaderboard = '/fantasy/leaderboard/:leagueId';
   static const String leaderboard = '/leaderboard';
   static const String achievements = '/achievements';
@@ -38,4 +40,19 @@ abstract class AppRoutes {
   static const String activityFeed = '/social/feed';
   static const String myTeams = '/teams';
   static const String tournaments = '/tournaments';
+
+  static String tournamentDetailById(String id) => '/tournament/$id';
+  static String organizerDashboardForTournament(String tournamentId) =>
+      '/organizer/dashboard/$tournamentId';
+  static String scoreApprovalForMatch(String matchId) =>
+      '/organizer/score/$matchId';
+  static String mvpVoteForMatch(String matchId) => '/rating/mvp/$matchId';
+  static String fantasyPickTeamForLeague(String leagueId) =>
+      '/fantasy/pick/$leagueId';
+  static String fantasyTeamForLeague(String leagueId) =>
+      '/fantasy/team/$leagueId';
+  static String fantasyTransfersForLeague(String leagueId) =>
+      '/fantasy/transfers/$leagueId';
+  static String fantasyLeaderboardForLeague(String leagueId) =>
+      '/fantasy/leaderboard/$leagueId';
 }

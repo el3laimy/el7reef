@@ -28,6 +28,25 @@ class FantasyRepositoryImpl implements FantasyRepository {
   }
 
   @override
+  Future<List<FantasyTeam>> getLeagueLeaderboard(
+    String leagueId, {
+    int limit = 50,
+  }) async {
+    final snapshot = await _teamsRef
+        .where('leagueIds', arrayContains: leagueId)
+        .orderBy('totalPoints', descending: true)
+        .limit(limit)
+        .get();
+
+    return snapshot.docs
+        .map((doc) => FantasyTeamModel.fromJson(
+              doc.data() as Map<String, dynamic>,
+              doc.id,
+            ).toEntity())
+        .toList();
+  }
+
+  @override
   Future<void> createFantasyTeam(FantasyTeam team, List<FantasySlot> slots) async {
     await _db.runTransaction((tx) async {
       final teamModel = FantasyTeamModel.fromEntity(team);
@@ -82,6 +101,21 @@ class FantasyRepositoryImpl implements FantasyRepository {
     final doc = await _valuesRef.doc(playerId).get();
     if (!doc.exists || doc.data() == null) return null;
     return PlayerFantasyValueModel.fromJson(doc.data() as Map<String, dynamic>, doc.id).toEntity();
+  }
+
+  @override
+  Future<List<PlayerFantasyValue>> getMarketValues({int limit = 100}) async {
+    final snapshot = await _valuesRef
+        .orderBy('totalFantasyPoints', descending: true)
+        .limit(limit)
+        .get();
+
+    return snapshot.docs
+        .map((doc) => PlayerFantasyValueModel.fromJson(
+              doc.data() as Map<String, dynamic>,
+              doc.id,
+            ).toEntity())
+        .toList();
   }
 
   @override

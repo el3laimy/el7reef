@@ -1,6 +1,8 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'app_routes.dart';
+import '../../core/constants/feature_flags.dart';
+import '../../core/widgets/feature_unavailable_screen.dart';
 import '../../features/splash/views/splash_screen.dart';
 import '../../features/splash/bindings/splash_binding.dart';
 import '../../features/auth/views/onboarding_screen.dart';
@@ -16,10 +18,14 @@ import '../../features/match/views/match_discover_screen.dart';
 import '../../features/match/views/score_submit_screen.dart';
 import '../../features/match/views/fan_voting_screen.dart';
 import '../../features/match/bindings/match_binding.dart';
+import '../../features/match/bindings/score_submit_binding.dart';
+import '../../features/match/bindings/fan_voting_binding.dart';
 import '../../features/tournament/views/tournament_list_screen.dart';
 import '../../features/tournament/views/tournament_detail_screen.dart';
 import '../../features/tournament/views/tournament_assistants_screen.dart';
 import '../../features/tournament/bindings/tournament_binding.dart';
+import '../../features/tournament/bindings/tournament_detail_binding.dart';
+import '../../features/tournament/bindings/tournament_assistants_binding.dart';
 import '../../features/social/views/username_screen.dart';
 import '../../features/social/views/qr_scanner_screen.dart';
 import '../../features/social/views/friends_screen.dart';
@@ -27,8 +33,14 @@ import '../../features/social/views/search_players_screen.dart';
 import '../../features/social/bindings/friend_binding.dart';
 import '../../features/fantasy/presentation/screens/fantasy_league_list_screen.dart';
 import '../../features/fantasy/presentation/screens/create_fantasy_team_screen.dart';
+import '../../features/fantasy/presentation/screens/fantasy_team_screen.dart';
+import '../../features/fantasy/presentation/screens/transfer_market_screen.dart';
 import '../../features/fantasy/presentation/screens/fantasy_leaderboard_screen.dart';
-import '../../domain/entities/tournament.dart';
+import '../../features/fantasy/presentation/bindings/fantasy_home_binding.dart';
+import '../../features/fantasy/presentation/bindings/fantasy_create_team_binding.dart';
+import '../../features/fantasy/presentation/bindings/fantasy_team_binding.dart';
+import '../../features/fantasy/presentation/bindings/transfer_market_binding.dart';
+import '../../features/fantasy/presentation/bindings/fantasy_leaderboard_binding.dart';
 
 /// GetX Page Route Definitions — جميع الشاشات مسجلة
 class AppPages {
@@ -109,7 +121,7 @@ class AppPages {
     GetPage(
       name: AppRoutes.scoreApproval,
       page: () => const ScoreSubmitScreen(),
-      binding: MatchBinding(),
+      binding: ScoreSubmitBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 
@@ -117,7 +129,7 @@ class AppPages {
     GetPage(
       name: AppRoutes.mvpVote,
       page: () => const FanVotingScreen(),
-      binding: MatchBinding(),
+      binding: FanVotingBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 
@@ -144,16 +156,8 @@ class AppPages {
     // ── Tournament Detail (FIX-05: safe casting) ──
     GetPage(
       name: AppRoutes.tournamentDetail,
-      page: () {
-        final args = Get.arguments;
-        if (args is! Tournament) {
-          return const Scaffold(
-            body: Center(child: Text('خطأ: لم يتم تحديد الدورة')),
-          );
-        }
-        return TournamentDetailScreen(tournament: args);
-      },
-      binding: TournamentBinding(),
+      page: () => const TournamentDetailScreen(),
+      binding: TournamentDetailBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 
@@ -161,7 +165,7 @@ class AppPages {
     GetPage(
       name: AppRoutes.organizerDashboard,
       page: () => const TournamentAssistantsScreen(),
-      binding: TournamentBinding(),
+      binding: TournamentAssistantsBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 
@@ -207,23 +211,107 @@ class AppPages {
     // ── Fantasy League List ──
     GetPage(
       name: AppRoutes.fantasyHome,
-      page: () => const FantasyLeagueListScreen(),
+      page: () => FeatureFlags.fantasyUiEnabled
+          ? const FantasyLeagueListScreen()
+          : const FeatureUnavailableScreen(
+              title: 'الفانتازي غير متاح حالياً',
+              message:
+                  'واجهات الفانتازي ما زالت قيد الإنهاء، لذلك تم إخفاؤها مؤقتاً لحين ربطها بالكامل بالـ backend.',
+            ),
+      binding: FantasyHomeBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 
     // ── Create Fantasy Team ──
     GetPage(
       name: AppRoutes.fantasyPickTeam,
-      page: () => const CreateFantasyTeamScreen(),
+      page: () {
+        final leagueId = Get.parameters['leagueId'];
+        if (!FeatureFlags.fantasyUiEnabled) {
+          return const FeatureUnavailableScreen(
+            title: 'إنشاء فريق فانتازي غير متاح',
+            message:
+                'تم إيقاف هذه الواجهة مؤقتاً حتى يكتمل ربط سوق اللاعبين والتشكيلة وعمليات الحفظ.',
+          );
+        }
+        if (leagueId == null || leagueId.isEmpty) {
+          return const Scaffold(
+            body: Center(child: Text('خطأ: لم يتم تحديد الدوري')),
+          );
+        }
+        return const CreateFantasyTeamScreen();
+      },
+      binding: FantasyCreateTeamBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    // ── Fantasy Team ──
+    GetPage(
+      name: AppRoutes.fantasyTeam,
+      page: () {
+        final leagueId = Get.parameters['leagueId'];
+        if (!FeatureFlags.fantasyUiEnabled) {
+          return const FeatureUnavailableScreen(
+            title: 'إدارة الفريق غير متاحة',
+            message:
+                'إدارة فريق الفانتازي ما زالت غير مفعلة في هذا البناء مؤقتاً.',
+          );
+        }
+        if (leagueId == null || leagueId.isEmpty) {
+          return const Scaffold(
+            body: Center(child: Text('خطأ: لم يتم تحديد الدوري')),
+          );
+        }
+        return const FantasyTeamScreen();
+      },
+      binding: FantasyTeamBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    // ── Fantasy Transfers ──
+    GetPage(
+      name: AppRoutes.fantasyTransfers,
+      page: () {
+        final leagueId = Get.parameters['leagueId'];
+        if (!FeatureFlags.fantasyUiEnabled) {
+          return const FeatureUnavailableScreen(
+            title: 'الانتقالات غير متاحة',
+            message:
+                'سوق انتقالات الفانتازي ما زال قيد التفعيل الكامل في هذا البناء.',
+          );
+        }
+        if (leagueId == null || leagueId.isEmpty) {
+          return const Scaffold(
+            body: Center(child: Text('خطأ: لم يتم تحديد الدوري')),
+          );
+        }
+        return const TransferMarketScreen();
+      },
+      binding: TransferMarketBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 
     // ── Fantasy Leaderboard ──
     GetPage(
       name: AppRoutes.fantasyLeaderboard,
-      page: () => const FantasyLeaderboardScreen(),
+      page: () {
+        final leagueId = Get.parameters['leagueId'];
+        if (!FeatureFlags.fantasyUiEnabled) {
+          return const FeatureUnavailableScreen(
+            title: 'ترتيب الفانتازي غير متاح',
+            message:
+                'سيعود هذا القسم بمجرد اكتمال تدفقات الفانتازي وبيانات الجولات الحقيقية.',
+          );
+        }
+        if (leagueId == null || leagueId.isEmpty) {
+          return const Scaffold(
+            body: Center(child: Text('خطأ: لم يتم تحديد الدوري')),
+          );
+        }
+        return const FantasyLeaderboardScreen();
+      },
+      binding: FantasyLeaderboardBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
   ];
 }
-

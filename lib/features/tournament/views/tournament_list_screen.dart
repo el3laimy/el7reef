@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
+import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
@@ -9,7 +10,6 @@ import '../../../core/widgets/el7reef_button.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../domain/entities/tournament.dart';
 import '../controllers/tournament_controller.dart';
-import 'tournament_detail_screen.dart';
 
 /// شاشة الدورات — القائمة الرئيسية
 class TournamentListScreen extends GetView<TournamentController> {
@@ -138,7 +138,7 @@ class _TournamentCard extends StatelessWidget {
     final (Color statusColor, String statusLabel) = _statusInfo(tournament.status);
 
     return GestureDetector(
-      onTap: () => Get.to(() => TournamentDetailScreen(tournament: tournament)),
+      onTap: () => Get.toNamed(AppRoutes.tournamentDetailById(tournament.id)),
       child: GlassmorphicContainer(
         padding: const EdgeInsets.all(AppDimensions.md),
         borderRadius: AppDimensions.radiusLg,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
+import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
@@ -9,10 +10,6 @@ import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../core/widgets/el7reef_button.dart';
 import '../../../domain/entities/match.dart';
 import '../controllers/match_controller.dart';
-import '../controllers/score_submit_controller.dart';
-import '../controllers/fan_voting_controller.dart';
-import 'score_submit_screen.dart';
-import 'fan_voting_screen.dart';
 
 /// شاشة اكتشاف المباريات المتاحة + إنشاء مباراة جديدة
 class MatchDiscoverScreen extends GetView<MatchController> {
@@ -218,7 +215,7 @@ class _MatchCard extends StatelessWidget {
               ),
               Column(
                 children: [
-                  if (match.isCompleted && match.scoreTeamA != null)
+                  if (match.scoreTeamA != null && match.scoreTeamB != null)
                     Text(
                       '${match.scoreTeamA} - ${match.scoreTeamB}',
                       style: AppTextStyles.ratingMedium.copyWith(fontSize: 24),
@@ -245,15 +242,15 @@ class _MatchCard extends StatelessWidget {
           const SizedBox(height: AppDimensions.md),
 
           // ── زر تصويت الجماهير (Fan Voting) ──
-          if (match.status == MatchStatus.live || match.status == MatchStatus.completed)
+          if (match.status == MatchStatus.completed ||
+              match.status == MatchStatus.pendingReview ||
+              match.status == MatchStatus.settled)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.only(bottom: AppDimensions.md),
               child: OutlinedButton.icon(
-                onPressed: () {
-                  Get.put(FanVotingController(match: match));
-                  Get.to(() => const FanVotingScreen());
-                },
+                onPressed: () =>
+                    Get.toNamed(AppRoutes.mvpVoteForMatch(match.id)),
                 icon: const Icon(Icons.star_border_purple500, size: 18),
                 label: const Text('تصويت رجل المباراة (الجماهير)'),
                 style: OutlinedButton.styleFrom(
@@ -269,10 +266,8 @@ class _MatchCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {
-                      Get.put(ScoreSubmitController(match: match, parentController: controller));
-                      Get.to(() => const ScoreSubmitScreen());
-                    },
+                    onPressed: () =>
+                        Get.toNamed(AppRoutes.scoreApprovalForMatch(match.id)),
                     icon: const Icon(Icons.edit_note, size: 18),
                     label: const Text('سجّل النتيجة'),
                     style: OutlinedButton.styleFrom(
@@ -295,13 +290,19 @@ class _MatchCard extends StatelessWidget {
               ],
             ),
 
-          if (isOrganizer && match.status == MatchStatus.completed)
+          if (isOrganizer &&
+              (match.status == MatchStatus.completed ||
+                  match.status == MatchStatus.pendingReview))
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () => controller.approveScore(match.id),
                 icon: const Icon(Icons.check_circle_outline, size: 18),
-                label: const Text('اعتماد النتيجة'),
+                label: Text(
+                  match.status == MatchStatus.pendingReview
+                      ? 'اعتماد بعد المراجعة'
+                      : 'اعتماد النتيجة',
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.success,
                   foregroundColor: Colors.white,
@@ -326,6 +327,7 @@ class _StatusBadge extends StatelessWidget {
       MatchStatus.live => (AppColors.primary, '🔵 جارية'),
       MatchStatus.completed => (AppColors.secondary, '⏳ بانتظار الاعتماد'),
       MatchStatus.settled => (AppColors.textMuted, '✅ منتهية'),
+      MatchStatus.pendingReview => (AppColors.warning, '🟠 قيد المراجعة'),
       MatchStatus.frozen => (AppColors.error, '🔒 مجمدة'),
       MatchStatus.full => (AppColors.accent, '🔴 مكتملة'),
       _ => (AppColors.textMuted, '⏸ معلقة'),

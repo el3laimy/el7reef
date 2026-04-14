@@ -70,7 +70,13 @@ class MatchRepositoryImpl implements MatchRepository {
     double radiusKm = 5,
   }) async {
     final snapshot = await _matchesRef
-        .where('status', whereIn: ['open', 'full', 'live'])
+        .where('status', whereIn: [
+          MatchStatus.open.name,
+          MatchStatus.full.name,
+          MatchStatus.live.name,
+          MatchStatus.completed.name,
+          MatchStatus.pendingReview.name,
+        ])
         .orderBy('createdAt', descending: true)
         .limit(30)
         .get();

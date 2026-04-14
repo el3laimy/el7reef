@@ -8,6 +8,10 @@ class FantasyTeam {
   
   /// اسم فريق الفانتازي (مثل: أبطال الحريف)
   final String teamName;
+
+  /// الدوريات التي يشارك فيها الفريق.
+  /// يتم إدراج `global` افتراضياً حتى يظهر كل فريق في الترتيب العام.
+  final List<String> leagueIds;
   
   /// الميزانية المتبقية (تبدأ بـ 100 مليون مثلاً)
   final double budget;
@@ -40,6 +44,7 @@ class FantasyTeam {
     required this.id,
     required this.ownerPlayerId,
     required this.teamName,
+    this.leagueIds = const ['global'],
     this.budget = 100.0,
     this.totalPoints = 0,
     this.currentGameweekPoints = 0,
@@ -55,6 +60,7 @@ class FantasyTeam {
     String? id,
     String? ownerPlayerId,
     String? teamName,
+    List<String>? leagueIds,
     double? budget,
     int? totalPoints,
     int? currentGameweekPoints,
@@ -69,6 +75,7 @@ class FantasyTeam {
       id: id ?? this.id,
       ownerPlayerId: ownerPlayerId ?? this.ownerPlayerId,
       teamName: teamName ?? this.teamName,
+      leagueIds: leagueIds ?? this.leagueIds,
       budget: budget ?? this.budget,
       totalPoints: totalPoints ?? this.totalPoints,
       currentGameweekPoints: currentGameweekPoints ?? this.currentGameweekPoints,

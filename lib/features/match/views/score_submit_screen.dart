@@ -14,8 +14,6 @@ class ScoreSubmitScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Controller is initialized and retrieved via routing bindings usually,
-    // or passed via Get.put directly. Here we assume it's created during navigation.
     final ScoreSubmitController controller = Get.find<ScoreSubmitController>();
 
     return Scaffold(
@@ -35,6 +33,20 @@ class ScoreSubmitScreen extends StatelessWidget {
         child: Obx(() {
           if (controller.isLoading.value && controller.teamAPlayers.isEmpty) {
             return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+          }
+
+          if (controller.errorMessage.value.isNotEmpty &&
+              controller.match.value == null) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppDimensions.xl),
+                child: Text(
+                  controller.errorMessage.value,
+                  style: AppTextStyles.titleMedium,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
           }
 
           return Column(

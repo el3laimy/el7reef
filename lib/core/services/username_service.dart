@@ -46,7 +46,7 @@ class UsernameService {
   }
 
   /// فحص التوفر على Firestore (case-insensitive)
-  Future<bool> isAvailable(String username) async {
+  Future<bool> isAvailable(String username, {String? currentOwnerId}) async {
     final lower = username.toLowerCase().trim();
 
     // فحص 1: هل هو مستخدم حالياً؟
@@ -56,7 +56,10 @@ class UsernameService {
         .limit(1)
         .get();
 
-    if (activeSnap.docs.isNotEmpty) return false;
+    if (activeSnap.docs.isNotEmpty &&
+        activeSnap.docs.first.id != currentOwnerId) {
+      return false;
+    }
 
     // فحص 2: هل هو محجوز (تم تغييره مؤخراً)؟
     final reservedSnap = await _db
@@ -64,16 +67,16 @@ class UsernameService {
         .doc(lower)
         .get();
 
-    if (reservedSnap.exists) {
-      final expiresAt = reservedSnap.data()?['expiresAt'] as int?;
-      if (expiresAt != null &&
-          DateTime.fromMillisecondsSinceEpoch(expiresAt)
-              .isAfter(DateTime.now())) {
-        return false; // لا يزال في فترة الحجز 14 يوماً
-      }
+    if (!reservedSnap.exists) {
+      return true;
     }
 
-    return true;
+    final data = reservedSnap.data() ?? <String, dynamic>{};
+    return _canClaimUsername(
+      data: data,
+      playerId: currentOwnerId,
+      now: DateTime.now(),
+    );
   }
 
   /// حفظ Username جديد وحجز القديم
@@ -83,6 +86,7 @@ class UsernameService {
     String? oldUsername,
   }) async {
     final lower = newUsername.toLowerCase().trim();
+    final oldLower = oldUsername?.toLowerCase().trim();
 
     // فحص محلي أولاً
     final localResult = validateLocally(lower);
@@ -90,39 +94,97 @@ class UsernameService {
       return UsernameSetResult.validationFailed;
     }
 
-    // فحص Firestore
-    final available = await isAvailable(lower);
-    if (!available) return UsernameSetResult.taken;
-
-    final batch = _db.batch();
-
-    // تحديث بروفايل اللاعب
-    final playerRef =
-        _db.collection(FirebasePaths.players).doc(playerId);
-    batch.update(playerRef, {
-      'username': lower,
-      'usernameLower': lower,
-    });
-
-    // حجز الـ Username القديم لمدة 14 يوماً
-    if (oldUsername != null && oldUsername.isNotEmpty) {
-      final oldLower = oldUsername.toLowerCase();
-      final reservedRef = _db
-          .collection(FirebasePaths.reservedUsernames)
-          .doc(oldLower);
-      batch.set(reservedRef, {
-        'username': oldLower,
-        'previousOwnerId': playerId,
-        'reservedAt': DateTime.now().millisecondsSinceEpoch,
-        'expiresAt': DateTime.now()
-            .add(const Duration(days: 14))
-            .millisecondsSinceEpoch,
-      });
+    if (oldLower == lower) {
+      return UsernameSetResult.success;
     }
 
-    await batch.commit();
-    return UsernameSetResult.success;
+    try {
+      await _db.runTransaction((transaction) async {
+        final now = DateTime.now();
+        final playerRef = _db.collection(FirebasePaths.players).doc(playerId);
+        final playerSnapshot = await transaction.get(playerRef);
+        if (!playerSnapshot.exists) {
+          throw StateError('player-not-found');
+        }
+
+        final usernameRef =
+            _db.collection(FirebasePaths.reservedUsernames).doc(lower);
+        final usernameSnapshot = await transaction.get(usernameRef);
+        if (usernameSnapshot.exists) {
+          final isClaimable = _canClaimUsername(
+            data: usernameSnapshot.data() ?? <String, dynamic>{},
+            playerId: playerId,
+            now: now,
+          );
+          if (!isClaimable) {
+            throw const _UsernameTakenException();
+          }
+        }
+
+        transaction.update(playerRef, {
+          'username': lower,
+          'usernameLower': lower,
+        });
+
+        transaction.set(usernameRef, {
+          'username': lower,
+          'ownerId': playerId,
+          'status': 'active',
+          'claimedAt': now.millisecondsSinceEpoch,
+          'expiresAt': null,
+        });
+
+        if (oldLower != null && oldLower.isNotEmpty) {
+          final reservedRef =
+              _db.collection(FirebasePaths.reservedUsernames).doc(oldLower);
+          transaction.set(reservedRef, {
+            'username': oldLower,
+            'ownerId': playerId,
+            'previousOwnerId': playerId,
+            'status': 'reserved',
+            'reservedAt': now.millisecondsSinceEpoch,
+            'expiresAt': now
+                .add(const Duration(days: 14))
+                .millisecondsSinceEpoch,
+          });
+        }
+      });
+      return UsernameSetResult.success;
+    } on _UsernameTakenException {
+      return UsernameSetResult.taken;
+    } catch (_) {
+      return UsernameSetResult.error;
+    }
   }
+
+  bool _canClaimUsername({
+    required Map<String, dynamic> data,
+    required String? playerId,
+    required DateTime now,
+  }) {
+    final ownerId =
+        data['ownerId'] as String? ?? data['previousOwnerId'] as String?;
+    final status = data['status'] as String?;
+    final expiresAt = data['expiresAt'] as int?;
+
+    if (playerId != null && ownerId == playerId) {
+      return true;
+    }
+
+    if (status == 'active') {
+      return false;
+    }
+
+    if (expiresAt == null) {
+      return true;
+    }
+
+    return !DateTime.fromMillisecondsSinceEpoch(expiresAt).isAfter(now);
+  }
+}
+
+class _UsernameTakenException implements Exception {
+  const _UsernameTakenException();
 }
 
 /// نتيجة التحقق المحلي

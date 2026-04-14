@@ -1,263 +1,409 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
-class CreateFantasyTeamScreen extends StatefulWidget {
+import '../controllers/fantasy_create_team_controller.dart';
+import '../models/fantasy_market_player.dart';
+import '../widgets/fantasy_lifecycle_banner.dart';
+import 'player_picker_screen.dart';
+import '../../../../core/widgets/tier_badge_widget.dart';
+
+class CreateFantasyTeamScreen extends GetView<FantasyCreateTeamController> {
   const CreateFantasyTeamScreen({super.key});
-
-  @override
-  State<CreateFantasyTeamScreen> createState() => _CreateFantasyTeamScreenState();
-}
-
-class _CreateFantasyTeamScreenState extends State<CreateFantasyTeamScreen> {
-  // للتبسيط في العرض، نفترض أننا نبني تشكيلة خماسية (5 أساسي + 2 احتياط)
-  double _remainingBudget = 100.0; // ignore: prefer_final_fields
-  int _playersSelected = 0; // ignore: prefer_final_fields
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: const Color(0xFF081120),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text(
-          'بناء التشكيلة (Draft)',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        title: Obx(() => Text('بناء التشكيلة - ${controller.leagueTitle.value}')),
         actions: [
           IconButton(
-            icon: const Icon(Icons.flash_on, color: Colors.amber),
-            tooltip: 'Auto Pick (تلقائي)',
-            onPressed: () {
-              // TODO: استدعاء AutoPickEngine لتعبئة التشكيلة التلقائية
-            },
-          )
-        ],
-      ),
-      body: Column(
-        children: [
-          _buildBudgetHeader(),
-          Expanded(
-            child: _buildPitchView(),
+            tooltip: 'تجديد البيانات',
+            onPressed: controller.loadDraft,
+            icon: const Icon(Icons.refresh_rounded),
           ),
-          _buildBenchSection(),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          // TODO: التحقق من التشكيلة (Mins, Tiers, Budget) ثم الحفظ
-        },
-        backgroundColor: const Color(0xFF32D74B),
-        icon: const Icon(Icons.check, color: Colors.white),
-        label: const Text('اعتماد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-      ),
-    );
-  }
+      body: Obx(() {
+        if (controller.isLoading.value && controller.slots.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-  /// شريط العارضة العلوية الذي يعرض الميزانية واللاعبين والندرة
-  Widget _buildBudgetHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: const BoxDecoration(
-        color: Color(0xFF1E293B),
-        border: Border(bottom: BorderSide(color: Colors.white10)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('الميزانية المتبقية', style: TextStyle(color: Colors.white70, fontSize: 12)),
-              Text(
-                '${_remainingBudget.toStringAsFixed(1)}M',
-                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+        if (controller.errorMessage.isNotEmpty && controller.slots.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                controller.errorMessage.value,
+                style: const TextStyle(color: Colors.white70),
+                textAlign: TextAlign.center,
               ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              const Text('اللاعبون المحترفون', style: TextStyle(color: Colors.white70, fontSize: 12)),
-              Row(
-                children: [
-                  Text(
-                    '$_playersSelected / 7',
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(width: 8),
-                  // مؤشرات المستوى المتاحة
-                  Icon(Icons.star, color: Colors.amber.shade300, size: 16), // Gold Limit Indicator
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+            ),
+          );
+        }
 
-  /// رقعة الملعب التي يتم توزيع الخانات عليها
-  Widget _buildPitchView() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF229954), // أخضر غامق
-            Color(0xFF27AE60), // أخضر عشبي
-            Color(0xFF229954),
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 50),
-            blurRadius: 10,
-            spreadRadius: 2,
-          )
-        ],
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // رسم خطوط الملعب التوضيحية
-          Positioned(
-            top: 0,
-            child: Container(
-              width: 150,
-              height: 60,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.white30, width: 2),
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(8),
-                  bottomRight: Radius.circular(8),
+        final starters =
+            controller.slots.where((slot) => slot.isStarting).toList();
+        final bench = controller.slots.where((slot) => !slot.isStarting).toList();
+
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+          children: [
+            _buildHeaderCard(),
+            if (controller.lifecycle.value != null) ...[
+              const SizedBox(height: 16),
+              FantasyLifecycleBanner(lifecycle: controller.lifecycle.value),
+            ],
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller.teamNameController,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                labelText: 'اسم الفريق',
+                labelStyle: const TextStyle(color: Colors.white70),
+                filled: true,
+                fillColor: const Color(0xFF102038),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
                 ),
               ),
             ),
-          ),
-          Positioned(
-            child: Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white30, width: 2),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: controller.marketPlayers.isEmpty
+                            || !controller.canEditDraft
+                        ? null
+                        : controller.autoPick,
+                    icon: const Icon(Icons.flash_on_rounded),
+                    label: const Text('Auto Pick'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF22C55E),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: !controller.canEditDraft
+                        ? null
+                        : () {
+                            for (var i = 0; i < controller.slots.length; i++) {
+                              controller.clearSlot(i);
+                            }
+                          },
+                    icon: const Icon(Icons.layers_clear_rounded),
+                    label: const Text('تفريغ'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white70,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            _SectionTitle(
+              title: 'الأساسيون',
+              subtitle: '${starters.length} خانة',
+            ),
+            const SizedBox(height: 12),
+            ...List.generate(starters.length, (index) {
+              final slotIndex = controller.slots.indexOf(starters[index]);
+              return _buildSlotCard(context, slotIndex, starters[index]);
+            }),
+            const SizedBox(height: 20),
+            _SectionTitle(
+              title: 'دكة البدلاء',
+              subtitle: '${bench.length} خانة',
+            ),
+            const SizedBox(height: 12),
+            ...List.generate(bench.length, (index) {
+              final slotIndex = controller.slots.indexOf(bench[index]);
+              return _buildSlotCard(context, slotIndex, bench[index]);
+            }),
+          ],
+        );
+      }),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Obx(
+            () => FilledButton.icon(
+              onPressed: controller.isSaving.value || !controller.canEditDraft
+                  ? null
+                  : controller.saveTeam,
+              icon: controller.isSaving.value
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.check_circle_outline_rounded),
+              label: Text(
+                controller.isSaving.value ? 'جارٍ الحفظ...' : 'حفظ التشكيلة',
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF38BDF8),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
               ),
             ),
           ),
-          Container(
-            height: 2,
-            width: double.infinity,
-            color: Colors.white30,
-          ),
-
-          // توزيع خانات التشكيلة (1 GK, 1 DEF, 2 MID, 1 FWD) - نموذج خماسي
-          Column(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildSlot(role: 'مهاجم', position: 'FWD'),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildSlot(role: 'خط وسط', position: 'MID'),
-                  _buildSlot(role: 'خط وسط', position: 'MID'),
-                ],
-              ),
-              _buildSlot(role: 'مدافع', position: 'DEF'),
-              _buildSlot(role: 'حارس', position: 'GK'),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  /// منطقة دكة الاحتياط
-  Widget _buildBenchSection() {
+  Widget _buildHeaderCard() {
     return Container(
-      height: 120,
-      padding: const EdgeInsets.all(12),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F172A),
-        border: Border(top: BorderSide(color: Color(0xFF38BDF8), width: 3)),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF10233C), Color(0xFF0A1628)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'دكة البدلاء (Bench)',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ),
-          const Spacer(),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildSlot(role: 'بديل 1', position: 'SUB', isBench: true),
-              _buildSlot(role: 'بديل 2', position: 'SUB', isBench: true),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// تصميم أيقونة تيشرت اللاعب لخانة واحدة داخل الملعب
-  Widget _buildSlot({required String role, required String position, bool isBench = false}) {
-    return GestureDetector(
-      onTap: () {
-        // TODO: توجيه المستخدم لصفحة Player Picker
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Stack(
-            alignment: Alignment.center,
-            clipBehavior: Clip.none,
-            children: [
-              Icon(
-                Icons.person_add_alt_1_rounded, // قميص افتراضي فارغ (Add)
-                size: isBench ? 40 : 50,
-                color: Colors.white.withValues(alpha: 200),
-              ),
-              // يمكنك إضافة علامة (C) كابتن هنا كـ Stack صغير إن لزم
-            ],
-          ),
-          const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: isBench ? const Color(0xFF334155) : const Color(0xFF0F172A).withValues(alpha: 200),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: Colors.white24, width: 1),
-            ),
-            child: Text(
-              position,
+      child: Obx(
+        () => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              controller.leagueTitle.value,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
               ),
             ),
+            const SizedBox(height: 8),
+            const Text(
+              'التزم بالميزانية وبقواعد الفئات: ذهبي واحد، فضيان كحد أقصى.',
+              style: TextStyle(color: Colors.white70, height: 1.5),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: _HeaderMetric(
+                    label: 'الميزانية',
+                    value: '${controller.remainingBudget.toStringAsFixed(1)}M',
+                    color: const Color(0xFF22C55E),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _HeaderMetric(
+                    label: 'اللاعبون',
+                    value: '${controller.selectedCount}/${controller.totalSlotCount}',
+                    color: const Color(0xFF38BDF8),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _HeaderMetric(
+                    label: 'الخطة',
+                    value: controller.teamSize.value.value.toString(),
+                    color: const Color(0xFFF59E0B),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSlotCard(
+    BuildContext context,
+    int index,
+    FantasyDraftSlot slot,
+  ) {
+    final selected = slot.selectedPlayer;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF102038),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        leading: selected == null
+            ? CircleAvatar(
+                backgroundColor: const Color(0xFF1D4ED8).withValues(alpha: 0.18),
+                child: Text(
+                  slot.requiredPosition,
+                  style: const TextStyle(
+                    color: Color(0xFF93C5FD),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                  ),
+                ),
+              )
+            : TierBadgeWidget(tier: selected.value.tier),
+        title: Text(
+          selected?.displayName ?? slot.label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
           ),
-          const SizedBox(height: 2),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-            decoration: BoxDecoration(
-              color: const Color(0xFFCBD5E1),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: const Text(
-              'أضف لاعب',
-              style: TextStyle(
-                color: Colors.black87,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: selected == null
+              ? Text(
+                  'اختر لاعباً لمركز ${slot.requiredPosition}',
+                  style: const TextStyle(color: Colors.white60),
+                )
+              : Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
+                  children: [
+                    _SlotBadge(label: slot.requiredPosition),
+                    _SlotBadge(label: '${selected.value.currentPrice}M'),
+                    _SlotBadge(label: '${selected.value.totalFantasyPoints} pts'),
+                  ],
+                ),
+        ),
+        trailing: Wrap(
+          spacing: 8,
+          children: [
+            if (selected != null)
+              IconButton(
+                onPressed: controller.canEditDraft
+                    ? () => controller.clearSlot(index)
+                    : null,
+                icon: const Icon(Icons.close_rounded, color: Colors.white54),
               ),
+            FilledButton(
+              onPressed: controller.canEditDraft
+                  ? () => _openPicker(context, index, slot)
+                  : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF38BDF8),
+              ),
+              child: Text(selected == null ? 'اختيار' : 'تبديل'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openPicker(
+    BuildContext context,
+    int index,
+    FantasyDraftSlot slot,
+  ) async {
+    final availableBudget =
+        controller.remainingBudget + (slot.selectedPlayer?.value.currentPrice ?? 0);
+    final result = await Get.to<FantasyMarketPlayer>(
+      () => PlayerPickerScreen(
+        players: controller.marketPlayers.toList(),
+        requiredPosition: slot.requiredPosition,
+        selectedPlayerIds: controller.selectedPlayerIds,
+        currentPlayerId: slot.selectedPlayer?.player.id,
+        availableBudget: availableBudget,
+      ),
+    );
+
+    if (result != null) {
+      controller.assignPlayerToSlot(index, result);
+    }
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _SectionTitle({
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(subtitle, style: const TextStyle(color: Colors.white54)),
+      ],
+    );
+  }
+}
+
+class _HeaderMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _HeaderMetric({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white60, fontSize: 12)),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SlotBadge extends StatelessWidget {
+  final String label;
+
+  const _SlotBadge({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(color: Colors.white70, fontSize: 12),
       ),
     );
   }

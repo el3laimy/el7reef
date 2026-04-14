@@ -1,288 +1,310 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
-import '../../../../domain/entities/player_fantasy_value.dart';
+import '../controllers/transfer_market_controller.dart';
+import '../models/fantasy_market_player.dart';
+import '../models/fantasy_squad_member.dart';
+import '../widgets/fantasy_lifecycle_banner.dart';
+import 'player_picker_screen.dart';
 import '../../../../core/widgets/tier_badge_widget.dart';
 
-/// شاشة سوق الانتقالات (الميركاتو) لتبديل اللاعبين وتلقي الخصومات
-class TransferMarketScreen extends StatefulWidget {
+class TransferMarketScreen extends GetView<TransferMarketController> {
   const TransferMarketScreen({super.key});
-
-  @override
-  State<TransferMarketScreen> createState() => _TransferMarketScreenState();
-}
-
-class _TransferMarketScreenState extends State<TransferMarketScreen> {
-  // متغيرات للعرض (Mocking)
-  final double _remainingBudget = 1.5;
-  final int _freeTransfers = 1;
-  final int _hitPoints = -4; // تظهر عندما نقوم بتبديل إضافي
-  final bool _isWildcardActive = false; // إذا تفعلت، يختفي الخصم
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: const Color(0xFF081120),
       appBar: AppBar(
-        title: const Text('سوق الانتقالات', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        backgroundColor: const Color(0xFF1E293B),
-        centerTitle: true,
+        title: Obx(() => Text('انتقالات ${controller.leagueTitle.value}')),
+        backgroundColor: Colors.transparent,
         actions: [
           IconButton(
-            icon: const Icon(Icons.info_outline, color: Colors.white70),
-            onPressed: () {},
-          )
-        ],
-      ),
-      body: Column(
-        children: [
-          _buildTransferMetrix(),
-          _buildWildcardBanner(),
-          Expanded(child: _buildTransferPitch()),
-        ],
-      ),
-      bottomNavigationBar: _buildConfirmBar(),
-    );
-  }
-
-  /// شريط مقاييس وتعقيدات الانتقالات
-  Widget _buildTransferMetrix() {
-    return Container(
-      color: const Color(0xFF1E293B),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildMetricItem(label: 'تبديل مجاني', value: '$_freeTransfers', valueColor: Colors.white),
-          Container(width: 1, height: 30, color: Colors.white10),
-          _buildMetricItem(
-            label: 'الخصم',
-            value: _hitPoints < 0 && !_isWildcardActive ? '$_hitPoints' : '0',
-            valueColor: _hitPoints < 0 && !_isWildcardActive ? Colors.redAccent : Colors.white,
+            onPressed: controller.loadData,
+            icon: const Icon(Icons.refresh_rounded),
           ),
-          Container(width: 1, height: 30, color: Colors.white10),
-          _buildMetricItem(label: 'يتوفر', value: '${_remainingBudget}M', valueColor: const Color(0xFF32D74B)),
         ],
       ),
-    );
-  }
+      body: Obx(() {
+        if (controller.isLoading.value && controller.squad.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-  Widget _buildMetricItem({required String label, required String value, required Color valueColor}) {
-    return Column(
-      children: [
-        Text(value, style: TextStyle(color: valueColor, fontSize: 20, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 10)),
-      ],
-    );
-  }
-
-  /// شريط تفعيل کارت الوايلدكارد
-  Widget _buildWildcardBanner() {
-    return Container(
-      width: double.infinity,
-      color: Colors.amber.withValues(alpha: 0.1),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.star, color: Colors.amber, size: 20),
-              SizedBox(width: 8),
-              Text(
-                'الوايلدكارد متاح (تغيير الفريق مجاناً)',
-                style: TextStyle(color: Colors.white70, fontSize: 12),
+        if (controller.errorMessage.isNotEmpty && controller.squad.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                controller.errorMessage.value,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70),
               ),
-            ],
-          ),
-          TextButton(
-            onPressed: () {
-              // TODO: Activate Wildcard
-            },
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-              minimumSize: const Size(60, 24),
-              backgroundColor: Colors.amber,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
             ),
-            child: const Text('تفعيل', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
-          ),
-        ],
-      ),
-    );
-  }
+          );
+        }
 
-  /// الملعب المخصص للانتقالات
-  Widget _buildTransferPitch() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF229954), 
-            Color(0xFF1E8449), 
-            Color(0xFF196F3D),
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 50), blurRadius: 10)
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildTransferPlayer(name: 'اللاعب 10', tier: PlayerTier.gold, price: '8.5M', status: TransferStatus.none),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildTransferPlayer(name: 'اللاعب 7', tier: PlayerTier.silver, price: '6.0M', status: TransferStatus.removed),
-              _buildTransferPlayer(name: 'لاعب جديد', tier: PlayerTier.silver, price: '5.5M', status: TransferStatus.added),
-            ],
-          ),
-          _buildTransferPlayer(name: 'مدافعنا', tier: PlayerTier.silver, price: '4.5M', status: TransferStatus.none),
-          _buildTransferPlayer(name: 'حارس بطل', tier: PlayerTier.bronze, price: '4.0M', status: TransferStatus.none),
-        ],
-      ),
-    );
-  }
-
-  /// عنصر اللاعب أثناء التبديل
-  Widget _buildTransferPlayer({
-    required String name,
-    required PlayerTier tier,
-    required String price,
-    required TransferStatus status,
-  }) {
-    final bool isAdded = status == TransferStatus.added;
-    final bool isRemoved = status == TransferStatus.removed;
-
-    return GestureDetector(
-      onTap: () {
-        // TODO: عرض نافذة الاستبدال (Replace/Info)
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Stack(
-            alignment: Alignment.bottomRight,
-            clipBehavior: Clip.none,
-            children: [
-              Opacity(
-                opacity: isRemoved ? 0.4 : 1.0,
-                child: Stack(
-                  alignment: Alignment.bottomRight,
-                  children: [
-                    ClipOval(
-                      child: Container(
-                        color: Colors.grey.shade800,
-                        width: 42,
-                        height: 42,
-                        child: const Icon(Icons.person, color: Colors.white54, size: 26),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: -2,
-                      right: -2,
-                      child: TierBadgeWidget(
-                        tier: tier,
-                        size: 18,
-                      ),
-                    ),
-                  ],
-                ),
+        if (controller.team.value == null) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'أنشئ فريقك أولاً قبل الدخول إلى سوق الانتقالات.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70),
               ),
-              // أيقونات الحالة IN / OUT
-              if (isAdded)
-                Positioned(
-                  top: -8,
-                  left: -8,
-                  child: Container(
-                    decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                    padding: const EdgeInsets.all(2),
-                    child: const Icon(Icons.arrow_upward, size: 14, color: Colors.white),
-                  ),
-                ),
-              if (isRemoved)
-                Positioned(
-                  top: -8,
-                  right: -8,
-                  child: Container(
-                    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                    padding: const EdgeInsets.all(2),
-                    child: const Icon(Icons.arrow_downward, size: 14, color: Colors.white),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: isRemoved ? Colors.red.withValues(alpha: 0.8) : (isAdded ? Colors.green.withValues(alpha: 0.8) : const Color(0xFF1E293B)),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: Colors.white10),
             ),
-            child: Text(
-              name,
+          );
+        }
+
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+          children: [
+            _buildMetrics(),
+            if (controller.lifecycle.value != null) ...[
+              const SizedBox(height: 16),
+              FantasyLifecycleBanner(lifecycle: controller.lifecycle.value),
+            ],
+            const SizedBox(height: 16),
+            if (controller.wildcardActive)
+              const _InfoBanner(
+                title: 'Wildcard مفعّل',
+                subtitle: 'الصفقات الإضافية لن تخصم نقاطاً طالما الخاصية نشطة.',
+                color: Color(0xFFF59E0B),
+              )
+            else
+              const _InfoBanner(
+                title: 'الوضع القياسي',
+                subtitle: 'سيتم خصم 4 نقاط لكل انتقال إضافي بعد انتهاء التبديلات المجانية.',
+                color: Color(0xFF38BDF8),
+              ),
+            const SizedBox(height: 20),
+            const Text(
+              'اختر لاعباً للاستبدال',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                decoration: isRemoved ? TextDecoration.lineThrough : null,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
               ),
             ),
+            const SizedBox(height: 12),
+            ...controller.squad.map(
+              (member) => _buildMemberCard(context, member),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+
+  Widget _buildMetrics() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF10233C), Color(0xFF0A1628)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _Metric(
+              label: 'المتبقي',
+              value: '${controller.budget.toStringAsFixed(1)}M',
+              color: const Color(0xFF22C55E),
+            ),
           ),
-          Container(
-            margin: const EdgeInsets.only(top: 2),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
-            child: Text(price, style: const TextStyle(color: Colors.white54, fontSize: 10)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _Metric(
+              label: 'تبديلات مجانية',
+              value: '${controller.freeTransfers}',
+              color: const Color(0xFF38BDF8),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _Metric(
+              label: 'الحالة',
+              value: controller.wildcardActive ? 'Wildcard' : 'Normal',
+              color: const Color(0xFFF59E0B),
+            ),
           ),
         ],
       ),
     );
   }
 
-  /// شريط اعتماد الصفقات بأسفل الشاشة
-  Widget _buildConfirmBar() {
+  Widget _buildMemberCard(BuildContext context, FantasySquadMember member) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: const BoxDecoration(
-        color: Color(0xFF1E293B),
-        border: Border(top: BorderSide(color: Colors.white10)),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF102038),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
-      child: SafeArea(
-        child: Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () {},
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  side: const BorderSide(color: Colors.white54),
-                ),
-                child: const Text('إلغاء', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              flex: 2,
-              child: ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  backgroundColor: const Color(0xFF38BDF8),
-                ),
-                child: const Text('اعتماد الصفقات', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        leading: TierBadgeWidget(tier: member.marketPlayer.value.tier),
+        title: Text(
+          member.marketPlayer.displayName,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
         ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              _Tag(label: member.marketPlayer.positionCode),
+              _Tag(label: '${member.marketPlayer.value.currentPrice}M'),
+              if (!member.slot.isStartingXI)
+                _Tag(label: 'Bench ${member.slot.benchPriority}'),
+            ],
+          ),
+        ),
+        trailing: FilledButton(
+          onPressed: controller.isSubmitting.value || !controller.canTransfer
+              ? null
+              : () => _replaceMember(context, member),
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFF38BDF8),
+          ),
+          child: const Text('استبدال'),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _replaceMember(
+    BuildContext context,
+    FantasySquadMember member,
+  ) async {
+    final availableBudget =
+        controller.budget + member.marketPlayer.value.currentPrice;
+    final replacement = await Get.to<FantasyMarketPlayer>(
+      () => PlayerPickerScreen(
+        players: controller.marketPlayers.toList(),
+        requiredPosition: member.slot.isStartingXI
+            ? member.marketPlayer.positionCode
+            : 'SUB',
+        selectedPlayerIds:
+            controller.selectedIdsExcluding(member.marketPlayer.player.id),
+        currentPlayerId: member.marketPlayer.player.id,
+        availableBudget: availableBudget,
+      ),
+    );
+
+    if (replacement != null) {
+      await controller.replacePlayer(
+        member: member,
+        replacement: replacement,
+      );
+    }
+  }
+}
+
+class _Metric extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _Metric({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white60, fontSize: 12)),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: 16,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-enum TransferStatus { none, added, removed }
+class _InfoBanner extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Color color;
+
+  const _InfoBanner({
+    required this.title,
+    required this.subtitle,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(color: color, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            style: const TextStyle(color: Colors.white70, height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Tag extends StatelessWidget {
+  final String label;
+
+  const _Tag({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(color: Colors.white70, fontSize: 12),
+      ),
+    );
+  }
+}

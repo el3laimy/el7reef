@@ -9,21 +9,32 @@ class TournamentAssistantsController extends GetxController {
   final TournamentRepositoryImpl _repo = TournamentRepositoryImpl();
   final Rx<Tournament?> currentTournament = Rx<Tournament?>(null);
   final RxBool isLoading = false.obs;
+  final RxString errorMessage = ''.obs;
+
+  String? get tournamentId => Get.parameters['tournamentId'];
 
   @override
   void onInit() {
     super.onInit();
-    final tournamentId = Get.arguments as String?;
-    if (tournamentId != null) {
-      loadTournament(tournamentId);
+    final id = tournamentId;
+    if (id != null && id.isNotEmpty) {
+      loadTournament(id);
+    } else {
+      errorMessage.value = 'لم يتم تحديد الدورة';
     }
   }
 
   Future<void> loadTournament(String tournamentId) async {
     try {
       isLoading.value = true;
+      errorMessage.value = '';
       currentTournament.value = await _repo.getTournament(tournamentId);
+      if (currentTournament.value == null) {
+        errorMessage.value = 'تعذر العثور على الدورة';
+      }
     } catch (e) {
+      AppLogger.error('TournamentAssistantsController.loadTournament', e);
+      errorMessage.value = 'تعذر تحميل بيانات الدورة';
       Get.snackbar('خطأ', 'تعذر تحميل بيانات الدورة');
     } finally {
       isLoading.value = false;

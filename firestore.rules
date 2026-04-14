@@ -1,173 +1,157 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // ── Helper Functions ──
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
-      return request.auth.uid == userId;
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function isParticipant() {
-      return request.auth.uid in resource.data.participants;
+    function isParticipant(participants) {
+      return isAuthenticated() && request.auth.uid in participants;
     }
-    
-    // ══════════════════════════════════════════
-    // Phase 1–5: Core Collections
-    // ══════════════════════════════════════════
-    
-    // ── Players ──
+
+    function isMatchOrganizer() {
+      return isAuthenticated() &&
+        resource.data.organizerId == request.auth.uid;
+    }
+
+    function isMatchOrganizerById(matchId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/matches/$(matchId)) &&
+        get(/databases/$(database)/documents/matches/$(matchId))
+          .data.organizerId == request.auth.uid;
+    }
+
+    function isTournamentOrganizer() {
+      return isAuthenticated() &&
+        resource.data.organizerId == request.auth.uid;
+    }
+
+    function ownsFantasyTeam(teamId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/fantasyTeams/$(teamId)) &&
+        get(/databases/$(database)/documents/fantasyTeams/$(teamId))
+          .data.ownerPlayerId == request.auth.uid;
+    }
+
     match /players/{playerId} {
       allow read: if isAuthenticated();
       allow create: if isOwner(playerId);
       allow update: if isOwner(playerId);
-      allow delete: if false; // لا يمكن حذف الحساب
+      allow delete: if false;
     }
-    
-    // ── Teams ──
+
     match /teams/{teamId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && 
-        resource.data.captainId == request.auth.uid;
+      allow create: if isAuthenticated() &&
+        request.resource.data.ownerId == request.auth.uid;
+      allow update: if isAuthenticated() &&
+        resource.data.ownerId == request.auth.uid &&
+        request.resource.data.ownerId == resource.data.ownerId;
       allow delete: if false;
     }
-    
-    // ── Matches ──
+
     match /matches/{matchId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.data.organizerId == request.auth.uid;
+      allow update: if isMatchOrganizer();
       allow delete: if false;
-      
-      // ── Player Stats (subcollection) ──
+
       match /player_stats/{playerId} {
         allow read: if isAuthenticated();
-        allow create: if isAuthenticated();
-        allow update: if isAuthenticated();
+        allow create, update: if isMatchOrganizerById(matchId);
         allow delete: if false;
       }
     }
-    
-    // ── Tournaments ──
+
     match /tournaments/{tournamentId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() &&
-        resource.data.organizerId == request.auth.uid;
+      allow create: if isAuthenticated() &&
+        request.resource.data.organizerId == request.auth.uid;
+      allow update: if isTournamentOrganizer();
       allow delete: if false;
     }
-    
-    // ── Rating Events (read-only for players) ──
+
     match /ratingEvents/{eventId} {
       allow read: if isAuthenticated();
-      allow write: if false; // Server-side only
+      allow write: if false;
     }
-    
-    // ── Encounter Logs ──
+
     match /encounterLogs/{logId} {
       allow read: if isAuthenticated();
-      allow write: if false; // Server-side only
+      allow write: if false;
     }
-    
-    // ── Organizer Actions ──
+
     match /organizerActions/{actionId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update: if false;
-      allow delete: if false;
+      allow update, delete: if false;
     }
 
-    // ══════════════════════════════════════════
-    // Phase 6: Social & Identity
-    // ══════════════════════════════════════════
-    
-    // ── Friendships ──
     match /friendships/{friendshipId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      // فقط المشاركون في الصداقة يقدروا يعدلوا (قبول/رفض/حظر)
-      allow update: if isAuthenticated() && isParticipant();
-      // فقط المشاركون يقدروا يحذفوا (إلغاء صداقة)
-      allow delete: if isAuthenticated() && isParticipant();
+      allow create: if isParticipant(request.resource.data.participants);
+      allow update, delete: if isParticipant(resource.data.participants);
     }
 
-    // ── Reserved Usernames ──
     match /reservedUsernames/{username} {
       allow read: if isAuthenticated();
-      // يتم التسجيل من الكود فقط عند اختيار username
-      allow create: if isAuthenticated();
-      allow update: if false; // لا يمكن تعديل username محجوز
+      allow create, update: if isAuthenticated() && (
+        request.resource.data.ownerId == request.auth.uid ||
+        request.resource.data.previousOwnerId == request.auth.uid
+      );
       allow delete: if false;
     }
 
-    // ══════════════════════════════════════════
-    // Phase 7: Fan Voting
-    // ══════════════════════════════════════════
-    
-    // ── Fan Voting Sessions ──
     match /fanVotingSessions/{sessionId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
+      allow create, update: if isMatchOrganizerById(sessionId);
       allow delete: if false;
     }
 
-    // ── User Votes (تصويت واحد فقط لكل مستخدم) ──
     match /userVotes/{voteId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if false; // تصويت واحد فقط — لا تعديل
-      allow delete: if false;
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
     }
 
-    // ══════════════════════════════════════════
-    // Phase 8: Fantasy League
-    // ══════════════════════════════════════════
-    
-    // ── Fantasy Leagues ──
     match /fantasyLeagues/{leagueId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
-    
-    // ── Fantasy Teams ──
+
     match /fantasyTeams/{teamId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.data.ownerPlayerId == request.auth.uid;
       allow update: if isAuthenticated() &&
-        resource.data.ownerId == request.auth.uid;
+        resource.data.ownerPlayerId == request.auth.uid &&
+        request.resource.data.ownerPlayerId == resource.data.ownerPlayerId;
       allow delete: if false;
     }
 
-    // ── Fantasy Slots ──
     match /fantasySlots/{slotId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
+      allow create, update: if isAuthenticated() &&
+        ownsFantasyTeam(request.resource.data.fantasyTeamId);
       allow delete: if false;
     }
 
-    // ── Transfer Records (سجل غير قابل للتعديل) ──
     match /transferRecords/{recordId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if false; // سجل تاريخي — لا يُعدَّل
-      allow delete: if false;
+      allow create: if isAuthenticated() &&
+        ownsFantasyTeam(request.resource.data.fantasyTeamId);
+      allow update, delete: if false;
     }
 
-    // ── Player Fantasy Values (حساب آلي) ──
     match /playerFantasyValues/{valueId} {
       allow read: if isAuthenticated();
-      // يتم تحديثه بواسطة PlayerValueService فقط
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if false;
+      allow write: if false;
     }
   }
 }

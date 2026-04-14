@@ -51,7 +51,9 @@ class TransferEngine {
     // 5. حساب تكلفة التبديل الإضافي (Hit Points -4) مع التحقق من خواص الإنقاذ
     int transferCost = 0;
     int newFreeTransfers = currentTeam.freeTransfers;
-    final bool isWildcardActive = currentTeam.activeChips.contains('Wildcard');
+    final bool isWildcardActive = currentTeam.activeChips.any(
+      (chip) => chip.startsWith('Wildcard'),
+    );
 
     if (newFreeTransfers > 0) {
       // التبديل مجاني، يتم سحب واحد

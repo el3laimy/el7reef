@@ -1,272 +1,457 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
-import '../../../../domain/entities/player_fantasy_value.dart';
+import '../../../../app/routes/app_routes.dart';
+import '../../../../domain/entities/fantasy_slot.dart';
 import '../../../../core/widgets/tier_badge_widget.dart';
+import '../controllers/fantasy_team_controller.dart';
+import '../models/fantasy_squad_member.dart';
+import '../widgets/fantasy_lifecycle_banner.dart';
 
-class FantasyTeamScreen extends StatelessWidget {
+class FantasyTeamScreen extends GetView<FantasyTeamController> {
   const FantasyTeamScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: const Color(0xFF081120),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text(
-          'تشكيلتي (Live Points)',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        centerTitle: true,
+        title: const Text('فريقي'),
+        backgroundColor: Colors.transparent,
         actions: [
           IconButton(
-            icon: const Icon(Icons.history, color: Colors.white70),
-            tooltip: 'تاريخ الجولات',
-            onPressed: () {},
-          )
-        ],
-      ),
-      body: Column(
-        children: [
-          _buildLiveHeader(),
-          Expanded(
-            child: _buildLivePitchView(),
+            onPressed: controller.loadTeam,
+            icon: const Icon(Icons.refresh_rounded),
           ),
-          _buildLiveBenchSection(),
         ],
       ),
-    );
-  }
+      body: Obx(() {
+        if (controller.isLoading.value &&
+            controller.team.value == null &&
+            controller.errorMessage.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-  /// شريط العارضة العلوية الذي يعرض إجمالي نقاط الجولة والخواص النشطة
-  Widget _buildLiveHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(
-        color: Color(0xFF1E293B),
-        border: Border(bottom: BorderSide(color: Colors.white10)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('نقاط الجولة (GW 4)', style: TextStyle(color: Colors.white70, fontSize: 12)),
-              Text(
-                '45',
-                style: TextStyle(color: Color(0xFF38BDF8), fontSize: 26, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              const Text('الخواص النشطة', style: TextStyle(color: Colors.white70, fontSize: 12)),
-              Container(
-                margin: const EdgeInsets.only(top: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
-                ),
-                child: const Text(
-                  'Triple Captain',
-                  style: TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+        if (controller.errorMessage.isNotEmpty && controller.team.value == null) {
+          return _InfoState(
+            title: controller.errorMessage.value,
+            subtitle: 'حاول لاحقاً أو أعد تسجيل الدخول.',
+          );
+        }
 
-  /// رقعة الملعب وفيها اللاعبين الفعليين
-  Widget _buildLivePitchView() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF229954), 
-            Color(0xFF27AE60), 
-            Color(0xFF229954),
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 50),
-            blurRadius: 10,
-          )
-        ],
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-           // خطوط الملعب
-          Positioned(
-            top: 0,
-            child: Container(
-              width: 150,
-              height: 60,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.white30, width: 2),
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(8),
-                  bottomRight: Radius.circular(8),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            child: Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white30, width: 2),
-              ),
-            ),
-          ),
+        final team = controller.team.value;
+        if (team == null) {
+          return _InfoState(
+            title: 'لا يوجد فريق فانتازي بعد',
+            subtitle: 'ابدأ ببناء تشكيلتك الأولى ثم ارجع هنا لإدارة الفريق.',
+            actionLabel: 'أنشئ فريقي',
+            onPressed: controller.openDraft,
+          );
+        }
 
-          // توزيع خانات اللاعبين الحقيقيين بالنقط
-          Column(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildLivePlayer(name: 'اللاعب 10', points: '12', tier: PlayerTier.gold, isCaptain: true),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildLivePlayer(name: 'اللاعب 7', points: '5', tier: PlayerTier.silver),
-                  _buildLivePlayer(name: 'اللاعب 8', points: '3', tier: PlayerTier.bronze),
-                ],
-              ),
-              _buildLivePlayer(name: 'مدافعنا', points: '6', tier: PlayerTier.silver, isViceCaptain: true),
-              _buildLivePlayer(name: 'حارس بطل', points: '8', tier: PlayerTier.bronze),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+        if (!controller.isJoinedLeague) {
+          return _InfoState(
+            title: 'فريقك غير منضم لهذا الدوري بعد',
+            subtitle:
+                'يمكنك استخدام نفس التشكيلة الحالية وربطها بهذا الدوري من شاشة الانضمام.',
+            actionLabel: 'ضم فريقي',
+            onPressed: controller.openDraft,
+          );
+        }
 
-  /// دكة البدلاء
-  Widget _buildLiveBenchSection() {
-    return Container(
-      height: 140,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F172A),
-        border: Border(top: BorderSide(color: Color(0xFF38BDF8), width: 3)),
-      ),
-      child: Column(
-        children: [
-          const Text(
-            'مقاعد البدلاء',
-            style: TextStyle(color: Colors.white70, fontSize: 12),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildLivePlayer(name: 'احتياط 1', points: '-', tier: PlayerTier.bronze, isBench: true),
-              _buildLivePlayer(name: 'احتياط 2', points: '2', tier: PlayerTier.bronze, isBench: true),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// تصمیم کارت اللاعب الحقيقي في شاشة التشكيلة
-  Widget _buildLivePlayer({
-    required String name, 
-    required String points, 
-    required PlayerTier tier,
-    bool isCaptain = false,
-    bool isViceCaptain = false,
-    bool isBench = false,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Stack(
-          alignment: Alignment.topRight,
-          clipBehavior: Clip.none,
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
           children: [
-            // صورة اللاعب مع بادج النُدرة كشارة جانبية
-            Stack(
-              alignment: Alignment.bottomRight,
+            _buildSummary(team.teamName),
+            if (controller.lifecycle.value != null) ...[
+              const SizedBox(height: 16),
+              FantasyLifecycleBanner(lifecycle: controller.lifecycle.value),
+            ],
+            const SizedBox(height: 16),
+            Row(
               children: [
-                ClipOval(
-                  child: Container(
-                    color: Colors.grey.shade800,
-                    width: isBench ? 36 : 46,
-                    height: isBench ? 36 : 46,
-                    child: Icon(Icons.person, color: Colors.white54, size: isBench ? 24 : 30),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: controller.canOpenTransfers
+                        ? controller.openTransfers
+                        : null,
+                    icon: const Icon(Icons.swap_horiz_rounded),
+                    label: const Text('الانتقالات'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF38BDF8),
+                    ),
                   ),
                 ),
-                Positioned(
-                  bottom: -2,
-                  right: -2,
-                  child: TierBadgeWidget(
-                    tier: tier,
-                    size: isBench ? 16 : 20,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Get.toNamed(
+                        AppRoutes.fantasyLeaderboardForLeague(controller.leagueId),
+                      );
+                    },
+                    icon: const Icon(Icons.emoji_events_outlined),
+                    label: const Text('الترتيب'),
                   ),
                 ),
               ],
             ),
-            // علامة الكابتن
-            if (isCaptain || isViceCaptain)
-              Positioned(
-                right: -6,
-                top: -6,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.black,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    isCaptain ? 'C' : 'V',
-                    style: const TextStyle(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold),
-                  ),
+            const SizedBox(height: 20),
+            _SectionTitle(
+              title: 'الأساسيون',
+              subtitle: '${controller.starters.length} لاعب',
+            ),
+            const SizedBox(height: 12),
+            ...controller.starters.map(_buildSquadMemberCard),
+            const SizedBox(height: 20),
+            _SectionTitle(
+              title: 'البدلاء',
+              subtitle: '${controller.bench.length} لاعب',
+            ),
+            const SizedBox(height: 12),
+            ...controller.bench.map(_buildSquadMemberCard),
+            const SizedBox(height: 20),
+            _SectionTitle(
+              title: 'آخر الانتقالات',
+              subtitle: '${controller.transferHistory.length} عملية',
+            ),
+            const SizedBox(height: 12),
+            if (controller.transferHistory.isEmpty)
+              const _SimpleCard(
+                child: Text(
+                  'لم يتم تنفيذ أي انتقالات بعد.',
+                  style: TextStyle(color: Colors.white70),
                 ),
+              )
+            else
+              ...controller.transferHistory.map(_buildTransferHistoryCard),
+          ],
+        );
+      }),
+    );
+  }
+
+  Widget _buildSummary(String teamName) {
+    final team = controller.team.value!;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF10233C), Color(0xFF0A1628)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            teamName,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'مرتبط بـ ${team.leagueIds.length} دوري | خواص نشطة: ${team.activeChips.isEmpty ? 'لا يوجد' : team.activeChips.join(', ')}',
+            style: const TextStyle(color: Colors.white70, height: 1.5),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: _StatBox(
+                  label: 'النقاط',
+                  value: '${team.totalPoints}',
+                  color: const Color(0xFF38BDF8),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatBox(
+                  label: 'الجولة',
+                  value: '${team.currentGameweekPoints}',
+                  color: const Color(0xFF22C55E),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatBox(
+                  label: 'المتبقي',
+                  value: '${team.budget.toStringAsFixed(1)}M',
+                  color: const Color(0xFFF59E0B),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSquadMemberCard(FantasySquadMember member) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF102038),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        leading: TierBadgeWidget(tier: member.marketPlayer.value.tier),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                member.marketPlayer.displayName,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            if (member.isCaptain || member.isViceCaptain)
+              Chip(
+                label: Text(member.isCaptain ? 'C' : 'V'),
+                side: BorderSide.none,
+                backgroundColor:
+                    member.isCaptain ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8),
+                labelStyle: const TextStyle(color: Colors.black),
               ),
           ],
         ),
-        const SizedBox(height: 6),
-        // اسم اللاعب
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E293B).withValues(alpha: 220),
-            borderRadius: const BorderRadius.only(topLeft: Radius.circular(4), topRight: Radius.circular(4)),
-            border: Border.all(color: Colors.white10),
-          ),
-          child: Text(
-            name,
-            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              _MetaBadge(label: member.marketPlayer.positionCode),
+              _MetaBadge(label: '${member.marketPlayer.value.currentPrice}M'),
+              _MetaBadge(label: '${member.slot.pointsEarned} pts'),
+              if (!member.slot.isStartingXI)
+                _MetaBadge(label: 'Bench ${member.slot.benchPriority}'),
+            ],
           ),
         ),
-        // نقاط اللاعب الحية
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-          decoration: BoxDecoration(
-            color: isBench ? Colors.grey.shade700 : const Color(0xFF38BDF8),
-            borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(4), bottomRight: Radius.circular(4)),
+        trailing: member.slot.isStartingXI && !controller.isRoundLocked
+            ? PopupMenuButton<FantasyPlayerRole>(
+                color: const Color(0xFF102038),
+                onSelected: (role) {
+                  if (role == FantasyPlayerRole.captain) {
+                    controller.setCaptain(member.slot.id);
+                  } else if (role == FantasyPlayerRole.viceCaptain) {
+                    controller.setViceCaptain(member.slot.id);
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: FantasyPlayerRole.captain,
+                    child: Text('تعيين كابتن',
+                        style: TextStyle(color: Colors.white)),
+                  ),
+                  PopupMenuItem(
+                    value: FantasyPlayerRole.viceCaptain,
+                    child: Text('تعيين نائب',
+                        style: TextStyle(color: Colors.white)),
+                  ),
+                ],
+                child: const Icon(Icons.more_vert_rounded, color: Colors.white70),
+              )
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildTransferHistoryCard(TransferHistoryEntry entry) {
+    return _SimpleCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${entry.playerOutName} -> ${entry.playerInName}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          child: Text(
-            isBench && points == '-' ? '-' : points,
-            style: const TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.w900),
+          const SizedBox(height: 6),
+          Text(
+            'الجولة ${entry.record.gameweek} | التكلفة ${entry.record.cost} | ${_formatDate(entry.record.timestamp)}',
+            style: const TextStyle(color: Colors.white60),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime timestamp) {
+    return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _SectionTitle({
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
           ),
         ),
+        const SizedBox(width: 8),
+        Text(subtitle, style: const TextStyle(color: Colors.white54)),
       ],
+    );
+  }
+}
+
+class _StatBox extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _StatBox({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white60, fontSize: 12)),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetaBadge extends StatelessWidget {
+  final String label;
+
+  const _MetaBadge({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(color: Colors.white70, fontSize: 12),
+      ),
+    );
+  }
+}
+
+class _SimpleCard extends StatelessWidget {
+  final Widget child;
+
+  const _SimpleCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF102038),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _InfoState extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final String? actionLabel;
+  final VoidCallback? onPressed;
+
+  const _InfoState({
+    required this.title,
+    required this.subtitle,
+    this.actionLabel,
+    this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.shield_outlined, size: 54, color: Colors.white54),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white60),
+            ),
+            if (actionLabel != null && onPressed != null) ...[
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: onPressed,
+                child: Text(actionLabel!),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

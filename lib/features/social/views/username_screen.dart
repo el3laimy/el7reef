@@ -53,7 +53,10 @@ class _UsernameScreenState extends State<UsernameScreen> {
 
     setState(() => _checking = true);
     try {
-      final avail = await _usernameService.isAvailable(text);
+      final avail = await _usernameService.isAvailable(
+        text,
+        currentOwnerId: _profileCtrl.currentPlayer?.id,
+      );
       setState(() => _isAvailable = avail);
     } finally {
       setState(() => _checking = false);

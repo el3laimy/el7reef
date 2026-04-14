@@ -1,28 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:get/get.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/constants/feature_flags.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
-
-/// كائن يمثل نشاطاً في الـ Feed
-class ActivityItem {
-  final String id;
-  final String playerName;
-  final String actionText;
-  final String highlightText;
-  final String timeText;
-  final String iconEmoji;
-
-  const ActivityItem({
-    required this.id,
-    required this.playerName,
-    required this.actionText,
-    required this.highlightText,
-    required this.timeText,
-    required this.iconEmoji,
-  });
-}
+import '../controllers/activity_feed_controller.dart';
+import '../../../core/services/activity_feed_service.dart';
 
 /// ودجت النشاطات - يُعرض في الصفحة الرئيسية
 class ActivityFeedWidget extends StatelessWidget {
@@ -30,83 +15,131 @@ class ActivityFeedWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // قائمة تجريبية للأحداث (سيتم ربطها بـ Firestore لاحقاً)
-    final mockActivities = [
-      const ActivityItem(
-        id: '1',
-        playerName: 'محمد',
-        actionText: 'فاز ببطولة',
-        highlightText: 'كأس الزيتون',
-        timeText: 'منذ ساعتين',
-        iconEmoji: '🏆',
-      ),
-      const ActivityItem(
-        id: '2',
-        playerName: 'أحمد',
-        actionText: 'تم اختياره',
-        highlightText: 'رجل المباراة MVP',
-        timeText: 'منذ 5 ساعات',
-        iconEmoji: '⭐',
-      ),
-      const ActivityItem(
-        id: '3',
-        playerName: 'كريم',
-        actionText: 'سجّل هدفه رقم',
-        highlightText: '50',
-        timeText: 'منذ يوم',
-        iconEmoji: '🎯',
-      ),
-      const ActivityItem(
-        id: '4',
-        playerName: 'فريق النسور',
-        actionText: 'انضم لبطولة',
-        highlightText: 'كأس الشباب 2025',
-        timeText: 'منذ يومين',
-        iconEmoji: '🔥',
-      ),
-    ];
+    if (!FeatureFlags.activityFeedEnabled) {
+      return const SizedBox.shrink();
+    }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'آخر الأنشطة',
-                style: AppTextStyles.titleLarge,
-              ),
-              Text(
-                'عرض الكل',
-                style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary),
-              ),
-            ],
+    final controller = Get.find<ActivityFeedController>();
+
+    return Obx(() {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppDimensions.pagePadding,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'آخر الأنشطة',
+                  style: AppTextStyles.titleLarge,
+                ),
+                GestureDetector(
+                  onTap: controller.loadFeed,
+                  child: Text(
+                    'تحديث',
+                    style: AppTextStyles.labelMedium.copyWith(
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: AppDimensions.sm),
-        SizedBox(
-          height: 110,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
-            itemCount: mockActivities.length,
-            itemBuilder: (context, index) {
-              final item = mockActivities[index];
-              return _buildActivityCard(item)
-                  .animate()
-                  .fadeIn(delay: Duration(milliseconds: 100 * index))
-                  .slideX(begin: 0.2);
-            },
-          ),
-        ),
-      ],
+          const SizedBox(height: AppDimensions.sm),
+          if (controller.isLoading.value && controller.items.isEmpty)
+            _buildLoadingState()
+          else if (controller.errorMessage.isNotEmpty &&
+              controller.items.isEmpty)
+            _buildInfoState(
+              title: controller.errorMessage.value,
+              subtitle: 'حاول مرة أخرى بعد لحظات.',
+            )
+          else if (controller.items.isEmpty)
+            _buildInfoState(
+              title: 'لا توجد أنشطة بعد',
+              subtitle: 'ابدأ بإضافة أصدقاء أو متابعة منظمين لتظهر تحركاتهم هنا.',
+            )
+          else
+            SizedBox(
+              height: 110,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppDimensions.pagePadding,
+                ),
+                itemCount: controller.items.length,
+                itemBuilder: (context, index) {
+                  final item = controller.items[index];
+                  return _buildActivityCard(item)
+                      .animate()
+                      .fadeIn(delay: Duration(milliseconds: 100 * index))
+                      .slideX(begin: 0.2);
+                },
+              ),
+            ),
+        ],
+      );
+    });
+  }
+
+  Widget _buildLoadingState() {
+    return SizedBox(
+      height: 110,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding:
+            const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
+        itemCount: 3,
+        itemBuilder: (context, index) {
+          return Container(
+            width: 260,
+            margin: const EdgeInsets.only(left: AppDimensions.md, bottom: 8),
+            child: const GlassmorphicContainer(
+              padding: EdgeInsets.all(AppDimensions.md),
+              borderRadius: AppDimensions.radiusLg,
+              child: Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildActivityCard(ActivityItem item) {
+  Widget _buildInfoState({
+    required String title,
+    required String subtitle,
+  }) {
+    return Padding(
+      padding:
+          const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
+      child: GlassmorphicContainer(
+        padding: const EdgeInsets.all(AppDimensions.lg),
+        borderRadius: AppDimensions.radiusLg,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: AppTextStyles.titleMedium),
+            const SizedBox(height: AppDimensions.xs),
+            Text(
+              subtitle,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActivityCard(ActivityFeedEntry item) {
     return Container(
       width: 260,
       margin: const EdgeInsets.only(left: AppDimensions.md, bottom: 8), // Shadow space
@@ -139,7 +172,7 @@ class ActivityFeedWidget extends StatelessWidget {
                       style: AppTextStyles.bodyMedium,
                       children: [
                         TextSpan(
-                          text: '${item.playerName} ',
+                          text: '${item.actorName} ',
                           style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
                         ),
                         TextSpan(text: '${item.actionText} '),
@@ -152,7 +185,7 @@ class ActivityFeedWidget extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    item.timeText,
+                    item.timeAgo(),
                     style: AppTextStyles.labelSmall.copyWith(color: AppColors.textMuted),
                   ),
                 ],

@@ -9,14 +9,11 @@ import '../../../core/enums/tournament_enums.dart';
 import '../../../domain/entities/tournament_assistant.dart';
 import '../controllers/tournament_assistants_controller.dart';
 
-class TournamentAssistantsScreen extends StatelessWidget {
+class TournamentAssistantsScreen extends GetView<TournamentAssistantsController> {
   const TournamentAssistantsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Ensuring the controller is registered with the injected tournament ID
-    final controller = Get.put(TournamentAssistantsController());
-
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -38,7 +35,25 @@ class TournamentAssistantsScreen extends StatelessWidget {
 
           final tournament = controller.currentTournament.value;
           if (tournament == null) {
-            return Center(child: Text('عفواً، لم يتم العثور على الدورة', style: AppTextStyles.titleMedium));
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppDimensions.xl),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline, color: AppColors.error, size: 64),
+                    const SizedBox(height: AppDimensions.md),
+                    Text(
+                      controller.errorMessage.value.isEmpty
+                          ? 'عفواً، لم يتم العثور على الدورة'
+                          : controller.errorMessage.value,
+                      style: AppTextStyles.titleMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
 
           return Column(
