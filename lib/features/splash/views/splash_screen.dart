@@ -6,6 +6,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/app_logger.dart';
 import '../../../services/auth_service.dart';
 
 /// شاشة البداية — Splash Screen
@@ -35,7 +36,8 @@ class _SplashScreenState extends State<SplashScreen> {
       } else {
         Get.offAllNamed(AppRoutes.onboarding);
       }
-    } catch (_) {
+    } catch (e) {
+      AppLogger.error('SplashScreen.navigate', e);
       // إذا AuthService مش مسجل بعد، يروح للـ onboarding
       Get.offAllNamed(AppRoutes.onboarding);
     }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
+import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
@@ -10,13 +11,10 @@ import '../../../services/auth_service.dart';
 import '../../match/views/match_discover_screen.dart';
 import '../../match/controllers/match_controller.dart';
 import '../../tournament/views/tournament_list_screen.dart';
-import '../../tournament/controllers/tournament_controller.dart';
 import '../../../domain/entities/match.dart';
 import '../../../core/enums/match_status.dart';
 import '../../profile/views/profile_screen.dart';
 import '../../team/views/my_teams_screen.dart';
-import '../../team/controllers/team_controller.dart';
-import '../../profile/controllers/profile_controller.dart';
 
 import '../../social/widgets/activity_feed_widget.dart';
 
@@ -34,10 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    Get.put(ProfileController());
-    Get.put(TeamController());
-    Get.put(MatchController());
-    Get.put(TournamentController());
+    // Controllers مسجلة عبر HomeBinding في app_pages.dart
   }
 
   final _pages = const [
@@ -211,17 +206,17 @@ class _HomeTab extends StatelessWidget {
                         children: [
                           _actionCard(
                             '⚽', 'ابحث عن\nمباراة', AppColors.primary,
-                            () {},
+                            () => Get.toNamed(AppRoutes.findMatch),
                           ),
                           const SizedBox(width: AppDimensions.md),
                           _actionCard(
                             '🏆', 'أنشئ\nدورة', AppColors.secondary,
-                            () {},
+                            () => Get.toNamed(AppRoutes.tournamentList),
                           ),
                           const SizedBox(width: AppDimensions.md),
                           _actionCard(
                             '👥', 'أنشئ\nفريق', AppColors.accent,
-                            () {},
+                            () => Get.toNamed(AppRoutes.myTeams),
                           ),
                         ],
                       ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.1),

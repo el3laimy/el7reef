@@ -41,7 +41,7 @@ class FriendshipModel extends Friendship {
       'userId2': userId2,
       'status': status.name,
       'lastActionBy': lastActionBy,
-      'createdAt': createdAt != DateTime.now() ? Timestamp.fromDate(createdAt) : FieldValue.serverTimestamp(),
+      'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': FieldValue.serverTimestamp(),
       // حقل إضافي لتسهيل الاستعلامات المعقدة لو احتجنا
       'participants': [userId1, userId2], 

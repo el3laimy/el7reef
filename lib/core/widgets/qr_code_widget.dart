@@ -57,10 +57,7 @@ class QrCodeWidget extends StatelessWidget {
               dataModuleShape: QrDataModuleShape.square,
               color: Colors.black,
             ),
-            embeddedImage: const AssetImage('assets/images/qr_logo.png'),
-            embeddedImageStyle: const QrEmbeddedImageStyle(
-              size: Size(36, 36),
-            ),
+            // TODO: إضافة embeddedImage بعد إنشاء assets/images/qr_logo.png
           ),
 
           const SizedBox(height: AppDimensions.md),

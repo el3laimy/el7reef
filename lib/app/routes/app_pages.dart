@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:flutter/material.dart';
 import 'app_routes.dart';
 import '../../features/splash/views/splash_screen.dart';
 import '../../features/splash/bindings/splash_binding.dart';
@@ -6,20 +7,27 @@ import '../../features/auth/views/onboarding_screen.dart';
 import '../../features/auth/views/login_screen.dart';
 import '../../features/auth/bindings/auth_binding.dart';
 import '../../features/home/views/home_screen.dart';
+import '../../features/home/bindings/home_binding.dart';
 import '../../features/profile/views/profile_screen.dart';
 import '../../features/profile/bindings/profile_binding.dart';
 import '../../features/team/views/my_teams_screen.dart';
 import '../../features/team/bindings/team_binding.dart';
 import '../../features/match/views/match_discover_screen.dart';
+import '../../features/match/views/score_submit_screen.dart';
+import '../../features/match/views/fan_voting_screen.dart';
 import '../../features/match/bindings/match_binding.dart';
 import '../../features/tournament/views/tournament_list_screen.dart';
 import '../../features/tournament/views/tournament_detail_screen.dart';
+import '../../features/tournament/views/tournament_assistants_screen.dart';
 import '../../features/tournament/bindings/tournament_binding.dart';
 import '../../features/social/views/username_screen.dart';
 import '../../features/social/views/qr_scanner_screen.dart';
 import '../../features/social/views/friends_screen.dart';
 import '../../features/social/views/search_players_screen.dart';
 import '../../features/social/bindings/friend_binding.dart';
+import '../../features/fantasy/presentation/screens/fantasy_league_list_screen.dart';
+import '../../features/fantasy/presentation/screens/create_fantasy_team_screen.dart';
+import '../../features/fantasy/presentation/screens/fantasy_leaderboard_screen.dart';
 import '../../domain/entities/tournament.dart';
 
 /// GetX Page Route Definitions — جميع الشاشات مسجلة
@@ -61,6 +69,7 @@ class AppPages {
     GetPage(
       name: AppRoutes.home,
       page: () => const HomeScreen(),
+      binding: HomeBinding(),
       transition: Transition.fadeIn,
     ),
 
@@ -96,6 +105,22 @@ class AppPages {
       transition: Transition.rightToLeftWithFade,
     ),
 
+    // ── Score Submission ──
+    GetPage(
+      name: AppRoutes.scoreApproval,
+      page: () => const ScoreSubmitScreen(),
+      binding: MatchBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    // ── Fan Voting ──
+    GetPage(
+      name: AppRoutes.mvpVote,
+      page: () => const FanVotingScreen(),
+      binding: MatchBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
     // ══════════════════════════════════════════
     // Phase 5: Tournaments
     // ══════════════════════════════════════════
@@ -108,12 +133,34 @@ class AppPages {
       transition: Transition.rightToLeftWithFade,
     ),
 
-    // ── Tournament Detail (يتطلب Tournament argument) ──
+    // ── Tournament List (alias — مُستخدم في QR Scanner) ──
+    GetPage(
+      name: AppRoutes.tournaments,
+      page: () => const TournamentListScreen(),
+      binding: TournamentBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    // ── Tournament Detail (FIX-05: safe casting) ──
     GetPage(
       name: AppRoutes.tournamentDetail,
-      page: () => TournamentDetailScreen(
-        tournament: Get.arguments as Tournament,
-      ),
+      page: () {
+        final args = Get.arguments;
+        if (args is! Tournament) {
+          return const Scaffold(
+            body: Center(child: Text('خطأ: لم يتم تحديد الدورة')),
+          );
+        }
+        return TournamentDetailScreen(tournament: args);
+      },
+      binding: TournamentBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    // ── Tournament Assistants ──
+    GetPage(
+      name: AppRoutes.organizerDashboard,
+      page: () => const TournamentAssistantsScreen(),
       binding: TournamentBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
@@ -149,8 +196,34 @@ class AppPages {
     GetPage(
       name: AppRoutes.searchPlayers,
       page: () => const SearchPlayersScreen(),
-      binding: FriendBinding(), // Uses SearchPlayersController from FriendBinding
+      binding: FriendBinding(),
       transition: Transition.fadeIn,
+    ),
+
+    // ══════════════════════════════════════════
+    // Phase 8: Fantasy League
+    // ══════════════════════════════════════════
+
+    // ── Fantasy League List ──
+    GetPage(
+      name: AppRoutes.fantasyHome,
+      page: () => const FantasyLeagueListScreen(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    // ── Create Fantasy Team ──
+    GetPage(
+      name: AppRoutes.fantasyPickTeam,
+      page: () => const CreateFantasyTeamScreen(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    // ── Fantasy Leaderboard ──
+    GetPage(
+      name: AppRoutes.fantasyLeaderboard,
+      page: () => const FantasyLeaderboardScreen(),
+      transition: Transition.rightToLeftWithFade,
     ),
   ];
 }
+

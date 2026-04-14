@@ -1,8 +1,12 @@
 import 'package:get/get.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../core/constants/firebase_paths.dart';
+import '../../../core/utils/app_logger.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/entities/player.dart';
 import '../../../domain/entities/player_match_stats.dart';
 import '../../../data/repositories/player_repository_impl.dart';
+import '../../../data/models/player_match_stats_model.dart';
 import 'match_controller.dart';
 
 class ScoreSubmitController extends GetxController {
@@ -109,25 +113,19 @@ class ScoreSubmitController extends GetxController {
     if (scoreB == 0) teamACleanSheet.value = true;
     if (scoreA == 0) teamBCleanSheet.value = true;
 
-    // Use parent MatchController's submitScore but override its logic temporarily or 
-    // inject the calculated score and detailed stats.
-    
-    // In order to keep things perfectly aligned, we update the parent controller's text fields:
+    // Sync scores to parent controller
     parentController.scoreAController.text = scoreA.toString();
     parentController.scoreBController.text = scoreB.toString();
     parentController.selectedMvpId.value = selectedMvpId.value;
 
-    // Then we submit the match. If successful, we push out the detailed stats to Firebase.
-    // Wait, MatchController will process rating and aggregate stats. We can hook the detailed stats save right here!
-    
-    // First, let parent do its job
+    // Parent submitScore() handles: save score + _applyRatings() (rating + aggregate stats)
+    // We must NOT call updateMatchStats() again — only save detailed per-player stats
     await parentController.submitScore(match.id);
     
-    // Now, let's execute the detailed stats
+    // Save detailed stats to subcollection (matches/{matchId}/player_stats/{playerId})
+    // WITHOUT incrementing totalMatches/wins/losses again
     isLoading.value = true;
     try {
-      final winner = scoreA > scoreB ? 'A' : scoreB > scoreA ? 'B' : 'draw';
-
       for (var p in teamAPlayers) {
         final st = playerStats[p.id]!;
         final detailed = PlayerMatchStats(
@@ -142,14 +140,8 @@ class ScoreSubmitController extends GetxController {
           redCard: st['redCard'],
           cleanSheet: teamACleanSheet.value,
         );
-        // Save detailed stats directly.
-        await _playerRepo.updateMatchStats(
-          playerId: p.id,
-          isWin: winner == 'A',
-          isDraw: winner == 'draw',
-          isMvp: selectedMvpId.value == p.id,
-          detailedStats: detailed,
-        );
+        // فقط حفظ الإحصائيات التفصيلية — بدون تكرار الـ aggregate stats
+        await _saveDetailedStats(detailed);
       }
 
       for (var p in teamBPlayers) {
@@ -166,18 +158,25 @@ class ScoreSubmitController extends GetxController {
           redCard: st['redCard'],
           cleanSheet: teamBCleanSheet.value,
         );
-        await _playerRepo.updateMatchStats(
-          playerId: p.id,
-          isWin: winner == 'B',
-          isDraw: winner == 'draw',
-          isMvp: selectedMvpId.value == p.id,
-          detailedStats: detailed,
-        );
+        await _saveDetailedStats(detailed);
       }
 
     } finally {
       isLoading.value = false;
-      Get.back(); // close the screen entirely after submission.
+      Get.back();
     }
+  }
+
+  /// حفظ الإحصائيات التفصيلية فقط في subcollection بدون تكرار aggregate stats
+  Future<void> _saveDetailedStats(PlayerMatchStats stats) async {
+    try {
+      final statModel = PlayerMatchStatsModel.fromEntity(stats);
+      await FirebaseFirestore.instance
+          .collection(FirebasePaths.matches)
+          .doc(stats.matchId)
+          .collection('player_stats')
+          .doc(stats.playerId)
+          .set(statModel.toJson());
+    } catch (e) { AppLogger.error('ScoreSubmitController._saveDetailedStats', e); }
   }
 }

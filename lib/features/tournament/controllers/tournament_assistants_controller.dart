@@ -2,10 +2,11 @@ import 'package:get/get.dart';
 import '../../../domain/entities/tournament.dart';
 import '../../../domain/entities/tournament_assistant.dart';
 import '../../../core/enums/tournament_enums.dart';
+import '../../../core/utils/app_logger.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
 
 class TournamentAssistantsController extends GetxController {
-  final TournamentRepositoryImpl _repo = Get.find<TournamentRepositoryImpl>();
+  final TournamentRepositoryImpl _repo = TournamentRepositoryImpl();
   final Rx<Tournament?> currentTournament = Rx<Tournament?>(null);
   final RxBool isLoading = false.obs;
 
@@ -82,7 +83,8 @@ class TournamentAssistantsController extends GetxController {
       currentTournament.value = updatedTournament;
       
       Get.snackbar('تم', 'تم الحذف بنجاح', snackPosition: SnackPosition.BOTTOM);
-    } catch (_) {
+    } catch (e) {
+      AppLogger.error('TournamentAssistantsController.removeAssistant', e);
       Get.snackbar('خطأ', 'حصلت مشكلة أثناء إزالة المساعد');
     } finally {
       isLoading.value = false;

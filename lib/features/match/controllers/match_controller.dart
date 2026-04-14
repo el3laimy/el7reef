@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/firebase_paths.dart';
 import '../../../core/enums/match_status.dart';
 import '../../../core/services/rating_engine.dart';
+import '../../../core/utils/app_logger.dart';
 import '../../../data/repositories/match_repository_impl.dart';
 import '../../../data/repositories/player_repository_impl.dart';
 import '../../../domain/entities/match.dart';
@@ -45,7 +46,8 @@ class MatchController extends GetxController {
     try {
       isLoading.value = true;
       liveMatches.value = await _matchRepo.getLiveMatches();
-    } catch (_) {
+    } catch (e) {
+      AppLogger.error('MatchController.loadLiveMatches', e);
       errorMessage.value = 'فشل تحميل المباريات';
     } finally {
       isLoading.value = false;
@@ -58,7 +60,7 @@ class MatchController extends GetxController {
     if (uid == null) return;
     try {
       myMatches.value = await _matchRepo.getPlayerMatches(uid);
-    } catch (_) {}
+    } catch (e) { AppLogger.error('MatchController.loadMyMatches', e); }
   }
 
   /// إنشاء مباراة جديدة
@@ -163,7 +165,8 @@ class MatchController extends GetxController {
       Get.snackbar('تم التجميد 🔒', 'تم تجميد المباراة',
           snackPosition: SnackPosition.BOTTOM);
       await loadLiveMatches();
-    } catch (_) {
+    } catch (e) {
+      AppLogger.error('MatchController.freezeMatch', e);
       Get.snackbar('خطأ', 'فشل التجميد');
     }
   }
@@ -174,7 +177,8 @@ class MatchController extends GetxController {
       await _matchRepo.unfreezeMatch(matchId);
       Get.snackbar('تم الرفع 🔓', 'تم رفع تجميد المباراة',
           snackPosition: SnackPosition.BOTTOM);
-    } catch (_) {
+    } catch (e) {
+      AppLogger.error('MatchController.unfreezeMatch', e);
       Get.snackbar('خطأ', 'فشل رفع التجميد');
     }
   }
@@ -185,7 +189,8 @@ class MatchController extends GetxController {
       await _matchRepo.activateGoldenRating(matchId);
       Get.snackbar('تقييم ذهبي ⭐', 'تم تفعيل التقييم المضاعف',
           snackPosition: SnackPosition.BOTTOM);
-    } catch (_) {
+    } catch (e) {
+      AppLogger.error('MatchController.activateGoldenRating', e);
       Get.snackbar('خطأ', 'فشل تفعيل التقييم الذهبي');
     }
   }
@@ -197,7 +202,8 @@ class MatchController extends GetxController {
       await _applyRatings(matchId, 0, 0);
       Get.snackbar('تم الاعتماد ✅', 'تمت تسوية النتيجة والتقييمات',
           snackPosition: SnackPosition.BOTTOM);
-    } catch (_) {
+    } catch (e) {
+      AppLogger.error('MatchController.approveScore', e);
       Get.snackbar('خطأ', 'فشل اعتماد النتيجة');
     }
   }
@@ -214,7 +220,7 @@ class MatchController extends GetxController {
       if (fanSessionData.exists) {
         fanMvpId = fanSessionData.data()?['winnerPlayerId'] as String?;
       }
-    } catch (_) {}
+    } catch (e) { AppLogger.error('MatchController._applyRatings.fanMvp', e); }
 
     final actualScoreA = match.scoreTeamA ?? scoreA;
     final actualScoreB = match.scoreTeamB ?? scoreB;

@@ -10,6 +10,14 @@ service cloud.firestore {
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
+
+    function isParticipant() {
+      return request.auth.uid in resource.data.participants;
+    }
+    
+    // ══════════════════════════════════════════
+    // Phase 1–5: Core Collections
+    // ══════════════════════════════════════════
     
     // ── Players ──
     match /players/{playerId} {
@@ -34,6 +42,14 @@ service cloud.firestore {
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
       allow delete: if false;
+      
+      // ── Player Stats (subcollection) ──
+      match /player_stats/{playerId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update: if isAuthenticated();
+        allow delete: if false;
+      }
     }
     
     // ── Tournaments ──
@@ -64,6 +80,53 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if false;
     }
+
+    // ══════════════════════════════════════════
+    // Phase 6: Social & Identity
+    // ══════════════════════════════════════════
+    
+    // ── Friendships ──
+    match /friendships/{friendshipId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      // فقط المشاركون في الصداقة يقدروا يعدلوا (قبول/رفض/حظر)
+      allow update: if isAuthenticated() && isParticipant();
+      // فقط المشاركون يقدروا يحذفوا (إلغاء صداقة)
+      allow delete: if isAuthenticated() && isParticipant();
+    }
+
+    // ── Reserved Usernames ──
+    match /reservedUsernames/{username} {
+      allow read: if isAuthenticated();
+      // يتم التسجيل من الكود فقط عند اختيار username
+      allow create: if isAuthenticated();
+      allow update: if false; // لا يمكن تعديل username محجوز
+      allow delete: if false;
+    }
+
+    // ══════════════════════════════════════════
+    // Phase 7: Fan Voting
+    // ══════════════════════════════════════════
+    
+    // ── Fan Voting Sessions ──
+    match /fanVotingSessions/{sessionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // ── User Votes (تصويت واحد فقط لكل مستخدم) ──
+    match /userVotes/{voteId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if false; // تصويت واحد فقط — لا تعديل
+      allow delete: if false;
+    }
+
+    // ══════════════════════════════════════════
+    // Phase 8: Fantasy League
+    // ══════════════════════════════════════════
     
     // ── Fantasy Leagues ──
     match /fantasyLeagues/{leagueId} {
@@ -79,6 +142,31 @@ service cloud.firestore {
       allow create: if isAuthenticated();
       allow update: if isAuthenticated() &&
         resource.data.ownerId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // ── Fantasy Slots ──
+    match /fantasySlots/{slotId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // ── Transfer Records (سجل غير قابل للتعديل) ──
+    match /transferRecords/{recordId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if false; // سجل تاريخي — لا يُعدَّل
+      allow delete: if false;
+    }
+
+    // ── Player Fantasy Values (حساب آلي) ──
+    match /playerFantasyValues/{valueId} {
+      allow read: if isAuthenticated();
+      // يتم تحديثه بواسطة PlayerValueService فقط
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
       allow delete: if false;
     }
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/enums/tournament_enums.dart';
+import '../../../core/utils/app_logger.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
 import '../../../domain/entities/tournament.dart';
 import '../../../services/auth_service.dart';
@@ -43,7 +44,8 @@ class TournamentController extends GetxController {
     try {
       isLoading.value = true;
       liveTournaments.value = await _repo.getLiveTournaments();
-    } catch (_) {
+    } catch (e) {
+      AppLogger.error('TournamentController.loadTournaments', e);
       errorMessage.value = 'فشل تحميل الدورات';
     } finally {
       isLoading.value = false;
@@ -56,7 +58,7 @@ class TournamentController extends GetxController {
     if (uid == null) return;
     try {
       myOrganizedTournaments.value = await _repo.getOrganizerTournaments(uid);
-    } catch (_) {}
+    } catch (e) { AppLogger.error('TournamentController.loadMyTournaments', e); }
   }
 
   /// إنشاء دورة جديدة
@@ -118,7 +120,8 @@ class TournamentController extends GetxController {
       }
       Get.snackbar('تم ✅', 'تم تسجيل الفريق في الدورة',
           snackPosition: SnackPosition.BOTTOM);
-    } catch (_) {
+    } catch (e) {
+      AppLogger.error('TournamentController.updateStatus', e);
       Get.snackbar('خطأ', 'فشل تسجيل الفريق');
     }
   }
@@ -160,7 +163,8 @@ class TournamentController extends GetxController {
       if (idx >= 0) {
         liveTournaments[idx] = liveTournaments[idx].copyWith(status: status);
       }
-    } catch (_) {
+    } catch (e) {
+      AppLogger.error('TournamentController.registerTeam', e);
       Get.snackbar('خطأ', 'فشل تحديث حالة الدورة');
     }
   }

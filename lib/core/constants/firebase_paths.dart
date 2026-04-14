@@ -13,6 +13,7 @@ abstract class FirebasePaths {
   static const String notifications = 'notifications';
   // Phase 6 — Social
   static const String reservedUsernames = 'reservedUsernames';
+  static const String friendships = 'friendships';
   static const String friendRequests = 'friendRequests';
   static const String userVotes = 'userVotes';       // Fan voting
   static const String fanVotingSessions = 'fanVotingSessions';

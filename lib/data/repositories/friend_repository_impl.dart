@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/constants/firebase_paths.dart';
 import '../../core/enums/friendship_status.dart';
 import '../../domain/entities/friendship.dart';
 import '../../domain/repositories/friend_repository.dart';
@@ -7,8 +8,8 @@ import '../models/friendship_model.dart';
 class FriendRepositoryImpl implements FriendRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  CollectionReference get _friendshipsRef => _firestore.collection('friendships');
-  CollectionReference get _playersRef => _firestore.collection('players');
+  CollectionReference get _friendshipsRef => _firestore.collection(FirebasePaths.friendships);
+  CollectionReference get _playersRef => _firestore.collection(FirebasePaths.players);
 
   @override
   Future<Friendship?> getFriendship(String userId1, String userId2) async {

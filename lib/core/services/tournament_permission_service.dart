@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import '../../domain/entities/tournament.dart';
 import '../enums/tournament_enums.dart';
+import '../utils/app_logger.dart';
 
 /// خدمة التحقق من صلاحيات المشرفين والمساعدين في الدورات
 class TournamentPermissionService extends GetxService {
@@ -60,7 +61,8 @@ class TournamentPermissionService extends GetxService {
       }
       
       return assistant.role;
-    } catch (_) {
+    } catch (e) {
+      AppLogger.error('TournamentPermissionService._getActiveRole', e);
       return null;
     }
   }

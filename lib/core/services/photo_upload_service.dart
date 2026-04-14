@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../utils/app_logger.dart';
 
 /// خدمة رفع الصورة الشخصية — Task 6.3.2
 /// الوثيقة: ضغط → قص مربع → 3 نسخ → رفع Storage
@@ -26,12 +27,14 @@ class PhotoUploadService {
         maxHeight: 1200,
       );
       return xFile != null ? File(xFile.path) : null;
-    } catch (_) {
+    } catch (e) {
+      AppLogger.error('PhotoUploadService.pickImage', e);
       return null;
     }
   }
 
-  /// رفع الصورة كاملاً: pick → compress → 3 versions → upload
+  /// رفع الصورة: pick → upload (نسخة واحدة حالياً)
+  /// TODO: إضافة flutter_image_compress لإنشاء 3 نسخ مختلفة الحجم فعلياً
   Future<PhotoUploadResult?> uploadProfilePhoto({
     required String userId,
     required File imageFile,
@@ -39,37 +42,23 @@ class PhotoUploadService {
     try {
       final bytes = await imageFile.readAsBytes();
 
-      // ── رفع النسخ الثلاثة ──
-      final thumbUrl = await _uploadVersion(
-        bytes: bytes,
-        userId: userId,
-        version: 'thumb',
-        quality: 60,
-        maxDimension: 100,
-      );
-      final mediumUrl = await _uploadVersion(
-        bytes: bytes,
-        userId: userId,
-        version: 'medium',
-        quality: 75,
-        maxDimension: 300,
-      );
+      // حالياً نرفع نسخة واحدة — pickImage بيعمل resize مبدئي (1200×1200, quality 85)
+      // لما نضيف flutter_image_compress نقدر ننشئ thumb (100px) و medium (300px) و full (600px)
       final fullUrl = await _uploadVersion(
         bytes: bytes,
         userId: userId,
         version: 'full',
-        quality: 90,
-        maxDimension: 600,
       );
 
       if (fullUrl == null) return null;
 
       return PhotoUploadResult(
-        thumbUrl: thumbUrl ?? fullUrl,
-        mediumUrl: mediumUrl ?? fullUrl,
+        thumbUrl: fullUrl,   // مؤقتاً نفس الصورة
+        mediumUrl: fullUrl,  // مؤقتاً نفس الصورة
         fullUrl: fullUrl,
       );
-    } catch (_) {
+    } catch (e) {
+      AppLogger.error('PhotoUploadService.uploadProfilePhoto', e);
       return null;
     }
   }
@@ -78,8 +67,6 @@ class PhotoUploadService {
     required Uint8List bytes,
     required String userId,
     required String version,
-    required int quality,
-    required int maxDimension,
   }) async {
     try {
       final path = 'profiles/$userId/photo_$version.jpg';
@@ -94,7 +81,8 @@ class PhotoUploadService {
       );
       await ref.putData(bytes, metadata);
       return await ref.getDownloadURL();
-    } catch (_) {
+    } catch (e) {
+      AppLogger.error('PhotoUploadService._uploadVersion', e);
       return null;
     }
   }
@@ -104,7 +92,7 @@ class PhotoUploadService {
     for (final version in ['thumb', 'medium', 'full']) {
       try {
         await _storage.ref('profiles/$userId/photo_$version.jpg').delete();
-      } catch (_) {}
+      } catch (e) { AppLogger.error('PhotoUploadService.deleteOldPhotos.$version', e); }
     }
   }
 
