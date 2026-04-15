@@ -103,7 +103,7 @@ Acceptance:
 Parent: `ENG-01`
 Priority: `P0`
 Estimate: `S`
-Status: `Todo`
+Status: `Done`
 Depends On: `IMP-003`
 Likely Touchpoints:
 - `test/core/services/`
@@ -142,7 +142,7 @@ Acceptance:
 Parent: `ENG-02`
 Priority: `P0`
 Estimate: `M`
-Status: `In Progress`
+Status: `Done`
 Depends On: `IMP-004`
 Likely Touchpoints:
 - `lib/features/fantasy/presentation/controllers/fantasy_create_team_controller.dart`
@@ -161,7 +161,7 @@ Acceptance:
 Parent: `ENG-02`
 Priority: `P0`
 Estimate: `M`
-Status: `In Progress`
+Status: `Done`
 Depends On: `IMP-004`
 Likely Touchpoints:
 - `lib/core/services/transfer_engine.dart`
@@ -180,7 +180,7 @@ Acceptance:
 Parent: `ENG-02`
 Priority: `P0`
 Estimate: `M`
-Status: `In Progress`
+Status: `Done`
 Depends On: `IMP-007`, `IMP-008`
 Likely Touchpoints:
 - `lib/features/fantasy/presentation/screens/`
@@ -198,7 +198,7 @@ Acceptance:
 Parent: `ENG-02`
 Priority: `P0`
 Estimate: `S`
-Status: `Todo`
+Status: `Done`
 Depends On: `IMP-007`, `IMP-008`
 Likely Touchpoints:
 - `test/core/services/`
@@ -219,7 +219,7 @@ Acceptance:
 Parent: `ENG-03`
 Priority: `P0`
 Estimate: `M`
-Status: `Todo`
+Status: `Done`
 Depends On: `IMP-003`
 Likely Touchpoints:
 - `lib/domain/entities/fantasy_team.dart`
@@ -237,7 +237,7 @@ Acceptance:
 Parent: `ENG-03`
 Priority: `P0`
 Estimate: `M`
-Status: `Todo`
+Status: `Done`
 Depends On: `IMP-011`
 Likely Touchpoints:
 - `lib/core/services/`
@@ -256,7 +256,7 @@ Acceptance:
 Parent: `ENG-03`
 Priority: `P0`
 Estimate: `M`
-Status: `Todo`
+Status: `Done`
 Depends On: `IMP-012`
 Likely Touchpoints:
 - `lib/features/fantasy/presentation/screens/fantasy_team_screen.dart`
@@ -275,7 +275,7 @@ Acceptance:
 Parent: `ENG-03`
 Priority: `P0`
 Estimate: `M`
-Status: `Todo`
+Status: `Done`
 Depends On: `IMP-012`
 Likely Touchpoints:
 - `lib/core/services/fantasy_points_engine.dart`
@@ -294,7 +294,7 @@ Acceptance:
 Parent: `ENG-03`
 Priority: `P0`
 Estimate: `S`
-Status: `Todo`
+Status: `Done`
 Depends On: `IMP-014`
 Likely Touchpoints:
 - `test/core/services/`
@@ -314,7 +314,7 @@ Acceptance:
 Parent: `ENG-04`
 Priority: `P0`
 Estimate: `M`
-Status: `Todo`
+Status: `Done`
 Depends On: `IMP-003`
 Likely Touchpoints:
 - `lib/core/services/transfer_engine.dart`
@@ -332,7 +332,7 @@ Acceptance:
 Parent: `ENG-04`
 Priority: `P0`
 Estimate: `M`
-Status: `Todo`
+Status: `Done`
 Depends On: `IMP-008`, `IMP-016`
 Likely Touchpoints:
 - `lib/core/services/transfer_engine.dart`
@@ -350,7 +350,7 @@ Acceptance:
 Parent: `ENG-04`
 Priority: `P0`
 Estimate: `S`
-Status: `Todo`
+Status: `Done`
 Depends On: `IMP-017`
 Likely Touchpoints:
 - `lib/domain/entities/transfer_record.dart`
@@ -367,7 +367,7 @@ Acceptance:
 Parent: `ENG-04`
 Priority: `P0`
 Estimate: `S`
-Status: `Todo`
+Status: `Done`
 Depends On: `IMP-016`, `IMP-017`, `IMP-018`
 Likely Touchpoints:
 - `test/core/services/transfer_engine_test.dart`
@@ -388,7 +388,7 @@ Acceptance:
 Parent: `ENG-05`
 Priority: `P0`
 Estimate: `S`
-Status: `Todo`
+Status: `Done`
 Depends On: `IMP-003`
 Likely Touchpoints:
 - `lib/domain/entities/`
@@ -405,7 +405,7 @@ Acceptance:
 Parent: `ENG-05`
 Priority: `P0`
 Estimate: `L`
-Status: `Todo`
+Status: `Done`
 Depends On: `IMP-020`, `IMP-014`
 Likely Touchpoints:
 - `lib/core/services/`
@@ -425,7 +425,7 @@ Acceptance:
 Parent: `ENG-05`
 Priority: `P0`
 Estimate: `M`
-Status: `Todo`
+Status: `Done`
 Depends On: `IMP-021`
 Likely Touchpoints:
 - `lib/core/services/fantasy_points_engine.dart`
@@ -444,7 +444,7 @@ Acceptance:
 Parent: `ENG-05`
 Priority: `P0`
 Estimate: `M`
-Status: `Todo`
+Status: `Done`
 Depends On: `IMP-021`, `IMP-022`
 Likely Touchpoints:
 - `test/core/services/`
@@ -683,5 +683,7 @@ Acceptance:
 
 ## Next Ticket To Start
 
-Start with `IMP-004`.
-The lifecycle model, repository, and service are now in place, so the next step is wiring them through the remaining fantasy controllers and screens.
+Start with `IMP-024`.
+Round settlement is now idempotent and covered for captain, vice-captain, and
+bench behavior, so the next highest-value step is adding admin lifecycle
+controls to operate league phases safely.

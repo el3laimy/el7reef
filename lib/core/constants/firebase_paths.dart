@@ -20,4 +20,5 @@ abstract class FirebasePaths {
   static const String fantasySlots = 'fantasySlots';
   static const String transferRecords = 'transferRecords';
   static const String playerFantasyValues = 'playerFantasyValues';
+  static const String fantasyRoundSettlements = 'fantasyRoundSettlements';
 }

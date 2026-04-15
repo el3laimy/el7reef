@@ -1,6 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:el7reef/core/enums/fantasy_league_phase.dart';
+import 'package:el7reef/domain/entities/fantasy_chip.dart';
 import 'package:el7reef/core/services/transfer_engine.dart';
+import 'package:el7reef/domain/entities/fantasy_league_lifecycle.dart';
 import 'package:el7reef/domain/entities/fantasy_slot.dart';
 import 'package:el7reef/domain/entities/fantasy_team.dart';
 import 'package:el7reef/domain/entities/player_fantasy_value.dart';
@@ -27,7 +30,7 @@ void main() {
           _buildValue('player-out', price: 7),
           _buildValue('player-2', price: 6),
         ],
-        currentGameweek: 3,
+        lifecycle: _buildLifecycle(gameweek: 3),
       );
 
       expect(repository.updatedTeam, isNotNull);
@@ -38,6 +41,9 @@ void main() {
       expect(repository.record, isNotNull);
       expect(repository.record!.cost, 0);
       expect(repository.record!.gameweek, 3);
+      expect(repository.record!.usedFreeTransfer, isTrue);
+      expect(repository.record!.hitApplied, isFalse);
+      expect(repository.record!.policyPhase, 'global_transferWindow');
       expect(repository.updatedSlots.single.playerId, 'player-in');
       expect(repository.updatedSlots.single.pointsEarned, 0);
     });
@@ -59,25 +65,34 @@ void main() {
           _buildValue('player-out', price: 6),
           _buildValue('player-2', price: 5),
         ],
-        currentGameweek: 4,
+        lifecycle: _buildLifecycle(gameweek: 4),
       );
 
       expect(repository.updatedTeam, isNotNull);
       expect(repository.updatedTeam!.freeTransfers, 0);
       expect(repository.updatedTeam!.totalPoints, 46);
       expect(repository.record!.cost, -4);
+      expect(repository.record!.hitApplied, isTrue);
+      expect(repository.record!.usedFreeTransfer, isFalse);
     });
 
     test('treats wildcard variants as free extra transfers', () async {
       final repository = _FakeFantasyRepository();
       final engine = TransferEngine(repository);
+      final now = DateTime(2026, 4, 14);
 
       await engine.executeTransfer(
         currentTeam: _buildTeam(
           budget: 11,
           freeTransfers: 0,
           totalPoints: 72,
-          activeChips: const ['Wildcard (Knockout)'],
+          chipUsages: [
+            ChipUsage(
+              chipType: ChipType.wildcardKnockout,
+              gameweek: 5,
+              activatedAt: now,
+            ),
+          ],
         ),
         slotToReplace: _buildSlot(playerId: 'player-out'),
         playerOutValue: _buildValue('player-out', price: 7.5),
@@ -86,13 +101,78 @@ void main() {
           _buildValue('player-out', price: 7.5),
           _buildValue('player-2', price: 5),
         ],
-        currentGameweek: 5,
+        lifecycle: _buildLifecycle(gameweek: 5),
       );
 
       expect(repository.updatedTeam, isNotNull);
       expect(repository.updatedTeam!.totalPoints, 72);
       expect(repository.record!.cost, 0);
       expect(repository.updatedTeam!.freeTransfers, 0);
+      expect(repository.record!.wildcardApplied, isTrue);
+    });
+
+    test('ignores wildcard usage from a previous gameweek', () async {
+      final repository = _FakeFantasyRepository();
+      final engine = TransferEngine(repository);
+
+      await engine.executeTransfer(
+        currentTeam: _buildTeam(
+          budget: 11,
+          freeTransfers: 0,
+          totalPoints: 72,
+          chipUsages: [
+            ChipUsage(
+              chipType: ChipType.wildcardKnockout,
+              gameweek: 4,
+              activatedAt: DateTime(2026, 4, 14),
+            ),
+          ],
+        ),
+        slotToReplace: _buildSlot(playerId: 'player-out'),
+        playerOutValue: _buildValue('player-out', price: 7.5),
+        playerInValue: _buildValue('player-in', price: 9.5),
+        fullTeamValues: [
+          _buildValue('player-out', price: 7.5),
+          _buildValue('player-2', price: 5),
+        ],
+        lifecycle: _buildLifecycle(gameweek: 5),
+      );
+
+      expect(repository.record!.cost, -4);
+      expect(repository.updatedTeam!.totalPoints, 68);
+    });
+
+    test('blocks transfer when lifecycle phase does not allow it', () async {
+      final repository = _FakeFantasyRepository();
+      final engine = TransferEngine(repository);
+
+      await expectLater(
+        () => engine.executeTransfer(
+          currentTeam: _buildTeam(
+            budget: 10,
+            freeTransfers: 1,
+          ),
+          lifecycle: _buildLifecycle(
+            gameweek: 3,
+            phase: FantasyLeaguePhase.live,
+          ),
+          slotToReplace: _buildSlot(playerId: 'player-out'),
+          playerOutValue: _buildValue('player-out', price: 7),
+          playerInValue: _buildValue('player-in', price: 8),
+          fullTeamValues: [
+            _buildValue('player-out', price: 7),
+            _buildValue('player-2', price: 5),
+          ],
+        ),
+        throwsA(
+          predicate(
+            (error) => error.toString().contains('أثناء لعب الجولة'),
+          ),
+        ),
+      );
+
+      expect(repository.record, isNull);
+      expect(repository.updatedTeam, isNull);
     });
   });
 }
@@ -102,7 +182,7 @@ FantasyTeam _buildTeam({
   required int freeTransfers,
   int totalTransfers = 0,
   int totalPoints = 0,
-  List<String> activeChips = const [],
+  List<ChipUsage> chipUsages = const [],
 }) {
   final now = DateTime(2026, 4, 14);
   return FantasyTeam(
@@ -113,7 +193,7 @@ FantasyTeam _buildTeam({
     freeTransfers: freeTransfers,
     totalTransfers: totalTransfers,
     totalPoints: totalPoints,
-    activeChips: activeChips,
+    chipUsages: chipUsages,
     createdAt: now,
     updatedAt: now,
   );
@@ -133,6 +213,20 @@ PlayerFantasyValue _buildValue(String playerId, {required double price}) {
     playerId: playerId,
     currentPrice: price,
     tier: PlayerTier.bronze,
+  );
+}
+
+FantasyLeagueLifecycle _buildLifecycle({
+  required int gameweek,
+  FantasyLeaguePhase phase = FantasyLeaguePhase.transferWindow,
+  bool isGlobal = true,
+}) {
+  return FantasyLeagueLifecycle(
+    leagueId: isGlobal ? 'global' : 'tournament-1',
+    currentGameweek: gameweek,
+    phase: phase,
+    isGlobal: isGlobal,
+    updatedAt: DateTime(2026, 4, 14),
   );
 }
 

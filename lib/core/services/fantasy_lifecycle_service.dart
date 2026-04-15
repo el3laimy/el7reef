@@ -77,6 +77,7 @@ class FantasyLifecycleService extends GetxService {
         (deadlinePassed && lifecycle.phase != FantasyLeaguePhase.transferWindow);
 
     return lifecycle.copyWith(
+      isGlobal: lifecycle.isGlobal || lifecycle.leagueId == 'global',
       isLocked: effectiveLocked,
       updatedAt: lifecycle.updatedAt,
     );

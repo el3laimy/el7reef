@@ -1,10 +1,10 @@
 import 'package:get/get.dart';
 
+import '../../../../core/auth/auth_session.dart';
 import '../../../../data/repositories/fantasy_repository_impl.dart';
 import '../../../../data/repositories/tournament_repository_impl.dart';
 import '../../../../domain/entities/fantasy_team.dart';
 import '../../../../domain/entities/tournament.dart';
-import '../../../../services/auth_service.dart';
 
 class FantasyLeagueSummary {
   final String id;
@@ -25,17 +25,16 @@ class FantasyLeagueSummary {
 class FantasyHomeController extends GetxController {
   final FantasyRepositoryImpl _fantasyRepository;
   final TournamentRepositoryImpl _tournamentRepository;
-  final AuthService? _authService;
+  final AuthSession? _authSession;
 
   FantasyHomeController({
     FantasyRepositoryImpl? fantasyRepository,
     TournamentRepositoryImpl? tournamentRepository,
-    AuthService? authService,
+    AuthSession? authSession,
   })  : _fantasyRepository = fantasyRepository ?? FantasyRepositoryImpl(),
         _tournamentRepository =
             tournamentRepository ?? TournamentRepositoryImpl(),
-        _authService = authService ??
-            (Get.isRegistered<AuthService>() ? Get.find<AuthService>() : null);
+        _authSession = authSession;
 
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
@@ -54,7 +53,7 @@ class FantasyHomeController extends GetxController {
       isLoading.value = true;
       errorMessage.value = '';
 
-      final userId = _authService?.currentUserId;
+      final userId = _authSession?.currentUserId;
       FantasyTeam? team;
       if (userId != null && userId.isNotEmpty) {
         team = await _fantasyRepository.getFantasyTeam(userId);

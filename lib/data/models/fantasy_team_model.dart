@@ -1,3 +1,4 @@
+import '../../domain/entities/fantasy_chip.dart';
 import '../../domain/entities/fantasy_team.dart';
 
 class FantasyTeamModel extends FantasyTeam {
@@ -10,14 +11,22 @@ class FantasyTeamModel extends FantasyTeam {
     super.totalPoints = 0,
     super.currentGameweekPoints = 0,
     super.freeTransfers = 1,
+    super.freeTransfersGameweek = 0,
     super.totalTransfers = 0,
     super.formation = '2-1-1',
-    super.activeChips = const [],
+    super.chipUsages = const [],
     required super.createdAt,
     required super.updatedAt,
   });
 
   factory FantasyTeamModel.fromJson(Map<String, dynamic> json, String documentId) {
+    final createdAt = json['createdAt'] != null
+        ? DateTime.fromMillisecondsSinceEpoch(json['createdAt'] as int)
+        : DateTime.now();
+    final updatedAt = json['updatedAt'] != null
+        ? DateTime.fromMillisecondsSinceEpoch(json['updatedAt'] as int)
+        : DateTime.now();
+
     return FantasyTeamModel(
       id: documentId,
       ownerPlayerId: json['ownerPlayerId'] as String? ?? '',
@@ -27,19 +36,21 @@ class FantasyTeamModel extends FantasyTeam {
       totalPoints: json['totalPoints'] as int? ?? 0,
       currentGameweekPoints: json['currentGameweekPoints'] as int? ?? 0,
       freeTransfers: json['freeTransfers'] as int? ?? 1,
+      freeTransfersGameweek: json['freeTransfersGameweek'] as int? ?? 0,
       totalTransfers: json['totalTransfers'] as int? ?? 0,
       formation: json['formation'] as String? ?? '2-1-1',
-      activeChips: List<String>.from(json['activeChips'] ?? []),
-      createdAt: json['createdAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['createdAt'] as int)
-          : DateTime.now(),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['updatedAt'] as int)
-          : DateTime.now(),
+      chipUsages: _parseChipUsages(json, createdAt),
+      createdAt: createdAt,
+      updatedAt: updatedAt,
     );
   }
 
   Map<String, dynamic> toJson() {
+    final activeChipLabels = chipUsages
+        .where((usage) => !usage.isConsumed)
+        .map((usage) => usage.displayName)
+        .toList(growable: false);
+
     return {
       'ownerPlayerId': ownerPlayerId,
       'teamName': teamName,
@@ -48,9 +59,11 @@ class FantasyTeamModel extends FantasyTeam {
       'totalPoints': totalPoints,
       'currentGameweekPoints': currentGameweekPoints,
       'freeTransfers': freeTransfers,
+      'freeTransfersGameweek': freeTransfersGameweek,
       'totalTransfers': totalTransfers,
       'formation': formation,
-      'activeChips': activeChips,
+      'chipUsages': chipUsages.map((usage) => usage.toJson()).toList(),
+      'activeChips': activeChipLabels,
       'createdAt': createdAt.millisecondsSinceEpoch,
       'updatedAt': updatedAt.millisecondsSinceEpoch,
     };
@@ -66,9 +79,10 @@ class FantasyTeamModel extends FantasyTeam {
       totalPoints: entity.totalPoints,
       currentGameweekPoints: entity.currentGameweekPoints,
       freeTransfers: entity.freeTransfers,
+      freeTransfersGameweek: entity.freeTransfersGameweek,
       totalTransfers: entity.totalTransfers,
       formation: entity.formation,
-      activeChips: entity.activeChips,
+      chipUsages: entity.chipUsages,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
     );
@@ -84,11 +98,45 @@ class FantasyTeamModel extends FantasyTeam {
       totalPoints: totalPoints,
       currentGameweekPoints: currentGameweekPoints,
       freeTransfers: freeTransfers,
+      freeTransfersGameweek: freeTransfersGameweek,
       totalTransfers: totalTransfers,
       formation: formation,
-      activeChips: activeChips,
+      chipUsages: chipUsages,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );
+  }
+
+  static List<ChipUsage> _parseChipUsages(
+    Map<String, dynamic> json,
+    DateTime fallbackActivatedAt,
+  ) {
+    final rawUsages = json['chipUsages'];
+    if (rawUsages is List) {
+      return rawUsages
+          .whereType<Map>()
+          .map((usage) => ChipUsage.fromJson(Map<String, dynamic>.from(usage)))
+          .toList(growable: false);
+    }
+
+    final legacyActiveChips = json['activeChips'];
+    if (legacyActiveChips is List) {
+      final usages = <ChipUsage>[];
+      for (final value in legacyActiveChips) {
+        if (value is! String) continue;
+        final chipType = ChipType.fromValue(value);
+        if (chipType == null) continue;
+        usages.add(
+          ChipUsage(
+            chipType: chipType,
+            gameweek: 0,
+            activatedAt: fallbackActivatedAt,
+          ),
+        );
+      }
+      return usages;
+    }
+
+    return const [];
   }
 }

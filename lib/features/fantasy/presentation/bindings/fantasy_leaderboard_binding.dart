@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 
+import '../../../../core/auth/auth_service_session.dart';
 import '../../../../core/services/fantasy_lifecycle_service.dart';
 import '../../../../data/repositories/fantasy_lifecycle_repository_impl.dart';
 import '../../../../data/repositories/fantasy_repository_impl.dart';
@@ -40,8 +41,9 @@ class FantasyLeaderboardBinding extends Bindings {
         tournamentRepository: Get.isRegistered<TournamentRepositoryImpl>()
             ? Get.find<TournamentRepositoryImpl>()
             : null,
-        authService:
-            Get.isRegistered<AuthService>() ? Get.find<AuthService>() : null,
+        authSession: Get.isRegistered<AuthService>()
+            ? AuthServiceSession(Get.find<AuthService>())
+            : null,
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:el7reef/core/services/fantasy_points_engine.dart';
 import 'package:el7reef/core/services/auto_substitution_engine.dart';
+import 'package:el7reef/domain/entities/fantasy_chip.dart';
 import 'package:el7reef/domain/entities/player_match_stats.dart';
 import 'package:el7reef/domain/entities/fantasy_slot.dart';
 
@@ -116,8 +117,94 @@ void main() {
         'p-bench': const PlayerMatchStats(playerId: 'p-bench', matchId: 'm1', teamId: 't1', played: true, goals: 1), // 6 pts normally (assuming mixed/forward=4)
       };
       
-      final total = FantasyPointsEngine.calculateRoundPoints(slots: slots, roundStats: stats, activeChips: ['Bench Boost']);
+      final total = FantasyPointsEngine.calculateRoundPoints(
+        slots: slots,
+        roundStats: stats,
+        currentGameweek: 4,
+        activeChips: [
+          ChipUsage(
+            chipType: ChipType.benchBoost,
+            gameweek: 4,
+            activatedAt: DateTime(2026, 4, 14),
+          ),
+        ],
+      );
       expect(total, 2 + 6); // 2(participation) + (2 + 4 for goal) = 8
+    });
+
+    test('11.1 Bench Boost is ignored outside its activation gameweek', () {
+      final slots = [
+        const FantasySlot(id: '1', fantasyTeamId: 't1', playerId: 'p-start', isStartingXI: true),
+        const FantasySlot(id: '2', fantasyTeamId: 't1', playerId: 'p-bench', isStartingXI: false),
+      ];
+      final stats = {
+        'p-start': const PlayerMatchStats(playerId: 'p-start', matchId: 'm1', teamId: 't1', played: true),
+        'p-bench': const PlayerMatchStats(playerId: 'p-bench', matchId: 'm1', teamId: 't1', played: true, goals: 1),
+      };
+
+      final total = FantasyPointsEngine.calculateRoundPoints(
+        slots: slots,
+        roundStats: stats,
+        currentGameweek: 5,
+        activeChips: [
+          ChipUsage(
+            chipType: ChipType.benchBoost,
+            gameweek: 4,
+            activatedAt: DateTime(2026, 4, 14),
+          ),
+        ],
+      );
+
+      expect(total, 2);
+    });
+
+    test('11.2 Triple Captain only affects the matching gameweek', () {
+      final slots = [
+        const FantasySlot(
+          id: '1',
+          fantasyTeamId: 't1',
+          playerId: 'captain',
+          isStartingXI: true,
+          role: FantasyPlayerRole.captain,
+        ),
+      ];
+      final stats = {
+        'captain': const PlayerMatchStats(
+          playerId: 'captain',
+          matchId: 'm1',
+          teamId: 't1',
+          played: true,
+          goals: 1,
+        ),
+      };
+
+      final totalWithChip = FantasyPointsEngine.calculateRoundPoints(
+        slots: slots,
+        roundStats: stats,
+        currentGameweek: 7,
+        activeChips: [
+          ChipUsage(
+            chipType: ChipType.tripleCaptain,
+            gameweek: 7,
+            activatedAt: DateTime(2026, 4, 14),
+          ),
+        ],
+      );
+      final totalWithoutChip = FantasyPointsEngine.calculateRoundPoints(
+        slots: slots,
+        roundStats: stats,
+        currentGameweek: 8,
+        activeChips: [
+          ChipUsage(
+            chipType: ChipType.tripleCaptain,
+            gameweek: 7,
+            activatedAt: DateTime(2026, 4, 14),
+          ),
+        ],
+      );
+
+      expect(totalWithChip, 18);
+      expect(totalWithoutChip, 12);
     });
 
     test('12. Auto Substitution swaps non-playing starter with top priority playing bench', () {

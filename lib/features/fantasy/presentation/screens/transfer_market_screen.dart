@@ -65,17 +65,24 @@ class TransferMarketScreen extends GetView<TransferMarketController> {
               FantasyLifecycleBanner(lifecycle: controller.lifecycle.value),
             ],
             const SizedBox(height: 16),
-            if (controller.wildcardActive)
-              const _InfoBanner(
+            if (!controller.canTransfer)
+              _InfoBanner(
+                title: 'الانتقالات غير متاحة',
+                subtitle: controller.blockedTransferReason ??
+                    'لا يمكن تنفيذ انتقالات حالياً.',
+                color: const Color(0xFFF97316),
+              )
+            else if (controller.wildcardActive)
+              _InfoBanner(
                 title: 'Wildcard مفعّل',
-                subtitle: 'الصفقات الإضافية لن تخصم نقاطاً طالما الخاصية نشطة.',
-                color: Color(0xFFF59E0B),
+                subtitle: controller.transferStatusMessage,
+                color: const Color(0xFFF59E0B),
               )
             else
-              const _InfoBanner(
-                title: 'الوضع القياسي',
-                subtitle: 'سيتم خصم 4 نقاط لكل انتقال إضافي بعد انتهاء التبديلات المجانية.',
-                color: Color(0xFF38BDF8),
+              _InfoBanner(
+                title: 'سياسة الانتقالات',
+                subtitle: controller.transferStatusMessage,
+                color: const Color(0xFF38BDF8),
               ),
             const SizedBox(height: 20),
             const Text(
@@ -129,7 +136,7 @@ class TransferMarketScreen extends GetView<TransferMarketController> {
           Expanded(
             child: _Metric(
               label: 'الحالة',
-              value: controller.wildcardActive ? 'Wildcard' : 'Normal',
+              value: controller.policyPhaseLabel,
               color: const Color(0xFFF59E0B),
             ),
           ),

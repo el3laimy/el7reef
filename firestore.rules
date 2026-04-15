@@ -125,6 +125,11 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /fantasyRoundSettlements/{markerId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if false;
+    }
+
     match /fantasyTeams/{teamId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() &&

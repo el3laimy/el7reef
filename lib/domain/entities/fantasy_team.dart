@@ -1,3 +1,5 @@
+import 'fantasy_chip.dart';
+
 /// كيان تفاصيل فريق الفانتازي الخاص بأحد المستخدمين
 class FantasyTeam {
   /// معرف الفريق (غالباً يتطابق مع معرف اللاعب المالك userId)
@@ -24,6 +26,10 @@ class FantasyTeam {
   
   /// عدد التبديلات المجانية المتبقية هذا الأسبوع
   final int freeTransfers;
+
+  /// آخر جولة تمت مزامنة رصيد التبديلات المجانية لها.
+  /// القيمة `0` تعني أن الفريق قديم ولم يُرحّل بعد إلى نظام التتبع الحالي.
+  final int freeTransfersGameweek;
   
   /// إجمالي التبديلات التي أجراها المدرب طول الموسم
   final int totalTransfers;
@@ -31,8 +37,8 @@ class FantasyTeam {
   /// خطة اللعب (مثال: '2-1-1' في خماسي أو '4-3-3' في 11)
   final String formation;
   
-  /// الخواص المفعلة حالياً (Bench Boost, Triple Captain..)
-  final List<String> activeChips;
+  /// سجلات تفعيل الخواص على مستوى الجولات المختلفة.
+  final List<ChipUsage> chipUsages;
   
   /// تاريخ الإنشاء
   final DateTime createdAt;
@@ -49,12 +55,37 @@ class FantasyTeam {
     this.totalPoints = 0,
     this.currentGameweekPoints = 0,
     this.freeTransfers = 1,
+    this.freeTransfersGameweek = 0,
     this.totalTransfers = 0,
     this.formation = '2-1-1', 
-    this.activeChips = const [],
+    this.chipUsages = const [],
     required this.createdAt,
     required this.updatedAt,
   });
+
+  List<ChipUsage> activeChipsForGameweek(int gameweek) {
+    return chipUsages
+        .where((usage) => usage.isActiveInGameweek(gameweek))
+        .toList(growable: false);
+  }
+
+  List<String> activeChipLabelsForGameweek(int gameweek) {
+    return activeChipsForGameweek(gameweek)
+        .map((usage) => usage.displayName)
+        .toList(growable: false);
+  }
+
+  bool hasActiveChip(
+    ChipType chipType, {
+    required int gameweek,
+  }) {
+    return activeChipsForGameweek(gameweek)
+        .any((usage) => usage.chipType == chipType);
+  }
+
+  bool hasConsumedChip(ChipType chipType) {
+    return chipUsages.any((usage) => usage.chipType == chipType);
+  }
 
   FantasyTeam copyWith({
     String? id,
@@ -65,9 +96,10 @@ class FantasyTeam {
     int? totalPoints,
     int? currentGameweekPoints,
     int? freeTransfers,
+    int? freeTransfersGameweek,
     int? totalTransfers,
     String? formation,
-    List<String>? activeChips,
+    List<ChipUsage>? chipUsages,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -80,9 +112,11 @@ class FantasyTeam {
       totalPoints: totalPoints ?? this.totalPoints,
       currentGameweekPoints: currentGameweekPoints ?? this.currentGameweekPoints,
       freeTransfers: freeTransfers ?? this.freeTransfers,
+      freeTransfersGameweek:
+          freeTransfersGameweek ?? this.freeTransfersGameweek,
       totalTransfers: totalTransfers ?? this.totalTransfers,
       formation: formation ?? this.formation,
-      activeChips: activeChips ?? this.activeChips,
+      chipUsages: chipUsages ?? this.chipUsages,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

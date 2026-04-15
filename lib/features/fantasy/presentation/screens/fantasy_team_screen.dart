@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../app/routes/app_routes.dart';
+import '../../../../domain/entities/fantasy_chip.dart';
 import '../../../../domain/entities/fantasy_slot.dart';
 import '../../../../core/widgets/tier_badge_widget.dart';
 import '../controllers/fantasy_team_controller.dart';
@@ -98,6 +99,24 @@ class FantasyTeamScreen extends GetView<FantasyTeamController> {
             ),
             const SizedBox(height: 20),
             _SectionTitle(
+              title: 'الخواص',
+              subtitle: controller.currentGameweek > 0
+                  ? 'الجولة ${controller.currentGameweek}'
+                  : 'غير متاح',
+            ),
+            const SizedBox(height: 12),
+            ...controller.availableChipTypes.map(_buildChipCard),
+            if (controller.chipHistory.isNotEmpty) ...[
+              const _SimpleCard(
+                child: Text(
+                  'سجل التفعيل يعرض أحدث الخواص المستخدمة عبر الجولات.',
+                  style: TextStyle(color: Colors.white60),
+                ),
+              ),
+              ...controller.chipHistory.take(4).map(_buildChipHistoryCard),
+            ],
+            const SizedBox(height: 20),
+            _SectionTitle(
               title: 'الأساسيون',
               subtitle: '${controller.starters.length} لاعب',
             ),
@@ -133,6 +152,9 @@ class FantasyTeamScreen extends GetView<FantasyTeamController> {
 
   Widget _buildSummary(String teamName) {
     final team = controller.team.value!;
+    final activeChipLabels = controller.currentGameweek > 0
+        ? team.activeChipLabelsForGameweek(controller.currentGameweek)
+        : const <String>[];
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -158,7 +180,7 @@ class FantasyTeamScreen extends GetView<FantasyTeamController> {
           ),
           const SizedBox(height: 8),
           Text(
-            'مرتبط بـ ${team.leagueIds.length} دوري | خواص نشطة: ${team.activeChips.isEmpty ? 'لا يوجد' : team.activeChips.join(', ')}',
+            'مرتبط بـ ${team.leagueIds.length} دوري | خواص الجولة: ${activeChipLabels.isEmpty ? 'لا يوجد' : activeChipLabels.join(', ')}',
             style: const TextStyle(color: Colors.white70, height: 1.5),
           ),
           const SizedBox(height: 18),
@@ -286,9 +308,122 @@ class FantasyTeamScreen extends GetView<FantasyTeamController> {
             'الجولة ${entry.record.gameweek} | التكلفة ${entry.record.cost} | ${_formatDate(entry.record.timestamp)}',
             style: const TextStyle(color: Colors.white60),
           ),
+          const SizedBox(height: 6),
+          Text(
+            '${controller.describeTransferPolicyPhase(entry.record.policyPhase)} | ${controller.describeTransferAudit(entry.record)}',
+            style: const TextStyle(color: Colors.white54, height: 1.4),
+          ),
         ],
       ),
     );
+  }
+
+  Widget _buildChipCard(ChipType chipType) {
+    final isActive = controller.isChipActive(chipType);
+    final isConsumed = controller.isChipConsumed(chipType);
+    final unavailableReason = controller.chipUnavailableReason(chipType);
+    final canActivate = unavailableReason == null && !controller.isActivatingChip.value;
+
+    String stateLabel;
+    Color stateColor;
+    if (isActive) {
+      stateLabel = 'نشطة الآن';
+      stateColor = const Color(0xFF22C55E);
+    } else if (isConsumed) {
+      stateLabel = 'مستهلكة';
+      stateColor = const Color(0xFFF97316);
+    } else if (unavailableReason != null) {
+      stateLabel = 'غير متاحة';
+      stateColor = const Color(0xFFF59E0B);
+    } else {
+      stateLabel = 'متاحة';
+      stateColor = const Color(0xFF38BDF8);
+    }
+
+    return _SimpleCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  chipType.displayName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              _MetaBadge(label: stateLabel),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _chipDescription(chipType),
+            style: const TextStyle(color: Colors.white70, height: 1.5),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            unavailableReason ??
+                'يمكنك تفعيل هذه الخاصية الآن وستسري على الجولة الحالية.',
+            style: TextStyle(color: stateColor, fontSize: 12.5),
+          ),
+          const SizedBox(height: 14),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton(
+              onPressed: canActivate
+                  ? () => controller.activateChip(chipType)
+                  : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF38BDF8),
+                disabledBackgroundColor: Colors.white12,
+              ),
+              child: Text(isActive ? 'مفعلة' : 'تفعيل'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChipHistoryCard(ChipUsage usage) {
+    return _SimpleCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            usage.displayName,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'الجولة ${usage.gameweek} | ${_formatDate(usage.activatedAt)}',
+            style: const TextStyle(color: Colors.white60),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _chipDescription(ChipType chipType) {
+    switch (chipType) {
+      case ChipType.tripleCaptain:
+        return 'يضاعف نقاط الكابتن ثلاث مرات للجولة الحالية فقط.';
+      case ChipType.benchBoost:
+        return 'يحتسب نقاط البدلاء مع الأساسيين في الجولة الحالية.';
+      case ChipType.wildcardGroups:
+        return 'يسمح بتبديلات إضافية دون خصومات خلال هذه الجولة.';
+      case ChipType.wildcardKnockout:
+        return 'نسخة المراحل الإقصائية من الـ Wildcard بدون خصومات انتقال.';
+      case ChipType.emergencySub:
+        return 'خاصية مخصصة للطوارئ ولا تُستخدم من هذه الواجهة حالياً.';
+    }
   }
 
   String _formatDate(DateTime timestamp) {

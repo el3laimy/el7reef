@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../app/routes/app_routes.dart';
+import '../../../../core/auth/auth_session.dart';
 import '../../../../core/enums/tournament_enums.dart';
 import '../../../../core/services/fantasy_lifecycle_service.dart';
 import '../../../../core/services/fantasy_market_service.dart';
@@ -14,7 +15,6 @@ import '../../../../domain/entities/fantasy_slot.dart';
 import '../../../../domain/entities/fantasy_team.dart';
 import '../../../../domain/entities/player_fantasy_value.dart';
 import '../../../../features/fantasy/presentation/models/fantasy_market_player.dart';
-import '../../../../services/auth_service.dart';
 
 class FantasyDraftSlot {
   final String key;
@@ -54,7 +54,7 @@ class FantasyCreateTeamController extends GetxController {
   final TournamentRepositoryImpl _tournamentRepository;
   final FantasyMarketService _marketService;
   final FantasyLifecycleService _lifecycleService;
-  final AuthService? _authService;
+  final AuthSession? _authSession;
 
   FantasyCreateTeamController({
     required this.leagueId,
@@ -62,7 +62,7 @@ class FantasyCreateTeamController extends GetxController {
     TournamentRepositoryImpl? tournamentRepository,
     FantasyMarketService? marketService,
     FantasyLifecycleService? lifecycleService,
-    AuthService? authService,
+    AuthSession? authSession,
   })  : _fantasyRepository = fantasyRepository ?? FantasyRepositoryImpl(),
         _tournamentRepository =
             tournamentRepository ?? TournamentRepositoryImpl(),
@@ -81,8 +81,7 @@ class FantasyCreateTeamController extends GetxController {
                     tournamentRepository:
                         tournamentRepository ?? TournamentRepositoryImpl(),
                   )),
-        _authService = authService ??
-            (Get.isRegistered<AuthService>() ? Get.find<AuthService>() : null);
+        _authSession = authSession;
 
   final TextEditingController teamNameController = TextEditingController();
   final RxBool isLoading = false.obs;
@@ -147,7 +146,7 @@ class FantasyCreateTeamController extends GetxController {
 
       marketPlayers.assignAll(await _marketService.getMarketPlayers());
 
-      final userId = _authService?.currentUserId;
+      final userId = _authSession?.currentUserId;
       if (userId != null && userId.isNotEmpty) {
         final team = await _fantasyRepository.getFantasyTeam(userId);
         existingTeam.value = team;
@@ -159,8 +158,8 @@ class FantasyCreateTeamController extends GetxController {
         }
       }
 
-      teamNameController.text = _authService?.currentPlayer.value?.name != null
-          ? 'فريق ${_authService!.currentPlayer.value!.name}'
+      teamNameController.text = _authSession?.currentPlayer?.name != null
+          ? 'فريق ${_authSession!.currentPlayer!.name}'
           : 'فريقي';
       slots.assignAll(_buildDefaultSlots(teamSize.value));
     } catch (_) {
@@ -300,7 +299,7 @@ class FantasyCreateTeamController extends GetxController {
       return;
     }
 
-    final userId = _authService?.currentUserId;
+    final userId = _authSession?.currentUserId;
     if (userId == null || userId.isEmpty) {
       Get.snackbar(
         'تسجيل الدخول مطلوب',
@@ -355,9 +354,13 @@ class FantasyCreateTeamController extends GetxController {
         totalPoints: existing?.totalPoints ?? 0,
         currentGameweekPoints: existing?.currentGameweekPoints ?? 0,
         freeTransfers: existing?.freeTransfers ?? 1,
+        freeTransfersGameweek: existing != null &&
+                existing.freeTransfersGameweek > 0
+            ? existing.freeTransfersGameweek
+            : (lifecycle.value?.currentGameweek ?? 1),
         totalTransfers: existing?.totalTransfers ?? 0,
         formation: _formationLabel(teamSize.value),
-        activeChips: existing?.activeChips ?? const [],
+        chipUsages: existing?.chipUsages ?? const [],
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
       );

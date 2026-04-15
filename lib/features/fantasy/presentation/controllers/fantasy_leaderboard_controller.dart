@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 
+import '../../../../core/auth/auth_session.dart';
 import '../../../../core/services/fantasy_lifecycle_service.dart';
 import '../../../../data/repositories/fantasy_lifecycle_repository_impl.dart';
 import '../../../../data/repositories/fantasy_repository_impl.dart';
@@ -7,7 +8,6 @@ import '../../../../data/repositories/player_repository_impl.dart';
 import '../../../../data/repositories/tournament_repository_impl.dart';
 import '../../../../domain/entities/fantasy_league_lifecycle.dart';
 import '../../../../domain/entities/fantasy_team.dart';
-import '../../../../services/auth_service.dart';
 
 class FantasyLeaderboardEntry {
   final FantasyTeam team;
@@ -27,7 +27,7 @@ class FantasyLeaderboardController extends GetxController {
   final PlayerRepositoryImpl _playerRepository;
   final TournamentRepositoryImpl _tournamentRepository;
   final FantasyLifecycleService _lifecycleService;
-  final AuthService? _authService;
+  final AuthSession? _authSession;
 
   FantasyLeaderboardController({
     required this.leagueId,
@@ -35,7 +35,7 @@ class FantasyLeaderboardController extends GetxController {
     PlayerRepositoryImpl? playerRepository,
     TournamentRepositoryImpl? tournamentRepository,
     FantasyLifecycleService? lifecycleService,
-    AuthService? authService,
+    AuthSession? authSession,
   })  : _fantasyRepository = fantasyRepository ?? FantasyRepositoryImpl(),
         _playerRepository = playerRepository ?? PlayerRepositoryImpl(),
         _tournamentRepository =
@@ -51,8 +51,7 @@ class FantasyLeaderboardController extends GetxController {
                     tournamentRepository:
                         tournamentRepository ?? TournamentRepositoryImpl(),
                   )),
-        _authService = authService ??
-            (Get.isRegistered<AuthService>() ? Get.find<AuthService>() : null);
+        _authSession = authSession;
 
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
@@ -62,7 +61,7 @@ class FantasyLeaderboardController extends GetxController {
   final RxList<FantasyLeaderboardEntry> entries =
       <FantasyLeaderboardEntry>[].obs;
 
-  String? get currentUserId => _authService?.currentUserId;
+  String? get currentUserId => _authSession?.currentUserId;
   bool get isJoinedLeague =>
       currentTeam.value?.leagueIds.contains(leagueId) ?? false;
 

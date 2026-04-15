@@ -1,16 +1,18 @@
 import 'package:get/get.dart';
 
+import '../../../../core/auth/auth_session.dart';
 import '../../../../core/services/fantasy_lifecycle_service.dart';
 import '../../../../core/services/fantasy_market_service.dart';
+import '../../../../core/services/fantasy_transfer_policy_service.dart';
 import '../../../../core/services/transfer_engine.dart';
 import '../../../../data/repositories/fantasy_lifecycle_repository_impl.dart';
 import '../../../../data/repositories/fantasy_repository_impl.dart';
 import '../../../../data/repositories/tournament_repository_impl.dart';
+import '../../../../domain/entities/fantasy_chip.dart';
 import '../../../../domain/entities/fantasy_league_lifecycle.dart';
 import '../../../../domain/entities/fantasy_team.dart';
 import '../../../../features/fantasy/presentation/models/fantasy_market_player.dart';
 import '../../../../features/fantasy/presentation/models/fantasy_squad_member.dart';
-import '../../../../services/auth_service.dart';
 
 class TransferMarketController extends GetxController {
   final String leagueId;
@@ -18,9 +20,13 @@ class TransferMarketController extends GetxController {
   final FantasyMarketService _marketService;
   final TournamentRepositoryImpl _tournamentRepository;
   final FantasyLifecycleService _lifecycleService;
-  final AuthService? _authService;
+  final FantasyTransferPolicyService _transferPolicyService;
+  final AuthSession? _authSession;
 
-  late final TransferEngine _transferEngine = TransferEngine(_fantasyRepository);
+  late final TransferEngine _transferEngine = TransferEngine(
+        _fantasyRepository,
+        transferPolicyService: _transferPolicyService,
+      );
 
   TransferMarketController({
     required this.leagueId,
@@ -28,7 +34,8 @@ class TransferMarketController extends GetxController {
     FantasyMarketService? marketService,
     TournamentRepositoryImpl? tournamentRepository,
     FantasyLifecycleService? lifecycleService,
-    AuthService? authService,
+    FantasyTransferPolicyService? transferPolicyService,
+    AuthSession? authSession,
   })  : _fantasyRepository = fantasyRepository ?? FantasyRepositoryImpl(),
         _marketService = marketService ??
             (Get.isRegistered<FantasyMarketService>()
@@ -47,8 +54,9 @@ class TransferMarketController extends GetxController {
                     tournamentRepository:
                         tournamentRepository ?? TournamentRepositoryImpl(),
                   )),
-        _authService = authService ??
-            (Get.isRegistered<AuthService>() ? Get.find<AuthService>() : null);
+        _transferPolicyService =
+            transferPolicyService ?? const FantasyTransferPolicyService(),
+        _authSession = authSession;
 
   final RxBool isLoading = false.obs;
   final RxBool isSubmitting = false.obs;
@@ -56,6 +64,8 @@ class TransferMarketController extends GetxController {
   final RxString leagueTitle = 'سوق الانتقالات'.obs;
   final Rx<FantasyLeagueLifecycle?> lifecycle = Rx<FantasyLeagueLifecycle?>(null);
   final Rx<FantasyTeam?> team = Rx<FantasyTeam?>(null);
+  final Rx<TransferPolicyDecision?> transferDecision =
+      Rx<TransferPolicyDecision?>(null);
   final RxList<FantasySquadMember> squad = <FantasySquadMember>[].obs;
   final RxList<FantasyMarketPlayer> marketPlayers = <FantasyMarketPlayer>[].obs;
 
@@ -66,7 +76,7 @@ class TransferMarketController extends GetxController {
   }
 
   Future<void> loadData() async {
-    final userId = _authService?.currentUserId;
+    final userId = _authSession?.currentUserId;
     if (userId == null || userId.isEmpty) {
       errorMessage.value = 'يجب تسجيل الدخول أولاً.';
       return;
@@ -87,12 +97,21 @@ class TransferMarketController extends GetxController {
       final loadedTeam = await _fantasyRepository.getFantasyTeam(userId);
       if (loadedTeam == null) {
         team.value = null;
+        transferDecision.value = null;
         squad.clear();
         return;
       }
 
-      team.value = loadedTeam;
-      final slots = await _fantasyRepository.getTeamSlots(loadedTeam.id);
+      final syncedTeam = await _syncTeamToLifecycle(
+        loadedTeam,
+        lifecycle.value,
+      );
+      team.value = syncedTeam;
+      transferDecision.value = _buildTransferDecision(
+        syncedTeam,
+        lifecycle.value,
+      );
+      final slots = await _fantasyRepository.getTeamSlots(syncedTeam.id);
       final market = await _marketService.getMarketPlayers(limit: 120);
       marketPlayers.assignAll(market);
       final marketById = {for (final player in market) player.player.id: player};
@@ -123,41 +142,73 @@ class TransferMarketController extends GetxController {
 
   double get budget => team.value?.budget ?? 0;
   int get freeTransfers => team.value?.freeTransfers ?? 0;
-  bool get canTransfer => lifecycle.value?.allowsTransfers ?? true;
-  bool get wildcardActive =>
-      team.value?.activeChips.any((chip) => chip.startsWith('Wildcard')) ?? false;
+  bool get canTransfer => transferDecision.value?.isAllowed ?? false;
+  String get policyPhaseLabel => transferDecision.value == null
+      ? 'غير متاح'
+      : _transferPolicyService.describePolicyPhase(
+          transferDecision.value!.policyPhase,
+        );
+  String get transferStatusMessage =>
+      transferDecision.value?.executionLabelAr ??
+      'بيانات الانتقالات غير مكتملة حالياً.';
+  String? get blockedTransferReason => transferDecision.value?.blockedReason;
+  bool get wildcardActive {
+    final currentTeam = team.value;
+    final currentLifecycle = lifecycle.value;
+    if (currentTeam == null || currentLifecycle == null) {
+      return false;
+    }
+
+    return currentTeam.hasActiveChip(
+          ChipType.wildcardGroups,
+          gameweek: currentLifecycle.currentGameweek,
+        ) ||
+        currentTeam.hasActiveChip(
+          ChipType.wildcardKnockout,
+          gameweek: currentLifecycle.currentGameweek,
+        );
+  }
 
   Future<void> replacePlayer({
     required FantasySquadMember member,
     required FantasyMarketPlayer replacement,
   }) async {
-    if (!canTransfer) {
-      Get.snackbar(
-        'سوق الانتقالات مغلق',
-        'لا يمكن تنفيذ انتقالات في هذه المرحلة من الجولة.',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return;
-    }
-
     final currentTeam = team.value;
     if (currentTeam == null) {
       return;
     }
 
+    final currentLifecycle = await _lifecycleService.resolveLifecycle(leagueId);
+    lifecycle.value = currentLifecycle;
+    final syncedTeam = await _syncTeamToLifecycle(currentTeam, currentLifecycle);
+    team.value = syncedTeam;
+    transferDecision.value = _buildTransferDecision(
+      syncedTeam,
+      currentLifecycle,
+    );
+
+    if (!(transferDecision.value?.isAllowed ?? false)) {
+      Get.snackbar(
+        'سوق الانتقالات مغلق',
+        transferDecision.value?.blockedReason ??
+            'لا يمكن تنفيذ انتقالات في هذه المرحلة من الجولة.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
     final currentValues =
         squad.map((member) => member.marketPlayer.value).toList(growable: false);
-    final currentGameweek = await _resolveCurrentGameweek();
 
     try {
       isSubmitting.value = true;
       await _transferEngine.executeTransfer(
-        currentTeam: currentTeam,
+        currentTeam: syncedTeam,
+        lifecycle: currentLifecycle,
         slotToReplace: member.slot,
         playerOutValue: member.marketPlayer.value,
         playerInValue: replacement.value,
         fullTeamValues: currentValues,
-        currentGameweek: currentGameweek,
       );
       Get.snackbar(
         'تمت الصفقة',
@@ -183,8 +234,37 @@ class TransferMarketController extends GetxController {
         .toList();
   }
 
-  Future<int> _resolveCurrentGameweek() async {
-    final lifecycle = await _lifecycleService.resolveLifecycle(leagueId);
-    return lifecycle.currentGameweek;
+  Future<FantasyTeam> _syncTeamToLifecycle(
+    FantasyTeam loadedTeam,
+    FantasyLeagueLifecycle? currentLifecycle,
+  ) async {
+    if (currentLifecycle == null) {
+      return loadedTeam;
+    }
+
+    final syncResult = _transferPolicyService.syncTeamForLifecycle(
+      team: loadedTeam,
+      lifecycle: currentLifecycle,
+    );
+    if (!syncResult.changed) {
+      return loadedTeam;
+    }
+
+    await _fantasyRepository.updateFantasyTeam(syncResult.team);
+    return syncResult.team;
+  }
+
+  TransferPolicyDecision? _buildTransferDecision(
+    FantasyTeam? currentTeam,
+    FantasyLeagueLifecycle? currentLifecycle,
+  ) {
+    if (currentTeam == null || currentLifecycle == null) {
+      return null;
+    }
+
+    return _transferPolicyService.evaluateTransfer(
+      team: currentTeam,
+      lifecycle: currentLifecycle,
+    );
   }
 }

@@ -9,6 +9,11 @@ class TransferRecordModel extends TransferRecord {
     required super.playerInId,
     required super.gameweek,
     required super.cost,
+    super.usedFreeTransfer = false,
+    super.hitApplied = false,
+    super.wildcardApplied = false,
+    super.policyPhase = 'unknown',
+    super.blockedReason,
     required super.timestamp,
   });
 
@@ -21,6 +26,11 @@ class TransferRecordModel extends TransferRecord {
       playerInId: json['playerInId'] as String? ?? '',
       gameweek: json['gameweek'] as int? ?? 1,
       cost: json['cost'] as int? ?? 0,
+      usedFreeTransfer: json['usedFreeTransfer'] as bool? ?? false,
+      hitApplied: json['hitApplied'] as bool? ?? false,
+      wildcardApplied: json['wildcardApplied'] as bool? ?? false,
+      policyPhase: json['policyPhase'] as String? ?? 'unknown',
+      blockedReason: json['blockedReason'] as String?,
       timestamp: json['timestamp'] != null
           ? DateTime.fromMillisecondsSinceEpoch(json['timestamp'] as int)
           : DateTime.now(),
@@ -35,6 +45,11 @@ class TransferRecordModel extends TransferRecord {
       'playerInId': playerInId,
       'gameweek': gameweek,
       'cost': cost,
+      'usedFreeTransfer': usedFreeTransfer,
+      'hitApplied': hitApplied,
+      'wildcardApplied': wildcardApplied,
+      'policyPhase': policyPhase,
+      'blockedReason': blockedReason,
       'timestamp': timestamp.millisecondsSinceEpoch,
     };
   }
@@ -48,6 +63,11 @@ class TransferRecordModel extends TransferRecord {
       playerInId: entity.playerInId,
       gameweek: entity.gameweek,
       cost: entity.cost,
+      usedFreeTransfer: entity.usedFreeTransfer,
+      hitApplied: entity.hitApplied,
+      wildcardApplied: entity.wildcardApplied,
+      policyPhase: entity.policyPhase,
+      blockedReason: entity.blockedReason,
       timestamp: entity.timestamp,
     );
   }
@@ -61,6 +81,11 @@ class TransferRecordModel extends TransferRecord {
       playerInId: playerInId,
       gameweek: gameweek,
       cost: cost,
+      usedFreeTransfer: usedFreeTransfer,
+      hitApplied: hitApplied,
+      wildcardApplied: wildcardApplied,
+      policyPhase: policyPhase,
+      blockedReason: blockedReason,
       timestamp: timestamp,
     );
   }

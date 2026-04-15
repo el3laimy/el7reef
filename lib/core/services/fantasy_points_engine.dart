@@ -1,3 +1,4 @@
+import '../../domain/entities/fantasy_chip.dart';
 import '../../domain/entities/player_match_stats.dart';
 import '../../domain/entities/fantasy_slot.dart';
 
@@ -103,13 +104,22 @@ class FantasyPointsEngine {
   static int calculateRoundPoints({
     required List<FantasySlot> slots,
     required Map<String, PlayerMatchStats> roundStats,
-    List<String> activeChips = const [],
+    List<ChipUsage> activeChips = const [],
+    int currentGameweek = 1,
     Set<String> mvpPlayers = const {},
     Set<String> doubleAwardPlayers = const {},
   }) {
     int totalPoints = 0;
-    final bool benchBoost = activeChips.contains('Bench Boost');
-    final bool tripleCaptain = activeChips.contains('Triple Captain');
+    final bool benchBoost = activeChips.any(
+      (chip) =>
+          chip.chipType == ChipType.benchBoost &&
+          chip.isActiveInGameweek(currentGameweek),
+    );
+    final bool tripleCaptain = activeChips.any(
+      (chip) =>
+          chip.chipType == ChipType.tripleCaptain &&
+          chip.isActiveInGameweek(currentGameweek),
+    );
 
     for (var slot in slots) {
       // إهمال اللاعب إذا كان احتياطياً ولم تستخدم خاصية الـ Bench Boost
