@@ -1,227 +1,427 @@
-# EL7REEF Engineering Plan
+# EL7REEF Engineering Plan V2
 
-Version: 2026-04-14
-Scope: Next execution phase after the completed security, routing, activity feed, and core fantasy fixes.
+Version: 2026-04-15
+Companion Docs:
+- [product_plan.md](product_plan.md)
+- [implementation_backlog_v2.md](implementation_backlog_v2.md)
 
-Implementation backlog for this plan lives in [implementation_backlog.md](implementation_backlog.md).
+Legacy fantasy-focused backlog remains in [implementation_backlog.md](implementation_backlog.md) as execution history for the completed foundation work.
+
+## Executive Summary
+
+EL7REEF is moving from a fantasy-and-tournament app with working core flows to a real-world football operations platform that can handle hybrid participation from day one. The engineering priority is no longer only "complete missing screens", but to build the operational layer that supports:
+
+- registered players and teams
+- guest players and guest teams
+- hybrid tournament registration
+- lineup, check-in, and substitutions
+- claim and merge flows
+- audit, disputes, and trusted operations
+
+The system should work before full adoption, then gradually convert real-world participation into verified digital identity.
 
 ## Current Baseline
 
-- Firestore rules were tightened and aligned with real ownership fields.
-- Match settlement, fan voting, username claiming, and route contracts were stabilized.
+The following foundation already exists and should be treated as completed input to V2:
+
+- Firestore rules were tightened around real ownership fields.
+- ID-based routing was stabilized for critical flows.
+- Match settlement, fan voting, and username claim flows were hardened.
 - Activity feed is connected to real data.
-- Fantasy core flows are live: league list, draft, team page, leaderboard, and transfers.
+- Fantasy lifecycle, chips, transfer policy, and round settlement are working.
 - `flutter analyze` and `flutter test` are currently passing.
 
-## Goal Of This Plan
+## Strategic Shift
 
-Move the product from "core flows are working" to "fantasy and tournament operations are production-ready, controlled, and testable end-to-end".
+Previous planning assumed a mostly app-native experience. V2 shifts EL7REEF to a hybrid operating model:
 
-## Priorities
+- do not block organizers because some participants are not registered
+- represent guest participation explicitly in the data model
+- treat claim and merge as first-class growth flows
+- make operational trust part of the product, not a later add-on
 
-- `P0`: Must be completed before broad rollout.
-- `P1`: Strongly recommended for stable launch quality.
-- `P2`: Improvement and scale work after launch readiness.
+## Engineering Objectives
 
-## Execution Order
+1. Support hybrid identity and participation without hacks.
+2. Keep sensitive writes idempotent and safe to retry.
+3. Align authorization with real ownership and role boundaries.
+4. Build operational primitives before feature polish.
+5. Keep unfinished modules behind explicit feature flags.
 
-1. `ENG-01` to `ENG-04`
-2. `ENG-05` to `ENG-08`
-3. `ENG-09` to `ENG-12`
+## Architecture Principles
 
-## Task Breakdown
+### 1. ID-First Navigation
 
-### ENG-01: Gameweek Lifecycle Service
+All navigation contracts must remain parameter-driven and route-safe:
 
-Priority: `P0`
-Area: Fantasy Backend
-Task: Create a single lifecycle service that knows the current fantasy gameweek, its status, and whether actions are open or locked.
-Output: Central service used by fantasy team, transfers, scoring, and chips.
-Done When:
-- One source of truth returns `currentGameweek`, `deadlineAt`, `isLocked`, and `phase`.
-- Controllers stop hardcoding fallback gameweek values.
-- Tournament phase and global league phase resolve consistently.
-Depends On: None
+- `/team/:teamId`
+- `/team/:teamId/formation`
+- `/tournament/:tournamentId/register`
+- `/match/:matchId/lineup`
+- `/guest-player/:guestPlayerId/claim`
 
-### ENG-02: Deadline Locking For Draft And Transfers
+No screen should depend on injected objects that are not reconstructible from IDs.
 
-Priority: `P0`
-Area: Fantasy Rules
-Task: Prevent team edits and transfers after the round deadline unless the round is in an allowed transfer phase.
-Output: Locking rules enforced in services and visible in UI.
-Done When:
-- Draft save is blocked after deadline.
-- Transfer execution is blocked after deadline unless transfer window is open.
-- UI shows a clear locked state with reason.
-- Tests cover allowed and blocked paths.
-Depends On: `ENG-01`
+### 2. Controllers Orchestrate, Services Decide
 
-### ENG-03: Chips Activation Flow
+Controllers should remain orchestration-only. Core business logic belongs in services, policies, and use-case style classes.
 
-Priority: `P0`
-Area: Fantasy Gameplay
-Task: Implement full chip lifecycle for `Wildcard`, `Bench Boost`, and `Triple Captain`.
-Output: Users can activate chips from the team page and the scoring engine consumes them correctly.
-Done When:
-- Chip activation is stored on the team with round context.
-- `Triple Captain` and `Bench Boost` affect scoring in the correct round only.
-- `Wildcard` removes transfer hit penalties only while active.
-- Used chips cannot be replayed outside the allowed policy.
-Depends On: `ENG-01`, `ENG-02`
+### 3. Idempotent Sensitive Flows
 
-### ENG-04: Transfer Policy By Tournament Phase
+The following classes of writes must be safe to retry:
 
-Priority: `P0`
-Area: Fantasy Rules
-Task: Align transfer permissions and free transfer refill behavior with tournament phase and round transitions.
-Output: Transfer engine respects phase-based policy.
-Done When:
-- Free transfers are reset or carried according to policy.
-- Tournament-specific leagues can have different transfer windows from global league.
-- Transfer history stores enough metadata to audit why a move was accepted.
-- Tests cover normal transfer, extra hit, wildcard transfer, and blocked transfer.
-Depends On: `ENG-01`, `ENG-02`
+- match settlement
+- fan voting session open
+- username claim
+- guest player claim
+- guest team claim
+- lineup lock
+- tournament registration approval
 
-### ENG-05: Idempotent Fantasy Round Settlement
+### 4. Additive Schema Over Breaking Migration
 
-Priority: `P0`
-Area: Scoring
-Task: Build a round settlement pipeline that applies fantasy points once per round without double counting.
-Output: Round settlement service with idempotency marker.
-Done When:
-- Slot points, team round points, and total points are updated in one controlled flow.
-- Re-running the same settlement does not duplicate points.
-- Captain, vice-captain, and bench rules are applied correctly.
-- Admin or background job can trigger settlement safely.
-Depends On: `ENG-01`, `ENG-03`
+V2 should add guest and membership layers beside the current data model first, then migrate traffic gradually. Avoid large destructive rewrites.
 
-### ENG-06: Fantasy Admin Controls
+### 5. Audit-First For Operational Changes
 
-Priority: `P1`
-Area: Internal Tools
-Task: Add organizer/admin controls for opening rounds, locking rounds, and triggering settlement.
-Output: Admin screen or protected organizer actions.
-Done When:
-- Authorized users can move a round between open, locked, and settled.
-- Unauthorized users cannot access these actions.
-- Admin actions are logged with actor and timestamp.
-Depends On: `ENG-01`, `ENG-05`
+Anything that affects trust or competitive integrity should leave an explicit audit trail.
 
-### ENG-07: Team Management Polish
+## Target Capability Map
 
-Priority: `P1`
-Area: Flutter UI
-Task: Improve the fantasy team experience around captain changes, chip activation, and transfer history.
-Output: Cleaner team management flow.
-Done When:
-- Team page shows active chip, round status, and next deadline clearly.
-- Transfer history supports basic filtering by gameweek.
-- Captain and vice-captain changes have optimistic UI or clear refresh behavior.
-- Empty, loading, and error states are consistent.
-Depends On: `ENG-02`, `ENG-03`, `ENG-04`
+### Identity And Participation
 
-### ENG-08: Notifications And Feed Integration
+- Registered Player
+- Guest Player
+- Registered Team
+- Guest Team
+- Claim status lifecycle
+- Merge-safe identity linking
 
-Priority: `P1`
-Area: Social / Product
-Task: Push round events into activity feed and notifications.
-Output: Users see deadline reminders, chip confirmations, and major fantasy updates.
-Done When:
-- Feed items are generated for round open, deadline approaching, transfer completed, and settlement completed.
-- Notification payloads are deduplicated.
-- UI can deep-link from notification to the correct fantasy route.
-Depends On: `ENG-01`, `ENG-05`, `ENG-07`
+### Team Operations
 
-### ENG-09: Firestore Rule Tests And Index Audit
+- roster management
+- starter and bench states
+- availability and attendance
+- captain and assistant roles
+- formation templates and snapshots
 
-Priority: `P1`
-Area: Security / Infra
-Task: Add repeatable validation for rules and required indexes for fantasy and match queries.
-Output: Documented rules coverage and index list.
-Done When:
-- Critical write paths have rules tests.
-- Known composite indexes are documented.
-- CI fails if protected paths become writable unexpectedly.
-Depends On: None
+### Tournament Operations
 
-### ENG-10: Integration And Route Tests
+- quick setup
+- hybrid registration
+- verified registration mode
+- organizer approval workflows
 
-Priority: `P1`
-Area: Quality
-Task: Extend tests from unit level to flow level.
-Output: Coverage for complete user journeys.
-Done When:
-- Tests cover `create team -> view team -> transfer -> leaderboard`.
-- Tests cover `round lock -> blocked edit`.
-- Tests cover `settlement -> updated leaderboard`.
-- Smoke tests exist for protected and error routes.
-Depends On: `ENG-02`, `ENG-04`, `ENG-05`
+### Matchday Operations
 
-### ENG-11: Telemetry And Audit Logging
+- check-in
+- lineup lock
+- bench selection
+- substitution log
+- participation truth for stats and fantasy
 
-Priority: `P2`
-Area: Observability
-Task: Add product telemetry and engineering logs for critical fantasy actions.
-Output: Structured events for diagnosis and product insight.
-Done When:
-- Transfer failures, settlement failures, and permission failures are logged.
-- Product events exist for draft completion, chip use, and leaderboard entry.
-- Logs avoid storing sensitive user data unnecessarily.
-Depends On: `ENG-04`, `ENG-05`
+### Trust And Governance
 
-### ENG-12: Rollout And Migration Checklist
+- audit events
+- dispute windows
+- freeze and unlock controls
+- actor-scoped permissions
 
-Priority: `P2`
-Area: Release
-Task: Prepare safe rollout steps for fantasy production readiness.
-Output: Release checklist with rollback plan.
-Done When:
-- Feature flags are documented by environment.
-- Existing teams are backfilled if schema changes are needed.
-- Release checklist includes smoke test steps and rollback instructions.
-- Known risks and manual checks are listed.
-Depends On: `ENG-01` to `ENG-10`
+### Growth And Engagement
 
-## Suggested Sprint Split
+- WhatsApp-first invites
+- claim links and QR payloads
+- post-match claim prompts
+- feed events tied to real participation
 
-### Sprint 1
+## Target Data Model
 
-- `ENG-01`
-- `ENG-02`
-- `ENG-03`
-- `ENG-04`
+### `GuestPlayer`
 
-### Sprint 2
+Purpose: represent a player who is known to a team or tournament but has not claimed an app account yet.
 
-- `ENG-05`
-- `ENG-06`
-- `ENG-07`
-- `ENG-08`
+Minimum fields:
 
-### Sprint 3
+- `id`
+- `displayName`
+- `normalizedName`
+- `phoneNumber?`
+- `jerseyNumber?`
+- `preferredPosition?`
+- `teamId?`
+- `tournamentId?`
+- `createdBy`
+- `createdAt`
+- `claimStatus`
+- `claimCode?`
+- `linkedPlayerId?`
+- `notes?`
 
-- `ENG-09`
-- `ENG-10`
-- `ENG-11`
-- `ENG-12`
+### `GuestTeam`
 
-## Definition Of Done For Any Task
+Purpose: allow a tournament or organizer to add a team before that team has a registered captain or full app presence.
 
-- Code is merged behind the correct feature behavior.
-- Security and permission impact is reviewed.
-- Unit or integration tests are added where behavior changed.
-- `flutter analyze` passes.
-- `flutter test` passes.
-- User-facing errors have clear Arabic copy.
+Minimum fields:
 
-## Main Risks
+- `id`
+- `name`
+- `normalizedName`
+- `creatorId`
+- `contactName?`
+- `contactPhone?`
+- `logoUrl?`
+- `tournamentIds[]`
+- `captainGuestPlayerId?`
+- `claimStatus`
+- `linkedTeamId?`
+- `createdAt`
 
-- Round lifecycle rules may diverge between global league and tournament leagues.
-- Chips can become a hidden source of double-counting unless settlement stays idempotent.
-- Firestore query/index growth may surface only after more leagues and teams are added.
-- Admin actions need strict authorization to avoid silent data corruption.
+### `TeamMembership`
 
-## Recommended Start
+Purpose: replace fragile arrays with an explicit membership layer.
 
-Start with `ENG-01` immediately.
-It is the dependency that unlocks deadline locking, chips, transfer policy, and settlement in a clean way.
+Minimum fields:
+
+- `playerId?`
+- `guestPlayerId?`
+- `role`
+- `status`
+- `availability`
+- `joinedAt`
+- `invitedBy`
+- `claimLinkage`
+
+### `TournamentRegistration`
+
+Purpose: separate tournament participation from the team entity itself.
+
+Minimum fields:
+
+- `tournamentId`
+- `teamId?`
+- `guestTeamId?`
+- `registrationStatus`
+- `lineupStatus`
+- `paymentStatus?`
+- `verifiedAt?`
+
+### `MatchLineupSnapshot`
+
+Purpose: capture the authoritative pre-match roster and roles at lock time.
+
+Minimum fields:
+
+- `matchId`
+- `teamLineups`
+- `starters`
+- `bench`
+- `guests`
+- `lockedAt`
+- `lockedBy`
+
+### `AuditEvent`
+
+Purpose: create a uniform history for sensitive operations.
+
+Minimum fields:
+
+- `entityType`
+- `entityId`
+- `action`
+- `actorId`
+- `actorRole`
+- `before`
+- `after`
+- `timestamp`
+
+## Target Services
+
+### `GuestClaimService`
+
+Responsibilities:
+
+- create claim codes
+- resolve guest player claim
+- resolve guest team claim
+- merge guest entities into registered ones
+- prevent double claim
+- emit audit events
+
+### `TeamRosterService`
+
+Responsibilities:
+
+- add registered and guest players
+- update roster status and availability
+- move starter and bench assignments
+- replace guest entries after claim
+- save formation templates and snapshots
+
+### `TournamentRegistrationService`
+
+Responsibilities:
+
+- register team or guest team
+- quick mode setup
+- approval and verification flow
+- registration lock and capacity checks
+
+### `MatchdayService`
+
+Responsibilities:
+
+- check-in
+- lineup validation
+- lineup lock
+- substitutions
+- attendance and played-truth
+
+### `DisputeService`
+
+Responsibilities:
+
+- open dispute
+- attach reason and evidence
+- resolve or reject
+- freeze protected data after ruling
+
+### `ShareLinkService`
+
+Responsibilities:
+
+- create invite and claim payloads
+- generate deep link and QR data
+- support WhatsApp entry points
+
+## Authorization Targets
+
+### Players / GuestPlayers
+
+- a player reads their own player data
+- captain or organizer can create guest players inside owned team or tournament scope
+- claim writes must run through controlled merge logic only
+
+### Teams / GuestTeams
+
+- only authorized captain, manager, or organizer roles can change roster-critical data
+- guest team claim requires organizer approval or verified ownership flow
+
+### Tournaments
+
+- only organizers and explicitly delegated assistants can change tournament operations
+- roles must be narrow, not full-admin by default
+
+### Matches
+
+- score submission and lineup lock must be limited to allowed actors
+- stats truth should depend on trusted matchday or settlement flow
+
+### Fantasy
+
+- fantasy writes remain owner-scoped
+- transfer and settlement logic stays lifecycle-aware
+- fantasy should later consume matchday truth, not bypass it
+
+## Delivery Roadmap
+
+### Phase 0: Completed Foundation
+
+- security stabilization
+- route stabilization
+- activity feed baseline
+- fantasy lifecycle and settlement foundation
+
+### Phase 1: Hybrid Identity Foundation
+
+Build guest entities, paths, rules, CRUD, and feature-flagged entry points.
+
+### Phase 2: Team Roster Engine
+
+Introduce memberships, roster policies, formation templates, and availability states.
+
+### Phase 3: Claim And Merge Flows
+
+Ship guest claim, merge safety, organizer approval, and audit recording.
+
+### Phase 4: Tournament Hybrid Registration
+
+Support quick mode, hybrid mode, and verified mode with explicit registration records.
+
+### Phase 5: Matchday Operations
+
+Add check-in, lineup lock, substitution tracking, and participation truth.
+
+### Phase 6: Audit And Dispute Layer
+
+Add timeline visibility, dispute windows, freeze controls, and audit viewers.
+
+### Phase 7: Growth Layer
+
+Ship WhatsApp invites, claim CTAs, QR payloads, and lightweight share flows.
+
+### Phase 8: Fantasy Completion On Top Of Ops Truth
+
+Connect fantasy eligibility and engagement to real matchday and roster data.
+
+## Testing Strategy
+
+### Unit Tests
+
+- claim merge rules
+- roster validation rules
+- lineup lock validation
+- registration eligibility
+- dispute resolution rules
+
+### Repository Tests
+
+- guest CRUD
+- claim transactions
+- membership queries
+- hybrid registration queries
+- audit event persistence
+
+### Widget And Flow Tests
+
+- create guest team
+- create guest player
+- claim guest player
+- register guest team in tournament
+- check-in and lineup lock
+- roster save and formation save
+
+### Integration Tests
+
+- organizer creates hybrid tournament
+- organizer registers guest team
+- captain adds guest players
+- match lineup gets locked
+- player later claims guest slot
+- claim merges without breaking history
+
+## Major Risks
+
+- migration from simple arrays to memberships may create temporary dual-write complexity
+- duplicate identity conflicts may appear during guest claim
+- too much flexibility may reduce data cleanliness without strong policies
+- operational UI can become heavy if too many advanced actions are exposed at once
+- new flows can drift from rules if permission review happens too late
+
+## Safe Rollout Strategy
+
+1. Build schema, services, and rules before heavy UI investment.
+2. Ship all new modules behind feature flags first.
+3. Prefer additive storage and progressive cutover.
+4. Require audit output for all sensitive operations.
+5. Separate "usable now" deliverables from long-term polish.
+
+## Recommended Immediate Start
+
+Start with the V2 foundation pack:
+
+- `V2-001`: `GuestPlayer` model and enums
+- `V2-002`: `GuestTeam` model and enums
+- `V2-003`: Firestore paths, rules, and claim code storage
+- `V2-004`: repository and CRUD test coverage
+
+This is the minimum slice that unlocks hybrid registration, roster work, and claim flows without forcing disruptive rewrites later.

@@ -107,6 +107,7 @@ class PlayerModel {
   Map<String, dynamic> toJson() {
     return {
       'name': name,
+      'nameLower': name.toLowerCase(),
       'username': username,
       'usernameLower': username?.toLowerCase(),
       'photoUrl': photoUrl,

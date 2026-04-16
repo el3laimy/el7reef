@@ -30,6 +30,302 @@ service cloud.firestore {
         resource.data.organizerId == request.auth.uid;
     }
 
+    function ownsTeamById(teamId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/teams/$(teamId)) &&
+        get(/databases/$(database)/documents/teams/$(teamId))
+          .data.ownerId == request.auth.uid;
+    }
+
+    function canManageTeamById(teamId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/teams/$(teamId)) &&
+        (
+          get(/databases/$(database)/documents/teams/$(teamId))
+            .data.ownerId == request.auth.uid ||
+          request.auth.uid in
+            get(/databases/$(database)/documents/teams/$(teamId))
+              .data.viceCaptainIds
+        );
+    }
+
+    function organizesTournamentById(tournamentId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/tournaments/$(tournamentId)) &&
+        get(/databases/$(database)/documents/tournaments/$(tournamentId))
+          .data.organizerId == request.auth.uid;
+    }
+
+    function canManageGuestPlayer(data) {
+      return isAuthenticated() && (
+        (data.createdBy is string && data.createdBy == request.auth.uid) ||
+        (data.teamId is string && ownsTeamById(data.teamId)) ||
+        (data.tournamentId is string && organizesTournamentById(data.tournamentId))
+      );
+    }
+
+    function canCreateGuestPlayer(data) {
+      return isAuthenticated() &&
+        data.createdBy == request.auth.uid &&
+        (
+          (data.teamId is string && ownsTeamById(data.teamId)) ||
+          (data.tournamentId is string && organizesTournamentById(data.tournamentId))
+        );
+    }
+
+    function canManageGuestTeam(data) {
+      return isAuthenticated() &&
+        data.creatorId is string &&
+        data.creatorId == request.auth.uid;
+    }
+
+    function ownsGuestTeamById(guestTeamId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/guestTeams/$(guestTeamId)) &&
+        get(/databases/$(database)/documents/guestTeams/$(guestTeamId))
+          .data.creatorId == request.auth.uid;
+    }
+
+    function canCreateTournamentRegistration(data) {
+      return isAuthenticated() &&
+        data.tournamentId is string &&
+        (
+          organizesTournamentById(data.tournamentId) ||
+          (data.teamId is string && ownsTeamById(data.teamId)) ||
+          (data.guestTeamId is string && ownsGuestTeamById(data.guestTeamId))
+        );
+    }
+
+    function canUpdateTournamentRegistration(data) {
+      return isAuthenticated() &&
+        data.tournamentId is string &&
+        (
+          organizesTournamentById(data.tournamentId) ||
+          (data.teamId is string && ownsTeamById(data.teamId)) ||
+          (data.guestTeamId is string && ownsGuestTeamById(data.guestTeamId))
+        );
+    }
+
+    function canCreateClaimCode(data) {
+      return isAuthenticated() &&
+        data.createdBy == request.auth.uid &&
+        (
+          (
+            data.targetType == 'guestPlayer' &&
+            data.targetId is string &&
+            exists(/databases/$(database)/documents/guestPlayers/$(data.targetId)) &&
+            canManageGuestPlayer(
+              get(/databases/$(database)/documents/guestPlayers/$(data.targetId)).data
+            )
+          ) ||
+          (
+            data.targetType == 'guestTeam' &&
+            data.targetId is string &&
+            exists(/databases/$(database)/documents/guestTeams/$(data.targetId)) &&
+            canManageGuestTeam(
+              get(/databases/$(database)/documents/guestTeams/$(data.targetId)).data
+            )
+          ) ||
+          (
+            data.targetType == 'teamInvite' &&
+            data.teamId is string &&
+            data.targetId == data.teamId &&
+            canManageTeamById(data.teamId)
+          )
+        );
+    }
+
+    function isActiveGuestPlayerClaimCode(claimCode, guestPlayerId) {
+      return claimCode is string &&
+        exists(/databases/$(database)/documents/claimCodes/$(claimCode)) &&
+        get(/databases/$(database)/documents/claimCodes/$(claimCode))
+          .data.targetType == 'guestPlayer' &&
+        get(/databases/$(database)/documents/claimCodes/$(claimCode))
+          .data.targetId == guestPlayerId &&
+        get(/databases/$(database)/documents/claimCodes/$(claimCode))
+          .data.status == 'active' &&
+        (
+          !(get(/databases/$(database)/documents/claimCodes/$(claimCode))
+            .data.expiresAt is int) ||
+          get(/databases/$(database)/documents/claimCodes/$(claimCode))
+            .data.expiresAt > request.time.toMillis()
+        );
+    }
+
+    function isActiveGuestTeamClaimCode(claimCode, guestTeamId) {
+      return claimCode is string &&
+        exists(/databases/$(database)/documents/claimCodes/$(claimCode)) &&
+        get(/databases/$(database)/documents/claimCodes/$(claimCode))
+          .data.targetType == 'guestTeam' &&
+        get(/databases/$(database)/documents/claimCodes/$(claimCode))
+          .data.targetId == guestTeamId &&
+        get(/databases/$(database)/documents/claimCodes/$(claimCode))
+          .data.status == 'active' &&
+        (
+          !(get(/databases/$(database)/documents/claimCodes/$(claimCode))
+            .data.expiresAt is int) ||
+          get(/databases/$(database)/documents/claimCodes/$(claimCode))
+            .data.expiresAt > request.time.toMillis()
+        );
+    }
+
+    function canSelfClaimGuestPlayer(guestPlayerId) {
+      return isAuthenticated() &&
+        resource.data.claimCode is string &&
+        isActiveGuestPlayerClaimCode(resource.data.claimCode, guestPlayerId) &&
+        request.resource.data.displayName == resource.data.displayName &&
+        request.resource.data.normalizedName == resource.data.normalizedName &&
+        request.resource.data.phoneNumber == resource.data.phoneNumber &&
+        request.resource.data.jerseyNumber == resource.data.jerseyNumber &&
+        request.resource.data.preferredPosition == resource.data.preferredPosition &&
+        request.resource.data.teamId == resource.data.teamId &&
+        request.resource.data.tournamentId == resource.data.tournamentId &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.claimCode == resource.data.claimCode &&
+        request.resource.data.notes == resource.data.notes &&
+        request.resource.data.claimStatus == 'claimed' &&
+        request.resource.data.linkedPlayerId == request.auth.uid;
+    }
+
+    function canSelfClaimGuestTeam(guestTeamId) {
+      return isAuthenticated() &&
+        resource.data.claimCode is string &&
+        isActiveGuestTeamClaimCode(resource.data.claimCode, guestTeamId) &&
+        request.resource.data.name == resource.data.name &&
+        request.resource.data.normalizedName == resource.data.normalizedName &&
+        request.resource.data.creatorId == resource.data.creatorId &&
+        request.resource.data.contactName == resource.data.contactName &&
+        request.resource.data.contactPhone == resource.data.contactPhone &&
+        request.resource.data.logoUrl == resource.data.logoUrl &&
+        request.resource.data.tournamentIds == resource.data.tournamentIds &&
+        request.resource.data.captainGuestPlayerId == resource.data.captainGuestPlayerId &&
+        request.resource.data.claimCode == resource.data.claimCode &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.claimStatus == 'claimed' &&
+        request.resource.data.linkedTeamId is string &&
+        ownsTeamById(request.resource.data.linkedTeamId) &&
+        (
+          !(get(/databases/$(database)/documents/claimCodes/$(resource.data.claimCode))
+            .data.teamId is string) ||
+          get(/databases/$(database)/documents/claimCodes/$(resource.data.claimCode))
+            .data.teamId == request.resource.data.linkedTeamId
+        );
+    }
+
+    function canFinalizeGuestPlayerClaimCode() {
+      return isAuthenticated() &&
+        resource.data.targetType == 'guestPlayer' &&
+        resource.data.status == 'active' &&
+        (
+          !(resource.data.expiresAt is int) ||
+          resource.data.expiresAt > request.time.toMillis()
+        ) &&
+        request.resource.data.targetType == resource.data.targetType &&
+        request.resource.data.targetId == resource.data.targetId &&
+        request.resource.data.scope == resource.data.scope &&
+        request.resource.data.teamId == resource.data.teamId &&
+        request.resource.data.tournamentId == resource.data.tournamentId &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.requiresApproval == resource.data.requiresApproval &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.expiresAt == resource.data.expiresAt &&
+        request.resource.data.status == 'claimed' &&
+        request.resource.data.claimedByPlayerId == request.auth.uid;
+    }
+
+    function canRequestGuestTeamClaimCode() {
+      return isAuthenticated() &&
+        resource.data.targetType == 'guestTeam' &&
+        resource.data.status == 'active' &&
+        (
+          !(resource.data.expiresAt is int) ||
+          resource.data.expiresAt > request.time.toMillis()
+        ) &&
+        request.resource.data.targetType == resource.data.targetType &&
+        request.resource.data.targetId == resource.data.targetId &&
+        request.resource.data.scope == resource.data.scope &&
+        request.resource.data.tournamentId == resource.data.tournamentId &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.requiresApproval == resource.data.requiresApproval &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.expiresAt == resource.data.expiresAt &&
+        request.resource.data.status == 'active' &&
+        request.resource.data.claimedAt == resource.data.claimedAt &&
+        request.resource.data.claimedByPlayerId == request.auth.uid &&
+        request.resource.data.teamId is string &&
+        ownsTeamById(request.resource.data.teamId) &&
+        (
+          !(resource.data.teamId is string) ||
+          resource.data.teamId == request.resource.data.teamId
+        ) &&
+        (
+          !(resource.data.claimedByPlayerId is string) ||
+          resource.data.claimedByPlayerId == request.auth.uid
+        );
+    }
+
+    function canFinalizeGuestTeamClaimCode() {
+      return isAuthenticated() &&
+        resource.data.targetType == 'guestTeam' &&
+        resource.data.status == 'active' &&
+        (
+          !(resource.data.expiresAt is int) ||
+          resource.data.expiresAt > request.time.toMillis()
+        ) &&
+        request.resource.data.targetType == resource.data.targetType &&
+        request.resource.data.targetId == resource.data.targetId &&
+        request.resource.data.scope == resource.data.scope &&
+        request.resource.data.tournamentId == resource.data.tournamentId &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.requiresApproval == resource.data.requiresApproval &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.expiresAt == resource.data.expiresAt &&
+        request.resource.data.status == 'claimed' &&
+        request.resource.data.claimedAt is int &&
+        request.resource.data.teamId is string &&
+        (
+          (
+            ownsTeamById(request.resource.data.teamId) &&
+            request.resource.data.claimedByPlayerId == request.auth.uid
+          ) ||
+          (
+            resource.data.createdBy == request.auth.uid &&
+            resource.data.teamId is string &&
+            resource.data.teamId == request.resource.data.teamId &&
+            resource.data.claimedByPlayerId is string &&
+            request.resource.data.claimedByPlayerId == resource.data.claimedByPlayerId
+          )
+        );
+    }
+
+    function canSelfClaimMembership() {
+      return isAuthenticated() &&
+        resource.data.guestPlayerId is string &&
+        isActiveGuestPlayerClaimCode(
+          get(/databases/$(database)/documents/guestPlayers/$(resource.data.guestPlayerId))
+            .data.claimCode,
+          resource.data.guestPlayerId
+        ) &&
+        request.resource.data.teamId == resource.data.teamId &&
+        request.resource.data.playerId == request.auth.uid &&
+        request.resource.data.guestPlayerId == null &&
+        request.resource.data.claimedFromGuestPlayerId == resource.data.guestPlayerId &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.status == resource.data.status &&
+        request.resource.data.availability == resource.data.availability &&
+        request.resource.data.joinedAt == resource.data.joinedAt &&
+        request.resource.data.invitedBy == resource.data.invitedBy;
+    }
+
+    function canUpdateClaimCode(data) {
+      return isAuthenticated() &&
+        data.createdBy == request.auth.uid &&
+        request.resource.data.targetType == resource.data.targetType &&
+        request.resource.data.targetId == resource.data.targetId &&
+        request.resource.data.createdBy == resource.data.createdBy;
+    }
+
     function ownsFantasyTeam(teamId) {
       return isAuthenticated() &&
         exists(/databases/$(database)/documents/fantasyTeams/$(teamId)) &&
@@ -44,6 +340,16 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /guestPlayers/{guestPlayerId} {
+      allow read: if isAuthenticated();
+      allow create: if canCreateGuestPlayer(request.resource.data);
+      allow update: if (
+        canManageGuestPlayer(resource.data) &&
+        request.resource.data.createdBy == resource.data.createdBy
+      ) || canSelfClaimGuestPlayer(guestPlayerId);
+      allow delete: if false;
+    }
+
     match /teams/{teamId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() &&
@@ -51,6 +357,46 @@ service cloud.firestore {
       allow update: if isAuthenticated() &&
         resource.data.ownerId == request.auth.uid &&
         request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if false;
+    }
+
+    match /teamMemberships/{membershipId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        canManageTeamById(request.resource.data.teamId);
+      allow update: if (
+        isAuthenticated() &&
+        canManageTeamById(resource.data.teamId) &&
+        request.resource.data.teamId == resource.data.teamId
+      ) || canSelfClaimMembership();
+      allow delete: if false;
+    }
+
+    match /teamFormationTemplates/{templateId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        canManageTeamById(request.resource.data.teamId);
+      allow update: if isAuthenticated() &&
+        canManageTeamById(resource.data.teamId) &&
+        request.resource.data.teamId == resource.data.teamId;
+      allow delete: if isAuthenticated() &&
+        canManageTeamById(resource.data.teamId);
+    }
+
+    match /teamRosterSnapshots/{snapshotId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        canManageTeamById(request.resource.data.teamId);
+      allow update, delete: if false;
+    }
+
+    match /guestTeams/{guestTeamId} {
+      allow read: if isAuthenticated();
+      allow create: if canManageGuestTeam(request.resource.data);
+      allow update: if (
+        canManageGuestTeam(resource.data) &&
+        request.resource.data.creatorId == resource.data.creatorId
+      ) || canSelfClaimGuestTeam(guestTeamId);
       allow delete: if false;
     }
 
@@ -73,6 +419,16 @@ service cloud.firestore {
       allow create: if isAuthenticated() &&
         request.resource.data.organizerId == request.auth.uid;
       allow update: if isTournamentOrganizer();
+      allow delete: if false;
+    }
+
+    match /tournamentRegistrations/{registrationId} {
+      allow read: if isAuthenticated();
+      allow create: if canCreateTournamentRegistration(request.resource.data);
+      allow update: if (
+        canUpdateTournamentRegistration(resource.data) &&
+        request.resource.data.tournamentId == resource.data.tournamentId
+      );
       allow delete: if false;
     }
 
@@ -104,6 +460,16 @@ service cloud.firestore {
         request.resource.data.ownerId == request.auth.uid ||
         request.resource.data.previousOwnerId == request.auth.uid
       );
+      allow delete: if false;
+    }
+
+    match /claimCodes/{claimCodeId} {
+      allow read: if isAuthenticated();
+      allow create: if canCreateClaimCode(request.resource.data);
+      allow update: if canUpdateClaimCode(resource.data) ||
+        canFinalizeGuestPlayerClaimCode() ||
+        canRequestGuestTeamClaimCode() ||
+        canFinalizeGuestTeamClaimCode();
       allow delete: if false;
     }
 

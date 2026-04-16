@@ -59,6 +59,7 @@ class TeamModel {
   Map<String, dynamic> toJson() {
     return {
       'name': name,
+      'nameLower': name.toLowerCase(),
       'logoUrl': logoUrl,
       'ownerId': ownerId,
       'viceCaptainIds': viceCaptainIds,

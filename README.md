@@ -76,3 +76,105 @@ When enabling fantasy for a new tournament-backed league:
 - Client reads are allowed for `fantasyLeagues`.
 - Client writes are blocked by Firestore rules; lifecycle writes must happen
   through trusted admin tooling or backend automation.
+
+## Hybrid Identity Bootstrap
+
+V2 introduces a guest identity layer so tournaments and teams can operate before
+every participant is fully registered inside the app.
+
+Current foundation collections:
+
+- `guestPlayers`
+- `guestTeams`
+- `claimCodes`
+
+Feature flags controlling rollout:
+
+- `FeatureFlags.guestIdentityEnabled`
+- `FeatureFlags.hybridTournamentRegistrationEnabled`
+
+### `guestPlayers` Shape
+
+Example document:
+
+```json
+{
+  "displayName": "Mahmoud Ali",
+  "normalizedName": "mahmoud ali",
+  "phoneNumber": "01000000000",
+  "jerseyNumber": 9,
+  "preferredPosition": "FWD",
+  "teamId": "team-1",
+  "tournamentId": "tournament-1",
+  "createdBy": "captain-1",
+  "createdAt": 1776200400000,
+  "updatedAt": 1776200400000,
+  "claimStatus": "guest",
+  "claimCode": null,
+  "linkedPlayerId": null,
+  "notes": "manual entry"
+}
+```
+
+### `guestTeams` Shape
+
+Example document:
+
+```json
+{
+  "name": "El Mal3ab Guests",
+  "normalizedName": "el mal3ab guests",
+  "creatorId": "organizer-1",
+  "contactName": "Captain Ahmed",
+  "contactPhone": "01000000000",
+  "logoUrl": null,
+  "tournamentIds": ["tournament-1"],
+  "captainGuestPlayerId": "guest-player-1",
+  "claimStatus": "guest",
+  "claimCode": null,
+  "linkedTeamId": null,
+  "createdAt": 1776200400000,
+  "updatedAt": 1776200400000
+}
+```
+
+### `claimCodes` Shape
+
+Example document:
+
+```json
+{
+  "targetType": "guestPlayer",
+  "targetId": "guest-player-1",
+  "scope": "team",
+  "teamId": "team-1",
+  "tournamentId": null,
+  "createdBy": "captain-1",
+  "requiresApproval": false,
+  "status": "active",
+  "createdAt": 1776200400000,
+  "updatedAt": 1776200400000,
+  "expiresAt": 1776805200000,
+  "claimedByPlayerId": null,
+  "claimedAt": null
+}
+```
+
+### Claim Share Links
+
+The app now has a share-link foundation for:
+
+- guest player claim links
+- guest team claim links
+- team invite links
+
+The transport contract is `ClaimPayload`, and the persisted contract is
+`claimCodes/{code}`.
+
+### Current Security Intent
+
+- guest player creation is limited to the creator who also owns the target team
+  or tournament scope
+- guest team creation is limited to its creator
+- claim code writes are now limited to authorized guest/team managers and team
+  managers issuing invite or claim links

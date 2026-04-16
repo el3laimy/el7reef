@@ -21,6 +21,10 @@ abstract class AppRoutes {
   static const String tournamentDetail = '/tournament/:id';
   static const String tournamentBracket = '/tournament/:id/bracket';
   static const String teamRegistration = '/tournament/:id/register';
+  static const String tournamentGuestTeamCreate =
+      '/tournament/:id/register/guest-team/create';
+  static const String tournamentRegistrationReview =
+      '/tournament/:id/register/review/:registrationId';
   static const String organizerDashboard = '/organizer/dashboard/:tournamentId';
   static const String scoreApproval = '/organizer/score/:matchId';
   static const String goldenRating = '/organizer/golden-rating/:matchId';
@@ -38,10 +42,22 @@ abstract class AppRoutes {
   static const String friends = '/social/friends';
   static const String searchPlayers = '/social/search';
   static const String activityFeed = '/social/feed';
+  static const String claimEntry = '/claim';
+  static const String guestPlayerClaim = '/guest-player/:guestPlayerId/claim';
+  static const String guestTeamClaim = '/guest-team/:guestTeamId/claim';
   static const String myTeams = '/teams';
   static const String tournaments = '/tournaments';
 
+  static String teamProfileById(String id) => '/team/$id';
   static String tournamentDetailById(String id) => '/tournament/$id';
+  static String teamRegistrationForTournament(String tournamentId) =>
+      '/tournament/$tournamentId/register';
+  static String tournamentGuestTeamCreateForTournament(String tournamentId) =>
+      '/tournament/$tournamentId/register/guest-team/create';
+  static String tournamentRegistrationReviewForTournament(
+    String tournamentId,
+    String registrationId,
+  ) => '/tournament/$tournamentId/register/review/$registrationId';
   static String organizerDashboardForTournament(String tournamentId) =>
       '/organizer/dashboard/$tournamentId';
   static String scoreApprovalForMatch(String matchId) =>
@@ -55,4 +71,34 @@ abstract class AppRoutes {
       '/fantasy/transfers/$leagueId';
   static String fantasyLeaderboardForLeague(String leagueId) =>
       '/fantasy/leaderboard/$leagueId';
+
+  static String claimEntryWithQuery(Map<String, String?> queryParameters) =>
+      _withQuery(claimEntry, queryParameters);
+
+  static String guestPlayerClaimById(
+    String guestPlayerId, {
+    Map<String, String?> queryParameters = const {},
+  }) => _withQuery('/guest-player/$guestPlayerId/claim', queryParameters);
+
+  static String guestTeamClaimById(
+    String guestTeamId, {
+    Map<String, String?> queryParameters = const {},
+  }) => _withQuery('/guest-team/$guestTeamId/claim', queryParameters);
+
+  static String _withQuery(
+    String path,
+    Map<String, String?> queryParameters,
+  ) {
+    final filtered = <String, String>{};
+    for (final entry in queryParameters.entries) {
+      final value = entry.value;
+      if (value != null && value.isNotEmpty) {
+        filtered[entry.key] = value;
+      }
+    }
+    if (filtered.isEmpty) {
+      return path;
+    }
+    return Uri(path: path, queryParameters: filtered).toString();
+  }
 }

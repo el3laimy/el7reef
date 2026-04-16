@@ -14,6 +14,8 @@ import '../../features/profile/views/profile_screen.dart';
 import '../../features/profile/bindings/profile_binding.dart';
 import '../../features/team/views/my_teams_screen.dart';
 import '../../features/team/bindings/team_binding.dart';
+import '../../features/team/views/team_roster_screen.dart';
+import '../../features/team/bindings/team_roster_binding.dart';
 import '../../features/match/views/match_discover_screen.dart';
 import '../../features/match/views/score_submit_screen.dart';
 import '../../features/match/views/fan_voting_screen.dart';
@@ -22,15 +24,27 @@ import '../../features/match/bindings/score_submit_binding.dart';
 import '../../features/match/bindings/fan_voting_binding.dart';
 import '../../features/tournament/views/tournament_list_screen.dart';
 import '../../features/tournament/views/tournament_detail_screen.dart';
+import '../../features/tournament/views/tournament_registration_screen.dart';
+import '../../features/tournament/views/tournament_guest_team_create_screen.dart';
+import '../../features/tournament/views/tournament_registration_review_screen.dart';
 import '../../features/tournament/views/tournament_assistants_screen.dart';
 import '../../features/tournament/bindings/tournament_binding.dart';
 import '../../features/tournament/bindings/tournament_detail_binding.dart';
+import '../../features/tournament/bindings/tournament_registration_binding.dart';
+import '../../features/tournament/bindings/tournament_guest_team_create_binding.dart';
+import '../../features/tournament/bindings/tournament_registration_review_binding.dart';
 import '../../features/tournament/bindings/tournament_assistants_binding.dart';
 import '../../features/social/views/username_screen.dart';
 import '../../features/social/views/qr_scanner_screen.dart';
 import '../../features/social/views/friends_screen.dart';
 import '../../features/social/views/search_players_screen.dart';
 import '../../features/social/bindings/friend_binding.dart';
+import '../../features/guest_claim/views/claim_entry_screen.dart';
+import '../../features/guest_claim/views/guest_player_claim_screen.dart';
+import '../../features/guest_claim/views/guest_team_claim_screen.dart';
+import '../../features/guest_claim/bindings/claim_entry_binding.dart';
+import '../../features/guest_claim/bindings/guest_player_claim_binding.dart';
+import '../../features/guest_claim/bindings/guest_team_claim_binding.dart';
 import '../../features/fantasy/presentation/screens/fantasy_league_list_screen.dart';
 import '../../features/fantasy/presentation/screens/create_fantasy_team_screen.dart';
 import '../../features/fantasy/presentation/screens/fantasy_team_screen.dart';
@@ -105,6 +119,14 @@ class AppPages {
       transition: Transition.rightToLeftWithFade,
     ),
 
+    // ── Team Roster / Team Profile ──
+    GetPage(
+      name: AppRoutes.teamProfile,
+      page: () => const TeamRosterScreen(),
+      binding: TeamRosterBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
     // ══════════════════════════════════════════
     // Phase 4: Matches
     // ══════════════════════════════════════════
@@ -161,6 +183,48 @@ class AppPages {
       transition: Transition.rightToLeftWithFade,
     ),
 
+    // ── Tournament Registration Hub ──
+    GetPage(
+      name: AppRoutes.teamRegistration,
+      page: () => FeatureFlags.hybridTournamentRegistrationEnabled
+          ? const TournamentRegistrationScreen()
+          : const FeatureUnavailableScreen(
+              title: 'تسجيل البطولة غير متاح',
+              message:
+                  'واجهات التسجيل الهجين ما زالت متوقفة في هذا البناء حتى يتم تفعيلها بشكل كامل.',
+            ),
+      binding: TournamentRegistrationBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    // ── Create Guest Team For Tournament ──
+    GetPage(
+      name: AppRoutes.tournamentGuestTeamCreate,
+      page: () => FeatureFlags.hybridTournamentRegistrationEnabled
+          ? const TournamentGuestTeamCreateScreen()
+          : const FeatureUnavailableScreen(
+              title: 'إنشاء فريق ضيف غير متاح',
+              message:
+                  'هذه الشاشة تعتمد على تدفقات التسجيل الهجين التي ما زالت غير مفعلة في هذا البناء.',
+            ),
+      binding: TournamentGuestTeamCreateBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    // ── Tournament Registration Review ──
+    GetPage(
+      name: AppRoutes.tournamentRegistrationReview,
+      page: () => FeatureFlags.hybridTournamentRegistrationEnabled
+          ? const TournamentRegistrationReviewScreen()
+          : const FeatureUnavailableScreen(
+              title: 'مراجعة التسجيل غير متاحة',
+              message:
+                  'تم إيقاف واجهة مراجعة التسجيلات مؤقتًا لحين تفعيل التسجيل الهجين بالكامل.',
+            ),
+      binding: TournamentRegistrationReviewBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
     // ── Tournament Assistants ──
     GetPage(
       name: AppRoutes.organizerDashboard,
@@ -202,6 +266,48 @@ class AppPages {
       page: () => const SearchPlayersScreen(),
       binding: FriendBinding(),
       transition: Transition.fadeIn,
+    ),
+
+    // ── Generic Claim Entry (deep link / QR landing) ──
+    GetPage(
+      name: AppRoutes.claimEntry,
+      page: () => FeatureFlags.guestIdentityEnabled
+          ? const ClaimEntryScreen()
+          : const FeatureUnavailableScreen(
+              title: 'خاصية الـ claim غير متاحة',
+              message:
+                  'تم إيقاف شاشات استلام اللاعبين والفرق الضيوف مؤقتًا في هذا البناء.',
+            ),
+      binding: ClaimEntryBinding(),
+      transition: Transition.fadeIn,
+    ),
+
+    // ── Guest Player Claim ──
+    GetPage(
+      name: AppRoutes.guestPlayerClaim,
+      page: () => FeatureFlags.guestIdentityEnabled
+          ? const GuestPlayerClaimScreen()
+          : const FeatureUnavailableScreen(
+              title: 'استلام اللاعب غير متاح',
+              message:
+                  'شاشات استلام اللاعبين الضيوف ما زالت غير مفعلة في هذا البناء.',
+            ),
+      binding: GuestPlayerClaimBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    // ── Guest Team Claim ──
+    GetPage(
+      name: AppRoutes.guestTeamClaim,
+      page: () => FeatureFlags.guestIdentityEnabled
+          ? const GuestTeamClaimScreen()
+          : const FeatureUnavailableScreen(
+              title: 'استلام الفريق غير متاح',
+              message:
+                  'شاشات استلام الفرق الضيوف ما زالت غير مفعلة في هذا البناء.',
+            ),
+      binding: GuestTeamClaimBinding(),
+      transition: Transition.rightToLeftWithFade,
     ),
 
     // ══════════════════════════════════════════

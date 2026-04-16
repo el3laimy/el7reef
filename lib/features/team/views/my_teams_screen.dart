@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
+import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
@@ -86,12 +87,14 @@ class MyTeamsScreen extends GetView<TeamController> {
       roleIcon = Icons.shield;
     }
 
-    return GlassmorphicContainer(
-      margin: const EdgeInsets.only(bottom: AppDimensions.md),
-      padding: const EdgeInsets.all(AppDimensions.md),
-      borderRadius: AppDimensions.radiusLg,
-      child: Row(
-        children: [
+    return GestureDetector(
+      onTap: () => Get.toNamed(AppRoutes.teamProfileById(team.id)),
+      child: GlassmorphicContainer(
+        margin: const EdgeInsets.only(bottom: AppDimensions.md),
+        padding: const EdgeInsets.all(AppDimensions.md),
+        borderRadius: AppDimensions.radiusLg,
+        child: Row(
+          children: [
           // شعار الفريق
           Container(
             width: 56,
@@ -140,17 +143,24 @@ class MyTeamsScreen extends GetView<TeamController> {
               ],
             ),
           ),
-          // الرتبة
-          Column(
-            children: [
-              Text(
-                '${team.avgRating.toInt()}',
-                style: AppTextStyles.ratingMedium.copyWith(fontSize: 20),
-              ),
-              Text('متوسط', style: AppTextStyles.labelSmall),
-            ],
-          ),
-        ],
+            // الرتبة
+            Column(
+              children: [
+                Text(
+                  '${team.avgRating.toInt()}',
+                  style: AppTextStyles.ratingMedium.copyWith(fontSize: 20),
+                ),
+                Text('متوسط', style: AppTextStyles.labelSmall),
+                const SizedBox(height: 4),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: AppColors.textMuted,
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     ).animate(delay: (100 * index).ms).fadeIn(duration: 400.ms).slideX(begin: 0.1);
   }

@@ -10,7 +10,6 @@ import '../../../core/enums/tournament_enums.dart';
 import '../../../core/widgets/el7reef_button.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../domain/entities/tournament.dart';
-import '../../../features/team/controllers/team_controller.dart';
 import '../../../services/auth_service.dart';
 import '../controllers/tournament_controller.dart';
 import '../controllers/tournament_detail_controller.dart';
@@ -118,11 +117,9 @@ class TournamentDetailScreen extends GetView<TournamentDetailController> {
                       const SizedBox(height: AppDimensions.md),
                       if (!isOrganizer &&
                           tournament.status == TournamentStatus.registration)
-                        _RegisterTeamButton(
-                          tournament: tournament,
-                          ctrl: tournamentController,
-                          detailController: controller,
-                        ).animate().fadeIn(delay: 300.ms),
+                        _RegisterTeamButton(tournament: tournament)
+                            .animate()
+                            .fadeIn(delay: 300.ms),
                       if (tournament.isFantasyEnabled)
                         _FantasyLeagueButton(tournament: tournament)
                             .animate()
@@ -507,74 +504,35 @@ class _FantasyLeagueButton extends StatelessWidget {
 
 class _RegisterTeamButton extends StatelessWidget {
   final Tournament tournament;
-  final TournamentController ctrl;
-  final TournamentDetailController detailController;
 
   const _RegisterTeamButton({
     required this.tournament,
-    required this.ctrl,
-    required this.detailController,
   });
 
   @override
   Widget build(BuildContext context) {
-    final teamCtrl = Get.find<TeamController>();
-
-    return Obx(() {
-      final myTeams = teamCtrl.myTeams;
-      if (myTeams.isEmpty) {
-        return GlassmorphicContainer(
-          padding: const EdgeInsets.all(AppDimensions.md),
-          borderRadius: AppDimensions.radiusMd,
-          child: Column(
-            children: [
-              const Text('👥', style: TextStyle(fontSize: 32)),
-              const SizedBox(height: 8),
-              Text('عندك فريق؟ أنشئه الأول!', style: AppTextStyles.bodyMedium),
-            ],
-          ),
-        );
-      }
-
-      return Column(
+    return GlassmorphicContainer(
+      padding: const EdgeInsets.all(AppDimensions.md),
+      borderRadius: AppDimensions.radiusMd,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text('سجّل فريقك', style: AppTextStyles.titleLarge),
           const SizedBox(height: AppDimensions.sm),
-          ...myTeams.map(
-            (team) => Padding(
-              padding: const EdgeInsets.only(bottom: AppDimensions.sm),
-              child: OutlinedButton.icon(
-                onPressed: tournament.canRegister &&
-                        !tournament.registeredTeamIds.contains(team.id)
-                    ? () async {
-                        await ctrl.registerTeam(tournament.id, team.id);
-                        await detailController.loadTournament();
-                      }
-                    : null,
-                icon: const Icon(Icons.add_circle_outline),
-                label: Text(
-                  tournament.registeredTeamIds.contains(team.id)
-                      ? '${team.name} (مسجّل ✅)'
-                      : team.name,
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor:
-                      tournament.registeredTeamIds.contains(team.id)
-                          ? AppColors.success
-                          : AppColors.primary,
-                  side: BorderSide(
-                    color: tournament.registeredTeamIds.contains(team.id)
-                        ? AppColors.success
-                        : AppColors.primary,
-                  ),
-                ),
-              ),
-            ),
+          Text(
+            'افتح صفحة التسجيل لاختيار فريقك ومعرفة حالة طلبات البطولة الحالية.',
+            style: AppTextStyles.bodyMedium,
+          ),
+          const SizedBox(height: AppDimensions.md),
+          El7reefButton(
+            text: 'فتح صفحة التسجيل',
+            icon: Icons.app_registration_rounded,
+            onPressed: () =>
+                Get.toNamed(AppRoutes.teamRegistrationForTournament(tournament.id)),
           ),
         ],
-      );
-    });
+      ),
+    );
   }
 }
 
@@ -614,6 +572,14 @@ class _OrganizerPanel extends StatelessWidget {
             ),
             icon: const Icon(Icons.manage_accounts_rounded),
             label: const Text('إدارة المساعدين'),
+          ),
+          const SizedBox(height: AppDimensions.sm),
+          OutlinedButton.icon(
+            onPressed: () => Get.toNamed(
+              AppRoutes.teamRegistrationForTournament(tournament.id),
+            ),
+            icon: const Icon(Icons.app_registration_rounded),
+            label: const Text('إدارة التسجيلات'),
           ),
           const SizedBox(height: AppDimensions.sm),
           if (tournament.status == TournamentStatus.registration)

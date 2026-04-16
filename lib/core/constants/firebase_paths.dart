@@ -1,9 +1,16 @@
 /// مسارات مجموعات Firebase Firestore
 abstract class FirebasePaths {
   static const String players = 'players';
+  static const String guestPlayers = 'guestPlayers';
   static const String teams = 'teams';
+  static const String guestTeams = 'guestTeams';
+  static const String teamMemberships = 'teamMemberships';
+  static const String teamFormationTemplates = 'teamFormationTemplates';
+  static const String teamRosterSnapshots = 'teamRosterSnapshots';
   static const String matches = 'matches';
   static const String tournaments = 'tournaments';
+  static const String tournamentRegistrations = 'tournamentRegistrations';
+  static const String claimCodes = 'claimCodes';
   static const String ratingEvents = 'ratingEvents';
   static const String encounterLogs = 'encounterLogs';
   static const String organizerActions = 'organizerActions';
