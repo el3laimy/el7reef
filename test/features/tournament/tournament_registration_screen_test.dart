@@ -8,6 +8,7 @@ import 'package:el7reef/core/auth/auth_session.dart';
 import 'package:el7reef/core/enums/guest_claim_status.dart';
 import 'package:el7reef/core/enums/tournament_enums.dart';
 import 'package:el7reef/core/enums/tournament_registration_mode.dart';
+import 'package:el7reef/core/enums/tournament_registration_status.dart';
 import 'package:el7reef/core/services/tournament_registration_service.dart';
 import 'package:el7reef/data/repositories/guest_team_repository_impl.dart';
 import 'package:el7reef/data/repositories/player_repository_impl.dart';
@@ -19,7 +20,9 @@ import 'package:el7reef/domain/entities/player.dart';
 import 'package:el7reef/domain/entities/team.dart';
 import 'package:el7reef/domain/entities/tournament.dart';
 import 'package:el7reef/features/tournament/controllers/tournament_registration_controller.dart';
+import 'package:el7reef/features/tournament/controllers/tournament_guest_team_create_controller.dart';
 import 'package:el7reef/features/tournament/controllers/tournament_registration_review_controller.dart';
+import 'package:el7reef/features/tournament/views/tournament_guest_team_create_screen.dart';
 import 'package:el7reef/features/tournament/views/tournament_registration_review_screen.dart';
 import 'package:el7reef/features/tournament/views/tournament_registration_screen.dart';
 
@@ -191,6 +194,140 @@ void main() {
       await tester.pumpAndSettle();
     }
   });
+
+  testWidgets('organizer can create a guest team in hybrid mode from the UI',
+      (WidgetTester tester) async {
+    final emptyTournamentId = 'tournament-2';
+    final now = DateTime(2026, 4, 16, 21);
+    await tournamentRepository.createTournament(
+      Tournament(
+        id: emptyTournamentId,
+        organizerId: 'organizer-1',
+        name: 'Hybrid Cup',
+        format: TournamentFormat.groupsThenKnockout,
+        teamSize: TournamentTeamSize.fiveVsFive,
+        maxTeams: 8,
+        status: TournamentStatus.registration,
+        createdAt: now,
+      ),
+    );
+
+    Get.put<AuthSession>(
+      _FakeAuthSession(
+        currentUserId: 'organizer-1',
+        currentPlayer: Player(
+          id: 'organizer-1',
+          name: 'Organizer One',
+          createdAt: now,
+          lastActiveAt: now,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        initialRoute: AppRoutes.tournamentGuestTeamCreateForTournament(
+          emptyTournamentId,
+        ),
+        authSession: Get.find<AuthSession>(),
+        registrationService: registrationService,
+        registrationRepository: registrationRepository,
+        tournamentRepository: tournamentRepository,
+        teamRepository: teamRepository,
+        guestTeamRepository: guestTeamRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'اسم الفريق'),
+      'Hybrid Guests',
+    );
+    await tester.tap(find.text('اعتماد مباشر'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('إنشاء طلب بانتظار الاعتماد').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'إنشاء الفريق الضيف'));
+    await tester.pumpAndSettle();
+
+    final registrations = await registrationRepository.getTournamentRegistrations(
+      emptyTournamentId,
+    );
+
+    expect(find.byType(TournamentRegistrationReviewScreen), findsOneWidget);
+    expect(registrations, hasLength(1));
+    expect(registrations.single.status, TournamentRegistrationStatus.pending);
+    expect(registrations.single.guestTeamId, isNotNull);
+    if (Get.isSnackbarOpen) {
+      Get.closeAllSnackbars();
+      await tester.pumpAndSettle();
+    }
+  });
+
+  testWidgets('capacity errors appear in guest team creation flow',
+      (WidgetTester tester) async {
+    final fullTournamentId = 'tournament-full';
+    final now = DateTime(2026, 4, 16, 21, 30);
+    await tournamentRepository.createTournament(
+      Tournament(
+        id: fullTournamentId,
+        organizerId: 'organizer-1',
+        name: 'Full Cup',
+        format: TournamentFormat.groupsThenKnockout,
+        teamSize: TournamentTeamSize.fiveVsFive,
+        maxTeams: 1,
+        status: TournamentStatus.registration,
+        createdAt: now,
+      ),
+    );
+    await registrationService.registerTeam(
+      tournamentId: fullTournamentId,
+      teamId: 'team-2',
+      actorId: 'organizer-1',
+      now: now.add(const Duration(minutes: 1)),
+    );
+
+    Get.put<AuthSession>(
+      _FakeAuthSession(
+        currentUserId: 'organizer-1',
+        currentPlayer: Player(
+          id: 'organizer-1',
+          name: 'Organizer One',
+          createdAt: now,
+          lastActiveAt: now,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        initialRoute: AppRoutes.tournamentGuestTeamCreateForTournament(
+          fullTournamentId,
+        ),
+        authSession: Get.find<AuthSession>(),
+        registrationService: registrationService,
+        registrationRepository: registrationRepository,
+        tournamentRepository: tournamentRepository,
+        teamRepository: teamRepository,
+        guestTeamRepository: guestTeamRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'اسم الفريق'),
+      'Late Guests',
+    );
+    await tester.tap(find.text('اعتماد مباشر'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('إنشاء طلب بانتظار الاعتماد').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'إنشاء الفريق الضيف'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TournamentGuestTeamCreateScreen), findsOneWidget);
+    expect(find.text('اكتملت سعة التسجيل لهذه الدورة.'), findsOneWidget);
+  });
 }
 
 class _FakeAuthSession implements AuthSession {
@@ -247,6 +384,22 @@ GetMaterialApp _buildApp({
                 registrationRepository: registrationRepository,
                 tournamentRepository: tournamentRepository,
                 teamRepository: teamRepository,
+                guestTeamRepository: guestTeamRepository,
+                registrationService: registrationService,
+              ),
+            );
+          }
+        }),
+      ),
+      GetPage(
+        name: AppRoutes.tournamentGuestTeamCreate,
+        page: () => const TournamentGuestTeamCreateScreen(),
+        binding: BindingsBuilder(() {
+          if (!Get.isRegistered<TournamentGuestTeamCreateController>()) {
+            Get.put<TournamentGuestTeamCreateController>(
+              TournamentGuestTeamCreateController(
+                authSession: authSession,
+                tournamentRepository: tournamentRepository,
                 guestTeamRepository: guestTeamRepository,
                 registrationService: registrationService,
               ),

@@ -5,4 +5,5 @@ abstract class FeatureFlags {
   static const bool activityFeedEnabled = true;
   static const bool guestIdentityEnabled = true;
   static const bool hybridTournamentRegistrationEnabled = true;
+  static const bool matchdayUiEnabled = true;
 }

@@ -167,6 +167,8 @@ class _MatchCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isOrganizer = match.organizerId ==
         controller.authService.currentUserId;
+    final canOpenMatchday =
+        match.isOrganized || match.teamAId != null || match.teamBId != null;
 
     return GlassmorphicContainer(
       padding: const EdgeInsets.all(AppDimensions.md),
@@ -240,6 +242,22 @@ class _MatchCard extends StatelessWidget {
           ),
 
           const SizedBox(height: AppDimensions.md),
+
+          if (canOpenMatchday)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.only(bottom: AppDimensions.md),
+              child: OutlinedButton.icon(
+                onPressed: () =>
+                    Get.toNamed(AppRoutes.matchDetailsById(match.id)),
+                icon: const Icon(Icons.fact_check_outlined, size: 18),
+                label: const Text('إدارة يوم المباراة'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                ),
+              ),
+            ),
 
           // ── زر تصويت الجماهير (Fan Voting) ──
           if (match.status == MatchStatus.completed ||

@@ -1,0 +1,982 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../../../core/auth/auth_session.dart';
+import '../../../core/enums/match_attendance_status.dart';
+import '../../../core/enums/match_status.dart';
+import '../../../core/enums/team_membership_status.dart';
+import '../../../core/enums/tournament_registration_status.dart';
+import '../../../core/services/matchday_service.dart';
+import '../../../core/services/tournament_permission_service.dart';
+import '../../../data/repositories/guest_player_repository_impl.dart';
+import '../../../data/repositories/guest_team_repository_impl.dart';
+import '../../../data/repositories/match_attendance_repository_impl.dart';
+import '../../../data/repositories/match_check_in_repository_impl.dart';
+import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
+import '../../../data/repositories/match_repository_impl.dart';
+import '../../../data/repositories/match_substitution_repository_impl.dart';
+import '../../../data/repositories/player_repository_impl.dart';
+import '../../../data/repositories/team_membership_repository_impl.dart';
+import '../../../data/repositories/team_repository_impl.dart';
+import '../../../data/repositories/tournament_registration_repository_impl.dart';
+import '../../../data/repositories/tournament_repository_impl.dart';
+import '../../../domain/entities/guest_player.dart';
+import '../../../domain/entities/match.dart';
+import '../../../domain/entities/match_attendance.dart';
+import '../../../domain/entities/match_check_in.dart';
+import '../../../domain/entities/match_lineup_snapshot.dart';
+import '../../../domain/entities/match_substitution.dart';
+import '../../../domain/entities/player.dart';
+import '../../../domain/entities/team.dart';
+import '../../../domain/entities/tournament.dart';
+
+enum MatchdayManagedSideKind {
+  registeredTeam,
+  guestTeam,
+}
+
+enum MatchdayLineupSlot {
+  starter,
+  bench,
+}
+
+class MatchdayManagedSide {
+  final String key;
+  final MatchdayManagedSideKind kind;
+  final String label;
+  final String subtitle;
+  final String accessLabel;
+  final String? teamId;
+  final String? guestTeamId;
+  final bool usesOpenMatchSlot;
+  final MatchCheckIn? checkIn;
+  final MatchLineupSnapshot? snapshot;
+
+  const MatchdayManagedSide({
+    required this.key,
+    required this.kind,
+    required this.label,
+    required this.subtitle,
+    required this.accessLabel,
+    this.teamId,
+    this.guestTeamId,
+    this.usesOpenMatchSlot = false,
+    this.checkIn,
+    this.snapshot,
+  });
+
+  bool get isRegisteredTeam => kind == MatchdayManagedSideKind.registeredTeam;
+  bool get isGuestTeam => kind == MatchdayManagedSideKind.guestTeam;
+
+  MatchdayManagedSide copyWith({
+    MatchCheckIn? checkIn,
+    MatchLineupSnapshot? snapshot,
+  }) {
+    return MatchdayManagedSide(
+      key: key,
+      kind: kind,
+      label: label,
+      subtitle: subtitle,
+      accessLabel: accessLabel,
+      teamId: teamId,
+      guestTeamId: guestTeamId,
+      usesOpenMatchSlot: usesOpenMatchSlot,
+      checkIn: checkIn,
+      snapshot: snapshot,
+    );
+  }
+}
+
+class MatchdayParticipantDraft {
+  final String selectionId;
+  final String displayName;
+  final String? position;
+  final bool isGuest;
+  final TeamMembershipStatus? membershipStatus;
+  final MatchAttendance? attendance;
+  final String? playerId;
+  final String? guestPlayerId;
+
+  const MatchdayParticipantDraft({
+    required this.selectionId,
+    required this.displayName,
+    this.position,
+    required this.isGuest,
+    this.membershipStatus,
+    this.attendance,
+    this.playerId,
+    this.guestPlayerId,
+  });
+
+  String get statusSeedLabel {
+    return switch (membershipStatus) {
+      TeamMembershipStatus.starter => 'أساسي',
+      TeamMembershipStatus.bench => 'احتياط',
+      TeamMembershipStatus.inactive => 'غير نشط',
+      null => isGuest ? 'ضيف' : 'لاعب',
+    };
+  }
+}
+
+class MatchdayController extends GetxController {
+  final String matchId;
+  final AuthSession _authSession;
+  final MatchdayService _matchdayService;
+  final MatchRepositoryImpl _matchRepository;
+  final TournamentRepositoryImpl _tournamentRepository;
+  final TournamentRegistrationRepositoryImpl _registrationRepository;
+  final TeamRepositoryImpl _teamRepository;
+  final GuestTeamRepositoryImpl _guestTeamRepository;
+  final TeamMembershipRepositoryImpl _membershipRepository;
+  final PlayerRepositoryImpl _playerRepository;
+  final GuestPlayerRepositoryImpl _guestPlayerRepository;
+  final MatchCheckInRepositoryImpl _checkInRepository;
+  final MatchAttendanceRepositoryImpl _attendanceRepository;
+  final MatchLineupSnapshotRepositoryImpl _snapshotRepository;
+  final MatchSubstitutionRepositoryImpl _substitutionRepository;
+  final TournamentPermissionService _tournamentPermissionService;
+
+  MatchdayController({
+    required this.matchId,
+    required AuthSession authSession,
+    required MatchdayService matchdayService,
+    required MatchRepositoryImpl matchRepository,
+    required TournamentRepositoryImpl tournamentRepository,
+    required TournamentRegistrationRepositoryImpl registrationRepository,
+    required TeamRepositoryImpl teamRepository,
+    required GuestTeamRepositoryImpl guestTeamRepository,
+    required TeamMembershipRepositoryImpl membershipRepository,
+    required PlayerRepositoryImpl playerRepository,
+    required GuestPlayerRepositoryImpl guestPlayerRepository,
+    required MatchCheckInRepositoryImpl checkInRepository,
+    required MatchAttendanceRepositoryImpl attendanceRepository,
+    required MatchLineupSnapshotRepositoryImpl snapshotRepository,
+    required MatchSubstitutionRepositoryImpl substitutionRepository,
+    required TournamentPermissionService tournamentPermissionService,
+  })  : _authSession = authSession,
+        _matchdayService = matchdayService,
+        _matchRepository = matchRepository,
+        _tournamentRepository = tournamentRepository,
+        _registrationRepository = registrationRepository,
+        _teamRepository = teamRepository,
+        _guestTeamRepository = guestTeamRepository,
+        _membershipRepository = membershipRepository,
+        _playerRepository = playerRepository,
+        _guestPlayerRepository = guestPlayerRepository,
+        _checkInRepository = checkInRepository,
+        _attendanceRepository = attendanceRepository,
+        _snapshotRepository = snapshotRepository,
+        _substitutionRepository = substitutionRepository,
+        _tournamentPermissionService = tournamentPermissionService;
+
+  final RxBool isLoading = true.obs;
+  final RxBool isSubmitting = false.obs;
+  final RxString errorMessage = ''.obs;
+
+  final Rx<Match?> match = Rx<Match?>(null);
+  final Rx<Tournament?> tournament = Rx<Tournament?>(null);
+  final RxList<MatchdayManagedSide> managedSides = <MatchdayManagedSide>[].obs;
+  final RxString selectedSideKey = ''.obs;
+
+  final Rx<MatchCheckIn?> activeCheckIn = Rx<MatchCheckIn?>(null);
+  final Rx<MatchLineupSnapshot?> activeSnapshot = Rx<MatchLineupSnapshot?>(null);
+  final RxList<MatchSubstitution> sideSubstitutions = <MatchSubstitution>[].obs;
+  final RxList<MatchdayParticipantDraft> participants =
+      <MatchdayParticipantDraft>[].obs;
+
+  final RxMap<String, MatchAttendanceStatus> attendanceDrafts =
+      <String, MatchAttendanceStatus>{}.obs;
+  final RxMap<String, String> lineupDrafts = <String, String>{}.obs;
+
+  final RxnString selectedOutgoingAttendanceId = RxnString();
+  final RxnString selectedIncomingAttendanceId = RxnString();
+  final TextEditingController substitutionMinuteController =
+      TextEditingController();
+
+  String? get currentUserId => _authSession.currentUserId;
+  bool get isLoggedIn => currentUserId != null && currentUserId!.isNotEmpty;
+
+  MatchdayManagedSide? get selectedSide {
+    for (final side in managedSides) {
+      if (side.key == selectedSideKey.value) {
+        return side;
+      }
+    }
+    return null;
+  }
+
+  int? get requiredStarterCount => tournament.value?.teamSize.value;
+  bool get isLineupLocked => activeSnapshot.value != null;
+  bool get isMatchLive => match.value?.status == MatchStatus.live;
+  bool get canEditPreKickoff =>
+      !isLineupLocked &&
+      !isMatchLive &&
+      match.value?.status != MatchStatus.completed &&
+      match.value?.status != MatchStatus.pendingReview &&
+      match.value?.status != MatchStatus.ratingWindow &&
+      match.value?.status != MatchStatus.settled &&
+      match.value?.status != MatchStatus.frozen &&
+      match.value?.isFrozen != true;
+
+  List<MatchdayParticipantDraft> get eligibleLineupParticipants => participants
+      .where((participant) => _isEligibleForLineup(participant.selectionId))
+      .toList(growable: false);
+
+  List<MatchAttendance> get currentOnPitchAttendances => participants
+      .map((participant) => participant.attendance)
+      .whereType<MatchAttendance>()
+      .where((attendance) => attendance.currentlyOnPitch)
+      .toList(growable: false);
+
+  List<MatchAttendance> get availableIncomingAttendances => participants
+      .map((participant) => participant.attendance)
+      .whereType<MatchAttendance>()
+      .where(
+        (attendance) =>
+            !attendance.currentlyOnPitch && attendance.includedInLockedLineup,
+      )
+      .toList(growable: false);
+
+  @override
+  void onInit() {
+    super.onInit();
+    loadMatchday();
+  }
+
+  @override
+  void onClose() {
+    substitutionMinuteController.dispose();
+    super.onClose();
+  }
+
+  Future<void> loadMatchday() async {
+    try {
+      isLoading.value = true;
+      errorMessage.value = '';
+
+      final loadedMatch = await _matchRepository.getMatch(matchId);
+      if (loadedMatch == null) {
+        errorMessage.value = 'تعذر العثور على المباراة المطلوبة.';
+        return;
+      }
+
+      final loadedTournament = loadedMatch.tournamentId == null
+          ? null
+          : await _tournamentRepository.getTournament(loadedMatch.tournamentId!);
+
+      match.value = loadedMatch;
+      tournament.value = loadedTournament;
+
+      final sides = await _discoverManagedSides(
+        match: loadedMatch,
+        tournament: loadedTournament,
+      );
+      managedSides.assignAll(sides);
+
+      if (sides.isEmpty) {
+        selectedSideKey.value = '';
+        await _resetSelectedSideState();
+        return;
+      }
+
+      final preferredSide = sides.any((side) => side.key == selectedSideKey.value)
+          ? selectedSideKey.value
+          : sides.first.key;
+      selectedSideKey.value = preferredSide;
+      await _loadSelectedSideState();
+    } catch (error) {
+      errorMessage.value = _formatError(error);
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> selectSide(String sideKey) async {
+    if (sideKey == selectedSideKey.value) {
+      return;
+    }
+    selectedSideKey.value = sideKey;
+    await _loadSelectedSideState();
+  }
+
+  void setAttendanceStatus(String selectionId, MatchAttendanceStatus status) {
+    attendanceDrafts[selectionId] = status;
+    if (!_isEligibleForLineup(selectionId)) {
+      lineupDrafts.remove(selectionId);
+    }
+  }
+
+  void setLineupSlot(String selectionId, MatchdayLineupSlot? slot) {
+    if (!_isEligibleForLineup(selectionId)) {
+      lineupDrafts.remove(selectionId);
+      return;
+    }
+    if (slot == null) {
+      lineupDrafts.remove(selectionId);
+      return;
+    }
+    lineupDrafts[selectionId] = slot.name;
+  }
+
+  Future<void> submitCheckIn() async {
+    final side = selectedSide;
+    final actorId = currentUserId;
+    if (side == null || actorId == null) {
+      return;
+    }
+
+    try {
+      isSubmitting.value = true;
+      if (side.isRegisteredTeam) {
+        final membershipStatuses = <String, MatchAttendanceStatus>{};
+        for (final participant in participants) {
+          membershipStatuses[participant.selectionId] =
+              attendanceDrafts[participant.selectionId] ??
+                  MatchAttendanceStatus.pending;
+        }
+        final result = await _matchdayService.checkInRegisteredTeam(
+          matchId: matchId,
+          teamId: side.teamId!,
+          actorId: actorId,
+          membershipStatuses: membershipStatuses,
+        );
+        _showSnack(
+          'تم الحضور',
+          result.outcome == MatchdayCheckInOutcome.verified
+              ? 'تم حفظ check-in واعتماده مباشرة.'
+              : 'تم حفظ check-in بنجاح.',
+        );
+      } else {
+        final guestPlayerStatuses = <String, MatchAttendanceStatus>{};
+        for (final participant in participants) {
+          final status = attendanceDrafts[participant.selectionId] ??
+              MatchAttendanceStatus.pending;
+          if (status != MatchAttendanceStatus.pending ||
+              participant.attendance != null) {
+            guestPlayerStatuses[participant.selectionId] = status;
+          }
+        }
+        final result = await _matchdayService.checkInGuestTeam(
+          matchId: matchId,
+          guestTeamId: side.guestTeamId!,
+          actorId: actorId,
+          guestPlayerStatuses: guestPlayerStatuses,
+        );
+        _showSnack(
+          'تم الحضور',
+          result.outcome == MatchdayCheckInOutcome.verified
+              ? 'تم حفظ check-in واعتماده مباشرة.'
+              : 'تم حفظ check-in للفريق الضيف.',
+        );
+      }
+      await _loadSelectedSideState();
+    } catch (error) {
+      _showErrorSnack(error);
+    } finally {
+      isSubmitting.value = false;
+    }
+  }
+
+  Future<void> lockLineup() async {
+    final side = selectedSide;
+    final actorId = currentUserId;
+    if (side == null || actorId == null) {
+      return;
+    }
+
+    try {
+      isSubmitting.value = true;
+      final starterIds = _selectedIdsForSlot(MatchdayLineupSlot.starter);
+      final benchIds = _selectedIdsForSlot(MatchdayLineupSlot.bench);
+
+      if (side.isRegisteredTeam) {
+        final result = await _matchdayService.lockRegisteredTeamLineup(
+          matchId: matchId,
+          teamId: side.teamId!,
+          actorId: actorId,
+          starterMembershipIds: starterIds,
+          benchMembershipIds: benchIds,
+        );
+        _showSnack(
+          'تم قفل التشكيل',
+          result.outcome == MatchdayLineupLockOutcome.alreadyLocked
+              ? 'هذا التشكيل مقفول بالفعل وتم تحميل نسخته الحالية.'
+              : 'تم قفل التشكيل بنجاح.',
+        );
+      } else {
+        final result = await _matchdayService.lockGuestTeamLineup(
+          matchId: matchId,
+          guestTeamId: side.guestTeamId!,
+          actorId: actorId,
+          starterGuestPlayerIds: starterIds,
+          benchGuestPlayerIds: benchIds,
+        );
+        _showSnack(
+          'تم قفل التشكيل',
+          result.outcome == MatchdayLineupLockOutcome.alreadyLocked
+              ? 'هذا التشكيل مقفول بالفعل وتم تحميل نسخته الحالية.'
+              : 'تم قفل تشكيل الفريق الضيف بنجاح.',
+        );
+      }
+      await _loadSelectedSideState();
+    } catch (error) {
+      _showErrorSnack(error);
+    } finally {
+      isSubmitting.value = false;
+    }
+  }
+
+  Future<void> recordSubstitution() async {
+    final side = selectedSide;
+    final actorId = currentUserId;
+    final outgoingAttendanceId = selectedOutgoingAttendanceId.value;
+    final incomingAttendanceId = selectedIncomingAttendanceId.value;
+    final minute = int.tryParse(substitutionMinuteController.text.trim());
+    if (side == null ||
+        actorId == null ||
+        outgoingAttendanceId == null ||
+        incomingAttendanceId == null ||
+        minute == null) {
+      _showSnack('بيانات ناقصة', 'حدّد اللاعب الخارج والبديل والدقيقة أولاً.');
+      return;
+    }
+
+    try {
+      isSubmitting.value = true;
+      if (side.isRegisteredTeam) {
+        await _matchdayService.recordRegisteredTeamSubstitution(
+          matchId: matchId,
+          teamId: side.teamId!,
+          actorId: actorId,
+          outgoingAttendanceId: outgoingAttendanceId,
+          incomingAttendanceId: incomingAttendanceId,
+          minute: minute,
+        );
+      } else {
+        await _matchdayService.recordGuestTeamSubstitution(
+          matchId: matchId,
+          guestTeamId: side.guestTeamId!,
+          actorId: actorId,
+          outgoingAttendanceId: outgoingAttendanceId,
+          incomingAttendanceId: incomingAttendanceId,
+          minute: minute,
+        );
+      }
+
+      selectedOutgoingAttendanceId.value = null;
+      selectedIncomingAttendanceId.value = null;
+      substitutionMinuteController.clear();
+      _showSnack('تم تسجيل التبديل', 'تم تحديث played-truth والتبديل بنجاح.');
+      await _loadSelectedSideState();
+    } catch (error) {
+      _showErrorSnack(error);
+    } finally {
+      isSubmitting.value = false;
+    }
+  }
+
+  MatchAttendanceStatus statusFor(String selectionId) =>
+      attendanceDrafts[selectionId] ?? MatchAttendanceStatus.pending;
+
+  MatchdayLineupSlot? lineupSlotFor(String selectionId) {
+    final rawValue = lineupDrafts[selectionId];
+    if (rawValue == MatchdayLineupSlot.starter.name) {
+      return MatchdayLineupSlot.starter;
+    }
+    if (rawValue == MatchdayLineupSlot.bench.name) {
+      return MatchdayLineupSlot.bench;
+    }
+    return null;
+  }
+
+  String substitutionLabel(String attendanceId) {
+    for (final participant in participants) {
+      if (participant.attendance?.id == attendanceId) {
+        return participant.displayName;
+      }
+    }
+    return attendanceId;
+  }
+
+  Future<List<MatchdayManagedSide>> _discoverManagedSides({
+    required Match match,
+    required Tournament? tournament,
+  }) async {
+    final actorId = currentUserId;
+    if (actorId == null) {
+      return const [];
+    }
+
+    final organizerLevel = _hasOrganizerLevelAccess(
+      match: match,
+      tournament: tournament,
+      actorId: actorId,
+    );
+    final sides = <MatchdayManagedSide>[];
+    final seenKeys = <String>{};
+    final assignedTeamIds = <String>[
+      if (match.teamAId != null && match.teamAId!.isNotEmpty) match.teamAId!,
+      if (match.teamBId != null && match.teamBId!.isNotEmpty) match.teamBId!,
+    ];
+
+    for (final teamId in assignedTeamIds) {
+      final team = await _teamRepository.getTeam(teamId);
+      if (team == null) {
+        continue;
+      }
+      final canManage = organizerLevel || _canManageRegisteredTeam(team, actorId);
+      if (!canManage) {
+        continue;
+      }
+      final key = 'team::$teamId';
+      if (!seenKeys.add(key)) {
+        continue;
+      }
+      sides.add(
+        MatchdayManagedSide(
+          key: key,
+          kind: MatchdayManagedSideKind.registeredTeam,
+          label: team.name,
+          subtitle: 'فريق مسجل',
+          accessLabel: organizerLevel ? 'منظم' : 'قائد/نائب',
+          teamId: teamId,
+        ),
+      );
+    }
+
+    if (match.tournamentId == null || assignedTeamIds.length >= 2) {
+      return sides;
+    }
+
+    final registrations = await _registrationRepository.getTournamentRegistrations(
+      match.tournamentId!,
+    );
+
+    for (final registration in registrations) {
+      if (registration.status != TournamentRegistrationStatus.approved) {
+        continue;
+      }
+      if (registration.teamId != null) {
+        final team = await _teamRepository.getTeam(registration.teamId!);
+        if (team == null) {
+          continue;
+        }
+        final canManage = organizerLevel || _canManageRegisteredTeam(team, actorId);
+        if (!canManage) {
+          continue;
+        }
+        final key = 'team::${team.id}';
+        if (!seenKeys.add(key)) {
+          continue;
+        }
+        sides.add(
+          MatchdayManagedSide(
+            key: key,
+            kind: MatchdayManagedSideKind.registeredTeam,
+            label: team.name,
+            subtitle: assignedTeamIds.contains(team.id)
+                ? 'فريق مسجل'
+                : 'فريق مسجل على الطرف المفتوح',
+            accessLabel: organizerLevel ? 'منظم' : 'قائد/نائب',
+            teamId: team.id,
+            usesOpenMatchSlot: !assignedTeamIds.contains(team.id),
+          ),
+        );
+        continue;
+      }
+
+      if (registration.guestTeamId != null) {
+        final guestTeam = await _guestTeamRepository.getGuestTeam(
+          registration.guestTeamId!,
+        );
+        if (guestTeam == null) {
+          continue;
+        }
+        final canManage = organizerLevel || guestTeam.creatorId == actorId;
+        if (!canManage) {
+          continue;
+        }
+        final key = 'guest::${guestTeam.id}';
+        if (!seenKeys.add(key)) {
+          continue;
+        }
+        sides.add(
+          MatchdayManagedSide(
+            key: key,
+            kind: MatchdayManagedSideKind.guestTeam,
+            label: guestTeam.name,
+            subtitle: 'فريق ضيف على الطرف المفتوح',
+            accessLabel: organizerLevel ? 'منظم' : 'منشئ الفريق',
+            guestTeamId: guestTeam.id,
+            usesOpenMatchSlot: true,
+          ),
+        );
+      }
+    }
+
+    return sides;
+  }
+
+  Future<void> _loadSelectedSideState() async {
+    final side = selectedSide;
+    if (side == null) {
+      await _resetSelectedSideState();
+      return;
+    }
+
+    if (side.isRegisteredTeam) {
+      await _loadRegisteredSideState(side);
+    } else {
+      await _loadGuestSideState(side);
+    }
+  }
+
+  Future<void> _loadRegisteredSideState(MatchdayManagedSide side) async {
+    final teamId = side.teamId!;
+    final checkIn = await _checkInRepository.getCheckInByTeamId(
+      matchId: matchId,
+      teamId: teamId,
+    );
+    final attendances = await _attendanceRepository.getTeamAttendances(
+      matchId: matchId,
+      teamId: teamId,
+    );
+    final snapshot = await _snapshotRepository.getSnapshotByTeamId(
+      matchId: matchId,
+      teamId: teamId,
+    );
+    final substitutions = await _substitutionRepository.getTeamSubstitutions(
+      matchId: matchId,
+      teamId: teamId,
+    );
+    final memberships = await _membershipRepository.getTeamMemberships(teamId);
+
+    final playerIds = memberships
+        .map((membership) => membership.playerId)
+        .whereType<String>()
+        .toSet();
+    final guestPlayerIds = memberships
+        .map((membership) => membership.guestPlayerId)
+        .whereType<String>()
+        .toSet();
+    final players = await _loadPlayersByIds(playerIds);
+    final guestPlayers = await _loadGuestPlayersByIds(guestPlayerIds);
+    final attendancesByMembershipId = <String, MatchAttendance>{
+      for (final attendance in attendances)
+        if (attendance.teamMembershipId != null)
+          attendance.teamMembershipId!: attendance,
+    };
+
+    final drafts = memberships
+        .map(
+          (membership) => MatchdayParticipantDraft(
+            selectionId: membership.id,
+            displayName: membership.playerId != null
+                ? (players[membership.playerId!]?.name ?? 'لاعب مسجل')
+                : (guestPlayers[membership.guestPlayerId!]?.displayName ??
+                    'لاعب ضيف'),
+            position: membership.playerId != null
+                ? players[membership.playerId!]?.position
+                : guestPlayers[membership.guestPlayerId!]?.preferredPosition,
+            isGuest: membership.isGuest,
+            membershipStatus: membership.status,
+            attendance: attendancesByMembershipId[membership.id],
+            playerId: membership.playerId,
+            guestPlayerId: membership.guestPlayerId,
+          ),
+        )
+        .toList(growable: false);
+
+    _applySelectedSideSnapshot(
+      side: side,
+      checkIn: checkIn,
+      snapshot: snapshot,
+      substitutions: substitutions,
+      participantDrafts: drafts,
+    );
+  }
+
+  Future<void> _loadGuestSideState(MatchdayManagedSide side) async {
+    final guestTeamId = side.guestTeamId!;
+    final checkIn = await _checkInRepository.getCheckInByGuestTeamId(
+      matchId: matchId,
+      guestTeamId: guestTeamId,
+    );
+    final attendances = await _attendanceRepository.getTeamAttendances(
+      matchId: matchId,
+      guestTeamId: guestTeamId,
+    );
+    final snapshot = await _snapshotRepository.getSnapshotByGuestTeamId(
+      matchId: matchId,
+      guestTeamId: guestTeamId,
+    );
+    final substitutions = await _substitutionRepository.getTeamSubstitutions(
+      matchId: matchId,
+      guestTeamId: guestTeamId,
+    );
+
+    final candidateGuestPlayers = <String, GuestPlayer>{};
+    final activeTournament = tournament.value;
+    if (activeTournament != null) {
+      final tournamentGuestPlayers =
+          await _guestPlayerRepository.getTournamentGuestPlayers(
+        activeTournament.id,
+      );
+      for (final guestPlayer in tournamentGuestPlayers) {
+        candidateGuestPlayers[guestPlayer.id] = guestPlayer;
+      }
+    }
+    for (final attendance in attendances) {
+      final guestPlayerId = attendance.guestPlayerId;
+      if (guestPlayerId == null ||
+          candidateGuestPlayers.containsKey(guestPlayerId)) {
+        continue;
+      }
+      final guestPlayer =
+          await _guestPlayerRepository.getGuestPlayer(guestPlayerId);
+      if (guestPlayer != null) {
+        candidateGuestPlayers[guestPlayer.id] = guestPlayer;
+      }
+    }
+
+    final attendancesByGuestPlayerId = <String, MatchAttendance>{
+      for (final attendance in attendances)
+        if (attendance.guestPlayerId != null)
+          attendance.guestPlayerId!: attendance,
+    };
+
+    final drafts = candidateGuestPlayers.values
+        .map(
+          (guestPlayer) => MatchdayParticipantDraft(
+            selectionId: guestPlayer.id,
+            displayName: guestPlayer.displayName,
+            position: guestPlayer.preferredPosition,
+            isGuest: true,
+            attendance: attendancesByGuestPlayerId[guestPlayer.id],
+            guestPlayerId: guestPlayer.id,
+          ),
+        )
+        .toList()
+      ..sort((left, right) => left.displayName.compareTo(right.displayName));
+
+    _applySelectedSideSnapshot(
+      side: side,
+      checkIn: checkIn,
+      snapshot: snapshot,
+      substitutions: substitutions,
+      participantDrafts: drafts,
+    );
+  }
+
+  void _applySelectedSideSnapshot({
+    required MatchdayManagedSide side,
+    required MatchCheckIn? checkIn,
+    required MatchLineupSnapshot? snapshot,
+    required List<MatchSubstitution> substitutions,
+    required List<MatchdayParticipantDraft> participantDrafts,
+  }) {
+    activeCheckIn.value = checkIn;
+    activeSnapshot.value = snapshot;
+    sideSubstitutions.assignAll(substitutions);
+    participants.assignAll(participantDrafts);
+
+    final updatedSides = managedSides
+        .map(
+          (entry) => entry.key == side.key
+              ? entry.copyWith(checkIn: checkIn, snapshot: snapshot)
+              : entry,
+        )
+        .toList(growable: false);
+    managedSides.assignAll(updatedSides);
+
+    _seedAttendanceDrafts(participantDrafts);
+    _seedLineupDrafts(participantDrafts, snapshot);
+    selectedOutgoingAttendanceId.value = null;
+    selectedIncomingAttendanceId.value = null;
+    substitutionMinuteController.clear();
+  }
+
+  void _seedAttendanceDrafts(List<MatchdayParticipantDraft> participantDrafts) {
+    final seeded = <String, MatchAttendanceStatus>{};
+    for (final participant in participantDrafts) {
+      final existingAttendance = participant.attendance;
+      if (existingAttendance != null) {
+        seeded[participant.selectionId] = existingAttendance.status;
+        continue;
+      }
+      if (participant.isGuest) {
+        seeded[participant.selectionId] = MatchAttendanceStatus.pending;
+        continue;
+      }
+      seeded[participant.selectionId] = switch (participant.membershipStatus) {
+        TeamMembershipStatus.inactive => MatchAttendanceStatus.absent,
+        _ => MatchAttendanceStatus.present,
+      };
+    }
+    attendanceDrafts.assignAll(seeded);
+  }
+
+  void _seedLineupDrafts(
+    List<MatchdayParticipantDraft> participantDrafts,
+    MatchLineupSnapshot? snapshot,
+  ) {
+    final seeded = <String, String>{};
+    if (snapshot != null) {
+      for (final entry in snapshot.starters) {
+        final selectionId = entry.teamMembershipId ?? entry.guestPlayerId;
+        if (selectionId != null) {
+          seeded[selectionId] = MatchdayLineupSlot.starter.name;
+        }
+      }
+      for (final entry in snapshot.bench) {
+        final selectionId = entry.teamMembershipId ?? entry.guestPlayerId;
+        if (selectionId != null) {
+          seeded[selectionId] = MatchdayLineupSlot.bench.name;
+        }
+      }
+      lineupDrafts.assignAll(seeded);
+      return;
+    }
+
+    final eligible = participantDrafts
+        .where((participant) => _isEligibleForLineup(participant.selectionId))
+        .toList(growable: false);
+    final starters = <MatchdayParticipantDraft>[];
+    final bench = <MatchdayParticipantDraft>[];
+
+    if (selectedSide?.isRegisteredTeam == true) {
+      for (final participant in eligible) {
+        if (participant.membershipStatus == TeamMembershipStatus.starter) {
+          starters.add(participant);
+        } else if (participant.membershipStatus == TeamMembershipStatus.bench) {
+          bench.add(participant);
+        }
+      }
+    } else {
+      starters.addAll(eligible);
+    }
+
+    final requiredCount = requiredStarterCount ?? 1;
+    final starterIds = <String>{};
+    for (final participant in starters) {
+      if (starterIds.length >= requiredCount) {
+        bench.add(participant);
+        continue;
+      }
+      starterIds.add(participant.selectionId);
+      seeded[participant.selectionId] = MatchdayLineupSlot.starter.name;
+    }
+
+    for (final participant in eligible) {
+      if (seeded.containsKey(participant.selectionId)) {
+        continue;
+      }
+      if (bench.any((benchParticipant) =>
+          benchParticipant.selectionId == participant.selectionId)) {
+        seeded[participant.selectionId] = MatchdayLineupSlot.bench.name;
+      }
+    }
+    lineupDrafts.assignAll(seeded);
+  }
+
+  List<String> _selectedIdsForSlot(MatchdayLineupSlot slot) {
+    final ids = <String>[];
+    for (final participant in participants) {
+      if (!_isEligibleForLineup(participant.selectionId)) {
+        continue;
+      }
+      if (lineupDrafts[participant.selectionId] == slot.name) {
+        ids.add(participant.selectionId);
+      }
+    }
+    return ids;
+  }
+
+  bool _isEligibleForLineup(String selectionId) {
+    final status = attendanceDrafts[selectionId] ?? MatchAttendanceStatus.pending;
+    return status == MatchAttendanceStatus.present ||
+        status == MatchAttendanceStatus.late;
+  }
+
+  bool _hasOrganizerLevelAccess({
+    required Match match,
+    required Tournament? tournament,
+    required String actorId,
+  }) {
+    if (match.organizerId == actorId) {
+      return true;
+    }
+    if (tournament == null) {
+      return false;
+    }
+    if (tournament.organizerId == actorId) {
+      return true;
+    }
+    if (!tournament.assistants.any((assistant) => assistant.userId == actorId)) {
+      return false;
+    }
+    return _tournamentPermissionService.canManageTeams(tournament, actorId);
+  }
+
+  bool _canManageRegisteredTeam(Team team, String actorId) {
+    return team.ownerId == actorId || team.viceCaptainIds.contains(actorId);
+  }
+
+  Future<Map<String, Player>> _loadPlayersByIds(Set<String> playerIds) async {
+    final players = <String, Player>{};
+    for (final playerId in playerIds) {
+      final player = await _playerRepository.getPlayer(playerId);
+      if (player != null) {
+        players[player.id] = player;
+      }
+    }
+    return players;
+  }
+
+  Future<Map<String, GuestPlayer>> _loadGuestPlayersByIds(
+    Set<String> guestPlayerIds,
+  ) async {
+    final guestPlayers = <String, GuestPlayer>{};
+    for (final guestPlayerId in guestPlayerIds) {
+      final guestPlayer =
+          await _guestPlayerRepository.getGuestPlayer(guestPlayerId);
+      if (guestPlayer != null) {
+        guestPlayers[guestPlayer.id] = guestPlayer;
+      }
+    }
+    return guestPlayers;
+  }
+
+  Future<void> _resetSelectedSideState() async {
+    activeCheckIn.value = null;
+    activeSnapshot.value = null;
+    sideSubstitutions.clear();
+    participants.clear();
+    attendanceDrafts.clear();
+    lineupDrafts.clear();
+    selectedOutgoingAttendanceId.value = null;
+    selectedIncomingAttendanceId.value = null;
+    substitutionMinuteController.clear();
+  }
+
+  String _formatError(Object error) {
+    final raw = error.toString();
+    if (raw.startsWith('Exception: ')) {
+      return raw.substring('Exception: '.length);
+    }
+    return raw;
+  }
+
+  void _showSnack(String title, String message) {
+    Get.snackbar(
+      title,
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.all(12),
+    );
+  }
+
+  void _showErrorSnack(Object error) {
+    _showSnack('تعذر إكمال العملية', _formatError(error));
+  }
+}

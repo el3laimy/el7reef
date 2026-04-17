@@ -62,6 +62,7 @@ abstract class AppRoutes {
       '/organizer/dashboard/$tournamentId';
   static String scoreApprovalForMatch(String matchId) =>
       '/organizer/score/$matchId';
+  static String matchDetailsById(String matchId) => '/match/details/$matchId';
   static String mvpVoteForMatch(String matchId) => '/rating/mvp/$matchId';
   static String fantasyPickTeamForLeague(String leagueId) =>
       '/fantasy/pick/$leagueId';

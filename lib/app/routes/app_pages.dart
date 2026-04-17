@@ -17,9 +17,11 @@ import '../../features/team/bindings/team_binding.dart';
 import '../../features/team/views/team_roster_screen.dart';
 import '../../features/team/bindings/team_roster_binding.dart';
 import '../../features/match/views/match_discover_screen.dart';
+import '../../features/match/views/matchday_screen.dart';
 import '../../features/match/views/score_submit_screen.dart';
 import '../../features/match/views/fan_voting_screen.dart';
 import '../../features/match/bindings/match_binding.dart';
+import '../../features/match/bindings/matchday_binding.dart';
 import '../../features/match/bindings/score_submit_binding.dart';
 import '../../features/match/bindings/fan_voting_binding.dart';
 import '../../features/tournament/views/tournament_list_screen.dart';
@@ -136,6 +138,20 @@ class AppPages {
       name: AppRoutes.findMatch,
       page: () => const MatchDiscoverScreen(),
       binding: MatchBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    // ── Matchday Operations ──
+    GetPage(
+      name: AppRoutes.matchDetails,
+      page: () => FeatureFlags.matchdayUiEnabled
+          ? const MatchdayScreen()
+          : const FeatureUnavailableScreen(
+              title: 'يوم المباراة غير متاح',
+              message:
+                  'واجهة الحضور والتشكيل والتبديلات ما زالت متوقفة في هذا البناء.',
+            ),
+      binding: MatchdayBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 

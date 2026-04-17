@@ -106,6 +106,27 @@ service cloud.firestore {
         );
     }
 
+    function canManageMatchdaySide(data) {
+      return isAuthenticated() &&
+        data.matchId is string &&
+        (
+          (
+            data.teamId is string &&
+            (
+              canManageTeamById(data.teamId) ||
+              isMatchOrganizerById(data.matchId)
+            )
+          ) ||
+          (
+            data.guestTeamId is string &&
+            (
+              ownsGuestTeamById(data.guestTeamId) ||
+              isMatchOrganizerById(data.matchId)
+            )
+          )
+        );
+    }
+
     function canCreateClaimCode(data) {
       return isAuthenticated() &&
         data.createdBy == request.auth.uid &&
@@ -412,6 +433,42 @@ service cloud.firestore {
         allow create, update: if isMatchOrganizerById(matchId);
         allow delete: if false;
       }
+    }
+
+    match /matchCheckIns/{checkInId} {
+      allow read: if isAuthenticated();
+      allow create: if canManageMatchdaySide(request.resource.data);
+      allow update: if (
+        canManageMatchdaySide(resource.data) &&
+        request.resource.data.matchId == resource.data.matchId &&
+        request.resource.data.teamId == resource.data.teamId &&
+        request.resource.data.guestTeamId == resource.data.guestTeamId
+      );
+      allow delete: if false;
+    }
+
+    match /matchAttendances/{attendanceId} {
+      allow read: if isAuthenticated();
+      allow create: if canManageMatchdaySide(request.resource.data);
+      allow update: if (
+        canManageMatchdaySide(resource.data) &&
+        request.resource.data.matchId == resource.data.matchId &&
+        request.resource.data.teamId == resource.data.teamId &&
+        request.resource.data.guestTeamId == resource.data.guestTeamId
+      );
+      allow delete: if false;
+    }
+
+    match /matchLineupSnapshots/{snapshotId} {
+      allow read: if isAuthenticated();
+      allow create: if canManageMatchdaySide(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    match /matchSubstitutions/{substitutionId} {
+      allow read: if isAuthenticated();
+      allow create: if canManageMatchdaySide(request.resource.data);
+      allow update, delete: if false;
     }
 
     match /tournaments/{tournamentId} {

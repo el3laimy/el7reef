@@ -181,6 +181,35 @@ void main() {
       expect(guestTeam?.tournamentIds, contains('tournament-1'));
     });
 
+    test('re-running guest team registration while pending is idempotent',
+        () async {
+      final first = await service.registerGuestTeam(
+        tournamentId: 'tournament-1',
+        guestTeamId: 'guest-team-1',
+        actorId: 'guest-owner-1',
+        mode: TournamentRegistrationMode.hybrid,
+        now: now.add(const Duration(minutes: 10)),
+      );
+
+      final second = await service.registerGuestTeam(
+        tournamentId: 'tournament-1',
+        guestTeamId: 'guest-team-1',
+        actorId: 'guest-owner-1',
+        mode: TournamentRegistrationMode.hybrid,
+        now: now.add(const Duration(minutes: 20)),
+      );
+
+      final registrations = await registrationRepository.getTournamentRegistrations(
+        'tournament-1',
+      );
+
+      expect(first.outcome, TournamentRegistrationOutcome.pendingApproval);
+      expect(second.outcome, TournamentRegistrationOutcome.alreadyPending);
+      expect(second.isIdempotent, isTrue);
+      expect(registrations, hasLength(1));
+      expect(registrations.single.id, first.registration.id);
+    });
+
     test('organizer can reject pending registrations and rerun rejection safely',
         () async {
       final pending = await service.registerGuestTeam(
