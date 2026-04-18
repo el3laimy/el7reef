@@ -47,6 +47,9 @@ abstract class AppRoutes {
   static const String guestTeamClaim = '/guest-team/:guestTeamId/claim';
   static const String myTeams = '/teams';
   static const String tournaments = '/tournaments';
+  // Phase 7 — Audit & Disputes
+  static const String auditTimeline = '/organizer/audit/:entityId';
+  static const String disputeViewer = '/organizer/disputes/:matchId';
 
   static String teamProfileById(String id) => '/team/$id';
   static String tournamentDetailById(String id) => '/tournament/$id';
@@ -72,6 +75,10 @@ abstract class AppRoutes {
       '/fantasy/transfers/$leagueId';
   static String fantasyLeaderboardForLeague(String leagueId) =>
       '/fantasy/leaderboard/$leagueId';
+  static String auditTimelineForEntity(String entityId) =>
+      '/organizer/audit/$entityId';
+  static String disputeViewerForMatch(String matchId) =>
+      '/organizer/disputes/$matchId';
 
   static String claimEntryWithQuery(Map<String, String?> queryParameters) =>
       _withQuery(claimEntry, queryParameters);

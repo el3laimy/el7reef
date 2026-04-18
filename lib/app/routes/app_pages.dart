@@ -57,6 +57,10 @@ import '../../features/fantasy/presentation/bindings/fantasy_create_team_binding
 import '../../features/fantasy/presentation/bindings/fantasy_team_binding.dart';
 import '../../features/fantasy/presentation/bindings/transfer_market_binding.dart';
 import '../../features/fantasy/presentation/bindings/fantasy_leaderboard_binding.dart';
+import '../../features/organizer/views/audit_timeline_screen.dart';
+import '../../features/organizer/views/dispute_viewer_screen.dart';
+import '../../features/organizer/bindings/audit_timeline_binding.dart';
+import '../../features/organizer/bindings/dispute_viewer_binding.dart';
 
 /// GetX Page Route Definitions — جميع الشاشات مسجلة
 class AppPages {
@@ -246,6 +250,26 @@ class AppPages {
       name: AppRoutes.organizerDashboard,
       page: () => const TournamentAssistantsScreen(),
       binding: TournamentAssistantsBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    // ══════════════════════════════════════════
+    // Phase 7: Audit & Disputes
+    // ══════════════════════════════════════════
+
+    // ── Audit Timeline ──
+    GetPage(
+      name: AppRoutes.auditTimeline,
+      page: () => const AuditTimelineScreen(),
+      binding: AuditTimelineBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    // ── Dispute Viewer ──
+    GetPage(
+      name: AppRoutes.disputeViewer,
+      page: () => const DisputeViewerScreen(),
+      binding: DisputeViewerBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 

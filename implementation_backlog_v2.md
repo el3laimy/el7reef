@@ -567,7 +567,7 @@ Acceptance:
 Parent: `EPIC-E`
 Priority: `P0`
 Estimate: `M`
-Status: `Todo`
+Status: `Done`
 Depends On: `V2-025` to `V2-027`
 Likely Touchpoints:
 - `test/core/services/`
@@ -586,7 +586,7 @@ Acceptance:
 Parent: `EPIC-F`
 Priority: `P0`
 Estimate: `M`
-Status: `Todo`
+Status: `Done`
 Depends On: `V2-003`
 Likely Touchpoints:
 - `lib/domain/entities/`
@@ -605,7 +605,7 @@ Acceptance:
 Parent: `EPIC-F`
 Priority: `P1`
 Estimate: `L`
-Status: `Todo`
+Status: `Done`
 Depends On: `V2-029`, `V2-025`
 Likely Touchpoints:
 - `lib/core/services/`
@@ -623,7 +623,7 @@ Acceptance:
 Parent: `EPIC-F`
 Priority: `P1`
 Estimate: `M`
-Status: `Todo`
+Status: `Done`
 Depends On: `V2-029`, `V2-030`
 Likely Touchpoints:
 - `lib/features/tournament/`
@@ -641,7 +641,7 @@ Acceptance:
 Parent: `EPIC-F`
 Priority: `P1`
 Estimate: `M`
-Status: `Todo`
+Status: `Done`
 Depends On: `V2-030`, `V2-031`
 Likely Touchpoints:
 - `test/core/services/`
@@ -904,9 +904,9 @@ Acceptance:
 
 ## Next Ticket To Start
 
-Start with `V2-028`.
-`MatchdayService` now records substitution logs as immutable matchday events and
-maintains lightweight played-truth directly on `MatchAttendance`, so later
-stats and fantasy flows can rely on who started, who entered, who exited, and
-who actually played. The next goal is exposing check-in, lineup lock, and
-substitution flows through dedicated mobile UI for organizers and captains.
+Start with `V2-033`.
+Epic F (Audit & Disputes) is complete. `AuditService` records events uniformly
+across match, tournament, claim, and dispute flows. `DisputeService` supports
+open, resolve, reject, freeze, and deadline expiry with full audit integration.
+Organizer UI screens for timeline and dispute management are wired via routes.
+The next goal is building growth and sharing flows for team invites and claims.

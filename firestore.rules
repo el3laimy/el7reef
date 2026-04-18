@@ -581,5 +581,34 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if false;
     }
+
+    // ── Phase 7: Audit & Disputes ──
+
+    match /auditEvents/{eventId} {
+      allow read: if isAuthenticated();
+      // Audit events are server-only writes (from trusted services)
+      allow create, update, delete: if false;
+    }
+
+    match /disputes/{disputeId} {
+      allow read: if isAuthenticated();
+      // Players can create disputes on their own matches
+      allow create: if isAuthenticated() &&
+        request.resource.data.raisedBy == request.auth.uid &&
+        request.resource.data.matchId is string;
+      // Only the tournament organizer can resolve/reject
+      allow update: if isAuthenticated() &&
+        resource.data.matchId is string &&
+        isMatchOrganizerById(resource.data.matchId) &&
+        request.resource.data.matchId == resource.data.matchId &&
+        request.resource.data.raisedBy == resource.data.raisedBy &&
+        request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if false;
+    }
+
+    // ── Catch-all: block any unknown collection ──
+    match /{document=**} {
+      allow read, write: if false;
+    }
   }
 }
