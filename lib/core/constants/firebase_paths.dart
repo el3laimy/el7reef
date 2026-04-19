@@ -14,6 +14,11 @@ abstract class FirebasePaths {
   static const String matchSubstitutions = 'matchSubstitutions';
   static const String tournaments = 'tournaments';
   static const String tournamentRegistrations = 'tournamentRegistrations';
+  static const String tournamentParticipants = 'tournamentParticipants';
+  static const String tournamentGroups = 'tournamentGroups';
+  static const String groupStandingSnapshots = 'groupStandingSnapshots';
+  static const String knockoutBrackets = 'knockoutBrackets';
+  static const String knockoutTies = 'knockoutTies';
   static const String claimCodes = 'claimCodes';
   static const String ratingEvents = 'ratingEvents';
   static const String encounterLogs = 'encounterLogs';

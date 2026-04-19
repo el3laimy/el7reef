@@ -30,12 +30,14 @@ import '../../features/tournament/views/tournament_registration_screen.dart';
 import '../../features/tournament/views/tournament_guest_team_create_screen.dart';
 import '../../features/tournament/views/tournament_registration_review_screen.dart';
 import '../../features/tournament/views/tournament_assistants_screen.dart';
+import '../../features/tournament/views/tournament_operations_screens.dart';
 import '../../features/tournament/bindings/tournament_binding.dart';
 import '../../features/tournament/bindings/tournament_detail_binding.dart';
 import '../../features/tournament/bindings/tournament_registration_binding.dart';
 import '../../features/tournament/bindings/tournament_guest_team_create_binding.dart';
 import '../../features/tournament/bindings/tournament_registration_review_binding.dart';
 import '../../features/tournament/bindings/tournament_assistants_binding.dart';
+import '../../features/tournament/bindings/tournament_operations_binding.dart';
 import '../../features/social/views/username_screen.dart';
 import '../../features/social/views/qr_scanner_screen.dart';
 import '../../features/social/views/friends_screen.dart';
@@ -205,6 +207,41 @@ class AppPages {
       transition: Transition.rightToLeftWithFade,
     ),
 
+    GetPage(
+      name: AppRoutes.tournamentParticipants,
+      page: () => const TournamentParticipantsScreen(),
+      binding: TournamentOperationsBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    GetPage(
+      name: AppRoutes.tournamentGroups,
+      page: () => const TournamentGroupsScreen(),
+      binding: TournamentOperationsBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    GetPage(
+      name: AppRoutes.tournamentFixtures,
+      page: () => const TournamentFixturesScreen(),
+      binding: TournamentOperationsBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    GetPage(
+      name: AppRoutes.tournamentStandings,
+      page: () => const TournamentStandingsScreen(),
+      binding: TournamentOperationsBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    GetPage(
+      name: AppRoutes.tournamentBracket,
+      page: () => const TournamentBracketScreen(),
+      binding: TournamentOperationsBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
     // ── Tournament Registration Hub ──
     GetPage(
       name: AppRoutes.teamRegistration,
@@ -250,6 +287,13 @@ class AppPages {
     // ── Tournament Assistants ──
     GetPage(
       name: AppRoutes.organizerDashboard,
+      page: () => const TournamentOperationsDashboardScreen(),
+      binding: TournamentOperationsBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    GetPage(
+      name: AppRoutes.tournamentAssistants,
       page: () => const TournamentAssistantsScreen(),
       binding: TournamentAssistantsBinding(),
       transition: Transition.rightToLeftWithFade,

@@ -11,7 +11,8 @@ class TournamentAssistantsController extends GetxController {
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
 
-  String? get tournamentId => Get.parameters['tournamentId'];
+  String? get tournamentId =>
+      Get.parameters['tournamentId'] ?? Get.parameters['id'];
 
   @override
   void onInit() {
@@ -46,10 +47,14 @@ class TournamentAssistantsController extends GetxController {
     try {
       isLoading.value = true;
       final tournament = currentTournament.value!;
-      
+
       // التأكد من أن المستخدم ليس موجود بالفعل
       if (tournament.assistants.any((a) => a.userId == userId)) {
-        Get.snackbar('مرفوض', 'اللاعب موجود بالفعل كمساعد', snackPosition: SnackPosition.BOTTOM);
+        Get.snackbar(
+          'مرفوض',
+          'اللاعب موجود بالفعل كمساعد',
+          snackPosition: SnackPosition.BOTTOM,
+        );
         return;
       }
 
@@ -66,14 +71,19 @@ class TournamentAssistantsController extends GetxController {
         expiresAt: expiresAt,
       );
 
-      final updatedList = List<TournamentAssistant>.from(tournament.assistants)..add(newAssistant);
+      final updatedList = List<TournamentAssistant>.from(tournament.assistants)
+        ..add(newAssistant);
       final updatedTournament = tournament.copyWith(assistants: updatedList);
 
       await _repo.updateTournament(updatedTournament);
       currentTournament.value = updatedTournament;
 
       Get.back();
-      Get.snackbar('تم', 'تم تعيين المساعد بنجاح!', snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'تم',
+        'تم تعيين المساعد بنجاح!',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     } catch (e) {
       Get.snackbar('خطأ', 'حصلت مشكلة أثناء إضافة المساعد');
     } finally {
@@ -86,13 +96,15 @@ class TournamentAssistantsController extends GetxController {
     try {
       isLoading.value = true;
       final tournament = currentTournament.value!;
-      
-      final updatedList = tournament.assistants.where((a) => a.userId != userId).toList();
+
+      final updatedList = tournament.assistants
+          .where((a) => a.userId != userId)
+          .toList();
       final updatedTournament = tournament.copyWith(assistants: updatedList);
 
       await _repo.updateTournament(updatedTournament);
       currentTournament.value = updatedTournament;
-      
+
       Get.snackbar('تم', 'تم الحذف بنجاح', snackPosition: SnackPosition.BOTTOM);
     } catch (e) {
       AppLogger.error('TournamentAssistantsController.removeAssistant', e);

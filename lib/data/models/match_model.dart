@@ -1,4 +1,5 @@
 import '../../core/enums/match_status.dart';
+import '../../core/enums/tournament_ops_enums.dart';
 import '../../domain/entities/match.dart';
 
 /// نموذج بيانات المباراة — تحويل Firestore
@@ -9,6 +10,8 @@ class MatchModel {
   final String? teamBId;
   final List<String> teamAPlayerIds;
   final List<String> teamBPlayerIds;
+  final String? teamAParticipantId;
+  final String? teamBParticipantId;
   final String status;
   final int? scoreTeamA;
   final int? scoreTeamB;
@@ -21,6 +24,16 @@ class MatchModel {
   final bool isGoldenRating;
   final bool isAnomaly;
   final bool isFrozen;
+  final String? stageType;
+  final String? groupId;
+  final String? groupStageId;
+  final String? knockoutTieId;
+  final int? roundIndex;
+  final int? slotNumber;
+  final DateTime? scheduledAt;
+  final DateTime? publishedAt;
+  final String? venueId;
+  final String fixtureStatus;
   final DateTime createdAt;
   final DateTime? startedAt;
   final DateTime? completedAt;
@@ -32,6 +45,8 @@ class MatchModel {
     this.teamBId,
     this.teamAPlayerIds = const [],
     this.teamBPlayerIds = const [],
+    this.teamAParticipantId,
+    this.teamBParticipantId,
     this.status = 'open',
     this.scoreTeamA,
     this.scoreTeamB,
@@ -44,6 +59,16 @@ class MatchModel {
     this.isGoldenRating = false,
     this.isAnomaly = false,
     this.isFrozen = false,
+    this.stageType,
+    this.groupId,
+    this.groupStageId,
+    this.knockoutTieId,
+    this.roundIndex,
+    this.slotNumber,
+    this.scheduledAt,
+    this.publishedAt,
+    this.venueId,
+    this.fixtureStatus = 'draft',
     required this.createdAt,
     this.startedAt,
     this.completedAt,
@@ -55,10 +80,18 @@ class MatchModel {
       organizerId: json['organizerId'] as String? ?? '',
       teamAId: json['teamAId'] as String?,
       teamBId: json['teamBId'] as String?,
-      teamAPlayerIds: (json['teamAPlayerIds'] as List<dynamic>?)
-              ?.map((e) => e as String).toList() ?? [],
-      teamBPlayerIds: (json['teamBPlayerIds'] as List<dynamic>?)
-              ?.map((e) => e as String).toList() ?? [],
+      teamAPlayerIds:
+          (json['teamAPlayerIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
+      teamBPlayerIds:
+          (json['teamBPlayerIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
+      teamAParticipantId: json['teamAParticipantId'] as String?,
+      teamBParticipantId: json['teamBParticipantId'] as String?,
       status: json['status'] as String? ?? 'open',
       scoreTeamA: (json['scoreTeamA'] as num?)?.toInt(),
       scoreTeamB: (json['scoreTeamB'] as num?)?.toInt(),
@@ -71,14 +104,39 @@ class MatchModel {
       isGoldenRating: json['isGoldenRating'] as bool? ?? false,
       isAnomaly: json['isAnomaly'] as bool? ?? false,
       isFrozen: json['isFrozen'] as bool? ?? false,
+      stageType: json['stageType'] as String?,
+      groupId: json['groupId'] as String?,
+      groupStageId: json['groupStageId'] as String?,
+      knockoutTieId: json['knockoutTieId'] as String?,
+      roundIndex: (json['roundIndex'] as num?)?.toInt(),
+      slotNumber: (json['slotNumber'] as num?)?.toInt(),
+      scheduledAt: json['scheduledAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(
+              (json['scheduledAt'] as num).toInt(),
+            )
+          : null,
+      publishedAt: json['publishedAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(
+              (json['publishedAt'] as num).toInt(),
+            )
+          : null,
+      venueId: json['venueId'] as String?,
+      fixtureStatus:
+          json['fixtureStatus'] as String? ?? FixtureStatus.draft.name,
       createdAt: json['createdAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch((json['createdAt'] as num).toInt())
+          ? DateTime.fromMillisecondsSinceEpoch(
+              (json['createdAt'] as num).toInt(),
+            )
           : DateTime.now(),
       startedAt: json['startedAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch((json['startedAt'] as num).toInt())
+          ? DateTime.fromMillisecondsSinceEpoch(
+              (json['startedAt'] as num).toInt(),
+            )
           : null,
       completedAt: json['completedAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch((json['completedAt'] as num).toInt())
+          ? DateTime.fromMillisecondsSinceEpoch(
+              (json['completedAt'] as num).toInt(),
+            )
           : null,
     );
   }
@@ -89,6 +147,8 @@ class MatchModel {
     'teamBId': teamBId,
     'teamAPlayerIds': teamAPlayerIds,
     'teamBPlayerIds': teamBPlayerIds,
+    'teamAParticipantId': teamAParticipantId,
+    'teamBParticipantId': teamBParticipantId,
     'status': status,
     'scoreTeamA': scoreTeamA,
     'scoreTeamB': scoreTeamB,
@@ -101,6 +161,16 @@ class MatchModel {
     'isGoldenRating': isGoldenRating,
     'isAnomaly': isAnomaly,
     'isFrozen': isFrozen,
+    'stageType': stageType,
+    'groupId': groupId,
+    'groupStageId': groupStageId,
+    'knockoutTieId': knockoutTieId,
+    'roundIndex': roundIndex,
+    'slotNumber': slotNumber,
+    'scheduledAt': scheduledAt?.millisecondsSinceEpoch,
+    'publishedAt': publishedAt?.millisecondsSinceEpoch,
+    'venueId': venueId,
+    'fixtureStatus': fixtureStatus,
     'createdAt': createdAt.millisecondsSinceEpoch,
     'startedAt': startedAt?.millisecondsSinceEpoch,
     'completedAt': completedAt?.millisecondsSinceEpoch,
@@ -113,6 +183,8 @@ class MatchModel {
     teamBId: teamBId,
     teamAPlayerIds: teamAPlayerIds,
     teamBPlayerIds: teamBPlayerIds,
+    teamAParticipantId: teamAParticipantId,
+    teamBParticipantId: teamBParticipantId,
     status: _parseStatus(status),
     scoreTeamA: scoreTeamA,
     scoreTeamB: scoreTeamB,
@@ -125,6 +197,24 @@ class MatchModel {
     isGoldenRating: isGoldenRating,
     isAnomaly: isAnomaly,
     isFrozen: isFrozen,
+    stageType: stageType == null
+        ? null
+        : TournamentStageType.values.firstWhere(
+            (value) => value.name == stageType,
+            orElse: () => TournamentStageType.groupStage,
+          ),
+    groupId: groupId,
+    groupStageId: groupStageId,
+    knockoutTieId: knockoutTieId,
+    roundIndex: roundIndex,
+    slotNumber: slotNumber,
+    scheduledAt: scheduledAt,
+    publishedAt: publishedAt,
+    venueId: venueId,
+    fixtureStatus: FixtureStatus.values.firstWhere(
+      (value) => value.name == fixtureStatus,
+      orElse: () => FixtureStatus.draft,
+    ),
     createdAt: createdAt,
     startedAt: startedAt,
     completedAt: completedAt,
@@ -137,6 +227,8 @@ class MatchModel {
     teamBId: m.teamBId,
     teamAPlayerIds: m.teamAPlayerIds,
     teamBPlayerIds: m.teamBPlayerIds,
+    teamAParticipantId: m.teamAParticipantId,
+    teamBParticipantId: m.teamBParticipantId,
     status: m.status.name,
     scoreTeamA: m.scoreTeamA,
     scoreTeamB: m.scoreTeamB,
@@ -149,12 +241,23 @@ class MatchModel {
     isGoldenRating: m.isGoldenRating,
     isAnomaly: m.isAnomaly,
     isFrozen: m.isFrozen,
+    stageType: m.stageType?.name,
+    groupId: m.groupId,
+    groupStageId: m.groupStageId,
+    knockoutTieId: m.knockoutTieId,
+    roundIndex: m.roundIndex,
+    slotNumber: m.slotNumber,
+    scheduledAt: m.scheduledAt,
+    publishedAt: m.publishedAt,
+    venueId: m.venueId,
+    fixtureStatus: m.fixtureStatus.name,
     createdAt: m.createdAt,
     startedAt: m.startedAt,
     completedAt: m.completedAt,
   );
 
-  static MatchStatus _parseStatus(String v) =>
-      MatchStatus.values.firstWhere((e) => e.name == v,
-          orElse: () => MatchStatus.open);
+  static MatchStatus _parseStatus(String v) => MatchStatus.values.firstWhere(
+    (e) => e.name == v,
+    orElse: () => MatchStatus.open,
+  );
 }

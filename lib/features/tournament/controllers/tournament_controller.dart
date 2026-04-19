@@ -15,7 +15,6 @@ class TournamentController extends GetxController {
   // ── State ──
   final RxList<Tournament> liveTournaments = <Tournament>[].obs;
   final RxList<Tournament> myOrganizedTournaments = <Tournament>[].obs;
-  final Rx<Tournament?> selectedTournament = Rx<Tournament?>(null);
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
 
@@ -58,7 +57,9 @@ class TournamentController extends GetxController {
     if (uid == null) return;
     try {
       myOrganizedTournaments.value = await _repo.getOrganizerTournaments(uid);
-    } catch (e) { AppLogger.error('TournamentController.loadMyTournaments', e); }
+    } catch (e) {
+      AppLogger.error('TournamentController.loadMyTournaments', e);
+    }
   }
 
   /// إنشاء دورة جديدة
@@ -95,81 +96,17 @@ class TournamentController extends GetxController {
 
       _clearForm();
       Get.back();
-      Get.snackbar('تم ✅', 'تم إنشاء الدورة بنجاح!',
-          snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'تم ✅',
+        'تم إنشاء الدورة بنجاح!',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     } catch (e) {
       errorMessage.value = 'فشل إنشاء الدورة: $e';
     } finally {
       isLoading.value = false;
     }
   }
-
-  /// تسجيل فريق في الدورة
-  Future<void> registerTeam(String tournamentId, String teamId) async {
-    try {
-      await _repo.registerTeam(tournamentId, teamId);
-      // تحديث محلي
-      final idx = liveTournaments.indexWhere((t) => t.id == tournamentId);
-      if (idx >= 0) {
-        liveTournaments[idx] = liveTournaments[idx].copyWith(
-          registeredTeamIds: [
-            ...liveTournaments[idx].registeredTeamIds,
-            teamId,
-          ],
-        );
-      }
-      Get.snackbar('تم ✅', 'تم تسجيل الفريق في الدورة',
-          snackPosition: SnackPosition.BOTTOM);
-    } catch (e) {
-      AppLogger.error('TournamentController.updateStatus', e);
-      Get.snackbar('خطأ', 'فشل تسجيل الفريق');
-    }
-  }
-
-  /// ── صلاحيات المنظم ──
-
-  /// بدء مرحلة المجموعات
-  Future<void> startGroupStage(String tournamentId) async {
-    await _updateStatus(tournamentId, TournamentStatus.groupStage);
-    Get.snackbar('انطلق! 🏆', 'بدأت مرحلة المجموعات',
-        snackPosition: SnackPosition.BOTTOM);
-  }
-
-  /// فتح نافذة التغيير (بين المجموعات والإقصاء)
-  Future<void> openTransferWindow(String tournamentId) async {
-    await _updateStatus(tournamentId, TournamentStatus.transferWindow);
-    Get.snackbar('نافذة مفتوحة 🔄', '24 ساعة لتغيير تشكيلات الفانتازي',
-        snackPosition: SnackPosition.BOTTOM);
-  }
-
-  /// بدء مرحلة الإقصاء
-  Future<void> startKnockoutStage(String tournamentId) async {
-    await _updateStatus(tournamentId, TournamentStatus.knockoutStage);
-    Get.snackbar('الإقصاء! ⚡', 'بدأت مرحلة الإقصاء',
-        snackPosition: SnackPosition.BOTTOM);
-  }
-
-  /// إنهاء الدورة
-  Future<void> completeTournament(String tournamentId) async {
-    await _updateStatus(tournamentId, TournamentStatus.completed);
-    Get.snackbar('انتهت الدورة 🏆', 'تهانينا للفائز!',
-        snackPosition: SnackPosition.BOTTOM);
-  }
-
-  Future<void> _updateStatus(String id, TournamentStatus status) async {
-    try {
-      await _repo.updateStatus(id, status.name);
-      final idx = liveTournaments.indexWhere((t) => t.id == id);
-      if (idx >= 0) {
-        liveTournaments[idx] = liveTournaments[idx].copyWith(status: status);
-      }
-    } catch (e) {
-      AppLogger.error('TournamentController.registerTeam', e);
-      Get.snackbar('خطأ', 'فشل تحديث حالة الدورة');
-    }
-  }
-
-  void selectTournament(Tournament t) => selectedTournament.value = t;
 
   void _clearForm() {
     nameController.clear();

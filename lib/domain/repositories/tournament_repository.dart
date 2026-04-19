@@ -10,7 +10,4 @@ abstract class TournamentRepository {
   Future<List<Tournament>> getPlayerTournaments(String teamId);
   Future<void> registerTeam(String tournamentId, String teamId);
   Future<void> unregisterTeam(String tournamentId, String teamId);
-  Future<void> updateStatus(String tournamentId, String status);
-  Future<void> addGroupRound(String tournamentId, String roundId);
-  Future<void> addKnockoutRound(String tournamentId, String roundId);
 }

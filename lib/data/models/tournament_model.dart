@@ -1,5 +1,6 @@
 import '../../core/enums/tournament_enums.dart';
 import '../../domain/entities/tournament.dart';
+import '../../domain/entities/tournament_group_standings_config.dart';
 import '../../domain/entities/tournament_assistant.dart';
 
 /// نموذج بيانات الدورة — Firestore serialization
@@ -23,6 +24,13 @@ class TournamentModel {
   final int? registrationDeadline;
   final int? startDate;
   final int? endDate;
+  final int? participantListFinalizedAt;
+  final int? activeParticipantCount;
+  final String? currentGroupStageId;
+  final String? currentKnockoutBracketId;
+  final String? winnerParticipantId;
+  final bool needsManualOpsMigration;
+  final TournamentGroupStandingsConfig groupStandingsConfig;
   final int createdAt;
 
   const TournamentModel({
@@ -45,6 +53,13 @@ class TournamentModel {
     this.registrationDeadline,
     this.startDate,
     this.endDate,
+    this.participantListFinalizedAt,
+    this.activeParticipantCount,
+    this.currentGroupStageId,
+    this.currentKnockoutBracketId,
+    this.winnerParticipantId,
+    this.needsManualOpsMigration = false,
+    this.groupStandingsConfig = const TournamentGroupStandingsConfig(),
     required this.createdAt,
   });
 
@@ -61,20 +76,45 @@ class TournamentModel {
       prizePool: (json['prizePool'] as num?)?.toInt(),
       prizeDescription: json['prizeDescription'] as String?,
       status: json['status'] as String? ?? 'upcoming',
-      registeredTeamIds: (json['registeredTeamIds'] as List<dynamic>?)
-              ?.map((e) => e as String).toList() ?? [],
-      assistants: (json['assistants'] as List<dynamic>?)
-              ?.map((e) => TournamentAssistant.fromJson(e as Map<String, dynamic>))
-              .toList() ?? [],
-      groupRoundIds: (json['groupRoundIds'] as List<dynamic>?)
-              ?.map((e) => e as String).toList() ?? [],
-      knockoutRoundIds: (json['knockoutRoundIds'] as List<dynamic>?)
-              ?.map((e) => e as String).toList() ?? [],
+      registeredTeamIds:
+          (json['registeredTeamIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
+      assistants:
+          (json['assistants'] as List<dynamic>?)
+              ?.map(
+                (e) => TournamentAssistant.fromJson(e as Map<String, dynamic>),
+              )
+              .toList() ??
+          [],
+      groupRoundIds:
+          (json['groupRoundIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
+      knockoutRoundIds:
+          (json['knockoutRoundIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
       isFantasyEnabled: json['isFantasyEnabled'] as bool? ?? true,
       registrationDeadline: (json['registrationDeadline'] as num?)?.toInt(),
       startDate: (json['startDate'] as num?)?.toInt(),
       endDate: (json['endDate'] as num?)?.toInt(),
-      createdAt: (json['createdAt'] as num?)?.toInt() ??
+      participantListFinalizedAt: (json['participantListFinalizedAt'] as num?)
+          ?.toInt(),
+      activeParticipantCount: (json['activeParticipantCount'] as num?)?.toInt(),
+      currentGroupStageId: json['currentGroupStageId'] as String?,
+      currentKnockoutBracketId: json['currentKnockoutBracketId'] as String?,
+      winnerParticipantId: json['winnerParticipantId'] as String?,
+      needsManualOpsMigration:
+          json['needsManualOpsMigration'] as bool? ?? false,
+      groupStandingsConfig: TournamentGroupStandingsConfig.fromJson(
+        json['groupStandingsConfig'] as Map<String, dynamic>?,
+      ),
+      createdAt:
+          (json['createdAt'] as num?)?.toInt() ??
           DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -98,6 +138,13 @@ class TournamentModel {
     'registrationDeadline': registrationDeadline,
     'startDate': startDate,
     'endDate': endDate,
+    'participantListFinalizedAt': participantListFinalizedAt,
+    'activeParticipantCount': activeParticipantCount,
+    'currentGroupStageId': currentGroupStageId,
+    'currentKnockoutBracketId': currentKnockoutBracketId,
+    'winnerParticipantId': winnerParticipantId,
+    'needsManualOpsMigration': needsManualOpsMigration,
+    'groupStandingsConfig': groupStandingsConfig.toJson(),
     'createdAt': createdAt,
   };
 
@@ -127,6 +174,15 @@ class TournamentModel {
     endDate: endDate != null
         ? DateTime.fromMillisecondsSinceEpoch(endDate!)
         : null,
+    participantListFinalizedAt: participantListFinalizedAt != null
+        ? DateTime.fromMillisecondsSinceEpoch(participantListFinalizedAt!)
+        : null,
+    activeParticipantCount: activeParticipantCount,
+    currentGroupStageId: currentGroupStageId,
+    currentKnockoutBracketId: currentKnockoutBracketId,
+    winnerParticipantId: winnerParticipantId,
+    needsManualOpsMigration: needsManualOpsMigration,
+    groupStandingsConfig: groupStandingsConfig,
     createdAt: DateTime.fromMillisecondsSinceEpoch(createdAt),
   );
 
@@ -150,14 +206,23 @@ class TournamentModel {
     registrationDeadline: t.registrationDeadline?.millisecondsSinceEpoch,
     startDate: t.startDate?.millisecondsSinceEpoch,
     endDate: t.endDate?.millisecondsSinceEpoch,
+    participantListFinalizedAt:
+        t.participantListFinalizedAt?.millisecondsSinceEpoch,
+    activeParticipantCount: t.activeParticipantCount,
+    currentGroupStageId: t.currentGroupStageId,
+    currentKnockoutBracketId: t.currentKnockoutBracketId,
+    winnerParticipantId: t.winnerParticipantId,
+    needsManualOpsMigration: t.needsManualOpsMigration,
+    groupStandingsConfig: t.groupStandingsConfig,
     createdAt: t.createdAt.millisecondsSinceEpoch,
   );
 
   static TournamentFormat _parseFormat(String v) =>
-      TournamentFormat.values.firstWhere((e) => e.name == v,
-          orElse: () => TournamentFormat.groupsOnly);
+      TournamentFormat.values.firstWhere(
+        (e) => e.name == v,
+        orElse: () => TournamentFormat.groupsOnly,
+      );
 
-  static TournamentStatus _parseStatus(String v) =>
-      TournamentStatus.values.firstWhere((e) => e.name == v,
-          orElse: () => TournamentStatus.upcoming);
+  static TournamentStatus _parseStatus(String v) => TournamentStatus.values
+      .firstWhere((e) => e.name == v, orElse: () => TournamentStatus.upcoming);
 }

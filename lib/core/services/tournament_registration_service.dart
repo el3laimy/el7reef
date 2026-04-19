@@ -12,6 +12,7 @@ import '../../domain/entities/guest_team.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/entities/tournament.dart';
 import '../../domain/entities/tournament_registration.dart';
+import 'tournament_participant_service.dart';
 
 enum TournamentRegistrationOutcome {
   approved,
@@ -43,9 +44,12 @@ class TournamentRegistrationResult {
 
 class TournamentRegistrationService {
   final FirebaseFirestore _firestore;
+  late final TournamentParticipantService _participantService;
 
   TournamentRegistrationService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance {
+    _participantService = TournamentParticipantService(firestore: _firestore);
+  }
 
   CollectionReference<Map<String, dynamic>> get _tournamentsRef =>
       _firestore.collection(FirebasePaths.tournaments);
@@ -67,14 +71,16 @@ class TournamentRegistrationService {
     DateTime? now,
   }) async {
     final effectiveNow = now ?? DateTime.now();
-    final policyRegistrations =
-        await _loadTournamentRegistrationsForPolicy(tournamentId);
-    final registrationRef =
-        _registrationsRef.doc(_teamRegistrationId(tournamentId, teamId));
+    final policyRegistrations = await _loadTournamentRegistrationsForPolicy(
+      tournamentId,
+    );
+    final registrationRef = _registrationsRef.doc(
+      _teamRegistrationId(tournamentId, teamId),
+    );
     final tournamentRef = _tournamentsRef.doc(tournamentId);
     final teamRef = _teamsRef.doc(teamId);
 
-    return _firestore.runTransaction((transaction) async {
+    final result = await _firestore.runTransaction((transaction) async {
       final tournamentSnapshot = await transaction.get(tournamentRef);
       if (!tournamentSnapshot.exists || tournamentSnapshot.data() == null) {
         throw Exception('الدورة المطلوبة غير موجودة.');
@@ -98,14 +104,11 @@ class TournamentRegistrationService {
       if (!isOrganizer && !ownsTeam) {
         throw Exception('لا تملك صلاحية تسجيل هذا الفريق في الدورة.');
       }
-      _ensureRegistrationIsOpen(
-        tournament,
-        currentTime: effectiveNow,
-      );
+      _ensureRegistrationIsOpen(tournament, currentTime: effectiveNow);
 
       final registrationSnapshot = await transaction.get(registrationRef);
-      final existingRegistration = registrationSnapshot.exists &&
-              registrationSnapshot.data() != null
+      final existingRegistration =
+          registrationSnapshot.exists && registrationSnapshot.data() != null
           ? TournamentRegistrationModel.fromJson(
               registrationSnapshot.data()!,
               registrationSnapshot.id,
@@ -132,7 +135,8 @@ class TournamentRegistrationService {
           updatedAt: effectiveNow,
         );
 
-        if (existingRegistration.status == TournamentRegistrationStatus.approved) {
+        if (existingRegistration.status ==
+            TournamentRegistrationStatus.approved) {
           final syncResult = _syncApprovedRegisteredTeam(
             transaction: transaction,
             tournament: tournament,
@@ -144,10 +148,12 @@ class TournamentRegistrationService {
             outcome: TournamentRegistrationOutcome.alreadyApproved,
             registration: updatedExisting,
             syncedTournamentTeamIds: syncResult.syncedTournamentTeamIds,
-            syncedParticipantTournamentIds: syncResult.syncedParticipantTournamentIds,
+            syncedParticipantTournamentIds:
+                syncResult.syncedParticipantTournamentIds,
           );
         }
-        if (existingRegistration.status == TournamentRegistrationStatus.pending &&
+        if (existingRegistration.status ==
+                TournamentRegistrationStatus.pending &&
             targetStatus == TournamentRegistrationStatus.pending) {
           return TournamentRegistrationResult(
             outcome: TournamentRegistrationOutcome.alreadyPending,
@@ -157,7 +163,9 @@ class TournamentRegistrationService {
 
         final promotedRegistration = updatedExisting.copyWith(
           verifiedBy: isOrganizer ? actorId : existingRegistration.verifiedBy,
-          verifiedAt: isOrganizer ? effectiveNow : existingRegistration.verifiedAt,
+          verifiedAt: isOrganizer
+              ? effectiveNow
+              : existingRegistration.verifiedAt,
         );
         transaction.update(
           registrationRef,
@@ -182,7 +190,8 @@ class TournamentRegistrationService {
           outcome: TournamentRegistrationOutcome.approved,
           registration: promotedRegistration,
           syncedTournamentTeamIds: syncResult.syncedTournamentTeamIds,
-          syncedParticipantTournamentIds: syncResult.syncedParticipantTournamentIds,
+          syncedParticipantTournamentIds:
+              syncResult.syncedParticipantTournamentIds,
         );
       }
 
@@ -221,9 +230,16 @@ class TournamentRegistrationService {
         outcome: TournamentRegistrationOutcome.approved,
         registration: registration,
         syncedTournamentTeamIds: syncResult.syncedTournamentTeamIds,
-        syncedParticipantTournamentIds: syncResult.syncedParticipantTournamentIds,
+        syncedParticipantTournamentIds:
+            syncResult.syncedParticipantTournamentIds,
       );
     });
+    await _syncParticipantForApprovedResult(
+      result: result,
+      actorId: actorId,
+      now: effectiveNow,
+    );
+    return result;
   }
 
   Future<TournamentRegistrationResult> registerGuestTeam({
@@ -234,14 +250,16 @@ class TournamentRegistrationService {
     DateTime? now,
   }) async {
     final effectiveNow = now ?? DateTime.now();
-    final policyRegistrations =
-        await _loadTournamentRegistrationsForPolicy(tournamentId);
-    final registrationRef =
-        _registrationsRef.doc(_guestTeamRegistrationId(tournamentId, guestTeamId));
+    final policyRegistrations = await _loadTournamentRegistrationsForPolicy(
+      tournamentId,
+    );
+    final registrationRef = _registrationsRef.doc(
+      _guestTeamRegistrationId(tournamentId, guestTeamId),
+    );
     final tournamentRef = _tournamentsRef.doc(tournamentId);
     final guestTeamRef = _guestTeamsRef.doc(guestTeamId);
 
-    return _firestore.runTransaction((transaction) async {
+    final result = await _firestore.runTransaction((transaction) async {
       final tournamentSnapshot = await transaction.get(tournamentRef);
       if (!tournamentSnapshot.exists || tournamentSnapshot.data() == null) {
         throw Exception('الدورة المطلوبة غير موجودة.');
@@ -265,10 +283,7 @@ class TournamentRegistrationService {
       if (!isOrganizer && !ownsGuestTeam) {
         throw Exception('لا تملك صلاحية تسجيل هذا الفريق الضيف في الدورة.');
       }
-      _ensureRegistrationIsOpen(
-        tournament,
-        currentTime: effectiveNow,
-      );
+      _ensureRegistrationIsOpen(tournament, currentTime: effectiveNow);
       _ensureGuestTeamModeEligibility(
         guestTeam: guestTeam,
         mode: mode,
@@ -281,8 +296,8 @@ class TournamentRegistrationService {
       );
 
       final registrationSnapshot = await transaction.get(registrationRef);
-      final existingRegistration = registrationSnapshot.exists &&
-              registrationSnapshot.data() != null
+      final existingRegistration =
+          registrationSnapshot.exists && registrationSnapshot.data() != null
           ? TournamentRegistrationModel.fromJson(
               registrationSnapshot.data()!,
               registrationSnapshot.id,
@@ -296,7 +311,8 @@ class TournamentRegistrationService {
       );
 
       if (existingRegistration != null) {
-        if (existingRegistration.status == TournamentRegistrationStatus.approved) {
+        if (existingRegistration.status ==
+            TournamentRegistrationStatus.approved) {
           final syncResult = _syncApprovedGuestTeam(
             transaction: transaction,
             guestTeam: guestTeam,
@@ -306,11 +322,13 @@ class TournamentRegistrationService {
           return TournamentRegistrationResult(
             outcome: TournamentRegistrationOutcome.alreadyApproved,
             registration: existingRegistration,
-            syncedParticipantTournamentIds: syncResult.syncedParticipantTournamentIds,
+            syncedParticipantTournamentIds:
+                syncResult.syncedParticipantTournamentIds,
           );
         }
 
-        if (existingRegistration.status == TournamentRegistrationStatus.rejected &&
+        if (existingRegistration.status ==
+                TournamentRegistrationStatus.rejected &&
             targetStatus == TournamentRegistrationStatus.rejected) {
           return TournamentRegistrationResult(
             outcome: TournamentRegistrationOutcome.alreadyRejected,
@@ -318,7 +336,8 @@ class TournamentRegistrationService {
           );
         }
 
-        if (existingRegistration.status == TournamentRegistrationStatus.pending &&
+        if (existingRegistration.status ==
+                TournamentRegistrationStatus.pending &&
             targetStatus == TournamentRegistrationStatus.pending) {
           return TournamentRegistrationResult(
             outcome: TournamentRegistrationOutcome.alreadyPending,
@@ -332,11 +351,13 @@ class TournamentRegistrationService {
           mode: mode,
           status: targetStatus,
           updatedAt: effectiveNow,
-          verifiedBy: targetStatus == TournamentRegistrationStatus.approved &&
+          verifiedBy:
+              targetStatus == TournamentRegistrationStatus.approved &&
                   isOrganizer
               ? actorId
               : null,
-          verifiedAt: targetStatus == TournamentRegistrationStatus.approved &&
+          verifiedAt:
+              targetStatus == TournamentRegistrationStatus.approved &&
                   isOrganizer
               ? effectiveNow
               : null,
@@ -356,7 +377,8 @@ class TournamentRegistrationService {
           return TournamentRegistrationResult(
             outcome: TournamentRegistrationOutcome.approved,
             registration: updatedRegistration,
-            syncedParticipantTournamentIds: syncResult.syncedParticipantTournamentIds,
+            syncedParticipantTournamentIds:
+                syncResult.syncedParticipantTournamentIds,
           );
         }
 
@@ -375,10 +397,12 @@ class TournamentRegistrationService {
         createdBy: actorId,
         createdAt: effectiveNow,
         updatedAt: effectiveNow,
-        verifiedBy: targetStatus == TournamentRegistrationStatus.approved && isOrganizer
+        verifiedBy:
+            targetStatus == TournamentRegistrationStatus.approved && isOrganizer
             ? actorId
             : null,
-        verifiedAt: targetStatus == TournamentRegistrationStatus.approved && isOrganizer
+        verifiedAt:
+            targetStatus == TournamentRegistrationStatus.approved && isOrganizer
             ? effectiveNow
             : null,
       );
@@ -397,7 +421,8 @@ class TournamentRegistrationService {
         return TournamentRegistrationResult(
           outcome: TournamentRegistrationOutcome.approved,
           registration: registration,
-          syncedParticipantTournamentIds: syncResult.syncedParticipantTournamentIds,
+          syncedParticipantTournamentIds:
+              syncResult.syncedParticipantTournamentIds,
         );
       }
 
@@ -406,6 +431,12 @@ class TournamentRegistrationService {
         registration: registration,
       );
     });
+    await _syncParticipantForApprovedResult(
+      result: result,
+      actorId: actorId,
+      now: effectiveNow,
+    );
+    return result;
   }
 
   Future<TournamentRegistrationResult> approveRegistration({
@@ -414,13 +445,15 @@ class TournamentRegistrationService {
     DateTime? now,
   }) async {
     final effectiveNow = now ?? DateTime.now();
-    final preflightRegistration = await _getRegistrationForPolicy(registrationId);
+    final preflightRegistration = await _getRegistrationForPolicy(
+      registrationId,
+    );
     final policyRegistrations = await _loadTournamentRegistrationsForPolicy(
       preflightRegistration.tournamentId,
     );
     final registrationRef = _registrationsRef.doc(registrationId);
 
-    return _firestore.runTransaction((transaction) async {
+    final result = await _firestore.runTransaction((transaction) async {
       final registrationSnapshot = await transaction.get(registrationRef);
       if (!registrationSnapshot.exists || registrationSnapshot.data() == null) {
         throw Exception('سجل التسجيل المطلوب غير موجود.');
@@ -465,7 +498,8 @@ class TournamentRegistrationService {
             outcome: TournamentRegistrationOutcome.alreadyApproved,
             registration: registration,
             syncedTournamentTeamIds: syncResult.syncedTournamentTeamIds,
-            syncedParticipantTournamentIds: syncResult.syncedParticipantTournamentIds,
+            syncedParticipantTournamentIds:
+                syncResult.syncedParticipantTournamentIds,
           );
         }
 
@@ -487,7 +521,8 @@ class TournamentRegistrationService {
         return TournamentRegistrationResult(
           outcome: TournamentRegistrationOutcome.alreadyApproved,
           registration: registration,
-          syncedParticipantTournamentIds: syncResult.syncedParticipantTournamentIds,
+          syncedParticipantTournamentIds:
+              syncResult.syncedParticipantTournamentIds,
         );
       }
 
@@ -536,7 +571,8 @@ class TournamentRegistrationService {
           outcome: TournamentRegistrationOutcome.approved,
           registration: approvedRegistration,
           syncedTournamentTeamIds: syncResult.syncedTournamentTeamIds,
-          syncedParticipantTournamentIds: syncResult.syncedParticipantTournamentIds,
+          syncedParticipantTournamentIds:
+              syncResult.syncedParticipantTournamentIds,
         );
       }
 
@@ -567,9 +603,16 @@ class TournamentRegistrationService {
       return TournamentRegistrationResult(
         outcome: TournamentRegistrationOutcome.approved,
         registration: approvedRegistration,
-        syncedParticipantTournamentIds: syncResult.syncedParticipantTournamentIds,
+        syncedParticipantTournamentIds:
+            syncResult.syncedParticipantTournamentIds,
       );
     });
+    await _syncParticipantForApprovedResult(
+      result: result,
+      actorId: actorId,
+      now: effectiveNow,
+    );
+    return result;
   }
 
   Future<TournamentRegistrationResult> rejectRegistration({
@@ -633,6 +676,21 @@ class TournamentRegistrationService {
     });
   }
 
+  Future<void> _syncParticipantForApprovedResult({
+    required TournamentRegistrationResult result,
+    required String actorId,
+    required DateTime now,
+  }) async {
+    if (result.registration.status != TournamentRegistrationStatus.approved) {
+      return;
+    }
+    await _participantService.syncApprovedRegistration(
+      registration: result.registration,
+      actorId: actorId,
+      now: now,
+    );
+  }
+
   String _teamRegistrationId(String tournamentId, String teamId) {
     return 'team::$tournamentId::$teamId';
   }
@@ -646,8 +704,7 @@ class TournamentRegistrationService {
     required bool isOrganizer,
   }) {
     return switch (mode) {
-      TournamentRegistrationMode.quick ||
-      TournamentRegistrationMode.hybrid =>
+      TournamentRegistrationMode.quick || TournamentRegistrationMode.hybrid =>
         TournamentRegistrationStatus.approved,
       TournamentRegistrationMode.verified when isOrganizer =>
         TournamentRegistrationStatus.approved,
@@ -663,10 +720,8 @@ class TournamentRegistrationService {
     return switch (mode) {
       TournamentRegistrationMode.quick when isOrganizer =>
         TournamentRegistrationStatus.approved,
-      TournamentRegistrationMode.quick =>
-        TournamentRegistrationStatus.pending,
-      TournamentRegistrationMode.hybrid =>
-        TournamentRegistrationStatus.pending,
+      TournamentRegistrationMode.quick => TournamentRegistrationStatus.pending,
+      TournamentRegistrationMode.hybrid => TournamentRegistrationStatus.pending,
       TournamentRegistrationMode.verified when isOrganizer =>
         TournamentRegistrationStatus.approved,
       TournamentRegistrationMode.verified =>
@@ -695,9 +750,7 @@ class TournamentRegistrationService {
     required bool isOrganizer,
   }) {
     if (mode == TournamentRegistrationMode.quick && !isOrganizer) {
-      throw Exception(
-        'الوضع السريع لإضافة الفرق الضيفة مخصص للمنظم فقط.',
-      );
+      throw Exception('الوضع السريع لإضافة الفرق الضيفة مخصص للمنظم فقط.');
     }
 
     if (mode != TournamentRegistrationMode.verified) {
@@ -705,9 +758,11 @@ class TournamentRegistrationService {
     }
 
     final hasContactName =
-        guestTeam.contactName != null && guestTeam.contactName!.trim().isNotEmpty;
+        guestTeam.contactName != null &&
+        guestTeam.contactName!.trim().isNotEmpty;
     final hasContactPhone =
-        guestTeam.contactPhone != null && guestTeam.contactPhone!.trim().isNotEmpty;
+        guestTeam.contactPhone != null &&
+        guestTeam.contactPhone!.trim().isNotEmpty;
     if (!hasContactName || !hasContactPhone) {
       throw Exception(
         'الوضع الموثق يتطلب اسم مسؤول التواصل ورقم هاتف صالح للفريق الضيف.',
@@ -764,7 +819,8 @@ class TournamentRegistrationService {
     final legacyOnlyRegisteredTeams = tournament.registeredTeamIds
         .where((teamId) => !activeRegisteredTeamIds.contains(teamId))
         .length;
-    final reservedSlots = activeRegistrations.length + legacyOnlyRegisteredTeams;
+    final reservedSlots =
+        activeRegistrations.length + legacyOnlyRegisteredTeams;
     final currentRegistrationAlreadyReservesSlot = policyRegistrations.any(
       (registration) =>
           registration.id == registrationId &&

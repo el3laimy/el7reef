@@ -20,6 +20,11 @@ abstract class AppRoutes {
   static const String tournamentList = '/tournament/list';
   static const String tournamentDetail = '/tournament/:id';
   static const String tournamentBracket = '/tournament/:id/bracket';
+  static const String tournamentParticipants = '/tournament/:id/participants';
+  static const String tournamentGroups = '/tournament/:id/groups';
+  static const String tournamentFixtures = '/tournament/:id/fixtures';
+  static const String tournamentStandings = '/tournament/:id/standings';
+  static const String tournamentAssistants = '/tournament/:id/assistants';
   static const String teamRegistration = '/tournament/:id/register';
   static const String tournamentGuestTeamCreate =
       '/tournament/:id/register/guest-team/create';
@@ -54,6 +59,15 @@ abstract class AppRoutes {
 
   static String teamProfileById(String id) => '/team/$id';
   static String tournamentDetailById(String id) => '/tournament/$id';
+  static String tournamentBracketById(String id) => '/tournament/$id/bracket';
+  static String tournamentParticipantsById(String id) =>
+      '/tournament/$id/participants';
+  static String tournamentGroupsById(String id) => '/tournament/$id/groups';
+  static String tournamentFixturesById(String id) => '/tournament/$id/fixtures';
+  static String tournamentStandingsById(String id) =>
+      '/tournament/$id/standings';
+  static String tournamentAssistantsById(String id) =>
+      '/tournament/$id/assistants';
   static String teamRegistrationForTournament(String tournamentId) =>
       '/tournament/$tournamentId/register';
   static String tournamentGuestTeamCreateForTournament(String tournamentId) =>
@@ -76,13 +90,8 @@ abstract class AppRoutes {
       '/fantasy/transfers/$leagueId';
   static String fantasyLeaderboardForLeague(String leagueId) =>
       '/fantasy/leaderboard/$leagueId';
-  static String auditTimelineForEntity(
-    String entityId, {
-    String? entityType,
-  }) => _withQuery(
-        '/organizer/audit/$entityId',
-        {'entityType': entityType},
-      );
+  static String auditTimelineForEntity(String entityId, {String? entityType}) =>
+      _withQuery('/organizer/audit/$entityId', {'entityType': entityType});
   static String disputeViewerForMatch(String matchId) =>
       '/organizer/disputes/$matchId';
 
@@ -102,10 +111,7 @@ abstract class AppRoutes {
     Map<String, String?> queryParameters = const {},
   }) => _withQuery('/guest-team/$guestTeamId/claim', queryParameters);
 
-  static String _withQuery(
-    String path,
-    Map<String, String?> queryParameters,
-  ) {
+  static String _withQuery(String path, Map<String, String?> queryParameters) {
     final filtered = <String, String>{};
     for (final entry in queryParameters.entries) {
       final value = entry.value;

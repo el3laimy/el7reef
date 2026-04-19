@@ -11,16 +11,13 @@ import '../../../core/widgets/el7reef_button.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../domain/entities/tournament.dart';
 import '../../../services/auth_service.dart';
-import '../controllers/tournament_controller.dart';
 import '../controllers/tournament_detail_controller.dart';
 
-/// شاشة تفاصيل الدورة — معلومات + جدول + زر التسجيل
 class TournamentDetailScreen extends GetView<TournamentDetailController> {
   const TournamentDetailScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final tournamentController = Get.find<TournamentController>();
     final authService = Get.find<AuthService>();
 
     return Scaffold(
@@ -100,36 +97,31 @@ class TournamentDetailScreen extends GetView<TournamentDetailController> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _InfoCard(tournament: tournament)
-                          .animate()
-                          .fadeIn(duration: 400.ms),
+                      _InfoCard(
+                        tournament: tournament,
+                      ).animate().fadeIn(duration: 400.ms),
                       const SizedBox(height: AppDimensions.md),
-                      _RegistrationProgress(tournament: tournament)
-                          .animate()
-                          .fadeIn(delay: 100.ms),
+                      _RegistrationProgress(
+                        tournament: tournament,
+                      ).animate().fadeIn(delay: 100.ms),
                       const SizedBox(height: AppDimensions.md),
-                      if (tournament.status == TournamentStatus.groupStage ||
-                          tournament.status == TournamentStatus.knockoutStage ||
-                          tournament.status == TournamentStatus.completed)
-                        _StandingsPreview(tournament: tournament)
-                            .animate()
-                            .fadeIn(delay: 200.ms),
+                      _OperationsSnapshot(
+                        tournament: tournament,
+                      ).animate().fadeIn(delay: 180.ms),
                       const SizedBox(height: AppDimensions.md),
                       if (!isOrganizer &&
                           tournament.status == TournamentStatus.registration)
-                        _RegisterTeamButton(tournament: tournament)
-                            .animate()
-                            .fadeIn(delay: 300.ms),
+                        _RegisterTeamButton(
+                          tournament: tournament,
+                        ).animate().fadeIn(delay: 260.ms),
                       if (tournament.isFantasyEnabled)
-                        _FantasyLeagueButton(tournament: tournament)
-                            .animate()
-                            .fadeIn(delay: 320.ms),
+                        _FantasyLeagueButton(
+                          tournament: tournament,
+                        ).animate().fadeIn(delay: 300.ms),
                       if (isOrganizer)
                         _OrganizerPanel(
                           tournament: tournament,
-                          ctrl: tournamentController,
-                          detailController: controller,
-                        ).animate().fadeIn(delay: 300.ms),
+                        ).animate().fadeIn(delay: 340.ms),
                     ],
                   ),
                 ),
@@ -162,7 +154,11 @@ class _InfoCard extends StatelessWidget {
           _Row(
             icon: Icons.format_list_bulleted,
             label: 'نوع الدورة',
-            value: _formatLabel(tournament.format),
+            value: switch (tournament.format) {
+              TournamentFormat.groupsOnly => 'مجموعات فقط',
+              TournamentFormat.knockoutOnly => 'إقصاء مباشر',
+              TournamentFormat.groupsThenKnockout => 'مجموعات + إقصاء',
+            },
           ),
           _Row(
             icon: Icons.groups,
@@ -175,52 +171,17 @@ class _InfoCard extends StatelessWidget {
               label: 'الموقع',
               value: tournament.location!,
             ),
-          if (tournament.isFantasyEnabled)
-            _Row(
-              icon: Icons.auto_awesome,
-              label: 'الفانتازي',
-              value: 'مفعَّل ✅',
-            ),
+          _Row(
+            icon: Icons.flag_circle_rounded,
+            label: 'حالة البطولة',
+            value: tournament.status.name,
+          ),
           if (tournament.prizeDescription != null)
             _Row(
               icon: Icons.card_giftcard,
               label: 'الجائزة',
               value: tournament.prizeDescription!,
             ),
-        ],
-      ),
-    );
-  }
-
-  String _formatLabel(TournamentFormat format) => switch (format) {
-        TournamentFormat.groupsOnly => 'مجموعات فقط',
-        TournamentFormat.knockoutOnly => 'إقصاء مباشر',
-        TournamentFormat.groupsThenKnockout => 'مجموعات + إقصاء',
-      };
-}
-
-class _Row extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _Row({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: AppColors.primary),
-          const SizedBox(width: 10),
-          Text(label, style: AppTextStyles.labelMedium),
-          const Spacer(),
-          Text(value, style: AppTextStyles.bodyMedium),
         ],
       ),
     );
@@ -256,8 +217,9 @@ class _RegistrationProgress extends StatelessWidget {
             child: LinearProgressIndicator(
               value: tournament.fillRate.clamp(0.0, 1.0),
               backgroundColor: AppColors.surfaceBorder,
-              valueColor:
-                  const AlwaysStoppedAnimation<Color>(AppColors.success),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                AppColors.success,
+              ),
               minHeight: 8,
             ),
           ),
@@ -265,7 +227,7 @@ class _RegistrationProgress extends StatelessWidget {
           Text(
             tournament.canRegister
                 ? '${tournament.maxTeams - tournament.teamCount} مكان متبقي'
-                : 'اكتملت الأماكن',
+                : 'اكتملت الأماكن أو أُغلق التسجيل',
             style: AppTextStyles.labelSmall.copyWith(
               color: tournament.canRegister
                   ? AppColors.success
@@ -278,10 +240,10 @@ class _RegistrationProgress extends StatelessWidget {
   }
 }
 
-class _StandingsPreview extends StatelessWidget {
+class _OperationsSnapshot extends StatelessWidget {
   final Tournament tournament;
 
-  const _StandingsPreview({required this.tournament});
+  const _OperationsSnapshot({required this.tournament});
 
   @override
   Widget build(BuildContext context) {
@@ -291,190 +253,85 @@ class _StandingsPreview extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Text('حالة التشغيل', style: AppTextStyles.titleMedium),
+          const SizedBox(height: AppDimensions.sm),
+          _Row(
+            icon: Icons.groups_2_rounded,
+            label: 'قائمة المشاركين',
+            value: tournament.participantListFinalizedAt == null
+                ? 'غير مقفلة بعد'
+                : 'تم قفلها',
+          ),
+          _Row(
+            icon: Icons.grid_view_rounded,
+            label: 'المجموعات',
+            value: tournament.currentGroupStageId == null
+                ? 'غير منشأة'
+                : 'جاهزة',
+          ),
+          _Row(
+            icon: Icons.account_tree_rounded,
+            label: 'الإقصاء',
+            value: tournament.currentKnockoutBracketId == null
+                ? 'غير منشأ'
+                : 'جاهز',
+          ),
+          if (tournament.winnerParticipantId != null)
+            _Row(
+              icon: Icons.emoji_events_rounded,
+              label: 'البطل',
+              value: tournament.winnerParticipantId!,
+            ),
+          if (tournament.needsManualOpsMigration)
+            Padding(
+              padding: const EdgeInsets.only(top: AppDimensions.sm),
+              child: Text(
+                'هذه البطولة تحتاج manual ops migration قبل التشغيل الكامل.',
+                style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+              ),
+            ),
+          const SizedBox(height: AppDimensions.sm),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              Text('جدول الترتيب', style: AppTextStyles.titleMedium),
-              const Spacer(),
-              TextButton(
-                onPressed: () {},
-                child: Text(
-                  'عرض الكل',
-                  style: AppTextStyles.labelMedium.copyWith(
-                    color: AppColors.primary,
-                  ),
+              OutlinedButton.icon(
+                onPressed: () => Get.toNamed(
+                  AppRoutes.tournamentParticipantsById(tournament.id),
                 ),
+                icon: const Icon(Icons.groups_2_outlined),
+                label: const Text('Participants'),
+              ),
+              OutlinedButton.icon(
+                onPressed: tournament.currentGroupStageId == null
+                    ? null
+                    : () => Get.toNamed(
+                        AppRoutes.tournamentGroupsById(tournament.id),
+                      ),
+                icon: const Icon(Icons.grid_view_rounded),
+                label: const Text('Groups'),
+              ),
+              OutlinedButton.icon(
+                onPressed:
+                    tournament.currentGroupStageId == null &&
+                        tournament.currentKnockoutBracketId == null
+                    ? null
+                    : () => Get.toNamed(
+                        AppRoutes.tournamentFixturesById(tournament.id),
+                      ),
+                icon: const Icon(Icons.calendar_month_rounded),
+                label: const Text('Fixtures'),
+              ),
+              OutlinedButton.icon(
+                onPressed: tournament.currentKnockoutBracketId == null
+                    ? null
+                    : () => Get.toNamed(
+                        AppRoutes.tournamentBracketById(tournament.id),
+                      ),
+                icon: const Icon(Icons.account_tree_outlined),
+                label: const Text('Bracket'),
               ),
             ],
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-            child: Row(
-              children: [
-                const SizedBox(width: 24),
-                Expanded(
-                  child: Text('الفريق', style: AppTextStyles.labelSmall),
-                ),
-                SizedBox(
-                  width: 28,
-                  child: Text(
-                    'ل',
-                    style: AppTextStyles.labelSmall,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                SizedBox(
-                  width: 28,
-                  child: Text(
-                    'ف',
-                    style: AppTextStyles.labelSmall,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                SizedBox(
-                  width: 28,
-                  child: Text(
-                    'ت',
-                    style: AppTextStyles.labelSmall,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                SizedBox(
-                  width: 28,
-                  child: Text(
-                    'خ',
-                    style: AppTextStyles.labelSmall,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                SizedBox(
-                  width: 36,
-                  child: Text(
-                    'نق',
-                    style: AppTextStyles.labelSmall,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(color: AppColors.surfaceBorder, height: 1),
-          ...List.generate(
-            tournament.teamCount.clamp(0, 4),
-            (index) => _StandingRow(
-              rank: index + 1,
-              teamName: 'فريق ${index + 1}',
-              played: 0,
-              wins: 0,
-              draws: 0,
-              losses: 0,
-              points: 0,
-            ),
-          ),
-          if (tournament.teamCount == 0)
-            Padding(
-              padding: const EdgeInsets.all(AppDimensions.md),
-              child: Center(
-                child: Text(
-                  'لم تبدأ المباريات بعد',
-                  style: AppTextStyles.bodySmall,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StandingRow extends StatelessWidget {
-  final int rank;
-  final String teamName;
-  final int played;
-  final int wins;
-  final int draws;
-  final int losses;
-  final int points;
-
-  const _StandingRow({
-    required this.rank,
-    required this.teamName,
-    required this.played,
-    required this.wins,
-    required this.draws,
-    required this.losses,
-    required this.points,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    var rankColor = AppColors.textMuted;
-    if (rank == 1) rankColor = AppColors.secondary;
-    if (rank == 3) rankColor = AppColors.accent;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 24,
-            child: Text(
-              '$rank',
-              style: AppTextStyles.labelMedium.copyWith(color: rankColor),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          Expanded(
-            child: Text(
-              teamName,
-              style: AppTextStyles.bodyMedium,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          SizedBox(
-            width: 28,
-            child: Text(
-              '$played',
-              style: AppTextStyles.labelSmall,
-              textAlign: TextAlign.center,
-            ),
-          ),
-          SizedBox(
-            width: 28,
-            child: Text(
-              '$wins',
-              style: AppTextStyles.labelSmall.copyWith(
-                color: AppColors.success,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          SizedBox(
-            width: 28,
-            child: Text(
-              '$draws',
-              style: AppTextStyles.labelSmall,
-              textAlign: TextAlign.center,
-            ),
-          ),
-          SizedBox(
-            width: 28,
-            child: Text(
-              '$losses',
-              style: AppTextStyles.labelSmall.copyWith(
-                color: AppColors.error,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          SizedBox(
-            width: 36,
-            child: Text(
-              '$points',
-              style: AppTextStyles.titleMedium.copyWith(
-                color: AppColors.primary,
-              ),
-              textAlign: TextAlign.center,
-            ),
           ),
         ],
       ),
@@ -505,9 +362,7 @@ class _FantasyLeagueButton extends StatelessWidget {
 class _RegisterTeamButton extends StatelessWidget {
   final Tournament tournament;
 
-  const _RegisterTeamButton({
-    required this.tournament,
-  });
+  const _RegisterTeamButton({required this.tournament});
 
   @override
   Widget build(BuildContext context) {
@@ -527,8 +382,9 @@ class _RegisterTeamButton extends StatelessWidget {
           El7reefButton(
             text: 'فتح صفحة التسجيل',
             icon: Icons.app_registration_rounded,
-            onPressed: () =>
-                Get.toNamed(AppRoutes.teamRegistrationForTournament(tournament.id)),
+            onPressed: () => Get.toNamed(
+              AppRoutes.teamRegistrationForTournament(tournament.id),
+            ),
           ),
         ],
       ),
@@ -538,14 +394,8 @@ class _RegisterTeamButton extends StatelessWidget {
 
 class _OrganizerPanel extends StatelessWidget {
   final Tournament tournament;
-  final TournamentController ctrl;
-  final TournamentDetailController detailController;
 
-  const _OrganizerPanel({
-    required this.tournament,
-    required this.ctrl,
-    required this.detailController,
-  });
+  const _OrganizerPanel({required this.tournament});
 
   @override
   Widget build(BuildContext context) {
@@ -562,7 +412,7 @@ class _OrganizerPanel extends StatelessWidget {
                 color: AppColors.secondary,
               ),
               const SizedBox(width: 8),
-              Text('لوحة المنظم', style: AppTextStyles.titleMedium),
+              Text('لوحة التشغيل', style: AppTextStyles.titleMedium),
             ],
           ),
           const SizedBox(height: AppDimensions.md),
@@ -570,8 +420,8 @@ class _OrganizerPanel extends StatelessWidget {
             onPressed: () => Get.toNamed(
               AppRoutes.organizerDashboardForTournament(tournament.id),
             ),
-            icon: const Icon(Icons.manage_accounts_rounded),
-            label: const Text('إدارة المساعدين'),
+            icon: const Icon(Icons.dashboard_customize_rounded),
+            label: const Text('Tournament Operations Dashboard'),
           ),
           const SizedBox(height: AppDimensions.sm),
           OutlinedButton.icon(
@@ -582,54 +432,47 @@ class _OrganizerPanel extends StatelessWidget {
             label: const Text('إدارة التسجيلات'),
           ),
           const SizedBox(height: AppDimensions.sm),
-          if (tournament.status == TournamentStatus.registration)
-            El7reefButton(
-              text: 'ابدأ المجموعات',
-              icon: Icons.play_arrow_rounded,
-              onPressed: () async {
-                await ctrl.startGroupStage(tournament.id);
-                await detailController.loadTournament();
-              },
+          OutlinedButton.icon(
+            onPressed: () =>
+                Get.toNamed(AppRoutes.tournamentAssistantsById(tournament.id)),
+            icon: const Icon(Icons.manage_accounts_rounded),
+            label: const Text('إدارة المساعدين'),
+          ),
+          const SizedBox(height: AppDimensions.sm),
+          Text(
+            'عمليات المراحل والتوليد والنشر والإغلاق أصبحت من dashboard التشغيلية فقط لتفادي status flips غير آمنة.',
+            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textMuted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Row extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _Row({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.primary),
+          const SizedBox(width: 10),
+          Text(label, style: AppTextStyles.labelMedium),
+          const Spacer(),
+          Flexible(
+            child: Text(
+              value,
+              style: AppTextStyles.bodyMedium,
+              textAlign: TextAlign.end,
             ),
-          if (tournament.status == TournamentStatus.groupStage) ...[
-            El7reefButton(
-              text: 'افتح نافذة التغيير',
-              icon: Icons.swap_horiz_rounded,
-              onPressed: () async {
-                await ctrl.openTransferWindow(tournament.id);
-                await detailController.loadTournament();
-              },
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () async {
-                await ctrl.startKnockoutStage(tournament.id);
-                await detailController.loadTournament();
-              },
-              icon: const Icon(Icons.bolt_rounded),
-              label: const Text('ابدأ الإقصاء'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.error,
-                side: const BorderSide(color: AppColors.error),
-              ),
-            ),
-          ],
-          if (tournament.status == TournamentStatus.knockoutStage)
-            El7reefButton(
-              text: 'أنهِ الدورة',
-              icon: Icons.emoji_events_rounded,
-              onPressed: () async {
-                await ctrl.completeTournament(tournament.id);
-                await detailController.loadTournament();
-              },
-            ),
-          if (tournament.status == TournamentStatus.completed)
-            Center(
-              child: Text(
-                '🏆 الدورة منتهية',
-                style: AppTextStyles.headlineMedium,
-              ),
-            ),
+          ),
         ],
       ),
     );

@@ -1,4 +1,5 @@
 import '../../core/enums/tournament_enums.dart';
+import 'tournament_group_standings_config.dart';
 import 'tournament_assistant.dart';
 
 /// كيان الدورة — يمثل بطولة كرة القدم الشعبية
@@ -16,12 +17,19 @@ class Tournament {
   final TournamentStatus status;
   final List<String> registeredTeamIds;
   final List<TournamentAssistant> assistants;
-  final List<String> groupRoundIds;   // IDs لجولات المجموعات
+  final List<String> groupRoundIds; // IDs لجولات المجموعات
   final List<String> knockoutRoundIds; // IDs لجولات الإقصاء
   final bool isFantasyEnabled;
   final DateTime? registrationDeadline;
   final DateTime? startDate;
   final DateTime? endDate;
+  final DateTime? participantListFinalizedAt;
+  final int? activeParticipantCount;
+  final String? currentGroupStageId;
+  final String? currentKnockoutBracketId;
+  final String? winnerParticipantId;
+  final bool needsManualOpsMigration;
+  final TournamentGroupStandingsConfig groupStandingsConfig;
   final DateTime createdAt;
 
   const Tournament({
@@ -44,6 +52,13 @@ class Tournament {
     this.registrationDeadline,
     this.startDate,
     this.endDate,
+    this.participantListFinalizedAt,
+    this.activeParticipantCount,
+    this.currentGroupStageId,
+    this.currentKnockoutBracketId,
+    this.winnerParticipantId,
+    this.needsManualOpsMigration = false,
+    this.groupStandingsConfig = const TournamentGroupStandingsConfig(),
     required this.createdAt,
   });
 
@@ -51,14 +66,15 @@ class Tournament {
   bool get isRegistrationOpen => status == TournamentStatus.registration;
 
   /// هل يمكن إضافة فريق جديد؟
-  bool get canRegister =>
-      isRegistrationOpen && registeredTeamIds.length < maxTeams;
+  bool get canRegister => isRegistrationOpen && teamCount < maxTeams;
 
   /// عدد الفرق الحالي
-  int get teamCount => registeredTeamIds.length;
+  int get teamCount => activeParticipantCount ?? registeredTeamIds.length;
 
   /// نسبة الامتلاء
-  double get fillRate => teamCount / maxTeams;
+  double get fillRate => maxTeams == 0 ? 0 : teamCount / maxTeams;
+
+  bool get hasOperationalParticipants => participantListFinalizedAt != null;
 
   Tournament copyWith({
     String? id,
@@ -80,6 +96,13 @@ class Tournament {
     DateTime? registrationDeadline,
     DateTime? startDate,
     DateTime? endDate,
+    DateTime? participantListFinalizedAt,
+    int? activeParticipantCount,
+    String? currentGroupStageId,
+    String? currentKnockoutBracketId,
+    String? winnerParticipantId,
+    bool? needsManualOpsMigration,
+    TournamentGroupStandingsConfig? groupStandingsConfig,
     DateTime? createdAt,
   }) {
     return Tournament(
@@ -102,6 +125,17 @@ class Tournament {
       registrationDeadline: registrationDeadline ?? this.registrationDeadline,
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
+      participantListFinalizedAt:
+          participantListFinalizedAt ?? this.participantListFinalizedAt,
+      activeParticipantCount:
+          activeParticipantCount ?? this.activeParticipantCount,
+      currentGroupStageId: currentGroupStageId ?? this.currentGroupStageId,
+      currentKnockoutBracketId:
+          currentKnockoutBracketId ?? this.currentKnockoutBracketId,
+      winnerParticipantId: winnerParticipantId ?? this.winnerParticipantId,
+      needsManualOpsMigration:
+          needsManualOpsMigration ?? this.needsManualOpsMigration,
+      groupStandingsConfig: groupStandingsConfig ?? this.groupStandingsConfig,
       createdAt: createdAt ?? this.createdAt,
     );
   }

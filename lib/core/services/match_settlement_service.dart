@@ -4,10 +4,12 @@ import '../../core/constants/firebase_paths.dart';
 import '../../core/enums/match_status.dart';
 import '../../data/models/match_model.dart';
 import '../../data/models/player_model.dart';
+import '../../core/enums/tournament_ops_enums.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/player.dart';
 import '../../domain/entities/player_match_stats.dart';
 import 'rating_engine.dart';
+import 'tournament_lifecycle_service.dart';
 
 class MatchSettlementResult {
   final MatchStatus status;
@@ -25,9 +27,17 @@ class MatchSettlementResult {
 /// settlement in one place so the match lifecycle stays atomic and idempotent.
 class MatchSettlementService {
   final FirebaseFirestore _firestore;
+  final TournamentLifecycleService _tournamentLifecycleService;
 
-  MatchSettlementService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  MatchSettlementService({
+    FirebaseFirestore? firestore,
+    TournamentLifecycleService? tournamentLifecycleService,
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _tournamentLifecycleService =
+           tournamentLifecycleService ??
+           TournamentLifecycleService(
+             firestore: firestore ?? FirebaseFirestore.instance,
+           );
 
   Future<MatchSettlementResult> submitScore({
     required String matchId,
@@ -37,8 +47,9 @@ class MatchSettlementService {
     List<PlayerMatchStats> detailedStats = const [],
   }) async {
     return _firestore.runTransaction((transaction) async {
-      final matchRef =
-          _firestore.collection(FirebasePaths.matches).doc(matchId);
+      final matchRef = _firestore
+          .collection(FirebasePaths.matches)
+          .doc(matchId);
       final matchSnapshot = await transaction.get(matchRef);
       if (!matchSnapshot.exists || matchSnapshot.data() == null) {
         throw StateError('المباراة غير موجودة');
@@ -62,6 +73,10 @@ class MatchSettlementService {
         scoreB: scoreB,
       );
       final submittedAt = DateTime.now();
+      final fanVotingRef = _firestore
+          .collection(FirebasePaths.fanVotingSessions)
+          .doc(matchId);
+      final fanVotingSnapshot = await transaction.get(fanVotingRef);
       final updatedMatch = rawMatch.copyWith(
         scoreTeamA: scoreA,
         scoreTeamB: scoreB,
@@ -89,6 +104,8 @@ class MatchSettlementService {
         transaction: transaction,
         match: updatedMatch,
         openedAt: submittedAt,
+        sessionRef: fanVotingRef,
+        sessionExists: fanVotingSnapshot.exists,
       );
 
       return MatchSettlementResult(
@@ -98,12 +115,12 @@ class MatchSettlementService {
     });
   }
 
-  Future<MatchSettlementResult> approveScore({
-    required String matchId,
-  }) async {
-    return _firestore.runTransaction((transaction) async {
-      final matchRef =
-          _firestore.collection(FirebasePaths.matches).doc(matchId);
+  Future<MatchSettlementResult> approveScore({required String matchId}) async {
+    Match? tournamentMatch;
+    final result = await _firestore.runTransaction((transaction) async {
+      final matchRef = _firestore
+          .collection(FirebasePaths.matches)
+          .doc(matchId);
       final matchSnapshot = await transaction.get(matchRef);
       if (!matchSnapshot.exists || matchSnapshot.data() == null) {
         throw StateError('المباراة غير موجودة');
@@ -121,13 +138,15 @@ class MatchSettlementService {
         matchSnapshot.data()!,
         matchSnapshot.id,
       ).toEntity();
+      tournamentMatch = match;
 
       if (match.scoreTeamA == null || match.scoreTeamB == null) {
         throw StateError('لا يمكن اعتماد مباراة بدون نتيجة');
       }
 
-      final fanVotingRef =
-          _firestore.collection(FirebasePaths.fanVotingSessions).doc(matchId);
+      final fanVotingRef = _firestore
+          .collection(FirebasePaths.fanVotingSessions)
+          .doc(matchId);
       final fanVotingSnapshot = await transaction.get(fanVotingRef);
 
       final fanWinnerId = _resolveFanWinner(
@@ -212,25 +231,25 @@ class MatchSettlementService {
         'isAnomaly': false,
         'ratingsAppliedAt': settledAt.millisecondsSinceEpoch,
       });
+      tournamentMatch = match.copyWith(status: MatchStatus.settled);
 
       return const MatchSettlementResult(
         status: MatchStatus.settled,
         ratingsApplied: true,
       );
     });
+    await _refreshTournamentProgress(match: tournamentMatch);
+    return result;
   }
 
   Future<void> _ensureFanVotingSession({
     required Transaction transaction,
     required Match match,
     required DateTime openedAt,
+    required DocumentReference<Map<String, dynamic>> sessionRef,
+    required bool sessionExists,
   }) async {
-    final sessionRef = _firestore
-        .collection(FirebasePaths.fanVotingSessions)
-        .doc(match.id);
-    final sessionSnapshot = await transaction.get(sessionRef);
-
-    if (sessionSnapshot.exists) {
+    if (sessionExists) {
       return;
     }
 
@@ -279,8 +298,9 @@ class MatchSettlementService {
   }) async {
     final players = <String, Player>{};
     for (final playerId in playerIds.toSet()) {
-      final playerRef =
-          _firestore.collection(FirebasePaths.players).doc(playerId);
+      final playerRef = _firestore
+          .collection(FirebasePaths.players)
+          .doc(playerId);
       final playerSnapshot = await transaction.get(playerRef);
       if (!playerSnapshot.exists || playerSnapshot.data() == null) {
         continue;
@@ -302,8 +322,9 @@ class MatchSettlementService {
     required int ratingDelta,
     required DateTime settledAt,
   }) {
-    final playerRef =
-        _firestore.collection(FirebasePaths.players).doc(player.id);
+    final playerRef = _firestore
+        .collection(FirebasePaths.players)
+        .doc(player.id);
     final updates = <String, dynamic>{
       'rating': (player.rating + ratingDelta).clamp(0, 9999),
       'totalMatches': FieldValue.increment(1),
@@ -332,18 +353,18 @@ class MatchSettlementService {
     }
 
     final playerVotes = Map<String, int>.from(
-      (data['playerVotes'] as Map<String, dynamic>? ?? const {})
-          .map((key, value) => MapEntry(key, (value as num).toInt())),
+      (data['playerVotes'] as Map<String, dynamic>? ?? const {}).map(
+        (key, value) => MapEntry(key, (value as num).toInt()),
+      ),
     );
     if (playerVotes.isEmpty) {
       return null;
     }
 
     final closesAtMs = (data['closesAt'] as num?)?.toInt();
-    final isClosed = closesAtMs != null &&
-        DateTime.now().isAfter(
-          DateTime.fromMillisecondsSinceEpoch(closesAtMs),
-        );
+    final isClosed =
+        closesAtMs != null &&
+        DateTime.now().isAfter(DateTime.fromMillisecondsSinceEpoch(closesAtMs));
     if (!isClosed) {
       return null;
     }
@@ -358,9 +379,7 @@ class MatchSettlementService {
     });
 
     if (winnerId != null) {
-      transaction.update(fanVotingRef, {
-        'winnerPlayerId': winnerId,
-      });
+      transaction.update(fanVotingRef, {'winnerPlayerId': winnerId});
     }
 
     return winnerId;
@@ -379,5 +398,29 @@ class MatchSettlementService {
     if (data == null) return false;
     return data['status'] == MatchStatus.settled.name ||
         data['ratingsAppliedAt'] != null;
+  }
+
+  Future<void> _refreshTournamentProgress({required Match? match}) async {
+    if (match == null ||
+        match.tournamentId == null ||
+        match.tournamentId!.isEmpty ||
+        !match.isOfficialTournamentResult) {
+      return;
+    }
+
+    switch (match.stageType) {
+      case TournamentStageType.groupStage:
+        await _tournamentLifecycleService.refreshGroupStandings(
+          tournamentId: match.tournamentId!,
+        );
+        return;
+      case TournamentStageType.knockoutStage:
+        await _tournamentLifecycleService.refreshKnockoutProgress(
+          tournamentId: match.tournamentId!,
+        );
+        return;
+      case null:
+        return;
+    }
   }
 }

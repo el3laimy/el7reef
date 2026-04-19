@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/firebase_paths.dart';
 import '../../core/enums/match_status.dart';
+import '../../core/enums/tournament_ops_enums.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/repositories/match_repository.dart';
 import '../models/match_model.dart';
@@ -10,16 +11,16 @@ class MatchRepositoryImpl implements MatchRepository {
   final FirebaseFirestore _db;
 
   MatchRepositoryImpl({FirebaseFirestore? db})
-      : _db = db ?? FirebaseFirestore.instance;
+    : _db = db ?? FirebaseFirestore.instance;
 
-  CollectionReference get _matchesRef => _db.collection(FirebasePaths.matches);
+  CollectionReference<Map<String, dynamic>> get _matchesRef =>
+      _db.collection(FirebasePaths.matches);
 
   @override
   Future<Match?> getMatch(String matchId) async {
     final doc = await _matchesRef.doc(matchId).get();
     if (!doc.exists || doc.data() == null) return null;
-    return MatchModel.fromJson(doc.data()! as Map<String, dynamic>, doc.id)
-        .toEntity();
+    return MatchModel.fromJson(doc.data()!, doc.id).toEntity();
   }
 
   @override
@@ -29,13 +30,28 @@ class MatchRepositoryImpl implements MatchRepository {
   }
 
   @override
+  Future<void> upsertMatches(List<Match> matches) async {
+    final batch = _db.batch();
+    for (final match in matches) {
+      batch.set(
+        _matchesRef.doc(match.id),
+        MatchModel.fromEntity(match).toJson(),
+      );
+    }
+    await batch.commit();
+  }
+
+  @override
   Future<void> updateMatch(Match match) async {
     final model = MatchModel.fromEntity(match);
     await _matchesRef.doc(match.id).update(model.toJson());
   }
 
   @override
-  Future<List<Match>> getPlayerMatches(String playerId, {int limit = 20}) async {
+  Future<List<Match>> getPlayerMatches(
+    String playerId, {
+    int limit = 20,
+  }) async {
     // مباريات الفريق A
     final snapshotA = await _matchesRef
         .where('teamAPlayerIds', arrayContains: playerId)
@@ -52,10 +68,7 @@ class MatchRepositoryImpl implements MatchRepository {
 
     final all = <Match>{};
     for (final doc in [...snapshotA.docs, ...snapshotB.docs]) {
-      all.add(
-        MatchModel.fromJson(doc.data()! as Map<String, dynamic>, doc.id)
-            .toEntity(),
-      );
+      all.add(MatchModel.fromJson(doc.data(), doc.id).toEntity());
     }
 
     final sorted = all.toList()
@@ -70,22 +83,59 @@ class MatchRepositoryImpl implements MatchRepository {
     double radiusKm = 5,
   }) async {
     final snapshot = await _matchesRef
-        .where('status', whereIn: [
-          MatchStatus.open.name,
-          MatchStatus.full.name,
-          MatchStatus.live.name,
-          MatchStatus.completed.name,
-          MatchStatus.pendingReview.name,
-        ])
+        .where(
+          'status',
+          whereIn: [
+            MatchStatus.open.name,
+            MatchStatus.full.name,
+            MatchStatus.live.name,
+            MatchStatus.completed.name,
+            MatchStatus.pendingReview.name,
+          ],
+        )
         .orderBy('createdAt', descending: true)
         .limit(30)
         .get();
 
     return snapshot.docs
-        .map((doc) =>
-            MatchModel.fromJson(doc.data()! as Map<String, dynamic>, doc.id)
-                .toEntity())
+        .map((doc) => MatchModel.fromJson(doc.data(), doc.id).toEntity())
         .toList();
+  }
+
+  @override
+  Future<List<Match>> getTournamentMatches({
+    required String tournamentId,
+    TournamentStageType? stageType,
+    String? groupStageId,
+    String? groupId,
+    String? knockoutTieId,
+  }) async {
+    Query<Map<String, dynamic>> query = _matchesRef.where(
+      'tournamentId',
+      isEqualTo: tournamentId,
+    );
+    if (stageType != null) {
+      query = query.where('stageType', isEqualTo: stageType.name);
+    }
+    if (groupStageId != null && groupStageId.isNotEmpty) {
+      query = query.where('groupStageId', isEqualTo: groupStageId);
+    }
+    if (groupId != null && groupId.isNotEmpty) {
+      query = query.where('groupId', isEqualTo: groupId);
+    }
+    if (knockoutTieId != null && knockoutTieId.isNotEmpty) {
+      query = query.where('knockoutTieId', isEqualTo: knockoutTieId);
+    }
+    final snapshot = await query.get();
+    final matches = snapshot.docs
+        .map((doc) => MatchModel.fromJson(doc.data(), doc.id).toEntity())
+        .toList(growable: true);
+    matches.sort((left, right) {
+      final leftDate = left.scheduledAt ?? left.createdAt;
+      final rightDate = right.scheduledAt ?? right.createdAt;
+      return leftDate.compareTo(rightDate);
+    });
+    return matches;
   }
 
   @override
@@ -106,9 +156,7 @@ class MatchRepositoryImpl implements MatchRepository {
 
   @override
   Future<void> approveScore(String matchId) async {
-    await _matchesRef.doc(matchId).update({
-      'status': MatchStatus.settled.name,
-    });
+    await _matchesRef.doc(matchId).update({'status': MatchStatus.settled.name});
   }
 
   @override
@@ -129,8 +177,6 @@ class MatchRepositoryImpl implements MatchRepository {
 
   @override
   Future<void> activateGoldenRating(String matchId) async {
-    await _matchesRef.doc(matchId).update({
-      'isGoldenRating': true,
-    });
+    await _matchesRef.doc(matchId).update({'isGoldenRating': true});
   }
 }

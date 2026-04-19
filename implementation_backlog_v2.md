@@ -1,9 +1,10 @@
 # EL7REEF Implementation Backlog V2
 
-Version: 2026-04-15
+Version: 2026-04-19
 Source Docs:
 - [product_plan.md](product_plan.md)
 - [engineering_plan.md](engineering_plan.md)
+- [tournament_tos_execution_rules.md](tournament_tos_execution_rules.md)
 
 Status Model:
 - `Todo`
@@ -33,10 +34,59 @@ These items are already in place and should be treated as foundation rather than
 2. `V2-006` to `V2-011`
 3. `V2-012` to `V2-018`
 4. `V2-019` to `V2-023`
-5. `V2-024` to `V2-028`
-6. `V2-029` to `V2-032`
-7. `V2-033` to `V2-036`
-8. `V2-037` to `V2-044`
+5. `TOS-001` to `TOS-010`
+6. `V2-024` to `V2-028`
+7. `V2-029` to `V2-032`
+8. `V2-033` to `V2-036`
+9. `V2-037` to `V2-044`
+
+## Tournament Operating System Reset
+
+The tournament module is no longer treated as "registration-complete". The
+next execution slice is an operations-first reset that turns the module from
+registration and review flows into a real tournament operating system.
+
+### TOS-001 to TOS-010
+
+Status: `In Progress`
+
+Key outcomes:
+- freeze misleading tournament surfaces and status-only controls
+- establish `TournamentParticipant` as the canonical participant entity
+- add backfill and compatibility migration for approved registrations
+- move lifecycle transitions into audited orchestration services
+- expand `Match` into tournament-grade fixture storage
+- add real groups, standings, knockout bracket, and operations dashboard
+- cover the operating path with service and UI tests before returning to `V2-039`
+
+Execution Snapshot: `2026-04-19`
+
+- `TOS-001` `Done`: misleading tournament surfaces are frozen; fake standings and unbacked bracket/dashboard entry points were removed or rerouted.
+- `TOS-002` `Done`: `TournamentParticipant` is now the canonical tournament participant entity with service-owned approval sync and participant lifecycle state.
+- `TOS-002.5` `Done`: approved registrations are backfilled into participants with compatibility support for existing tournament reads.
+- `TOS-003` `Done`: lifecycle transitions now run through `TournamentLifecycleService` orchestration instead of raw status flips.
+- `TOS-004` `Done`: `Match` has been expanded into fixture-capable tournament storage with stage, group, slot, publish, and scheduling metadata.
+- `TOS-005` `Done`: group-stage core exists end-to-end with generated groups, draft fixtures, persisted standings snapshots, and qualifier extraction.
+- `TOS-006` `Done`: fixture queries, single-fixture scheduling, venue/time editing, `publishFixtures`, and guarded `regenerate groups` are now implemented.
+- `TOS-007` `Done`: single-elimination knockout build and winner advancement are implemented with canonical bracket and tie persistence.
+- `TOS-008` `Done`: the Tournament Operations Dashboard now supports `manual add`, `replace participant`, `withdraw`, fixture scheduling, fixture publication, and guarded group regeneration.
+- `TOS-009` `In Progress`: real-data screens for participants, groups, fixtures, standings, and bracket exist; remaining work is deeper operating actions and state polish.
+- `TOS-010` `In Progress`: audit events and service/UI coverage are in place; canonical `activeParticipantCount` is now synced on tournament writes, player tournament reads prefer canonical participants with legacy fallback, and the old raw `status flip` repository/controller path has been retired. Broader regression coverage and the remaining legacy cleanup still remain.
+
+Current Focus:
+
+- finish `TOS-009` state polish where needed, but without reopening placeholder-style UI work
+- widen `TOS-010` cleanup, regression hardening, and legacy retirement
+
+Execution Rules:
+
+- use [tournament_tos_execution_rules.md](tournament_tos_execution_rules.md) as the operating reference for ownership, sequencing, and anti-conflict guardrails during the TOS workstream
+
+Operational Milestone Reached:
+
+- tournament results now affect standings and knockout progression only after official score approval
+- score approval refreshes tournament standings or bracket automatically
+- the module has crossed from registration-centric into operating-system baseline, but not yet into fully polished day-to-day tournament ops
 
 ## Epic A: Hybrid Identity Foundation
 
@@ -886,6 +936,10 @@ Acceptance:
 
 - `V2-019` to `V2-023`
 
+### Sprint 4.5
+
+- `TOS-001` to `TOS-010`
+
 ### Sprint 5
 
 - `V2-024` to `V2-028`
@@ -904,6 +958,9 @@ Acceptance:
 
 ## Next Ticket To Start
 
-Start with `V2-039`.
-Matchday truth now feeds fantasy eligibility, and the fantasy team plus transfer UX surfaces clearer live-round state, transfer impact, and lifecycle-aware copy.
-The next goal is adding organizer lifecycle controls so registration phases, lineup lock windows, and fantasy lifecycle moves are managed through protected policies and audit-backed flows.
+Continue with `TOS-010`.
+The tournament module now has a working operations core, guarded fixture ops,
+and organizer participant actions. The next ticket is broader cleanup,
+regression hardening, and legacy retirement, with only limited `TOS-009` state
+polish remaining where real-data screens still need refinement. `V2-039`
+remains blocked until `TOS-010` is materially stronger.

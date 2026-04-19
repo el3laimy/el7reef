@@ -22,8 +22,8 @@ class AuditTimelineController extends GetxController {
     required this.entityId,
     required this.entityType,
     AuditService? auditService,
-  }) : _auditService = auditService ??
-            AuditService(repository: AuditRepositoryImpl());
+  }) : _auditService =
+           auditService ?? AuditService(repository: AuditRepositoryImpl());
 
   @override
   void onInit() {
@@ -80,6 +80,26 @@ class AuditTimelineController extends GetxController {
         return 'تم اعتماد التسجيل';
       case AuditAction.registrationRejected:
         return 'تم رفض التسجيل';
+      case AuditAction.participantAdded:
+        return 'تمت إضافة participant للبطولة';
+      case AuditAction.participantReplaced:
+        return 'تم استبدال participant';
+      case AuditAction.participantWithdrawn:
+        return 'تم سحب participant من البطولة';
+      case AuditAction.participantsFinalized:
+        return 'تم قفل قائمة المشاركين';
+      case AuditAction.groupStageGenerated:
+        return 'تم إنشاء مرحلة المجموعات';
+      case AuditAction.groupStageRegenerated:
+        return 'تمت إعادة توليد المجموعات';
+      case AuditAction.fixtureScheduled:
+        return 'تمت جدولة fixture';
+      case AuditAction.fixturesPublished:
+        return 'تم نشر fixtures البطولة';
+      case AuditAction.knockoutGenerated:
+        return 'تم إنشاء bracket الإقصاء';
+      case AuditAction.tournamentCompleted:
+        return 'تم إنهاء البطولة';
       case AuditAction.guestPlayerCreated:
         return 'تم إضافة لاعب ضيف';
       case AuditAction.guestPlayerClaimed:

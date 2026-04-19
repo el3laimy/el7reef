@@ -10,7 +10,7 @@ class GuestTeamRepositoryImpl implements GuestTeamRepository {
   final FirebaseFirestore _firestore;
 
   GuestTeamRepositoryImpl({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _guestTeamsRef =>
       _firestore.collection(FirebasePaths.guestTeams);
@@ -43,6 +43,22 @@ class GuestTeamRepositoryImpl implements GuestTeamRepository {
         .orderBy('createdAt')
         .get();
 
+    return snapshot.docs
+        .map((doc) => GuestTeamModel.fromJson(doc.data(), doc.id).toEntity())
+        .toList(growable: false);
+  }
+
+  @override
+  Future<List<GuestTeam>> searchGuestTeams(String query) async {
+    final normalizedQuery = query.trim().toLowerCase();
+    if (normalizedQuery.isEmpty) {
+      return const <GuestTeam>[];
+    }
+    final snapshot = await _guestTeamsRef
+        .where('normalizedName', isGreaterThanOrEqualTo: normalizedQuery)
+        .where('normalizedName', isLessThanOrEqualTo: '$normalizedQuery\uf8ff')
+        .limit(20)
+        .get();
     return snapshot.docs
         .map((doc) => GuestTeamModel.fromJson(doc.data(), doc.id).toEntity())
         .toList(growable: false);

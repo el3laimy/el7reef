@@ -10,17 +10,20 @@ class TournamentRepositoryImpl implements TournamentRepository {
   final FirebaseFirestore _db;
 
   TournamentRepositoryImpl({FirebaseFirestore? db})
-      : _db = db ?? FirebaseFirestore.instance;
+    : _db = db ?? FirebaseFirestore.instance;
 
   CollectionReference get _col => _db.collection(FirebasePaths.tournaments);
+  CollectionReference<Map<String, dynamic>> get _participantsRef =>
+      _db.collection(FirebasePaths.tournamentParticipants);
 
   @override
   Future<Tournament?> getTournament(String tournamentId) async {
     final doc = await _col.doc(tournamentId).get();
     if (!doc.exists || doc.data() == null) return null;
     return TournamentModel.fromJson(
-            doc.data()! as Map<String, dynamic>, doc.id)
-        .toEntity();
+      doc.data()! as Map<String, dynamic>,
+      doc.id,
+    ).toEntity();
   }
 
   @override
@@ -38,19 +41,25 @@ class TournamentRepositoryImpl implements TournamentRepository {
   @override
   Future<List<Tournament>> getLiveTournaments({int limit = 20}) async {
     final snap = await _col
-        .where('status', whereIn: [
-          TournamentStatus.registration.name,
-          TournamentStatus.groupStage.name,
-          TournamentStatus.knockoutStage.name,
-        ])
+        .where(
+          'status',
+          whereIn: [
+            TournamentStatus.registration.name,
+            TournamentStatus.groupStage.name,
+            TournamentStatus.knockoutStage.name,
+          ],
+        )
         .orderBy('createdAt', descending: true)
         .limit(limit)
         .get();
 
     return snap.docs
-        .map((d) =>
-            TournamentModel.fromJson(d.data()! as Map<String, dynamic>, d.id)
-                .toEntity())
+        .map(
+          (d) => TournamentModel.fromJson(
+            d.data()! as Map<String, dynamic>,
+            d.id,
+          ).toEntity(),
+        )
         .toList();
   }
 
@@ -62,24 +71,58 @@ class TournamentRepositoryImpl implements TournamentRepository {
         .get();
 
     return snap.docs
-        .map((d) =>
-            TournamentModel.fromJson(d.data()! as Map<String, dynamic>, d.id)
-                .toEntity())
+        .map(
+          (d) => TournamentModel.fromJson(
+            d.data()! as Map<String, dynamic>,
+            d.id,
+          ).toEntity(),
+        )
         .toList();
   }
 
   @override
   Future<List<Tournament>> getPlayerTournaments(String teamId) async {
-    final snap = await _col
+    final participantSnap = await _participantsRef
+        .where('sourceType', isEqualTo: 'registeredTeam')
+        .where('sourceEntityId', isEqualTo: teamId)
+        .get();
+    final tournamentIds = participantSnap.docs
+        .map((doc) => doc.data()['tournamentId'] as String?)
+        .whereType<String>()
+        .toSet()
+        .toList(growable: false);
+
+    if (tournamentIds.isNotEmpty) {
+      final docs = await Future.wait(
+        tournamentIds.map((id) => _col.doc(id).get()),
+      );
+      final tournaments = docs
+          .where((doc) => doc.exists && doc.data() != null)
+          .map(
+            (doc) => TournamentModel.fromJson(
+              doc.data()! as Map<String, dynamic>,
+              doc.id,
+            ).toEntity(),
+          )
+          .toList(growable: true);
+      tournaments.sort(
+        (left, right) => right.createdAt.compareTo(left.createdAt),
+      );
+      return tournaments;
+    }
+
+    final legacySnap = await _col
         .where('registeredTeamIds', arrayContains: teamId)
         .orderBy('createdAt', descending: true)
         .get();
-
-    return snap.docs
-        .map((d) =>
-            TournamentModel.fromJson(d.data()! as Map<String, dynamic>, d.id)
-                .toEntity())
-        .toList();
+    return legacySnap.docs
+        .map(
+          (d) => TournamentModel.fromJson(
+            d.data()! as Map<String, dynamic>,
+            d.id,
+          ).toEntity(),
+        )
+        .toList(growable: false);
   }
 
   @override
@@ -93,25 +136,6 @@ class TournamentRepositoryImpl implements TournamentRepository {
   Future<void> unregisterTeam(String tournamentId, String teamId) async {
     await _col.doc(tournamentId).update({
       'registeredTeamIds': FieldValue.arrayRemove([teamId]),
-    });
-  }
-
-  @override
-  Future<void> updateStatus(String tournamentId, String status) async {
-    await _col.doc(tournamentId).update({'status': status});
-  }
-
-  @override
-  Future<void> addGroupRound(String tournamentId, String roundId) async {
-    await _col.doc(tournamentId).update({
-      'groupRoundIds': FieldValue.arrayUnion([roundId]),
-    });
-  }
-
-  @override
-  Future<void> addKnockoutRound(String tournamentId, String roundId) async {
-    await _col.doc(tournamentId).update({
-      'knockoutRoundIds': FieldValue.arrayUnion([roundId]),
     });
   }
 }
