@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:el7reef/core/enums/match_status.dart';
 import 'package:el7reef/core/enums/tournament_enums.dart';
+import 'package:el7reef/core/enums/tournament_ops_enums.dart';
+import 'package:el7reef/core/constants/firebase_paths.dart';
 import 'package:el7reef/core/services/tournament_lifecycle_service.dart';
 import 'package:el7reef/core/services/tournament_participant_service.dart';
 import 'package:el7reef/core/services/tournament_registration_service.dart';
@@ -195,7 +197,256 @@ void main() {
     );
 
     test(
-      'approved registrations are backfilled into participants before finalize',
+      'finalizeParticipants is idempotent and does not rewrite finalized state',
+      () async {
+        final participantId = participantService.participantIdFor(
+          tournamentId: 'tournament-1',
+          sourceType: TournamentParticipantSourceType.registeredTeam,
+          sourceEntityId: 'team-1',
+        );
+
+        final firstFinalized = await lifecycleService.finalizeParticipants(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 10)),
+        );
+        final firstTournamentDoc = await firestore
+            .collection(FirebasePaths.tournaments)
+            .doc('tournament-1')
+            .get();
+        final firstParticipantDoc = await firestore
+            .collection(FirebasePaths.tournamentParticipants)
+            .doc(participantId)
+            .get();
+        final firstAuditSnapshot = await firestore
+            .collection(FirebasePaths.auditEvents)
+            .where('action', isEqualTo: 'participantsFinalized')
+            .get();
+
+        final secondFinalized = await lifecycleService.finalizeParticipants(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 20)),
+        );
+        final secondTournamentDoc = await firestore
+            .collection(FirebasePaths.tournaments)
+            .doc('tournament-1')
+            .get();
+        final secondParticipantDoc = await firestore
+            .collection(FirebasePaths.tournamentParticipants)
+            .doc(participantId)
+            .get();
+        final secondAuditSnapshot = await firestore
+            .collection(FirebasePaths.auditEvents)
+            .where('action', isEqualTo: 'participantsFinalized')
+            .get();
+
+        expect(firstFinalized, hasLength(4));
+        expect(secondFinalized, hasLength(4));
+        expect(
+          secondTournamentDoc.data()?['participantListFinalizedAt'],
+          firstTournamentDoc.data()?['participantListFinalizedAt'],
+        );
+        expect(
+          secondParticipantDoc.data()?['updatedAt'],
+          firstParticipantDoc.data()?['updatedAt'],
+        );
+        expect(
+          secondAuditSnapshot.docs,
+          hasLength(firstAuditSnapshot.docs.length),
+        );
+      },
+    );
+
+    test(
+      'refreshGroupStandings avoids rewriting snapshots when results are unchanged',
+      () async {
+        await lifecycleService.finalizeParticipants(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 10)),
+        );
+        final groupStage = await lifecycleService.startGroupStage(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 15)),
+        );
+
+        final snapshotId = groupStage.standings.single.id;
+        final beforeRefreshDoc = await firestore
+            .collection(FirebasePaths.groupStandingSnapshots)
+            .doc(snapshotId)
+            .get();
+        final beforeRefreshUpdatedAt =
+            (beforeRefreshDoc.data()?['updatedAt'] as num?)?.toInt();
+
+        final refreshed = await lifecycleService.refreshGroupStandings(
+          tournamentId: 'tournament-1',
+          now: now.add(const Duration(minutes: 30)),
+        );
+
+        final afterRefreshDoc = await firestore
+            .collection(FirebasePaths.groupStandingSnapshots)
+            .doc(snapshotId)
+            .get();
+        final afterRefreshUpdatedAt =
+            (afterRefreshDoc.data()?['updatedAt'] as num?)?.toInt();
+
+        expect(refreshed, hasLength(1));
+        expect(afterRefreshUpdatedAt, beforeRefreshUpdatedAt);
+      },
+    );
+
+    test(
+      'refreshKnockoutProgress avoids rewriting bracket and ties when state is unchanged',
+      () async {
+        await lifecycleService.finalizeParticipants(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 10)),
+        );
+
+        final groupStage = await lifecycleService.startGroupStage(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 15)),
+        );
+
+        for (final fixture in groupStage.fixtures) {
+          final score = _groupScoreFor(fixture.teamAId!, fixture.teamBId!);
+          await matchRepository.updateMatch(
+            fixture.copyWith(
+              scoreTeamA: score.$1,
+              scoreTeamB: score.$2,
+              status: MatchStatus.settled,
+            ),
+          );
+        }
+
+        await lifecycleService.refreshGroupStandings(
+          tournamentId: 'tournament-1',
+          now: now.add(const Duration(minutes: 20)),
+        );
+        final knockout = await lifecycleService.startKnockout(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 25)),
+        );
+
+        final bracketDocBefore = await firestore
+            .collection(FirebasePaths.knockoutBrackets)
+            .doc(knockout.bracket.id)
+            .get();
+        final tieDocBefore = await firestore
+            .collection(FirebasePaths.knockoutTies)
+            .doc(knockout.ties.single.id)
+            .get();
+        final bracketUpdatedAtBefore =
+            (bracketDocBefore.data()?['updatedAt'] as num?)?.toInt();
+        final tieUpdatedAtBefore = (tieDocBefore.data()?['updatedAt'] as num?)
+            ?.toInt();
+
+        final refreshed = await lifecycleService.refreshKnockoutProgress(
+          tournamentId: 'tournament-1',
+          now: now.add(const Duration(minutes: 40)),
+        );
+
+        final bracketDocAfter = await firestore
+            .collection(FirebasePaths.knockoutBrackets)
+            .doc(knockout.bracket.id)
+            .get();
+        final tieDocAfter = await firestore
+            .collection(FirebasePaths.knockoutTies)
+            .doc(knockout.ties.single.id)
+            .get();
+        final bracketUpdatedAtAfter =
+            (bracketDocAfter.data()?['updatedAt'] as num?)?.toInt();
+        final tieUpdatedAtAfter = (tieDocAfter.data()?['updatedAt'] as num?)
+            ?.toInt();
+
+        expect(refreshed, isNotNull);
+        expect(bracketUpdatedAtAfter, bracketUpdatedAtBefore);
+        expect(tieUpdatedAtAfter, tieUpdatedAtBefore);
+      },
+    );
+
+    test(
+      'completeTournament is idempotent after champion is already set',
+      () async {
+        await lifecycleService.finalizeParticipants(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 10)),
+        );
+        final groupStage = await lifecycleService.startGroupStage(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 15)),
+        );
+
+        for (final fixture in groupStage.fixtures) {
+          final score = _groupScoreFor(fixture.teamAId!, fixture.teamBId!);
+          await matchRepository.updateMatch(
+            fixture.copyWith(
+              scoreTeamA: score.$1,
+              scoreTeamB: score.$2,
+              status: MatchStatus.settled,
+            ),
+          );
+        }
+
+        await lifecycleService.refreshGroupStandings(
+          tournamentId: 'tournament-1',
+          now: now.add(const Duration(minutes: 20)),
+        );
+        final knockout = await lifecycleService.startKnockout(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 25)),
+        );
+        await matchRepository.updateMatch(
+          knockout.matches.single.copyWith(
+            scoreTeamA: 2,
+            scoreTeamB: 0,
+            status: MatchStatus.settled,
+          ),
+        );
+        await lifecycleService.refreshKnockoutProgress(
+          tournamentId: 'tournament-1',
+          now: now.add(const Duration(minutes: 30)),
+        );
+
+        final firstCompleted = await lifecycleService.completeTournament(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 35)),
+        );
+        final auditCountBefore = await firestore
+            .collection(FirebasePaths.auditEvents)
+            .where('action', isEqualTo: 'tournamentCompleted')
+            .get();
+
+        final secondCompleted = await lifecycleService.completeTournament(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 45)),
+        );
+        final auditCountAfter = await firestore
+            .collection(FirebasePaths.auditEvents)
+            .where('action', isEqualTo: 'tournamentCompleted')
+            .get();
+
+        expect(secondCompleted.status, TournamentStatus.completed);
+        expect(
+          secondCompleted.winnerParticipantId,
+          firstCompleted.winnerParticipantId,
+        );
+        expect(auditCountAfter.docs, hasLength(auditCountBefore.docs.length));
+      },
+    );
+
+    test(
+      'approved registrations sync into participants during registration flow',
       () async {
         final participants = await participantService.getTournamentParticipants(
           'tournament-1',

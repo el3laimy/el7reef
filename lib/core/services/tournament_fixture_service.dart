@@ -60,6 +60,11 @@ class TournamentFixtureService {
 
     final tournament = await _loadTournament(tournamentId);
     final normalizedVenueId = _normalizeVenueId(venueId);
+    final scheduleUnchanged =
+        match.scheduledAt == scheduledAt && match.venueId == normalizedVenueId;
+    if (scheduleUnchanged) {
+      return match;
+    }
     final updatedMatch = match.copyWith(
       scheduledAt: scheduledAt,
       venueId: normalizedVenueId,

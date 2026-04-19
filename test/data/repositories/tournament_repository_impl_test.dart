@@ -61,6 +61,34 @@ void main() {
     );
 
     test(
+      'createTournament omits empty legacy stage arrays from new documents',
+      () async {
+        await repository.createTournament(
+          Tournament(
+            id: 'tournament-clean',
+            organizerId: 'organizer-1',
+            name: 'Ops Cup',
+            format: TournamentFormat.groupsThenKnockout,
+            teamSize: TournamentTeamSize.fiveVsFive,
+            maxTeams: 8,
+            status: TournamentStatus.registration,
+            createdAt: now,
+          ),
+        );
+
+        final snapshot = await firestore
+            .collection('tournaments')
+            .doc('tournament-clean')
+            .get();
+        final data = snapshot.data();
+
+        expect(data, isNotNull);
+        expect(data!.containsKey('groupRoundIds'), isFalse);
+        expect(data.containsKey('knockoutRoundIds'), isFalse);
+      },
+    );
+
+    test(
       'getPlayerTournaments falls back to legacy registeredTeamIds',
       () async {
         await repository.createTournament(
@@ -83,6 +111,45 @@ void main() {
 
         expect(tournaments, hasLength(1));
         expect(tournaments.single.id, 'tournament-legacy');
+      },
+    );
+
+    test(
+      'updateTournament preserves legacy stage arrays when historical data exists',
+      () async {
+        await firestore
+            .collection('tournaments')
+            .doc('tournament-historical')
+            .set({
+              'organizerId': 'organizer-1',
+              'name': 'Historical Cup',
+              'format': TournamentFormat.groupsThenKnockout.name,
+              'teamSize': TournamentTeamSize.fiveVsFive.value,
+              'maxTeams': 8,
+              'status': TournamentStatus.groupStage.name,
+              'groupRoundIds': const ['legacy-group-round'],
+              'knockoutRoundIds': const ['legacy-knockout-round'],
+              'createdAt': now.millisecondsSinceEpoch,
+            });
+
+        final tournament = await repository.getTournament(
+          'tournament-historical',
+        );
+        expect(tournament, isNotNull);
+
+        await repository.updateTournament(
+          tournament!.copyWith(description: 'Historical update'),
+        );
+
+        final snapshot = await firestore
+            .collection('tournaments')
+            .doc('tournament-historical')
+            .get();
+        final data = snapshot.data();
+
+        expect(data, isNotNull);
+        expect(data!['groupRoundIds'], const ['legacy-group-round']);
+        expect(data['knockoutRoundIds'], const ['legacy-knockout-round']);
       },
     );
   });

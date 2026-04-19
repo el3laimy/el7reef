@@ -1,12 +1,14 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:el7reef/core/constants/firebase_paths.dart';
 import 'package:el7reef/core/enums/guest_claim_status.dart';
 import 'package:el7reef/core/enums/tournament_enums.dart';
 import 'package:el7reef/core/enums/tournament_ops_enums.dart';
 import 'package:el7reef/core/services/tournament_lifecycle_service.dart';
 import 'package:el7reef/core/services/tournament_participant_service.dart';
 import 'package:el7reef/core/services/tournament_registration_service.dart';
+import 'package:el7reef/data/models/tournament_registration_model.dart';
 import 'package:el7reef/data/repositories/guest_team_repository_impl.dart';
 import 'package:el7reef/data/repositories/team_repository_impl.dart';
 import 'package:el7reef/data/repositories/tournament_repository_impl.dart';
@@ -204,5 +206,262 @@ void main() {
         ),
       );
     });
+
+    test(
+      'reactivateParticipant restores withdrawn finalized participant',
+      () async {
+        await lifecycleService.finalizeParticipants(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 10)),
+        );
+        final participantId = participantService.participantIdFor(
+          tournamentId: 'tournament-1',
+          sourceType: TournamentParticipantSourceType.registeredTeam,
+          sourceEntityId: 'team-1',
+        );
+
+        await participantService.withdrawParticipant(
+          participantId: participantId,
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 11)),
+        );
+        final reactivated = await participantService.reactivateParticipant(
+          participantId: participantId,
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 12)),
+        );
+
+        final tournament = await tournamentRepository.getTournament(
+          'tournament-1',
+        );
+        expect(reactivated.status, TournamentParticipantStatus.finalized);
+        expect(reactivated.withdrawnAt, isNull);
+        expect(tournament?.activeParticipantCount, 2);
+      },
+    );
+
+    test(
+      'reactivateParticipant restores replaced participant and withdraws replacement',
+      () async {
+        final participantId = participantService.participantIdFor(
+          tournamentId: 'tournament-1',
+          sourceType: TournamentParticipantSourceType.registeredTeam,
+          sourceEntityId: 'team-1',
+        );
+
+        final replacement = await participantService.replaceParticipant(
+          participantId: participantId,
+          replacementSourceType: TournamentParticipantSourceType.registeredTeam,
+          replacementSourceEntityId: 'team-3',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 11)),
+        );
+
+        final reactivated = await participantService.reactivateParticipant(
+          participantId: participantId,
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 12)),
+        );
+
+        final participants = await participantService.getTournamentParticipants(
+          'tournament-1',
+        );
+        final withdrawnReplacement = participants.firstWhere(
+          (item) => item.id == replacement.id,
+        );
+
+        expect(reactivated.status, TournamentParticipantStatus.approved);
+        expect(reactivated.replacedByParticipantId, isNull);
+        expect(
+          withdrawnReplacement.status,
+          TournamentParticipantStatus.withdrawn,
+        );
+      },
+    );
+
+    test(
+      'updateParticipantSeed updates active participant before groups start',
+      () async {
+        final participantId = participantService.participantIdFor(
+          tournamentId: 'tournament-1',
+          sourceType: TournamentParticipantSourceType.registeredTeam,
+          sourceEntityId: 'team-1',
+        );
+
+        final updated = await participantService.updateParticipantSeed(
+          participantId: participantId,
+          actorId: 'organizer-1',
+          seed: 7,
+          now: now.add(const Duration(minutes: 6)),
+        );
+
+        expect(updated.seed, 7);
+      },
+    );
+
+    test(
+      'withdrawParticipant is a no-op when participant is already withdrawn',
+      () async {
+        final participantId = participantService.participantIdFor(
+          tournamentId: 'tournament-1',
+          sourceType: TournamentParticipantSourceType.registeredTeam,
+          sourceEntityId: 'team-1',
+        );
+
+        await participantService.withdrawParticipant(
+          participantId: participantId,
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 6)),
+        );
+        final participantDocBefore = await firestore
+            .collection(FirebasePaths.tournamentParticipants)
+            .doc(participantId)
+            .get();
+        final auditBefore = await firestore
+            .collection(FirebasePaths.auditEvents)
+            .where('action', isEqualTo: 'participantWithdrawn')
+            .where('entityId', isEqualTo: participantId)
+            .get();
+
+        final unchanged = await participantService.withdrawParticipant(
+          participantId: participantId,
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 7)),
+        );
+        final participantDocAfter = await firestore
+            .collection(FirebasePaths.tournamentParticipants)
+            .doc(participantId)
+            .get();
+        final auditAfter = await firestore
+            .collection(FirebasePaths.auditEvents)
+            .where('action', isEqualTo: 'participantWithdrawn')
+            .where('entityId', isEqualTo: participantId)
+            .get();
+
+        expect(unchanged.status, TournamentParticipantStatus.withdrawn);
+        expect(
+          participantDocAfter.data()?['updatedAt'],
+          participantDocBefore.data()?['updatedAt'],
+        );
+        expect(auditAfter.docs, hasLength(auditBefore.docs.length));
+      },
+    );
+
+    test('updateParticipantSeed is a no-op when seed is unchanged', () async {
+      final participantId = participantService.participantIdFor(
+        tournamentId: 'tournament-1',
+        sourceType: TournamentParticipantSourceType.registeredTeam,
+        sourceEntityId: 'team-1',
+      );
+
+      await participantService.updateParticipantSeed(
+        participantId: participantId,
+        actorId: 'organizer-1',
+        seed: 3,
+        now: now.add(const Duration(minutes: 6)),
+      );
+      final participantDocBefore = await firestore
+          .collection(FirebasePaths.tournamentParticipants)
+          .doc(participantId)
+          .get();
+      final auditBefore = await firestore
+          .collection(FirebasePaths.auditEvents)
+          .where('action', isEqualTo: 'participantSeedUpdated')
+          .where('entityId', isEqualTo: participantId)
+          .get();
+
+      final unchanged = await participantService.updateParticipantSeed(
+        participantId: participantId,
+        actorId: 'organizer-1',
+        seed: 3,
+        now: now.add(const Duration(minutes: 7)),
+      );
+      final participantDocAfter = await firestore
+          .collection(FirebasePaths.tournamentParticipants)
+          .doc(participantId)
+          .get();
+      final auditAfter = await firestore
+          .collection(FirebasePaths.auditEvents)
+          .where('action', isEqualTo: 'participantSeedUpdated')
+          .where('entityId', isEqualTo: participantId)
+          .get();
+
+      expect(unchanged.seed, 3);
+      expect(
+        participantDocAfter.data()?['updatedAt'],
+        participantDocBefore.data()?['updatedAt'],
+      );
+      expect(auditAfter.docs, hasLength(auditBefore.docs.length));
+    });
+
+    test(
+      'syncApprovedRegistration is a no-op when participant state is unchanged',
+      () async {
+        final registrationSnapshot = await firestore
+            .collection(FirebasePaths.tournamentRegistrations)
+            .doc('team::tournament-1::team-1')
+            .get();
+        final registration = TournamentRegistrationModel.fromJson(
+          registrationSnapshot.data()!,
+          registrationSnapshot.id,
+        ).toEntity();
+        final participantId = participantService.participantIdFor(
+          tournamentId: 'tournament-1',
+          sourceType: TournamentParticipantSourceType.registeredTeam,
+          sourceEntityId: 'team-1',
+        );
+
+        final participantDocBefore = await firestore
+            .collection(FirebasePaths.tournamentParticipants)
+            .doc(participantId)
+            .get();
+        final tournamentDocBefore = await firestore
+            .collection(FirebasePaths.tournaments)
+            .doc('tournament-1')
+            .get();
+        final auditBefore = await firestore
+            .collection(FirebasePaths.auditEvents)
+            .where('action', isEqualTo: 'participantAdded')
+            .where('entityId', isEqualTo: participantId)
+            .get();
+
+        final unchanged = await participantService.syncApprovedRegistration(
+          registration: registration,
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 8)),
+        );
+
+        final participantDocAfter = await firestore
+            .collection(FirebasePaths.tournamentParticipants)
+            .doc(participantId)
+            .get();
+        final tournamentDocAfter = await firestore
+            .collection(FirebasePaths.tournaments)
+            .doc('tournament-1')
+            .get();
+        final auditAfter = await firestore
+            .collection(FirebasePaths.auditEvents)
+            .where('action', isEqualTo: 'participantAdded')
+            .where('entityId', isEqualTo: participantId)
+            .get();
+
+        expect(
+          unchanged.updatedAt,
+          DateTime.fromMillisecondsSinceEpoch(
+            participantDocBefore.data()!['updatedAt'] as int,
+          ),
+        );
+        expect(
+          participantDocAfter.data()?['updatedAt'],
+          participantDocBefore.data()?['updatedAt'],
+        );
+        expect(
+          tournamentDocAfter.data()?['activeParticipantCount'],
+          tournamentDocBefore.data()?['activeParticipantCount'],
+        );
+        expect(auditAfter.docs, hasLength(auditBefore.docs.length));
+      },
+    );
   });
 }

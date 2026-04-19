@@ -86,6 +86,10 @@ class AuditTimelineController extends GetxController {
         return 'تم استبدال participant';
       case AuditAction.participantWithdrawn:
         return 'تم سحب participant من البطولة';
+      case AuditAction.participantReactivated:
+        return 'تمت إعادة تفعيل participant';
+      case AuditAction.participantSeedUpdated:
+        return 'تم تحديث seed الخاصة بالمشارك';
       case AuditAction.participantsFinalized:
         return 'تم قفل قائمة المشاركين';
       case AuditAction.groupStageGenerated:

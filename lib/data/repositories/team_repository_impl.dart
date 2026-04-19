@@ -9,7 +9,7 @@ class TeamRepositoryImpl implements TeamRepository {
   final FirebaseFirestore _firestore;
 
   TeamRepositoryImpl({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   CollectionReference get _teamsRef =>
       _firestore.collection(FirebasePaths.teams);
@@ -18,8 +18,40 @@ class TeamRepositoryImpl implements TeamRepository {
   Future<Team?> getTeam(String teamId) async {
     final doc = await _teamsRef.doc(teamId).get();
     if (!doc.exists || doc.data() == null) return null;
-    return TeamModel.fromJson(doc.data()! as Map<String, dynamic>, doc.id)
-        .toEntity();
+    return TeamModel.fromJson(
+      doc.data()! as Map<String, dynamic>,
+      doc.id,
+    ).toEntity();
+  }
+
+  @override
+  Future<List<Team>> getTeamsByIds(List<String> teamIds) async {
+    final orderedIds = _normalizeIds(teamIds);
+    if (orderedIds.isEmpty) {
+      return const <Team>[];
+    }
+
+    final loadedTeams = <String, Team>{};
+    for (final chunk in _chunkIds(orderedIds)) {
+      final snapshot = await _teamsRef
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        if (data == null) {
+          continue;
+        }
+        loadedTeams[doc.id] = TeamModel.fromJson(
+          data as Map<String, dynamic>,
+          doc.id,
+        ).toEntity();
+      }
+    }
+
+    return orderedIds
+        .map((id) => loadedTeams[id])
+        .whereType<Team>()
+        .toList(growable: false);
   }
 
   @override
@@ -40,9 +72,12 @@ class TeamRepositoryImpl implements TeamRepository {
         .where('playerIds', arrayContains: playerId)
         .get();
     return snapshot.docs
-        .map((doc) =>
-            TeamModel.fromJson(doc.data()! as Map<String, dynamic>, doc.id)
-                .toEntity())
+        .map(
+          (doc) => TeamModel.fromJson(
+            doc.data()! as Map<String, dynamic>,
+            doc.id,
+          ).toEntity(),
+        )
         .toList();
   }
 
@@ -68,9 +103,12 @@ class TeamRepositoryImpl implements TeamRepository {
         .limit(20)
         .get();
     return snapshot.docs
-        .map((doc) =>
-            TeamModel.fromJson(doc.data()! as Map<String, dynamic>, doc.id)
-                .toEntity())
+        .map(
+          (doc) => TeamModel.fromJson(
+            doc.data()! as Map<String, dynamic>,
+            doc.id,
+          ).toEntity(),
+        )
         .toList();
   }
 
@@ -119,15 +157,25 @@ class TeamRepositoryImpl implements TeamRepository {
   }
 
   @override
-  Future<void> transferOwnership(String teamId, String currentOwnerId, String newOwnerId) async {
+  Future<void> transferOwnership(
+    String teamId,
+    String currentOwnerId,
+    String newOwnerId,
+  ) async {
     await _teamsRef.doc(teamId).update({
       'ownerId': newOwnerId,
-      'viceCaptainIds': FieldValue.arrayRemove([newOwnerId]), // لا يمكن أن يكون نائب ومالك في نفس الوقت
+      'viceCaptainIds': FieldValue.arrayRemove([
+        newOwnerId,
+      ]), // لا يمكن أن يكون نائب ومالك في نفس الوقت
     });
   }
 
   @override
-  Future<void> promoteToViceCaptain(String teamId, String ownerId, String targetId) async {
+  Future<void> promoteToViceCaptain(
+    String teamId,
+    String ownerId,
+    String targetId,
+  ) async {
     // التأكد من أن الذي يقوم بالترقية هو المالك الفعلي يتم في الواجهة أو في الـ Security Rules يفضل
     await _teamsRef.doc(teamId).update({
       'viceCaptainIds': FieldValue.arrayUnion([targetId]),
@@ -135,11 +183,29 @@ class TeamRepositoryImpl implements TeamRepository {
   }
 
   @override
-  Future<void> kickPlayer(String teamId, String actionUserId, String targetId) async {
+  Future<void> kickPlayer(
+    String teamId,
+    String actionUserId,
+    String targetId,
+  ) async {
     // يمكن التحقق من أن الـ actionUserId هو owner او viceCaptain
     await _teamsRef.doc(teamId).update({
       'playerIds': FieldValue.arrayRemove([targetId]),
       'viceCaptainIds': FieldValue.arrayRemove([targetId]),
     });
+  }
+
+  List<String> _normalizeIds(List<String> ids) {
+    return ids
+        .where((id) => id.trim().isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+  }
+
+  Iterable<List<String>> _chunkIds(List<String> ids, {int size = 10}) sync* {
+    for (var index = 0; index < ids.length; index += size) {
+      final end = (index + size) > ids.length ? ids.length : index + size;
+      yield ids.sublist(index, end);
+    }
   }
 }

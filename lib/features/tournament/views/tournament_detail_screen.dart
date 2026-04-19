@@ -107,6 +107,7 @@ class TournamentDetailScreen extends GetView<TournamentDetailController> {
                       const SizedBox(height: AppDimensions.md),
                       _OperationsSnapshot(
                         tournament: tournament,
+                        championLabel: controller.winnerDisplayName.value,
                       ).animate().fadeIn(delay: 180.ms),
                       const SizedBox(height: AppDimensions.md),
                       if (!isOrganizer &&
@@ -174,7 +175,7 @@ class _InfoCard extends StatelessWidget {
           _Row(
             icon: Icons.flag_circle_rounded,
             label: 'حالة البطولة',
-            value: tournament.status.name,
+            value: _tournamentStatusLabel(tournament.status),
           ),
           if (tournament.prizeDescription != null)
             _Row(
@@ -242,8 +243,12 @@ class _RegistrationProgress extends StatelessWidget {
 
 class _OperationsSnapshot extends StatelessWidget {
   final Tournament tournament;
+  final String championLabel;
 
-  const _OperationsSnapshot({required this.tournament});
+  const _OperationsSnapshot({
+    required this.tournament,
+    required this.championLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -280,7 +285,9 @@ class _OperationsSnapshot extends StatelessWidget {
             _Row(
               icon: Icons.emoji_events_rounded,
               label: 'البطل',
-              value: tournament.winnerParticipantId!,
+              value: championLabel.isEmpty
+                  ? tournament.winnerParticipantId!
+                  : championLabel,
             ),
           if (tournament.needsManualOpsMigration)
             Padding(
@@ -321,6 +328,15 @@ class _OperationsSnapshot extends StatelessWidget {
                       ),
                 icon: const Icon(Icons.calendar_month_rounded),
                 label: const Text('Fixtures'),
+              ),
+              OutlinedButton.icon(
+                onPressed: tournament.currentGroupStageId == null
+                    ? null
+                    : () => Get.toNamed(
+                        AppRoutes.tournamentStandingsById(tournament.id),
+                      ),
+                icon: const Icon(Icons.leaderboard_rounded),
+                label: const Text('Standings'),
               ),
               OutlinedButton.icon(
                 onPressed: tournament.currentKnockoutBracketId == null
@@ -478,3 +494,13 @@ class _Row extends StatelessWidget {
     );
   }
 }
+
+String _tournamentStatusLabel(TournamentStatus status) => switch (status) {
+  TournamentStatus.upcoming => 'لم تبدأ بعد',
+  TournamentStatus.registration => 'التسجيل مفتوح',
+  TournamentStatus.groupStage => 'مرحلة المجموعات',
+  TournamentStatus.transferWindow => 'نافذة التغييرات',
+  TournamentStatus.knockoutStage => 'مرحلة الإقصاء',
+  TournamentStatus.completed => 'مكتملة',
+  TournamentStatus.cancelled => 'ملغاة',
+};

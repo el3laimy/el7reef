@@ -53,7 +53,7 @@ Status: `In Progress`
 Key outcomes:
 - freeze misleading tournament surfaces and status-only controls
 - establish `TournamentParticipant` as the canonical participant entity
-- add backfill and compatibility migration for approved registrations
+- keep any legacy backfill/manual migration work optional and outside the critical path while current data remains disposable
 - move lifecycle transitions into audited orchestration services
 - expand `Match` into tournament-grade fixture storage
 - add real groups, standings, knockout bracket, and operations dashboard
@@ -63,20 +63,23 @@ Execution Snapshot: `2026-04-19`
 
 - `TOS-001` `Done`: misleading tournament surfaces are frozen; fake standings and unbacked bracket/dashboard entry points were removed or rerouted.
 - `TOS-002` `Done`: `TournamentParticipant` is now the canonical tournament participant entity with service-owned approval sync and participant lifecycle state.
-- `TOS-002.5` `Done`: approved registrations are backfilled into participants with compatibility support for existing tournament reads.
+- `TOS-002.5` `Done`: approved registrations can be backfilled into participants when needed, but this is now treated as optional maintenance rather than a blocker for ongoing product development.
 - `TOS-003` `Done`: lifecycle transitions now run through `TournamentLifecycleService` orchestration instead of raw status flips.
 - `TOS-004` `Done`: `Match` has been expanded into fixture-capable tournament storage with stage, group, slot, publish, and scheduling metadata.
 - `TOS-005` `Done`: group-stage core exists end-to-end with generated groups, draft fixtures, persisted standings snapshots, and qualifier extraction.
 - `TOS-006` `Done`: fixture queries, single-fixture scheduling, venue/time editing, `publishFixtures`, and guarded `regenerate groups` are now implemented.
 - `TOS-007` `Done`: single-elimination knockout build and winner advancement are implemented with canonical bracket and tie persistence.
 - `TOS-008` `Done`: the Tournament Operations Dashboard now supports `manual add`, `replace participant`, `withdraw`, fixture scheduling, fixture publication, and guarded group regeneration.
-- `TOS-009` `In Progress`: real-data screens for participants, groups, fixtures, standings, and bracket exist; remaining work is deeper operating actions and state polish.
-- `TOS-010` `In Progress`: audit events and service/UI coverage are in place; canonical `activeParticipantCount` is now synced on tournament writes, player tournament reads prefer canonical participants with legacy fallback, and the old raw `status flip` repository/controller path has been retired. Broader regression coverage and the remaining legacy cleanup still remain.
+- `TOS-009` `Done`: real-data screens for participants, groups, fixtures, standings, and bracket now cover day-to-day organizer flows with operator-grade filtering, drill-downs, state clarity, and participant recovery/seed controls.
+- `TOS-010` `In Progress`: audit events and service/UI coverage are in place; canonical `activeParticipantCount` is now synced on tournament writes, player tournament reads prefer canonical participants with legacy fallback, tournament registration capacity checks now prefer canonical participant summary before any legacy arrays, the old raw `status flip` repository/controller path has been retired, new tournament writes no longer persist empty legacy `groupRoundIds` / `knockoutRoundIds` while historical values remain preserved on read/update, organizer dashboard refresh avoids maintenance work in the default path, organizer dashboard group/knockout screens now load persisted state instead of forcing lifecycle recalculation on every open, organizer operations UI now uses cached derived labels for groups / fixtures / bracket instead of repeated list scans and raw IDs, frequent organizer actions now use targeted partial state updates instead of `refreshAll()` whenever a full reload is unnecessary, tournament registration / matchday flows now use more batched reads to reduce round trips and mobile data usage, standings / knockout refresh now skip persistence when no tournament state actually changed, participant search now uses debounce + short-lived caching, approved-registration participant sync now skips redundant participant rewrites when the canonical record is already current, participant summary refresh now skips tournament writes when `activeParticipantCount` is already correct, and key organizer commands like `finalizeParticipants`, `scheduleFixture`, `completeTournament`, `withdrawParticipant`, and unchanged `seed` edits now avoid duplicate writes / duplicate audit when the requested state is already current. Broader cleanup and any remaining low-value legacy retirement still remain.
 
 Current Focus:
 
+- production-first hardening for organizer flows: reduce non-essential reads/writes, remove maintenance work from default operating paths, and keep dashboard actions centered on real tournament ops
+- treat current tournament data as resettable test data; do not create new migration-heavy work unless it directly unlocks production behavior
 - finish `TOS-009` state polish where needed, but without reopening placeholder-style UI work
 - widen `TOS-010` cleanup, regression hardening, and legacy retirement
+- keep migration/compatibility work secondary and manual-only unless it directly protects a production flow
 
 Execution Rules:
 
@@ -87,6 +90,22 @@ Operational Milestone Reached:
 - tournament results now affect standings and knockout progression only after official score approval
 - score approval refreshes tournament standings or bracket automatically
 - the module has crossed from registration-centric into operating-system baseline, but not yet into fully polished day-to-day tournament ops
+
+### Tournament Finalization Gap Snapshot
+
+Status: `Closed`
+
+This is the short list that still blocks calling the tournament module `100% complete`.
+
+- `FG-01` `Done`: `TournamentDetailScreen` now shows human-readable tournament status, resolves champion display name from participant state, and includes a direct `Standings` deep link in the operating summary block.
+- `FG-02` `Done`: `Tournament Operations Dashboard` now includes pending-actions summary, readiness checklist, quick fixture counters, and safer enable/disable logic for lifecycle buttons instead of exposing actions as a flat button list only.
+- `FG-03` `Done`: `Participants` screen now has grouped sections for active / withdrawn / replaced participants, richer status/source chips, explicit `Reactivate` recovery for mistaken withdraw/replace cases, and inline `seed` editing before operational stages begin.
+- `FG-04` `Done`: `Groups` screen now shows per-group fixture and progress summary, qualifier badges, and a direct drill-down into each group’s fixture subset.
+- `FG-05` `Done`: `Fixtures` screen now includes operator-grade filters by stage / group / publication state / schedule state / scheduled day, direct `Matchday` and `Score Review` navigation from fixture rows, and clearer readiness cues per fixture.
+- `FG-06` `Done`: `Standings` screen now renders a tournament-grade table with explicit `P / W / D / L / GF / GA / GD / Pts` columns, qualifier highlighting, and visible last-updated / canonical snapshot messaging.
+- `FG-07` `Done`: `Bracket` screen now groups ties by round, includes knockout/final summary cards, and provides direct navigation from ties to the underlying fixture workflow.
+- `FG-08` `Done`: tournament UI regression coverage now includes dedicated widget tests for `Fixtures`, `Standings`, `Bracket`, `TournamentDetailScreen`, and an organizer happy-path navigation regression across the operating surfaces.
+- `FG-09` `Done`: participant picker/search dialogs now use debounced auto-search plus short-lived candidate caching to reduce repeated query churn without removing manual search control.
 
 ## Epic A: Hybrid Identity Foundation
 

@@ -52,8 +52,9 @@ void main() {
         ),
       );
 
-      final tournamentTeams =
-          await repository.getTournamentGuestTeams('tournament-1');
+      final tournamentTeams = await repository.getTournamentGuestTeams(
+        'tournament-1',
+      );
       final guestTeam = await repository.getGuestTeam('gt-2');
 
       expect(tournamentTeams.map((team) => team.id), ['gt-1', 'gt-2']);
@@ -97,6 +98,37 @@ void main() {
       expect(guestTeam?.contactName, 'Captain Ahmed');
       expect(guestTeam?.captainGuestPlayerId, 'gp-1');
       expect(guestTeam?.claimStatus, GuestClaimStatus.archived);
+    });
+
+    test('loads guest teams by ids in the requested order', () async {
+      await repository.createGuestTeam(
+        GuestTeam(
+          id: 'gt-1',
+          name: 'Street Kings',
+          normalizedName: 'street kings',
+          creatorId: 'organizer-1',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      await repository.createGuestTeam(
+        GuestTeam(
+          id: 'gt-2',
+          name: 'Red Lions',
+          normalizedName: 'red lions',
+          creatorId: 'organizer-1',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      final guestTeams = await repository.getGuestTeamsByIds([
+        'gt-2',
+        'missing',
+        'gt-1',
+      ]);
+
+      expect(guestTeams.map((team) => team.id).toList(), ['gt-2', 'gt-1']);
     });
   });
 }

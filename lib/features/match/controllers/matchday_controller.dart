@@ -28,17 +28,12 @@ import '../../../domain/entities/match_lineup_snapshot.dart';
 import '../../../domain/entities/match_substitution.dart';
 import '../../../domain/entities/player.dart';
 import '../../../domain/entities/team.dart';
+import '../../../domain/entities/team_membership.dart';
 import '../../../domain/entities/tournament.dart';
 
-enum MatchdayManagedSideKind {
-  registeredTeam,
-  guestTeam,
-}
+enum MatchdayManagedSideKind { registeredTeam, guestTeam }
 
-enum MatchdayLineupSlot {
-  starter,
-  bench,
-}
+enum MatchdayLineupSlot { starter, bench }
 
 class MatchdayManagedSide {
   final String key;
@@ -153,21 +148,21 @@ class MatchdayController extends GetxController {
     required MatchLineupSnapshotRepositoryImpl snapshotRepository,
     required MatchSubstitutionRepositoryImpl substitutionRepository,
     required TournamentPermissionService tournamentPermissionService,
-  })  : _authSession = authSession,
-        _matchdayService = matchdayService,
-        _matchRepository = matchRepository,
-        _tournamentRepository = tournamentRepository,
-        _registrationRepository = registrationRepository,
-        _teamRepository = teamRepository,
-        _guestTeamRepository = guestTeamRepository,
-        _membershipRepository = membershipRepository,
-        _playerRepository = playerRepository,
-        _guestPlayerRepository = guestPlayerRepository,
-        _checkInRepository = checkInRepository,
-        _attendanceRepository = attendanceRepository,
-        _snapshotRepository = snapshotRepository,
-        _substitutionRepository = substitutionRepository,
-        _tournamentPermissionService = tournamentPermissionService;
+  }) : _authSession = authSession,
+       _matchdayService = matchdayService,
+       _matchRepository = matchRepository,
+       _tournamentRepository = tournamentRepository,
+       _registrationRepository = registrationRepository,
+       _teamRepository = teamRepository,
+       _guestTeamRepository = guestTeamRepository,
+       _membershipRepository = membershipRepository,
+       _playerRepository = playerRepository,
+       _guestPlayerRepository = guestPlayerRepository,
+       _checkInRepository = checkInRepository,
+       _attendanceRepository = attendanceRepository,
+       _snapshotRepository = snapshotRepository,
+       _substitutionRepository = substitutionRepository,
+       _tournamentPermissionService = tournamentPermissionService;
 
   final RxBool isLoading = true.obs;
   final RxBool isSubmitting = false.obs;
@@ -179,7 +174,9 @@ class MatchdayController extends GetxController {
   final RxString selectedSideKey = ''.obs;
 
   final Rx<MatchCheckIn?> activeCheckIn = Rx<MatchCheckIn?>(null);
-  final Rx<MatchLineupSnapshot?> activeSnapshot = Rx<MatchLineupSnapshot?>(null);
+  final Rx<MatchLineupSnapshot?> activeSnapshot = Rx<MatchLineupSnapshot?>(
+    null,
+  );
   final RxList<MatchSubstitution> sideSubstitutions = <MatchSubstitution>[].obs;
   final RxList<MatchdayParticipantDraft> participants =
       <MatchdayParticipantDraft>[].obs;
@@ -262,7 +259,9 @@ class MatchdayController extends GetxController {
 
       final loadedTournament = loadedMatch.tournamentId == null
           ? null
-          : await _tournamentRepository.getTournament(loadedMatch.tournamentId!);
+          : await _tournamentRepository.getTournament(
+              loadedMatch.tournamentId!,
+            );
 
       match.value = loadedMatch;
       tournament.value = loadedTournament;
@@ -279,7 +278,8 @@ class MatchdayController extends GetxController {
         return;
       }
 
-      final preferredSide = sides.any((side) => side.key == selectedSideKey.value)
+      final preferredSide =
+          sides.any((side) => side.key == selectedSideKey.value)
           ? selectedSideKey.value
           : sides.first.key;
       selectedSideKey.value = preferredSide;
@@ -332,7 +332,7 @@ class MatchdayController extends GetxController {
         for (final participant in participants) {
           membershipStatuses[participant.selectionId] =
               attendanceDrafts[participant.selectionId] ??
-                  MatchAttendanceStatus.pending;
+              MatchAttendanceStatus.pending;
         }
         final result = await _matchdayService.checkInRegisteredTeam(
           matchId: matchId,
@@ -349,7 +349,8 @@ class MatchdayController extends GetxController {
       } else {
         final guestPlayerStatuses = <String, MatchAttendanceStatus>{};
         for (final participant in participants) {
-          final status = attendanceDrafts[participant.selectionId] ??
+          final status =
+              attendanceDrafts[participant.selectionId] ??
               MatchAttendanceStatus.pending;
           if (status != MatchAttendanceStatus.pending ||
               participant.attendance != null) {
@@ -519,16 +520,14 @@ class MatchdayController extends GetxController {
       if (match.teamBId != null && match.teamBId!.isNotEmpty) match.teamBId!,
     ];
 
-    for (final teamId in assignedTeamIds) {
-      final team = await _teamRepository.getTeam(teamId);
-      if (team == null) {
-        continue;
-      }
-      final canManage = organizerLevel || _canManageRegisteredTeam(team, actorId);
+    final assignedTeams = await _teamRepository.getTeamsByIds(assignedTeamIds);
+    for (final team in assignedTeams) {
+      final canManage =
+          organizerLevel || _canManageRegisteredTeam(team, actorId);
       if (!canManage) {
         continue;
       }
-      final key = 'team::$teamId';
+      final key = 'team::${team.id}';
       if (!seenKeys.add(key)) {
         continue;
       }
@@ -539,7 +538,7 @@ class MatchdayController extends GetxController {
           label: team.name,
           subtitle: 'فريق مسجل',
           accessLabel: organizerLevel ? 'منظم' : 'قائد/نائب',
-          teamId: teamId,
+          teamId: team.id,
         ),
       );
     }
@@ -548,20 +547,47 @@ class MatchdayController extends GetxController {
       return sides;
     }
 
-    final registrations = await _registrationRepository.getTournamentRegistrations(
-      match.tournamentId!,
+    final registrations = await _registrationRepository
+        .getTournamentRegistrations(match.tournamentId!);
+    final approvedRegistrations = registrations
+        .where(
+          (registration) =>
+              registration.status == TournamentRegistrationStatus.approved,
+        )
+        .toList(growable: false);
+    final registeredTeamIds = approvedRegistrations
+        .map((registration) => registration.teamId)
+        .whereType<String>()
+        .where((teamId) => teamId.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    final guestTeamIds = approvedRegistrations
+        .map((registration) => registration.guestTeamId)
+        .whereType<String>()
+        .where((guestTeamId) => guestTeamId.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    final registeredTeams = await _teamRepository.getTeamsByIds(
+      registeredTeamIds,
     );
+    final guestTeams = await _guestTeamRepository.getGuestTeamsByIds(
+      guestTeamIds,
+    );
+    final registeredTeamsById = {
+      for (final team in registeredTeams) team.id: team,
+    };
+    final guestTeamsById = {
+      for (final guestTeam in guestTeams) guestTeam.id: guestTeam,
+    };
 
-    for (final registration in registrations) {
-      if (registration.status != TournamentRegistrationStatus.approved) {
-        continue;
-      }
+    for (final registration in approvedRegistrations) {
       if (registration.teamId != null) {
-        final team = await _teamRepository.getTeam(registration.teamId!);
+        final team = registeredTeamsById[registration.teamId!];
         if (team == null) {
           continue;
         }
-        final canManage = organizerLevel || _canManageRegisteredTeam(team, actorId);
+        final canManage =
+            organizerLevel || _canManageRegisteredTeam(team, actorId);
         if (!canManage) {
           continue;
         }
@@ -586,9 +612,7 @@ class MatchdayController extends GetxController {
       }
 
       if (registration.guestTeamId != null) {
-        final guestTeam = await _guestTeamRepository.getGuestTeam(
-          registration.guestTeamId!,
-        );
+        final guestTeam = guestTeamsById[registration.guestTeamId!];
         if (guestTeam == null) {
           continue;
         }
@@ -633,23 +657,24 @@ class MatchdayController extends GetxController {
 
   Future<void> _loadRegisteredSideState(MatchdayManagedSide side) async {
     final teamId = side.teamId!;
-    final checkIn = await _checkInRepository.getCheckInByTeamId(
-      matchId: matchId,
-      teamId: teamId,
-    );
-    final attendances = await _attendanceRepository.getTeamAttendances(
-      matchId: matchId,
-      teamId: teamId,
-    );
-    final snapshot = await _snapshotRepository.getSnapshotByTeamId(
-      matchId: matchId,
-      teamId: teamId,
-    );
-    final substitutions = await _substitutionRepository.getTeamSubstitutions(
-      matchId: matchId,
-      teamId: teamId,
-    );
-    final memberships = await _membershipRepository.getTeamMemberships(teamId);
+    final results = await Future.wait<dynamic>([
+      _checkInRepository.getCheckInByTeamId(matchId: matchId, teamId: teamId),
+      _attendanceRepository.getTeamAttendances(
+        matchId: matchId,
+        teamId: teamId,
+      ),
+      _snapshotRepository.getSnapshotByTeamId(matchId: matchId, teamId: teamId),
+      _substitutionRepository.getTeamSubstitutions(
+        matchId: matchId,
+        teamId: teamId,
+      ),
+      _membershipRepository.getTeamMemberships(teamId),
+    ]);
+    final checkIn = results[0] as MatchCheckIn?;
+    final attendances = results[1] as List<MatchAttendance>;
+    final snapshot = results[2] as MatchLineupSnapshot?;
+    final substitutions = results[3] as List<MatchSubstitution>;
+    final memberships = results[4] as List<TeamMembership>;
 
     final playerIds = memberships
         .map((membership) => membership.playerId)
@@ -659,8 +684,12 @@ class MatchdayController extends GetxController {
         .map((membership) => membership.guestPlayerId)
         .whereType<String>()
         .toSet();
-    final players = await _loadPlayersByIds(playerIds);
-    final guestPlayers = await _loadGuestPlayersByIds(guestPlayerIds);
+    final playerLoadResults = await Future.wait<dynamic>([
+      _loadPlayersByIds(playerIds),
+      _loadGuestPlayersByIds(guestPlayerIds),
+    ]);
+    final players = playerLoadResults[0] as Map<String, Player>;
+    final guestPlayers = playerLoadResults[1] as Map<String, GuestPlayer>;
     final attendancesByMembershipId = <String, MatchAttendance>{
       for (final attendance in attendances)
         if (attendance.teamMembershipId != null)
@@ -674,7 +703,7 @@ class MatchdayController extends GetxController {
             displayName: membership.playerId != null
                 ? (players[membership.playerId!]?.name ?? 'لاعب مسجل')
                 : (guestPlayers[membership.guestPlayerId!]?.displayName ??
-                    'لاعب ضيف'),
+                      'لاعب ضيف'),
             position: membership.playerId != null
                 ? players[membership.playerId!]?.position
                 : guestPlayers[membership.guestPlayerId!]?.preferredPosition,
@@ -698,45 +727,53 @@ class MatchdayController extends GetxController {
 
   Future<void> _loadGuestSideState(MatchdayManagedSide side) async {
     final guestTeamId = side.guestTeamId!;
-    final checkIn = await _checkInRepository.getCheckInByGuestTeamId(
-      matchId: matchId,
-      guestTeamId: guestTeamId,
-    );
-    final attendances = await _attendanceRepository.getTeamAttendances(
-      matchId: matchId,
-      guestTeamId: guestTeamId,
-    );
-    final snapshot = await _snapshotRepository.getSnapshotByGuestTeamId(
-      matchId: matchId,
-      guestTeamId: guestTeamId,
-    );
-    final substitutions = await _substitutionRepository.getTeamSubstitutions(
-      matchId: matchId,
-      guestTeamId: guestTeamId,
-    );
+    final activeTournament = tournament.value;
+    final results = await Future.wait<dynamic>([
+      _checkInRepository.getCheckInByGuestTeamId(
+        matchId: matchId,
+        guestTeamId: guestTeamId,
+      ),
+      _attendanceRepository.getTeamAttendances(
+        matchId: matchId,
+        guestTeamId: guestTeamId,
+      ),
+      _snapshotRepository.getSnapshotByGuestTeamId(
+        matchId: matchId,
+        guestTeamId: guestTeamId,
+      ),
+      _substitutionRepository.getTeamSubstitutions(
+        matchId: matchId,
+        guestTeamId: guestTeamId,
+      ),
+      activeTournament != null
+          ? _guestPlayerRepository.getTournamentGuestPlayers(
+              activeTournament.id,
+            )
+          : Future.value(const <GuestPlayer>[]),
+    ]);
+    final checkIn = results[0] as MatchCheckIn?;
+    final attendances = results[1] as List<MatchAttendance>;
+    final snapshot = results[2] as MatchLineupSnapshot?;
+    final substitutions = results[3] as List<MatchSubstitution>;
+    final tournamentGuestPlayers = results[4] as List<GuestPlayer>;
 
     final candidateGuestPlayers = <String, GuestPlayer>{};
-    final activeTournament = tournament.value;
-    if (activeTournament != null) {
-      final tournamentGuestPlayers =
-          await _guestPlayerRepository.getTournamentGuestPlayers(
-        activeTournament.id,
-      );
-      for (final guestPlayer in tournamentGuestPlayers) {
-        candidateGuestPlayers[guestPlayer.id] = guestPlayer;
-      }
+    for (final guestPlayer in tournamentGuestPlayers) {
+      candidateGuestPlayers[guestPlayer.id] = guestPlayer;
     }
+    final missingGuestPlayerIds = <String>[];
     for (final attendance in attendances) {
       final guestPlayerId = attendance.guestPlayerId;
       if (guestPlayerId == null ||
           candidateGuestPlayers.containsKey(guestPlayerId)) {
         continue;
       }
-      final guestPlayer =
-          await _guestPlayerRepository.getGuestPlayer(guestPlayerId);
-      if (guestPlayer != null) {
-        candidateGuestPlayers[guestPlayer.id] = guestPlayer;
-      }
+      missingGuestPlayerIds.add(guestPlayerId);
+    }
+    final missingGuestPlayers = await _guestPlayerRepository
+        .getGuestPlayersByIds(missingGuestPlayerIds);
+    for (final guestPlayer in missingGuestPlayers) {
+      candidateGuestPlayers[guestPlayer.id] = guestPlayer;
     }
 
     final attendancesByGuestPlayerId = <String, MatchAttendance>{
@@ -745,19 +782,22 @@ class MatchdayController extends GetxController {
           attendance.guestPlayerId!: attendance,
     };
 
-    final drafts = candidateGuestPlayers.values
-        .map(
-          (guestPlayer) => MatchdayParticipantDraft(
-            selectionId: guestPlayer.id,
-            displayName: guestPlayer.displayName,
-            position: guestPlayer.preferredPosition,
-            isGuest: true,
-            attendance: attendancesByGuestPlayerId[guestPlayer.id],
-            guestPlayerId: guestPlayer.id,
-          ),
-        )
-        .toList()
-      ..sort((left, right) => left.displayName.compareTo(right.displayName));
+    final drafts =
+        candidateGuestPlayers.values
+            .map(
+              (guestPlayer) => MatchdayParticipantDraft(
+                selectionId: guestPlayer.id,
+                displayName: guestPlayer.displayName,
+                position: guestPlayer.preferredPosition,
+                isGuest: true,
+                attendance: attendancesByGuestPlayerId[guestPlayer.id],
+                guestPlayerId: guestPlayer.id,
+              ),
+            )
+            .toList()
+          ..sort(
+            (left, right) => left.displayName.compareTo(right.displayName),
+          );
 
     _applySelectedSideSnapshot(
       side: side,
@@ -871,8 +911,10 @@ class MatchdayController extends GetxController {
       if (seeded.containsKey(participant.selectionId)) {
         continue;
       }
-      if (bench.any((benchParticipant) =>
-          benchParticipant.selectionId == participant.selectionId)) {
+      if (bench.any(
+        (benchParticipant) =>
+            benchParticipant.selectionId == participant.selectionId,
+      )) {
         seeded[participant.selectionId] = MatchdayLineupSlot.bench.name;
       }
     }
@@ -893,7 +935,8 @@ class MatchdayController extends GetxController {
   }
 
   bool _isEligibleForLineup(String selectionId) {
-    final status = attendanceDrafts[selectionId] ?? MatchAttendanceStatus.pending;
+    final status =
+        attendanceDrafts[selectionId] ?? MatchAttendanceStatus.pending;
     return status == MatchAttendanceStatus.present ||
         status == MatchAttendanceStatus.late;
   }
@@ -912,7 +955,9 @@ class MatchdayController extends GetxController {
     if (tournament.organizerId == actorId) {
       return true;
     }
-    if (!tournament.assistants.any((assistant) => assistant.userId == actorId)) {
+    if (!tournament.assistants.any(
+      (assistant) => assistant.userId == actorId,
+    )) {
       return false;
     }
     return _tournamentPermissionService.canManageTeams(tournament, actorId);
@@ -923,28 +968,21 @@ class MatchdayController extends GetxController {
   }
 
   Future<Map<String, Player>> _loadPlayersByIds(Set<String> playerIds) async {
-    final players = <String, Player>{};
-    for (final playerId in playerIds) {
-      final player = await _playerRepository.getPlayer(playerId);
-      if (player != null) {
-        players[player.id] = player;
-      }
-    }
-    return players;
+    final players = await _playerRepository.getPlayersByIds(
+      playerIds.toList(growable: false),
+    );
+    return {for (final player in players) player.id: player};
   }
 
   Future<Map<String, GuestPlayer>> _loadGuestPlayersByIds(
     Set<String> guestPlayerIds,
   ) async {
-    final guestPlayers = <String, GuestPlayer>{};
-    for (final guestPlayerId in guestPlayerIds) {
-      final guestPlayer =
-          await _guestPlayerRepository.getGuestPlayer(guestPlayerId);
-      if (guestPlayer != null) {
-        guestPlayers[guestPlayer.id] = guestPlayer;
-      }
-    }
-    return guestPlayers;
+    final guestPlayers = await _guestPlayerRepository.getGuestPlayersByIds(
+      guestPlayerIds.toList(growable: false),
+    );
+    return {
+      for (final guestPlayer in guestPlayers) guestPlayer.id: guestPlayer,
+    };
   }
 
   Future<void> _resetSelectedSideState() async {

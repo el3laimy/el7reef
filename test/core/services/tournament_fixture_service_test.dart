@@ -1,6 +1,7 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:el7reef/core/constants/firebase_paths.dart';
 import 'package:el7reef/core/enums/match_status.dart';
 import 'package:el7reef/core/enums/tournament_enums.dart';
 import 'package:el7reef/core/services/tournament_fixture_service.dart';
@@ -91,6 +92,44 @@ void main() {
       expect(savedFixture, isNotNull);
       expect(savedFixture!.scheduledAt, scheduledAt);
       expect(savedFixture.venueId, 'Pitch-1');
+    });
+
+    test('scheduleFixture is a no-op when schedule is unchanged', () async {
+      final groupStage = await lifecycleService.startGroupStage(
+        tournamentId: 'tournament-1',
+        actorId: 'organizer-1',
+        now: now.add(const Duration(minutes: 15)),
+      );
+      final fixture = groupStage.fixtures.first;
+      final scheduledAt = now.add(const Duration(days: 1, hours: 2));
+
+      await fixtureService.scheduleFixture(
+        matchId: fixture.id,
+        actorId: 'organizer-1',
+        scheduledAt: scheduledAt,
+        venueId: 'Pitch-1',
+      );
+      final auditBefore = await firestore
+          .collection(FirebasePaths.auditEvents)
+          .where('action', isEqualTo: 'fixtureScheduled')
+          .where('entityId', isEqualTo: fixture.id)
+          .get();
+
+      final unchanged = await fixtureService.scheduleFixture(
+        matchId: fixture.id,
+        actorId: 'organizer-1',
+        scheduledAt: scheduledAt,
+        venueId: 'Pitch-1',
+      );
+      final auditAfter = await firestore
+          .collection(FirebasePaths.auditEvents)
+          .where('action', isEqualTo: 'fixtureScheduled')
+          .where('entityId', isEqualTo: fixture.id)
+          .get();
+
+      expect(unchanged.scheduledAt, scheduledAt);
+      expect(unchanged.venueId, 'Pitch-1');
+      expect(auditAfter.docs, hasLength(auditBefore.docs.length));
     });
 
     test(

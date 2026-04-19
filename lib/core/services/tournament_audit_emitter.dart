@@ -67,6 +67,42 @@ class TournamentAuditEmitter {
     );
   }
 
+  Future<void> participantReactivated({
+    required Tournament tournament,
+    required String actorId,
+    required String participantId,
+    required Map<String, dynamic> beforePayload,
+    required Map<String, dynamic> afterPayload,
+  }) {
+    return _auditService.record(
+      entityType: AuditEntityType.tournamentParticipant,
+      entityId: participantId,
+      action: AuditAction.participantReactivated,
+      actorId: actorId,
+      beforePayload: beforePayload,
+      afterPayload: afterPayload,
+      metadata: {'tournamentId': tournament.id},
+    );
+  }
+
+  Future<void> participantSeedUpdated({
+    required Tournament tournament,
+    required String actorId,
+    required String participantId,
+    required Map<String, dynamic> beforePayload,
+    required Map<String, dynamic> afterPayload,
+  }) {
+    return _auditService.record(
+      entityType: AuditEntityType.tournamentParticipant,
+      entityId: participantId,
+      action: AuditAction.participantSeedUpdated,
+      actorId: actorId,
+      beforePayload: beforePayload,
+      afterPayload: afterPayload,
+      metadata: {'tournamentId': tournament.id},
+    );
+  }
+
   Future<void> participantsFinalized({
     required Tournament tournament,
     required String actorId,

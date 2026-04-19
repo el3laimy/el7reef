@@ -23,6 +23,8 @@ enum AuditAction {
   participantAdded,
   participantReplaced,
   participantWithdrawn,
+  participantReactivated,
+  participantSeedUpdated,
   participantsFinalized,
   groupStageGenerated,
   groupStageRegenerated,

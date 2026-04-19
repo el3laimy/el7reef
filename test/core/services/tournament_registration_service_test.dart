@@ -420,6 +420,64 @@ void main() {
     );
 
     test(
+      'capacity policy prefers canonical activeParticipantCount before legacy arrays',
+      () async {
+        final canonicalFullTournamentId = 'tournament-canonical-full';
+        await tournamentRepository.createTournament(
+          Tournament(
+            id: canonicalFullTournamentId,
+            organizerId: 'organizer-1',
+            name: 'Canonical Full Cup',
+            format: TournamentFormat.groupsThenKnockout,
+            teamSize: TournamentTeamSize.fiveVsFive,
+            maxTeams: 1,
+            status: TournamentStatus.registration,
+            createdAt: now,
+          ),
+        );
+        await teamRepository.createTeam(
+          Team(
+            id: 'team-2',
+            name: 'Red Wolves',
+            ownerId: 'owner-2',
+            playerIds: const ['owner-2'],
+            createdAt: now,
+          ),
+        );
+
+        await participantService.addManualParticipant(
+          tournamentId: canonicalFullTournamentId,
+          sourceType: TournamentParticipantSourceType.registeredTeam,
+          sourceEntityId: 'team-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 5)),
+        );
+
+        final tournament = await tournamentRepository.getTournament(
+          canonicalFullTournamentId,
+        );
+        expect(tournament?.activeParticipantCount, 1);
+        expect(tournament?.registeredTeamIds, isEmpty);
+
+        expect(
+          () => service.registerTeam(
+            tournamentId: canonicalFullTournamentId,
+            teamId: 'team-2',
+            actorId: 'owner-2',
+            now: now.add(const Duration(minutes: 10)),
+          ),
+          throwsA(
+            isA<Exception>().having(
+              (error) => error.toString(),
+              'message',
+              contains('اكتملت سعة التسجيل'),
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
       'registration deadline closes new approvals and registrations',
       () async {
         final deadlineTournamentId = 'tournament-deadline';

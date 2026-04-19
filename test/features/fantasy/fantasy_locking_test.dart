@@ -31,8 +31,9 @@ void main() {
 
   tearDown(Get.reset);
 
-  testWidgets('locked draft save does not create a fantasy team',
-      (tester) async {
+  testWidgets('locked draft save does not create a fantasy team', (
+    tester,
+  ) async {
     await tester.pumpWidget(const GetMaterialApp(home: SizedBox.shrink()));
 
     final firestore = FakeFirebaseFirestore();
@@ -62,7 +63,9 @@ void main() {
       lifecycleService: lifecycleService,
     );
 
-    controller.lifecycle.value = await lifecycleService.resolveLifecycle('global');
+    controller.lifecycle.value = await lifecycleService.resolveLifecycle(
+      'global',
+    );
     controller.teamNameController.text = 'Locked Team';
     controller.slots.assignAll([
       FantasyDraftSlot(
@@ -86,8 +89,9 @@ void main() {
     expect(repository.createFantasyTeamCalled, isFalse);
   });
 
-  testWidgets('locked transfer does not process any player swap',
-      (tester) async {
+  testWidgets('locked transfer does not process any player swap', (
+    tester,
+  ) async {
     await tester.pumpWidget(const GetMaterialApp(home: SizedBox.shrink()));
 
     final firestore = FakeFirebaseFirestore();
@@ -117,7 +121,9 @@ void main() {
       lifecycleService: lifecycleService,
     );
 
-    controller.lifecycle.value = await lifecycleService.resolveLifecycle('global');
+    controller.lifecycle.value = await lifecycleService.resolveLifecycle(
+      'global',
+    );
     controller.team.value = _team(
       budget: 2,
       freeTransfers: 1,
@@ -148,8 +154,9 @@ void main() {
     expect(repository.processTransferCalled, isFalse);
   });
 
-  testWidgets('transfer window allows processing a player swap',
-      (tester) async {
+  testWidgets('transfer window allows processing a player swap', (
+    tester,
+  ) async {
     await tester.pumpWidget(const GetMaterialApp(home: SizedBox.shrink()));
 
     final firestore = FakeFirebaseFirestore();
@@ -179,7 +186,9 @@ void main() {
       lifecycleService: lifecycleService,
     );
 
-    controller.lifecycle.value = await lifecycleService.resolveLifecycle('global');
+    controller.lifecycle.value = await lifecycleService.resolveLifecycle(
+      'global',
+    );
     controller.team.value = _team(
       budget: 2,
       freeTransfers: 1,
@@ -261,7 +270,7 @@ class _RecordingFantasyRepository extends FantasyRepositoryImpl {
   List<FantasySlot> lastProcessedSlots = const [];
 
   _RecordingFantasyRepository(FakeFirebaseFirestore firestore)
-      : super(db: firestore);
+    : super(db: firestore);
 
   @override
   Future<void> createFantasyTeam(
@@ -289,6 +298,10 @@ class _FakePlayerRepository implements PlayerRepository {
 
   @override
   Future<Player?> getPlayer(String playerId) async => null;
+
+  @override
+  Future<List<Player>> getPlayersByIds(List<String> playerIds) async =>
+      const [];
 
   @override
   Future<List<Player>> getLeaderboard({int limit = 50}) async => const [];

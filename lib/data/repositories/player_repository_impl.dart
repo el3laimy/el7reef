@@ -11,7 +11,7 @@ class PlayerRepositoryImpl implements PlayerRepository {
   final FirebaseFirestore _firestore;
 
   PlayerRepositoryImpl({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   CollectionReference get _playersRef =>
       _firestore.collection(FirebasePaths.players);
@@ -20,8 +20,40 @@ class PlayerRepositoryImpl implements PlayerRepository {
   Future<Player?> getPlayer(String playerId) async {
     final doc = await _playersRef.doc(playerId).get();
     if (!doc.exists || doc.data() == null) return null;
-    return PlayerModel.fromJson(doc.data()! as Map<String, dynamic>, doc.id)
-        .toEntity();
+    return PlayerModel.fromJson(
+      doc.data()! as Map<String, dynamic>,
+      doc.id,
+    ).toEntity();
+  }
+
+  @override
+  Future<List<Player>> getPlayersByIds(List<String> playerIds) async {
+    final orderedIds = _normalizeIds(playerIds);
+    if (orderedIds.isEmpty) {
+      return const <Player>[];
+    }
+
+    final loadedPlayers = <String, Player>{};
+    for (final chunk in _chunkIds(orderedIds)) {
+      final snapshot = await _playersRef
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        if (data == null) {
+          continue;
+        }
+        loadedPlayers[doc.id] = PlayerModel.fromJson(
+          data as Map<String, dynamic>,
+          doc.id,
+        ).toEntity();
+      }
+    }
+
+    return orderedIds
+        .map((id) => loadedPlayers[id])
+        .whereType<Player>()
+        .toList(growable: false);
   }
 
   @override
@@ -58,9 +90,12 @@ class PlayerRepositoryImpl implements PlayerRepository {
     final snapshot = await targetQuery.limit(20).get();
 
     return snapshot.docs
-        .map((doc) =>
-            PlayerModel.fromJson(doc.data()! as Map<String, dynamic>, doc.id)
-                .toEntity())
+        .map(
+          (doc) => PlayerModel.fromJson(
+            doc.data()! as Map<String, dynamic>,
+            doc.id,
+          ).toEntity(),
+        )
         .toList();
   }
 
@@ -72,9 +107,12 @@ class PlayerRepositoryImpl implements PlayerRepository {
         .get();
 
     return snapshot.docs
-        .map((doc) =>
-            PlayerModel.fromJson(doc.data()! as Map<String, dynamic>, doc.id)
-                .toEntity())
+        .map(
+          (doc) => PlayerModel.fromJson(
+            doc.data()! as Map<String, dynamic>,
+            doc.id,
+          ).toEntity(),
+        )
         .toList();
   }
 
@@ -95,7 +133,7 @@ class PlayerRepositoryImpl implements PlayerRepository {
     PlayerMatchStats? detailedStats,
   }) async {
     final batch = _firestore.batch();
-    
+
     final playerDoc = _playersRef.doc(playerId);
     final updates = <String, dynamic>{
       'totalMatches': FieldValue.increment(1),
@@ -117,10 +155,24 @@ class PlayerRepositoryImpl implements PlayerRepository {
           .doc(detailedStats.matchId)
           .collection('player_stats')
           .doc(detailedStats.playerId);
-          
+
       batch.set(statsDoc, statModel.toJson());
     }
 
     await batch.commit();
+  }
+
+  List<String> _normalizeIds(List<String> ids) {
+    return ids
+        .where((id) => id.trim().isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+  }
+
+  Iterable<List<String>> _chunkIds(List<String> ids, {int size = 10}) sync* {
+    for (var index = 0; index < ids.length; index += size) {
+      final end = (index + size) > ids.length ? ids.length : index + size;
+      yield ids.sublist(index, end);
+    }
   }
 }

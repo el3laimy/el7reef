@@ -15,10 +15,10 @@ class Tournament {
   final int? prizePool;
   final String? prizeDescription;
   final TournamentStatus status;
-  final List<String> registeredTeamIds;
+  final List<String> registeredTeamIds; // Legacy compatibility only.
   final List<TournamentAssistant> assistants;
-  final List<String> groupRoundIds; // IDs لجولات المجموعات
-  final List<String> knockoutRoundIds; // IDs لجولات الإقصاء
+  final List<String> groupRoundIds; // Legacy read-only compatibility only.
+  final List<String> knockoutRoundIds; // Legacy read-only compatibility only.
   final bool isFantasyEnabled;
   final DateTime? registrationDeadline;
   final DateTime? startDate;

@@ -119,34 +119,43 @@ class TournamentModel {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'organizerId': organizerId,
-    'name': name,
-    'description': description,
-    'location': location,
-    'format': format,
-    'teamSize': teamSize,
-    'maxTeams': maxTeams,
-    'prizePool': prizePool,
-    'prizeDescription': prizeDescription,
-    'status': status,
-    'registeredTeamIds': registeredTeamIds,
-    'assistants': assistants.map((e) => e.toJson()).toList(),
-    'groupRoundIds': groupRoundIds,
-    'knockoutRoundIds': knockoutRoundIds,
-    'isFantasyEnabled': isFantasyEnabled,
-    'registrationDeadline': registrationDeadline,
-    'startDate': startDate,
-    'endDate': endDate,
-    'participantListFinalizedAt': participantListFinalizedAt,
-    'activeParticipantCount': activeParticipantCount,
-    'currentGroupStageId': currentGroupStageId,
-    'currentKnockoutBracketId': currentKnockoutBracketId,
-    'winnerParticipantId': winnerParticipantId,
-    'needsManualOpsMigration': needsManualOpsMigration,
-    'groupStandingsConfig': groupStandingsConfig.toJson(),
-    'createdAt': createdAt,
-  };
+  Map<String, dynamic> toJson() {
+    final data = <String, dynamic>{
+      'organizerId': organizerId,
+      'name': name,
+      'description': description,
+      'location': location,
+      'format': format,
+      'teamSize': teamSize,
+      'maxTeams': maxTeams,
+      'prizePool': prizePool,
+      'prizeDescription': prizeDescription,
+      'status': status,
+      'registeredTeamIds': registeredTeamIds,
+      'assistants': assistants.map((e) => e.toJson()).toList(),
+      'isFantasyEnabled': isFantasyEnabled,
+      'registrationDeadline': registrationDeadline,
+      'startDate': startDate,
+      'endDate': endDate,
+      'participantListFinalizedAt': participantListFinalizedAt,
+      'activeParticipantCount': activeParticipantCount,
+      'currentGroupStageId': currentGroupStageId,
+      'currentKnockoutBracketId': currentKnockoutBracketId,
+      'winnerParticipantId': winnerParticipantId,
+      'needsManualOpsMigration': needsManualOpsMigration,
+      'groupStandingsConfig': groupStandingsConfig.toJson(),
+      'createdAt': createdAt,
+    };
+
+    if (groupRoundIds.isNotEmpty) {
+      data['groupRoundIds'] = groupRoundIds;
+    }
+    if (knockoutRoundIds.isNotEmpty) {
+      data['knockoutRoundIds'] = knockoutRoundIds;
+    }
+
+    return data;
+  }
 
   Tournament toEntity() => Tournament(
     id: id,

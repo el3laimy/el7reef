@@ -28,12 +28,12 @@ class TournamentRegistrationController extends GetxController {
     required TeamRepository teamRepository,
     required GuestTeamRepository guestTeamRepository,
     required TournamentRegistrationService registrationService,
-  })  : _authSession = authSession,
-        _tournamentRepository = tournamentRepository,
-        _registrationRepository = registrationRepository,
-        _teamRepository = teamRepository,
-        _guestTeamRepository = guestTeamRepository,
-        _registrationService = registrationService;
+  }) : _authSession = authSession,
+       _tournamentRepository = tournamentRepository,
+       _registrationRepository = registrationRepository,
+       _teamRepository = teamRepository,
+       _guestTeamRepository = guestTeamRepository,
+       _registrationService = registrationService;
 
   final searchController = TextEditingController();
 
@@ -55,23 +55,32 @@ class TournamentRegistrationController extends GetxController {
       currentUserId != null && currentUserId!.trim().isNotEmpty;
   bool get isOrganizer => tournament.value?.organizerId == currentUserId;
 
-  List<TournamentRegistration> get pendingRegistrations => registrations
-      .where((registration) =>
-          registration.status == TournamentRegistrationStatus.pending)
-      .toList(growable: false)
-    ..sort((left, right) => left.createdAt.compareTo(right.createdAt));
+  List<TournamentRegistration> get pendingRegistrations =>
+      registrations
+          .where(
+            (registration) =>
+                registration.status == TournamentRegistrationStatus.pending,
+          )
+          .toList(growable: false)
+        ..sort((left, right) => left.createdAt.compareTo(right.createdAt));
 
-  List<TournamentRegistration> get approvedRegistrations => registrations
-      .where((registration) =>
-          registration.status == TournamentRegistrationStatus.approved)
-      .toList(growable: false)
-    ..sort((left, right) => left.updatedAt.compareTo(right.updatedAt));
+  List<TournamentRegistration> get approvedRegistrations =>
+      registrations
+          .where(
+            (registration) =>
+                registration.status == TournamentRegistrationStatus.approved,
+          )
+          .toList(growable: false)
+        ..sort((left, right) => left.updatedAt.compareTo(right.updatedAt));
 
-  List<TournamentRegistration> get rejectedRegistrations => registrations
-      .where((registration) =>
-          registration.status == TournamentRegistrationStatus.rejected)
-      .toList(growable: false)
-    ..sort((left, right) => right.updatedAt.compareTo(left.updatedAt));
+  List<TournamentRegistration> get rejectedRegistrations =>
+      registrations
+          .where(
+            (registration) =>
+                registration.status == TournamentRegistrationStatus.rejected,
+          )
+          .toList(growable: false)
+        ..sort((left, right) => right.updatedAt.compareTo(left.updatedAt));
 
   @override
   void onInit() {
@@ -102,8 +111,8 @@ class TournamentRegistrationController extends GetxController {
       }
 
       tournament.value = loadedTournament;
-      final loadedRegistrations =
-          await _registrationRepository.getTournamentRegistrations(id);
+      final loadedRegistrations = await _registrationRepository
+          .getTournamentRegistrations(id);
       registrations.assignAll(loadedRegistrations);
       await _primeParticipantLookups(loadedRegistrations);
       await _loadMyTeams();
@@ -141,7 +150,10 @@ class TournamentRegistrationController extends GetxController {
       return;
     }
     if (actorId == null || actorId.isEmpty) {
-      Get.snackbar('تسجيل الدخول مطلوب', 'سجّل الدخول أولًا حتى تتمكن من التسجيل.');
+      Get.snackbar(
+        'تسجيل الدخول مطلوب',
+        'سجّل الدخول أولًا حتى تتمكن من التسجيل.',
+      );
       return;
     }
 
@@ -153,16 +165,13 @@ class TournamentRegistrationController extends GetxController {
         actorId: actorId,
       );
       await loadScreen();
-      Get.snackbar(
-        'تم',
-        switch (result.outcome) {
-          TournamentRegistrationOutcome.approved =>
-            'تم تسجيل "${team.name}" في البطولة.',
-          TournamentRegistrationOutcome.alreadyApproved =>
-            '"${team.name}" مسجل بالفعل في البطولة.',
-          _ => 'تم تحديث تسجيل "${team.name}".',
-        },
-      );
+      Get.snackbar('تم', switch (result.outcome) {
+        TournamentRegistrationOutcome.approved =>
+          'تم تسجيل "${team.name}" في البطولة.',
+        TournamentRegistrationOutcome.alreadyApproved =>
+          '"${team.name}" مسجل بالفعل في البطولة.',
+        _ => 'تم تحديث تسجيل "${team.name}".',
+      });
     } catch (error) {
       Get.snackbar('خطأ', _normalizeError(error));
     } finally {
@@ -221,7 +230,8 @@ class TournamentRegistrationController extends GetxController {
     }
   }
 
-  bool isBusyFor(String participantId) => activeParticipantId.value == participantId;
+  bool isBusyFor(String participantId) =>
+      activeParticipantId.value == participantId;
 
   Future<void> _loadMyTeams() async {
     final userId = currentUserId;
@@ -242,30 +252,34 @@ class TournamentRegistrationController extends GetxController {
   Future<void> _primeParticipantLookups(
     List<TournamentRegistration> loadedRegistrations,
   ) async {
-    final loadedTeams = <String, Team>{};
-    final loadedGuestTeams = <String, GuestTeam>{};
+    final teamIds = loadedRegistrations
+        .map((registration) => registration.teamId)
+        .whereType<String>()
+        .where((teamId) => teamId.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    final guestTeamIds = loadedRegistrations
+        .map((registration) => registration.guestTeamId)
+        .whereType<String>()
+        .where((guestTeamId) => guestTeamId.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
 
-    for (final registration in loadedRegistrations) {
-      final teamId = registration.teamId;
-      if (teamId != null &&
-          teamId.isNotEmpty &&
-          !loadedTeams.containsKey(teamId)) {
-        final team = await _teamRepository.getTeam(teamId);
-        if (team != null) {
-          loadedTeams[teamId] = team;
-        }
-      }
+    final loadedTeamsFuture = _teamRepository.getTeamsByIds(teamIds);
+    final loadedGuestTeamsFuture = _guestTeamRepository.getGuestTeamsByIds(
+      guestTeamIds,
+    );
+    final results = await Future.wait<dynamic>([
+      loadedTeamsFuture,
+      loadedGuestTeamsFuture,
+    ]);
 
-      final guestTeamId = registration.guestTeamId;
-      if (guestTeamId != null &&
-          guestTeamId.isNotEmpty &&
-          !loadedGuestTeams.containsKey(guestTeamId)) {
-        final guestTeam = await _guestTeamRepository.getGuestTeam(guestTeamId);
-        if (guestTeam != null) {
-          loadedGuestTeams[guestTeamId] = guestTeam;
-        }
-      }
-    }
+    final loadedTeams = (results[0] as List<Team>).asMap().map(
+      (_, team) => MapEntry(team.id, team),
+    );
+    final loadedGuestTeams = (results[1] as List<GuestTeam>).asMap().map(
+      (_, guestTeam) => MapEntry(guestTeam.id, guestTeam),
+    );
 
     teamLookups.assignAll(loadedTeams);
     guestTeamLookups.assignAll(loadedGuestTeams);

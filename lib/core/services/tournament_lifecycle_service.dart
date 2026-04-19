@@ -22,12 +22,10 @@ import 'knockout_builder.dart';
 import 'participant_finalization_policy.dart';
 import 'tournament_audit_emitter.dart';
 import 'tournament_completion_policy.dart';
-import 'tournament_ops_migration_service.dart';
 import 'tournament_participant_service.dart';
 
 class TournamentLifecycleService {
   final FirebaseFirestore _firestore;
-  final TournamentOpsMigrationService _migrationService;
   final TournamentParticipantService _participantService;
   final ParticipantFinalizationPolicy _participantFinalizationPolicy;
   final GroupStageBuilder _groupStageBuilder;
@@ -37,7 +35,6 @@ class TournamentLifecycleService {
 
   TournamentLifecycleService({
     FirebaseFirestore? firestore,
-    TournamentOpsMigrationService? migrationService,
     TournamentParticipantService? participantService,
     ParticipantFinalizationPolicy? participantFinalizationPolicy,
     GroupStageBuilder? groupStageBuilder,
@@ -45,9 +42,6 @@ class TournamentLifecycleService {
     TournamentCompletionPolicy? completionPolicy,
     TournamentAuditEmitter? auditEmitter,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _migrationService =
-           migrationService ??
-           TournamentOpsMigrationService(firestore: firestore),
        _participantService =
            participantService ??
            TournamentParticipantService(firestore: firestore),
@@ -82,15 +76,18 @@ class TournamentLifecycleService {
     DateTime? now,
   }) async {
     final effectiveNow = now ?? DateTime.now();
-    await _migrationService.backfillTournament(
-      tournamentId: tournamentId,
-      actorId: actorId,
-      now: effectiveNow,
-    );
     final tournament = await _loadTournament(tournamentId);
     final participants = await _participantService.getTournamentParticipants(
       tournamentId,
     );
+    final alreadyFinalized =
+        tournament.participantListFinalizedAt != null &&
+        participants
+            .where((participant) => participant.isActive)
+            .every((participant) => participant.isFinalized);
+    if (alreadyFinalized) {
+      return participants;
+    }
     final finalized = _participantFinalizationPolicy.finalize(
       tournament: tournament,
       participants: participants,
@@ -104,7 +101,8 @@ class TournamentLifecycleService {
       );
     }
     final updatedTournament = tournament.copyWith(
-      participantListFinalizedAt: effectiveNow,
+      participantListFinalizedAt:
+          tournament.participantListFinalizedAt ?? effectiveNow,
     );
     batch.update(
       _tournamentsRef.doc(tournamentId),
@@ -125,11 +123,6 @@ class TournamentLifecycleService {
     DateTime? now,
   }) async {
     final effectiveNow = now ?? DateTime.now();
-    await _migrationService.backfillTournament(
-      tournamentId: tournamentId,
-      actorId: actorId,
-      now: effectiveNow,
-    );
     final tournament = await _loadTournament(tournamentId);
     if (tournament.currentGroupStageId != null &&
         tournament.currentGroupStageId!.isNotEmpty) {
@@ -327,36 +320,64 @@ class TournamentLifecycleService {
         tournament.currentGroupStageId!.isEmpty) {
       return const <GroupStandingSnapshot>[];
     }
-    final groups = await _loadGroups(
+    final groupsFuture = _loadGroups(
       tournamentId: tournamentId,
       groupStageId: tournament.currentGroupStageId!,
     );
-    final participants = await _participantService.getTournamentParticipants(
+    final participantsFuture = _participantService.getTournamentParticipants(
       tournamentId,
     );
-    final participantsById = {
-      for (final participant in participants) participant.id: participant,
-    };
-    final fixtures = await _loadMatches(
+    final fixturesFuture = _loadMatches(
       tournamentId: tournamentId,
       stageType: TournamentStageType.groupStage,
       groupStageId: tournament.currentGroupStageId!,
     );
-    final snapshots = groups
-        .map(
-          (group) => _groupStageBuilder.recalculateSnapshot(
-            tournament: tournament,
-            group: group,
-            participantsById: participantsById,
-            matches: fixtures
-                .where((match) => match.groupId == group.id)
-                .toList(),
-            now: effectiveNow,
-          ),
-        )
-        .toList(growable: false);
+    final existingSnapshotsFuture = _loadStandings(
+      tournament.currentGroupStageId!,
+    );
+
+    final groups = await groupsFuture;
+    final participants = await participantsFuture;
+    final participantsById = {
+      for (final participant in participants) participant.id: participant,
+    };
+    final fixtures = await fixturesFuture;
+    final existingSnapshots = await existingSnapshotsFuture;
+    final existingById = {
+      for (final snapshot in existingSnapshots) snapshot.id: snapshot,
+    };
+    final snapshots = <GroupStandingSnapshot>[];
+    final changedSnapshots = <GroupStandingSnapshot>[];
+
+    for (final group in groups) {
+      final recalculated = _groupStageBuilder.recalculateSnapshot(
+        tournament: tournament,
+        group: group,
+        participantsById: participantsById,
+        matches: fixtures.where((match) => match.groupId == group.id).toList(),
+        now: effectiveNow,
+      );
+      final existing = existingById[recalculated.id];
+      if (existing != null &&
+          _isEquivalentStandingSnapshot(existing, recalculated)) {
+        snapshots.add(existing);
+        continue;
+      }
+
+      final snapshotToPersist = recalculated.copyWith(
+        createdAt: existing?.createdAt ?? recalculated.createdAt,
+        updatedAt: effectiveNow,
+      );
+      snapshots.add(snapshotToPersist);
+      changedSnapshots.add(snapshotToPersist);
+    }
+
+    if (changedSnapshots.isEmpty) {
+      return snapshots;
+    }
+
     final batch = _firestore.batch();
-    for (final snapshot in snapshots) {
+    for (final snapshot in changedSnapshots) {
       batch.set(
         _standingsRef.doc(snapshot.id),
         GroupStandingSnapshotModel.fromEntity(snapshot).toJson(),
@@ -376,15 +397,19 @@ class TournamentLifecycleService {
     if (bracketId == null || bracketId.isEmpty) {
       return null;
     }
-    final bracket = await _loadBracket(bracketId);
-    final ties = await _loadTies(bracketId);
-    final matches = await _loadMatches(
+    final bracketFuture = _loadBracket(bracketId);
+    final tiesFuture = _loadTies(bracketId);
+    final matchesFuture = _loadMatches(
       tournamentId: tournamentId,
       stageType: TournamentStageType.knockoutStage,
     );
-    final participants = await _participantService.getTournamentParticipants(
+    final participantsFuture = _participantService.getTournamentParticipants(
       tournamentId,
     );
+    final bracket = await bracketFuture;
+    final ties = await tiesFuture;
+    final matches = await matchesFuture;
+    final participants = await participantsFuture;
     final participantsById = {
       for (final participant in participants) participant.id: participant,
     };
@@ -395,25 +420,84 @@ class TournamentLifecycleService {
       participantsById: participantsById,
       now: effectiveNow,
     );
-    final batch = _firestore.batch();
-    batch.update(
-      _bracketsRef.doc(progress.bracket.id),
-      KnockoutBracketModel.fromEntity(progress.bracket).toJson(),
-    );
+
+    final existingTiesById = {for (final tie in ties) tie.id: tie};
+    final existingMatchesById = {for (final match in matches) match.id: match};
+
+    var bracketToReturn = bracket;
+    KnockoutBracket? bracketToPersist;
+    if (!_isEquivalentKnockoutBracket(bracket, progress.bracket)) {
+      bracketToPersist = progress.bracket.copyWith(
+        createdAt: bracket.createdAt,
+        updatedAt: effectiveNow,
+      );
+      bracketToReturn = bracketToPersist;
+    }
+
+    final tiesToReturn = <KnockoutTie>[];
+    final changedTies = <KnockoutTie>[];
     for (final tie in progress.ties) {
+      final existingTie = existingTiesById[tie.id];
+      if (existingTie != null && _isEquivalentKnockoutTie(existingTie, tie)) {
+        tiesToReturn.add(existingTie);
+        continue;
+      }
+
+      final tieToPersist = tie.copyWith(
+        createdAt: existingTie?.createdAt ?? tie.createdAt,
+        updatedAt: effectiveNow,
+      );
+      tiesToReturn.add(tieToPersist);
+      changedTies.add(tieToPersist);
+    }
+
+    final matchesToReturn = <Match>[];
+    final changedMatches = <Match>[];
+    for (final match in progress.matches) {
+      final existingMatch = existingMatchesById[match.id];
+      if (existingMatch != null && _isEquivalentMatch(existingMatch, match)) {
+        matchesToReturn.add(existingMatch);
+        continue;
+      }
+      matchesToReturn.add(match);
+      changedMatches.add(match);
+    }
+
+    if (bracketToPersist == null &&
+        changedTies.isEmpty &&
+        changedMatches.isEmpty) {
+      return KnockoutProgressResult(
+        bracket: bracketToReturn,
+        ties: tiesToReturn,
+        matches: matchesToReturn,
+      );
+    }
+
+    final batch = _firestore.batch();
+    if (bracketToPersist != null) {
+      batch.update(
+        _bracketsRef.doc(bracketToPersist.id),
+        KnockoutBracketModel.fromEntity(bracketToPersist).toJson(),
+      );
+    }
+    for (final tie in changedTies) {
       batch.set(
         _tiesRef.doc(tie.id),
         KnockoutTieModel.fromEntity(tie).toJson(),
       );
     }
-    for (final match in progress.matches) {
+    for (final match in changedMatches) {
       batch.set(
         _matchesRef.doc(match.id),
         MatchModel.fromEntity(match).toJson(),
       );
     }
     await batch.commit();
-    return progress;
+    return KnockoutProgressResult(
+      bracket: bracketToReturn,
+      ties: tiesToReturn,
+      matches: matchesToReturn,
+    );
   }
 
   Future<Tournament> completeTournament({
@@ -443,6 +527,10 @@ class TournamentLifecycleService {
       status: TournamentStatus.completed,
       winnerParticipantId: winnerParticipantId,
     );
+    if (tournament.status == TournamentStatus.completed &&
+        tournament.winnerParticipantId == winnerParticipantId) {
+      return tournament;
+    }
     await _tournamentsRef
         .doc(tournamentId)
         .update(TournamentModel.fromEntity(updatedTournament).toJson());
@@ -549,5 +637,132 @@ class TournamentLifecycleService {
       return left.slotNumber.compareTo(right.slotNumber);
     });
     return ties;
+  }
+
+  bool _isEquivalentKnockoutBracket(
+    KnockoutBracket left,
+    KnockoutBracket right,
+  ) {
+    return left.tournamentId == right.tournamentId &&
+        left.format == right.format &&
+        left.championParticipantId == right.championParticipantId &&
+        _stringListsEqual(
+          left.qualifierParticipantIds,
+          right.qualifierParticipantIds,
+        );
+  }
+
+  bool _isEquivalentKnockoutTie(KnockoutTie left, KnockoutTie right) {
+    return left.tournamentId == right.tournamentId &&
+        left.bracketId == right.bracketId &&
+        left.roundIndex == right.roundIndex &&
+        left.slotNumber == right.slotNumber &&
+        left.participantAId == right.participantAId &&
+        left.participantBId == right.participantBId &&
+        left.winnerParticipantId == right.winnerParticipantId &&
+        left.matchId == right.matchId &&
+        left.nextTieId == right.nextTieId;
+  }
+
+  bool _isEquivalentMatch(Match left, Match right) {
+    return left.organizerId == right.organizerId &&
+        left.teamAId == right.teamAId &&
+        left.teamBId == right.teamBId &&
+        _stringListsEqual(left.teamAPlayerIds, right.teamAPlayerIds) &&
+        _stringListsEqual(left.teamBPlayerIds, right.teamBPlayerIds) &&
+        left.teamAParticipantId == right.teamAParticipantId &&
+        left.teamBParticipantId == right.teamBParticipantId &&
+        left.status == right.status &&
+        left.scoreTeamA == right.scoreTeamA &&
+        left.scoreTeamB == right.scoreTeamB &&
+        left.mvpPlayerId == right.mvpPlayerId &&
+        left.location == right.location &&
+        left.latitude == right.latitude &&
+        left.longitude == right.longitude &&
+        left.isOrganized == right.isOrganized &&
+        left.tournamentId == right.tournamentId &&
+        left.isGoldenRating == right.isGoldenRating &&
+        left.isAnomaly == right.isAnomaly &&
+        left.isFrozen == right.isFrozen &&
+        left.stageType == right.stageType &&
+        left.groupId == right.groupId &&
+        left.groupStageId == right.groupStageId &&
+        left.knockoutTieId == right.knockoutTieId &&
+        left.roundIndex == right.roundIndex &&
+        left.slotNumber == right.slotNumber &&
+        left.scheduledAt == right.scheduledAt &&
+        left.publishedAt == right.publishedAt &&
+        left.venueId == right.venueId &&
+        left.fixtureStatus == right.fixtureStatus &&
+        left.createdAt == right.createdAt &&
+        left.startedAt == right.startedAt &&
+        left.completedAt == right.completedAt;
+  }
+
+  bool _isEquivalentStandingSnapshot(
+    GroupStandingSnapshot left,
+    GroupStandingSnapshot right,
+  ) {
+    if (left.tournamentId != right.tournamentId ||
+        left.groupStageId != right.groupStageId ||
+        left.groupId != right.groupId) {
+      return false;
+    }
+    if (!_stringListsEqual(
+      left.qualifierParticipantIds,
+      right.qualifierParticipantIds,
+    )) {
+      return false;
+    }
+    if (!_metricListsEqual(left.tiebreakerOrder, right.tiebreakerOrder)) {
+      return false;
+    }
+    if (left.entries.length != right.entries.length) {
+      return false;
+    }
+    for (int index = 0; index < left.entries.length; index++) {
+      final leftEntry = left.entries[index];
+      final rightEntry = right.entries[index];
+      if (leftEntry.participantId != rightEntry.participantId ||
+          leftEntry.displayName != rightEntry.displayName ||
+          leftEntry.played != rightEntry.played ||
+          leftEntry.wins != rightEntry.wins ||
+          leftEntry.draws != rightEntry.draws ||
+          leftEntry.losses != rightEntry.losses ||
+          leftEntry.goalsFor != rightEntry.goalsFor ||
+          leftEntry.goalsAgainst != rightEntry.goalsAgainst ||
+          leftEntry.rank != rightEntry.rank ||
+          leftEntry.randomDrawOrder != rightEntry.randomDrawOrder) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _stringListsEqual(List<String> left, List<String> right) {
+    if (left.length != right.length) {
+      return false;
+    }
+    for (int index = 0; index < left.length; index++) {
+      if (left[index] != right[index]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _metricListsEqual(
+    List<GroupStandingsMetric> left,
+    List<GroupStandingsMetric> right,
+  ) {
+    if (left.length != right.length) {
+      return false;
+    }
+    for (int index = 0; index < left.length; index++) {
+      if (left[index] != right[index]) {
+        return false;
+      }
+    }
+    return true;
   }
 }

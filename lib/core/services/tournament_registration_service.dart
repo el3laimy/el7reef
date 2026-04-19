@@ -812,15 +812,33 @@ class TournamentRegistrationService {
     final activeRegistrations = policyRegistrations
         .where((registration) => _statusConsumesCapacity(registration.status))
         .toList(growable: false);
-    final activeRegisteredTeamIds = activeRegistrations
-        .where((registration) => registration.teamId != null)
-        .map((registration) => registration.teamId!)
-        .toSet();
-    final legacyOnlyRegisteredTeams = tournament.registeredTeamIds
-        .where((teamId) => !activeRegisteredTeamIds.contains(teamId))
+    final pendingReservations = activeRegistrations
+        .where(
+          (registration) =>
+              registration.status == TournamentRegistrationStatus.pending,
+        )
         .length;
-    final reservedSlots =
-        activeRegistrations.length + legacyOnlyRegisteredTeams;
+    final approvedRegistrations = activeRegistrations
+        .where(
+          (registration) =>
+              registration.status == TournamentRegistrationStatus.approved,
+        )
+        .length;
+
+    // Prefer canonical participant summary, then approved registrations,
+    // and only fall back to legacy registeredTeamIds when the canonical
+    // participant count is not available yet.
+    var approvedReservedSlots = approvedRegistrations;
+    final canonicalApprovedSlots = tournament.activeParticipantCount;
+    if (canonicalApprovedSlots != null &&
+        canonicalApprovedSlots > approvedReservedSlots) {
+      approvedReservedSlots = canonicalApprovedSlots;
+    } else if (canonicalApprovedSlots == null &&
+        tournament.registeredTeamIds.length > approvedReservedSlots) {
+      approvedReservedSlots = tournament.registeredTeamIds.length;
+    }
+
+    final reservedSlots = approvedReservedSlots + pendingReservations;
     final currentRegistrationAlreadyReservesSlot = policyRegistrations.any(
       (registration) =>
           registration.id == registrationId &&

@@ -10,7 +10,7 @@ class GuestPlayerRepositoryImpl implements GuestPlayerRepository {
   final FirebaseFirestore _firestore;
 
   GuestPlayerRepositoryImpl({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _guestPlayersRef =>
       _firestore.collection(FirebasePaths.guestPlayers);
@@ -22,6 +22,34 @@ class GuestPlayerRepositoryImpl implements GuestPlayerRepository {
       return null;
     }
     return GuestPlayerModel.fromJson(doc.data()!, doc.id).toEntity();
+  }
+
+  @override
+  Future<List<GuestPlayer>> getGuestPlayersByIds(
+    List<String> guestPlayerIds,
+  ) async {
+    final orderedIds = _normalizeIds(guestPlayerIds);
+    if (orderedIds.isEmpty) {
+      return const <GuestPlayer>[];
+    }
+
+    final loadedPlayers = <String, GuestPlayer>{};
+    for (final chunk in _chunkIds(orderedIds)) {
+      final snapshot = await _guestPlayersRef
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+      for (final doc in snapshot.docs) {
+        loadedPlayers[doc.id] = GuestPlayerModel.fromJson(
+          doc.data(),
+          doc.id,
+        ).toEntity();
+      }
+    }
+
+    return orderedIds
+        .map((id) => loadedPlayers[id])
+        .whereType<GuestPlayer>()
+        .toList(growable: false);
   }
 
   @override
@@ -49,7 +77,9 @@ class GuestPlayerRepositoryImpl implements GuestPlayerRepository {
   }
 
   @override
-  Future<List<GuestPlayer>> getTournamentGuestPlayers(String tournamentId) async {
+  Future<List<GuestPlayer>> getTournamentGuestPlayers(
+    String tournamentId,
+  ) async {
     final snapshot = await _guestPlayersRef
         .where('tournamentId', isEqualTo: tournamentId)
         .orderBy('createdAt')
@@ -66,5 +96,19 @@ class GuestPlayerRepositoryImpl implements GuestPlayerRepository {
       'claimStatus': GuestClaimStatus.archived.name,
       'updatedAt': DateTime.now().millisecondsSinceEpoch,
     });
+  }
+
+  List<String> _normalizeIds(List<String> ids) {
+    return ids
+        .where((id) => id.trim().isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+  }
+
+  Iterable<List<String>> _chunkIds(List<String> ids, {int size = 10}) sync* {
+    for (var index = 0; index < ids.length; index += size) {
+      final end = (index + size) > ids.length ? ids.length : index + size;
+      yield ids.sublist(index, end);
+    }
   }
 }

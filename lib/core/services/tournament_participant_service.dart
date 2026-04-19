@@ -64,6 +64,19 @@ class TournamentParticipantService {
     return participants;
   }
 
+  Future<TournamentParticipant?> getParticipantById(
+    String participantId,
+  ) async {
+    final snapshot = await _participantsRef.doc(participantId).get();
+    if (!snapshot.exists || snapshot.data() == null) {
+      return null;
+    }
+    return TournamentParticipantModel.fromJson(
+      snapshot.data()!,
+      snapshot.id,
+    ).toEntity();
+  }
+
   Future<TournamentParticipant> syncApprovedRegistration({
     required TournamentRegistration registration,
     required String actorId,
@@ -74,7 +87,6 @@ class TournamentParticipantService {
       throw Exception('لا يمكن تحويل تسجيل غير معتمد إلى participant.');
     }
     final effectiveNow = now ?? DateTime.now();
-    final tournament = await _loadTournament(registration.tournamentId);
     final source = await _loadSourceForRegistration(registration);
     final participantId = participantIdFor(
       tournamentId: registration.tournamentId,
@@ -108,10 +120,17 @@ class TournamentParticipantService {
       withdrawnAt: existing?.withdrawnAt,
       replacedAt: existing?.replacedAt,
     );
-    await _participantsRef
-        .doc(participant.id)
-        .set(TournamentParticipantModel.fromEntity(participant).toJson());
+    final shouldWrite =
+        existing == null ||
+        !_hasSameSyncedParticipantState(existing, participant);
+    Tournament? tournament;
+    if (shouldWrite) {
+      await _participantsRef
+          .doc(participant.id)
+          .set(TournamentParticipantModel.fromEntity(participant).toJson());
+    }
     if (existing == null) {
+      tournament = await _loadTournament(registration.tournamentId);
       await _auditEmitter.participantAdded(
         tournament: tournament,
         actorId: actorId,
@@ -124,9 +143,14 @@ class TournamentParticipantService {
       );
     }
     if (refreshTournamentSummary) {
+      tournament ??= await _loadTournament(registration.tournamentId);
       await refreshTournamentParticipantSummary(
         tournamentId: registration.tournamentId,
+        tournament: tournament,
       );
+    }
+    if (!shouldWrite) {
+      return existing;
     }
     return participant;
   }
@@ -183,7 +207,10 @@ class TournamentParticipantService {
       },
     );
     if (refreshTournamentSummary) {
-      await refreshTournamentParticipantSummary(tournamentId: tournamentId);
+      await refreshTournamentParticipantSummary(
+        tournamentId: tournamentId,
+        tournament: tournament,
+      );
     }
     return participant;
   }
@@ -211,6 +238,7 @@ class TournamentParticipantService {
     if (refreshTournamentSummary) {
       await refreshTournamentParticipantSummary(
         tournamentId: participant.tournamentId,
+        tournament: tournament,
       );
     }
   }
@@ -223,6 +251,9 @@ class TournamentParticipantService {
   }) async {
     final effectiveNow = now ?? DateTime.now();
     final participant = await _loadParticipant(participantId);
+    if (participant.status == TournamentParticipantStatus.withdrawn) {
+      return participant;
+    }
     final updated = participant.copyWith(
       status: TournamentParticipantStatus.withdrawn,
       withdrawnAt: effectiveNow,
@@ -242,9 +273,86 @@ class TournamentParticipantService {
     if (refreshTournamentSummary) {
       await refreshTournamentParticipantSummary(
         tournamentId: participant.tournamentId,
+        tournament: tournament,
       );
     }
     return updated;
+  }
+
+  Future<TournamentParticipant> reactivateParticipant({
+    required String participantId,
+    required String actorId,
+    DateTime? now,
+    bool refreshTournamentSummary = true,
+  }) async {
+    final effectiveNow = now ?? DateTime.now();
+    final participant = await _loadParticipant(participantId);
+    final tournament = await _loadTournament(participant.tournamentId);
+    _assertCanReactivateParticipant(tournament);
+    if (participant.isActive) {
+      return participant;
+    }
+
+    final reactivatedStatus = tournament.participantListFinalizedAt != null
+        ? TournamentParticipantStatus.finalized
+        : TournamentParticipantStatus.approved;
+    final reactivated = participant.copyWith(
+      status: reactivatedStatus,
+      replacedByParticipantId: null,
+      withdrawnAt: null,
+      replacedAt: null,
+      updatedAt: effectiveNow,
+    );
+
+    final batch = _firestore.batch();
+    batch.update(
+      _participantsRef.doc(reactivated.id),
+      TournamentParticipantModel.fromEntity(reactivated).toJson(),
+    );
+
+    TournamentParticipant? withdrawnReplacement;
+    if (participant.status == TournamentParticipantStatus.replaced &&
+        participant.replacedByParticipantId != null &&
+        participant.replacedByParticipantId!.isNotEmpty) {
+      final replacement = await getParticipantById(
+        participant.replacedByParticipantId!,
+      );
+      if (replacement != null &&
+          replacement.replacementForParticipantId == participant.id &&
+          replacement.isActive) {
+        withdrawnReplacement = replacement.copyWith(
+          status: TournamentParticipantStatus.withdrawn,
+          withdrawnAt: effectiveNow,
+          updatedAt: effectiveNow,
+        );
+        batch.update(
+          _participantsRef.doc(withdrawnReplacement.id),
+          TournamentParticipantModel.fromEntity(withdrawnReplacement).toJson(),
+        );
+      }
+    }
+
+    await batch.commit();
+    await _auditEmitter.participantReactivated(
+      tournament: tournament,
+      actorId: actorId,
+      participantId: reactivated.id,
+      beforePayload: {
+        'status': participant.status.name,
+        'replacedByParticipantId': participant.replacedByParticipantId,
+      },
+      afterPayload: {
+        'status': reactivated.status.name,
+        'replacementWithdrawnId': withdrawnReplacement?.id,
+      },
+    );
+    if (refreshTournamentSummary) {
+      await refreshTournamentParticipantSummary(
+        tournamentId: participant.tournamentId,
+        tournament: tournament,
+      );
+    }
+    return reactivated;
   }
 
   Future<TournamentParticipant> replaceParticipant({
@@ -340,13 +448,49 @@ class TournamentParticipantService {
     if (refreshTournamentSummary) {
       await refreshTournamentParticipantSummary(
         tournamentId: current.tournamentId,
+        tournament: tournament,
       );
     }
     return replacementParticipant;
   }
 
+  Future<TournamentParticipant> updateParticipantSeed({
+    required String participantId,
+    required String actorId,
+    int? seed,
+    DateTime? now,
+  }) async {
+    if (seed != null && seed <= 0) {
+      throw Exception('الـ seed يجب أن تكون رقمًا موجبًا.');
+    }
+    final effectiveNow = now ?? DateTime.now();
+    final participant = await _loadParticipant(participantId);
+    final tournament = await _loadTournament(participant.tournamentId);
+    _assertCanEditParticipantSeed(tournament);
+    if (!participant.isActive) {
+      throw Exception('لا يمكن تعديل seed لمشارك غير نشط.');
+    }
+    if (participant.seed == seed) {
+      return participant;
+    }
+
+    final updated = participant.copyWith(seed: seed, updatedAt: effectiveNow);
+    await _participantsRef
+        .doc(participantId)
+        .update(TournamentParticipantModel.fromEntity(updated).toJson());
+    await _auditEmitter.participantSeedUpdated(
+      tournament: tournament,
+      actorId: actorId,
+      participantId: updated.id,
+      beforePayload: {'seed': participant.seed},
+      afterPayload: {'seed': updated.seed},
+    );
+    return updated;
+  }
+
   Future<int> refreshTournamentParticipantSummary({
     required String tournamentId,
+    Tournament? tournament,
   }) async {
     final participants = await getTournamentParticipants(tournamentId);
     final activeCount = participants
@@ -356,10 +500,44 @@ class TournamentParticipantService {
               participant.status == TournamentParticipantStatus.finalized,
         )
         .length;
+    final currentTournament = tournament ?? await _loadTournament(tournamentId);
+    if (currentTournament.activeParticipantCount != null &&
+        currentTournament.activeParticipantCount == activeCount) {
+      return activeCount;
+    }
     await _tournamentsRef.doc(tournamentId).update({
       'activeParticipantCount': activeCount,
     });
     return activeCount;
+  }
+
+  bool _hasSameSyncedParticipantState(
+    TournamentParticipant existing,
+    TournamentParticipant desired,
+  ) {
+    return existing.tournamentId == desired.tournamentId &&
+        existing.sourceType == desired.sourceType &&
+        existing.sourceEntityId == desired.sourceEntityId &&
+        existing.displayName == desired.displayName &&
+        existing.status == desired.status &&
+        existing.seed == desired.seed &&
+        existing.groupId == desired.groupId &&
+        existing.sourceRegistrationId == desired.sourceRegistrationId &&
+        existing.replacementForParticipantId ==
+            desired.replacementForParticipantId &&
+        existing.replacedByParticipantId == desired.replacedByParticipantId &&
+        _sameInstant(existing.createdAt, desired.createdAt) &&
+        _sameInstant(existing.approvedAt, desired.approvedAt) &&
+        _sameInstant(existing.finalizedAt, desired.finalizedAt) &&
+        _sameInstant(existing.withdrawnAt, desired.withdrawnAt) &&
+        _sameInstant(existing.replacedAt, desired.replacedAt);
+  }
+
+  bool _sameInstant(DateTime? left, DateTime? right) {
+    if (left == null || right == null) {
+      return left == right;
+    }
+    return left.millisecondsSinceEpoch == right.millisecondsSinceEpoch;
   }
 
   Future<Tournament> _loadTournament(String tournamentId) async {
@@ -371,14 +549,11 @@ class TournamentParticipantService {
   }
 
   Future<TournamentParticipant> _loadParticipant(String participantId) async {
-    final snapshot = await _participantsRef.doc(participantId).get();
-    if (!snapshot.exists || snapshot.data() == null) {
+    final participant = await getParticipantById(participantId);
+    if (participant == null) {
       throw Exception('المشارك المطلوب غير موجود.');
     }
-    return TournamentParticipantModel.fromJson(
-      snapshot.data()!,
-      snapshot.id,
-    ).toEntity();
+    return participant;
   }
 
   Future<_ParticipantSource> _loadSourceForRegistration(
@@ -458,6 +633,28 @@ class TournamentParticipantService {
     }
     if (_hasOperationalStageStarted(tournament)) {
       throw Exception('لا يمكن استبدال participant بعد بدء تشغيل البطولة.');
+    }
+  }
+
+  void _assertCanReactivateParticipant(Tournament tournament) {
+    if (tournament.needsManualOpsMigration) {
+      throw Exception(
+        'هذه البطولة تحتاج manual ops migration قبل تعديل المشاركين.',
+      );
+    }
+    if (_hasOperationalStageStarted(tournament)) {
+      throw Exception('لا يمكن إعادة تفعيل participant بعد بدء تشغيل البطولة.');
+    }
+  }
+
+  void _assertCanEditParticipantSeed(Tournament tournament) {
+    if (tournament.needsManualOpsMigration) {
+      throw Exception(
+        'هذه البطولة تحتاج manual ops migration قبل تعديل المشاركين.',
+      );
+    }
+    if (_hasOperationalStageStarted(tournament)) {
+      throw Exception('لا يمكن تعديل seed بعد بدء تشغيل البطولة.');
     }
   }
 

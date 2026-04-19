@@ -25,6 +25,32 @@ class GuestTeamRepositoryImpl implements GuestTeamRepository {
   }
 
   @override
+  Future<List<GuestTeam>> getGuestTeamsByIds(List<String> guestTeamIds) async {
+    final orderedIds = _normalizeIds(guestTeamIds);
+    if (orderedIds.isEmpty) {
+      return const <GuestTeam>[];
+    }
+
+    final loadedTeams = <String, GuestTeam>{};
+    for (final chunk in _chunkIds(orderedIds)) {
+      final snapshot = await _guestTeamsRef
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+      for (final doc in snapshot.docs) {
+        loadedTeams[doc.id] = GuestTeamModel.fromJson(
+          doc.data(),
+          doc.id,
+        ).toEntity();
+      }
+    }
+
+    return orderedIds
+        .map((id) => loadedTeams[id])
+        .whereType<GuestTeam>()
+        .toList(growable: false);
+  }
+
+  @override
   Future<void> createGuestTeam(GuestTeam guestTeam) async {
     final model = GuestTeamModel.fromEntity(guestTeam);
     await _guestTeamsRef.doc(guestTeam.id).set(model.toJson());
@@ -70,5 +96,19 @@ class GuestTeamRepositoryImpl implements GuestTeamRepository {
       'claimStatus': GuestClaimStatus.archived.name,
       'updatedAt': DateTime.now().millisecondsSinceEpoch,
     });
+  }
+
+  List<String> _normalizeIds(List<String> ids) {
+    return ids
+        .where((id) => id.trim().isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+  }
+
+  Iterable<List<String>> _chunkIds(List<String> ids, {int size = 10}) sync* {
+    for (var index = 0; index < ids.length; index += size) {
+      final end = (index + size) > ids.length ? ids.length : index + size;
+      yield ids.sublist(index, end);
+    }
   }
 }

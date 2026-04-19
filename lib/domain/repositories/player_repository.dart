@@ -5,6 +5,7 @@ import '../entities/player_match_stats.dart';
 abstract class PlayerRepository {
   /// جلب بيانات لاعب بالـ ID
   Future<Player?> getPlayer(String playerId);
+  Future<List<Player>> getPlayersByIds(List<String> playerIds);
 
   /// إنشاء لاعب جديد
   Future<void> createPlayer(Player player);

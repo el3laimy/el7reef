@@ -70,10 +70,10 @@ class TournamentOperationsBinding extends Bindings {
       () => TournamentOperationsController(
         tournamentRepository: Get.find<TournamentRepositoryImpl>(),
         groupRepository: Get.find<TournamentGroupRepositoryImpl>(),
-        standingRepository: Get.find<GroupStandingSnapshotRepositoryImpl>(),
         matchRepository: Get.find<MatchRepositoryImpl>(),
         teamRepository: Get.find<TeamRepositoryImpl>(),
         guestTeamRepository: Get.find<GuestTeamRepositoryImpl>(),
+        standingRepository: Get.find<GroupStandingSnapshotRepositoryImpl>(),
         bracketRepository: Get.find<KnockoutBracketRepositoryImpl>(),
         tieRepository: Get.find<KnockoutTieRepositoryImpl>(),
         participantService: Get.find<TournamentParticipantService>(),
