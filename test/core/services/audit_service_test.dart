@@ -94,10 +94,43 @@ void main() {
         now: base.add(const Duration(hours: 2)),
       );
 
-      final timeline = await service.getEntityTimeline('match-2');
+      final timeline = await service.getEntityTimeline(
+        entityType: AuditEntityType.match,
+        entityId: 'match-2',
+      );
       expect(timeline, hasLength(3));
       expect(timeline.first.action, AuditAction.matchScoreApproved);
       expect(timeline.last.action, AuditAction.matchCreated);
+    });
+
+    test('entity timeline isolates events by entity type and id together', () async {
+      final base = DateTime(2026, 4, 18, 10);
+      await service.recordMatchEvent(
+        matchId: 'shared-id',
+        action: AuditAction.matchCreated,
+        actorId: 'organizer-1',
+        now: base,
+      );
+      await service.recordTournamentEvent(
+        tournamentId: 'shared-id',
+        action: AuditAction.tournamentCreated,
+        actorId: 'organizer-1',
+        now: base.add(const Duration(minutes: 5)),
+      );
+
+      final matchTimeline = await service.getEntityTimeline(
+        entityType: AuditEntityType.match,
+        entityId: 'shared-id',
+      );
+      final tournamentTimeline = await service.getEntityTimeline(
+        entityType: AuditEntityType.tournament,
+        entityId: 'shared-id',
+      );
+
+      expect(matchTimeline, hasLength(1));
+      expect(matchTimeline.single.action, AuditAction.matchCreated);
+      expect(tournamentTimeline, hasLength(1));
+      expect(tournamentTimeline.single.action, AuditAction.tournamentCreated);
     });
 
     test('retrieves actor history across different entities', () async {

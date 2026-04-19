@@ -2,6 +2,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/enums/audit_action.dart';
 import '../../core/enums/dispute_enums.dart';
+import '../../core/utils/app_logger.dart';
 import '../../domain/entities/dispute.dart';
 import '../../domain/repositories/dispute_repository.dart';
 import '../../domain/repositories/match_repository.dart';
@@ -80,25 +81,31 @@ class DisputeService {
       await _matchRepository.freezeMatch(matchId);
       matchFrozen = true;
 
-      await _auditService.recordMatchEvent(
-        matchId: matchId,
-        action: AuditAction.disputeFrozenMatch,
-        actorId: raisedBy,
-        metadata: {'disputeId': dispute.id, 'reason': description},
-        now: createdAt,
+      await _recordAuditSafely(
+        context: 'DisputeService.openDispute.freezeAudit',
+        operation: () => _auditService.recordMatchEvent(
+          matchId: matchId,
+          action: AuditAction.disputeFrozenMatch,
+          actorId: raisedBy,
+          metadata: {'disputeId': dispute.id, 'reason': description},
+          now: createdAt,
+        ),
       );
     }
 
-    await _auditService.recordDisputeEvent(
-      disputeId: dispute.id,
-      action: AuditAction.disputeOpened,
-      actorId: raisedBy,
-      metadata: {
-        'matchId': matchId,
-        'type': type.name,
-        'description': description,
-      },
-      now: createdAt,
+    await _recordAuditSafely(
+      context: 'DisputeService.openDispute.disputeAudit',
+      operation: () => _auditService.recordDisputeEvent(
+        disputeId: dispute.id,
+        action: AuditAction.disputeOpened,
+        actorId: raisedBy,
+        metadata: {
+          'matchId': matchId,
+          'type': type.name,
+          'description': description,
+        },
+        now: createdAt,
+      ),
     );
 
     return DisputeOpenResult(dispute: dispute, matchFrozen: matchFrozen);
@@ -133,18 +140,31 @@ class DisputeService {
     // رفع التجميد عن المباراة إذا مطلوب
     if (unfreezeMatch && existing.type == DisputeType.scoreDispute) {
       await _matchRepository.unfreezeMatch(existing.matchId);
+      await _recordAuditSafely(
+        context: 'DisputeService.resolveDispute.unfreezeAudit',
+        operation: () => _auditService.recordMatchEvent(
+          matchId: existing.matchId,
+          action: AuditAction.matchUnfrozen,
+          actorId: resolvedBy,
+          metadata: {'disputeId': disputeId},
+          now: resolvedAt,
+        ),
+      );
     }
 
-    await _auditService.recordDisputeEvent(
-      disputeId: disputeId,
-      action: AuditAction.disputeResolved,
-      actorId: resolvedBy,
-      metadata: {
-        'matchId': existing.matchId,
-        'resolutionNote': resolutionNote,
-        'unfrozen': unfreezeMatch,
-      },
-      now: resolvedAt,
+    await _recordAuditSafely(
+      context: 'DisputeService.resolveDispute.disputeAudit',
+      operation: () => _auditService.recordDisputeEvent(
+        disputeId: disputeId,
+        action: AuditAction.disputeResolved,
+        actorId: resolvedBy,
+        metadata: {
+          'matchId': existing.matchId,
+          'resolutionNote': resolutionNote,
+          'unfrozen': unfreezeMatch,
+        },
+        now: resolvedAt,
+      ),
     );
 
     return resolved;
@@ -178,20 +198,45 @@ class DisputeService {
 
     if (unfreezeMatch && existing.type == DisputeType.scoreDispute) {
       await _matchRepository.unfreezeMatch(existing.matchId);
+      await _recordAuditSafely(
+        context: 'DisputeService.rejectDispute.unfreezeAudit',
+        operation: () => _auditService.recordMatchEvent(
+          matchId: existing.matchId,
+          action: AuditAction.matchUnfrozen,
+          actorId: rejectedBy,
+          metadata: {'disputeId': disputeId},
+          now: rejectedAt,
+        ),
+      );
     }
 
-    await _auditService.recordDisputeEvent(
-      disputeId: disputeId,
-      action: AuditAction.disputeRejected,
-      actorId: rejectedBy,
-      metadata: {
-        'matchId': existing.matchId,
-        'rejectionNote': rejectionNote,
-      },
-      now: rejectedAt,
+    await _recordAuditSafely(
+      context: 'DisputeService.rejectDispute.disputeAudit',
+      operation: () => _auditService.recordDisputeEvent(
+        disputeId: disputeId,
+        action: AuditAction.disputeRejected,
+        actorId: rejectedBy,
+        metadata: {
+          'matchId': existing.matchId,
+          'rejectionNote': rejectionNote,
+        },
+        now: rejectedAt,
+      ),
     );
 
     return rejected;
+  }
+
+  Future<void> _recordAuditSafely({
+    required String context,
+    required Future<void> Function() operation,
+  }) async {
+    try {
+      await operation();
+    } catch (error, stackTrace) {
+      AppLogger.warning(context, error);
+      AppLogger.error(context, error, stackTrace);
+    }
   }
 
   /// ── التحقق من انتهاء مهلة النزاعات المفتوحة ──

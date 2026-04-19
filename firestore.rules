@@ -586,8 +586,61 @@ service cloud.firestore {
 
     match /auditEvents/{eventId} {
       allow read: if isAuthenticated();
-      // Audit events are server-only writes (from trusted services)
-      allow create, update, delete: if false;
+      allow create: if isAuthenticated() &&
+        request.resource.data.keys().hasOnly([
+          'entityType',
+          'entityId',
+          'action',
+          'actorId',
+          'beforePayload',
+          'afterPayload',
+          'metadata',
+          'createdAt'
+        ]) &&
+        request.resource.data.entityType is string &&
+        request.resource.data.entityId is string &&
+        request.resource.data.action is string &&
+        request.resource.data.actorId is string &&
+        request.resource.data.actorId == request.auth.uid &&
+        request.resource.data.createdAt is int &&
+        (
+          !request.resource.data.keys().hasAny(['beforePayload']) ||
+          request.resource.data.beforePayload is map
+        ) &&
+        (
+          !request.resource.data.keys().hasAny(['afterPayload']) ||
+          request.resource.data.afterPayload is map
+        ) &&
+        (
+          !request.resource.data.keys().hasAny(['metadata']) ||
+          request.resource.data.metadata is map
+        );
+      allow update, delete: if false;
+    }
+
+    match /analyticsEvents/{eventId} {
+      allow read: if isAuthenticated();
+      allow create: if request.resource.data.keys().hasOnly([
+          'eventName',
+          'actorId',
+          'parameters',
+          'createdAt'
+        ]) &&
+        request.resource.data.eventName is string &&
+        request.resource.data.createdAt is int &&
+        (
+          !request.resource.data.keys().hasAny(['parameters']) ||
+          request.resource.data.parameters is map
+        ) &&
+        (
+          !request.resource.data.keys().hasAny(['actorId']) ||
+          (
+            request.resource.data.actorId is string &&
+            isAuthenticated() &&
+            request.resource.data.actorId == request.auth.uid
+          )
+        );
+      allow update, delete: if false;
     }
 
     match /disputes/{disputeId} {

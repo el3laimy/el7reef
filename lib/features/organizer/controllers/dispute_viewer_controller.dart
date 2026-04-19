@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 
+import '../../../core/auth/auth_session.dart';
 import '../../../core/enums/dispute_enums.dart';
 import '../../../core/services/audit_service.dart';
 import '../../../core/services/dispute_service.dart';
@@ -12,6 +13,7 @@ import '../../../domain/entities/dispute.dart';
 /// كونترولر عرض وإدارة النزاعات لمباراة أو بطولة
 class DisputeViewerController extends GetxController {
   final DisputeService _disputeService;
+  final AuthSession _authSession;
 
   final RxList<Dispute> disputes = <Dispute>[].obs;
   final RxBool isLoading = false.obs;
@@ -24,13 +26,15 @@ class DisputeViewerController extends GetxController {
 
   DisputeViewerController({
     required this.matchId,
+    required AuthSession authSession,
     DisputeService? disputeService,
   }) : _disputeService = disputeService ??
             DisputeService(
               disputeRepository: DisputeRepositoryImpl(),
               matchRepository: MatchRepositoryImpl(),
               auditService: AuditService(repository: AuditRepositoryImpl()),
-            );
+            ),
+       _authSession = authSession;
 
   @override
   void onInit() {
@@ -137,4 +141,5 @@ class DisputeViewerController extends GetxController {
 
   int get openCount => disputes.where((d) => d.isOpen).length;
   int get closedCount => disputes.where((d) => d.isClosed).length;
+  String? get currentUserId => _authSession.currentUserId;
 }

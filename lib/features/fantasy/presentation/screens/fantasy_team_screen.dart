@@ -77,7 +77,7 @@ class FantasyTeamScreen extends GetView<FantasyTeamController> {
                         ? controller.openTransfers
                         : null,
                     icon: const Icon(Icons.swap_horiz_rounded),
-                    label: const Text('الانتقالات'),
+                    label: Text(controller.transferActionLabel),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF38BDF8),
                     ),
@@ -96,6 +96,12 @@ class FantasyTeamScreen extends GetView<FantasyTeamController> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 16),
+            _InfoStateCard(
+              title: controller.roundStatusTitle,
+              subtitle: controller.roundStatusMessage,
+              color: _roundStatusColor(),
             ),
             const SizedBox(height: 20),
             _SectionTitle(
@@ -118,14 +124,18 @@ class FantasyTeamScreen extends GetView<FantasyTeamController> {
             const SizedBox(height: 20),
             _SectionTitle(
               title: 'الأساسيون',
-              subtitle: '${controller.starters.length} لاعب',
+              subtitle: controller.isRoundLocked
+                  ? '${controller.starters.length} لاعب | مقفولون للجولة'
+                  : '${controller.starters.length} لاعب',
             ),
             const SizedBox(height: 12),
             ...controller.starters.map(_buildSquadMemberCard),
             const SizedBox(height: 20),
             _SectionTitle(
               title: 'البدلاء',
-              subtitle: '${controller.bench.length} لاعب',
+              subtitle: controller.hasBenchBoostActive
+                  ? '${controller.bench.length} لاعب | نقاطهم محسوبة الآن'
+                  : '${controller.bench.length} لاعب',
             ),
             const SizedBox(height: 12),
             ...controller.bench.map(_buildSquadMemberCard),
@@ -182,6 +192,20 @@ class FantasyTeamScreen extends GetView<FantasyTeamController> {
           Text(
             'مرتبط بـ ${team.leagueIds.length} دوري | خواص الجولة: ${activeChipLabels.isEmpty ? 'لا يوجد' : activeChipLabels.join(', ')}',
             style: const TextStyle(color: Colors.white70, height: 1.5),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _MetaBadge(label: controller.roundStatusTitle),
+              _MetaBadge(
+                label:
+                    controller.canOpenTransfers ? 'الانتقالات متاحة' : 'الانتقالات متوقفة',
+              ),
+              if (controller.hasBenchBoostActive)
+                const _MetaBadge(label: 'Bench Boost نشطة'),
+            ],
           ),
           const SizedBox(height: 18),
           Row(
@@ -250,42 +274,58 @@ class FantasyTeamScreen extends GetView<FantasyTeamController> {
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 6),
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 8,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _MetaBadge(label: member.marketPlayer.positionCode),
-              _MetaBadge(label: '${member.marketPlayer.value.currentPrice}M'),
-              _MetaBadge(label: '${member.slot.pointsEarned} pts'),
-              if (!member.slot.isStartingXI)
-                _MetaBadge(label: 'Bench ${member.slot.benchPriority}'),
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: [
+                  _MetaBadge(label: controller.describeSquadSlot(member)),
+                  _MetaBadge(label: member.marketPlayer.positionCode),
+                  _MetaBadge(label: '${member.marketPlayer.value.currentPrice}M'),
+                  _MetaBadge(label: controller.describeSquadPoints(member)),
+                  if (member.slot.isEliminated)
+                    const _MetaBadge(label: 'بحاجة لتبديل'),
+                ],
+              ),
+              if (controller.describeSquadAvailability(member) != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  controller.describeSquadAvailability(member)!,
+                  style: const TextStyle(color: Colors.white54, height: 1.4),
+                ),
+              ],
             ],
           ),
         ),
-        trailing: member.slot.isStartingXI && !controller.isRoundLocked
-            ? PopupMenuButton<FantasyPlayerRole>(
-                color: const Color(0xFF102038),
-                onSelected: (role) {
-                  if (role == FantasyPlayerRole.captain) {
-                    controller.setCaptain(member.slot.id);
-                  } else if (role == FantasyPlayerRole.viceCaptain) {
-                    controller.setViceCaptain(member.slot.id);
-                  }
-                },
-                itemBuilder: (context) => const [
-                  PopupMenuItem(
-                    value: FantasyPlayerRole.captain,
-                    child: Text('تعيين كابتن',
-                        style: TextStyle(color: Colors.white)),
-                  ),
-                  PopupMenuItem(
-                    value: FantasyPlayerRole.viceCaptain,
-                    child: Text('تعيين نائب',
-                        style: TextStyle(color: Colors.white)),
-                  ),
-                ],
-                child: const Icon(Icons.more_vert_rounded, color: Colors.white70),
-              )
+        trailing: member.slot.isStartingXI
+            ? controller.isRoundLocked
+                ? const Icon(Icons.lock_outline_rounded, color: Colors.white38)
+                : PopupMenuButton<FantasyPlayerRole>(
+                    color: const Color(0xFF102038),
+                    onSelected: (role) {
+                      if (role == FantasyPlayerRole.captain) {
+                        controller.setCaptain(member.slot.id);
+                      } else if (role == FantasyPlayerRole.viceCaptain) {
+                        controller.setViceCaptain(member.slot.id);
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: FantasyPlayerRole.captain,
+                        child: Text('تعيين كابتن',
+                            style: TextStyle(color: Colors.white)),
+                      ),
+                      PopupMenuItem(
+                        value: FantasyPlayerRole.viceCaptain,
+                        child: Text('تعيين نائب',
+                            style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                    child:
+                        const Icon(Icons.more_vert_rounded, color: Colors.white70),
+                  )
             : null,
       ),
     );
@@ -429,6 +469,16 @@ class FantasyTeamScreen extends GetView<FantasyTeamController> {
   String _formatDate(DateTime timestamp) {
     return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
   }
+
+  Color _roundStatusColor() {
+    if (controller.isRoundSettled || controller.isRoundLocked) {
+      return const Color(0xFFF59E0B);
+    }
+    if (controller.isRoundLive) {
+      return const Color(0xFF22C55E);
+    }
+    return const Color(0xFF38BDF8);
+  }
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -513,6 +563,44 @@ class _MetaBadge extends StatelessWidget {
       child: Text(
         label,
         style: const TextStyle(color: Colors.white70, fontSize: 12),
+      ),
+    );
+  }
+}
+
+class _InfoStateCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Color color;
+
+  const _InfoStateCard({
+    required this.title,
+    required this.subtitle,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(color: color, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            style: const TextStyle(color: Colors.white70, height: 1.5),
+          ),
+        ],
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 
 import '../../../../core/auth/auth_session.dart';
+import '../../../../core/enums/fantasy_league_phase.dart';
 import '../../../../core/services/fantasy_lifecycle_service.dart';
 import '../../../../core/services/fantasy_market_service.dart';
 import '../../../../core/services/fantasy_transfer_policy_service.dart';
@@ -143,6 +144,8 @@ class TransferMarketController extends GetxController {
   double get budget => team.value?.budget ?? 0;
   int get freeTransfers => team.value?.freeTransfers ?? 0;
   bool get canTransfer => transferDecision.value?.isAllowed ?? false;
+  bool get isRoundLocked => lifecycle.value?.isLocked ?? false;
+  bool get isRoundSettled => lifecycle.value?.isSettled ?? false;
   String get policyPhaseLabel => transferDecision.value == null
       ? 'غير متاح'
       : _transferPolicyService.describePolicyPhase(
@@ -152,6 +155,9 @@ class TransferMarketController extends GetxController {
       transferDecision.value?.executionLabelAr ??
       'بيانات الانتقالات غير مكتملة حالياً.';
   String? get blockedTransferReason => transferDecision.value?.blockedReason;
+  int get projectedFreeTransfersAfterMove =>
+      transferDecision.value?.freeTransfersAfter ?? freeTransfers;
+  int get projectedPointsDelta => transferDecision.value?.pointsDelta ?? 0;
   bool get wildcardActive {
     final currentTeam = team.value;
     final currentLifecycle = lifecycle.value;
@@ -167,6 +173,100 @@ class TransferMarketController extends GetxController {
           ChipType.wildcardKnockout,
           gameweek: currentLifecycle.currentGameweek,
         );
+  }
+
+  String get transferWindowTitle {
+    final phase = lifecycle.value?.phase;
+    if (phase == null) {
+      return 'حالة السوق غير واضحة';
+    }
+
+    return switch (phase) {
+      FantasyLeaguePhase.upcoming => 'السوق لم يفتح بعد',
+      FantasyLeaguePhase.draft => 'سوق التشكيل الأول',
+      FantasyLeaguePhase.transferWindow => 'السوق مفتوح الآن',
+      FantasyLeaguePhase.live => 'الجولة تُلعب الآن',
+      FantasyLeaguePhase.locked => 'السوق مقفول مؤقتًا',
+      FantasyLeaguePhase.settled => 'بانتظار الجولة التالية',
+      FantasyLeaguePhase.completed => 'الدوري اكتمل',
+      FantasyLeaguePhase.cancelled => 'الدوري أُلغي',
+    };
+  }
+
+  String get transferWindowSubtitle {
+    final currentTeam = team.value;
+    final currentLifecycle = lifecycle.value;
+    final decision = transferDecision.value;
+    if (currentTeam == null || currentLifecycle == null) {
+      return 'سيظهر سبب فتح أو إغلاق السوق بمجرد اكتمال بيانات الجولة.';
+    }
+
+    final gameweekLabel = currentLifecycle.currentGameweek > 0
+        ? 'الجولة ${currentLifecycle.currentGameweek}'
+        : 'هذه الجولة';
+
+    if (decision == null) {
+      return 'سيتم احتساب رصيد الانتقالات وسياسة الجولة الحالية بعد تحميل بيانات الفريق.';
+    }
+
+    if (!decision.isAllowed) {
+      return decision.blockedReason ??
+          '$gameweekLabel لا تسمح بإجراء انتقالات جديدة في الوقت الحالي.';
+    }
+
+    if (decision.wildcardApplied) {
+      return '$gameweekLabel تسمح بانتقالات إضافية دون خصومات لأن Wildcard نشطة على فريقك.';
+    }
+
+    if (decision.usedFreeTransfer) {
+      return '$gameweekLabel تسمح بانتقال مجاني الآن. بعد الصفقة سيبقى لديك ${decision.freeTransfersAfter} تبديل مجاني.';
+    }
+
+    if (decision.hitApplied) {
+      return '$gameweekLabel تسمح بالانتقالات، لكن الصفقة التالية ستكلّفك ${decision.pointsDelta.abs()} نقاط بسبب نفاد التبديلات المجانية.';
+    }
+
+    return 'السوق متاح الآن ويمكنك تعديل تشكيلتك وفق سياسة الجولة الحالية.';
+  }
+
+  String get nextTransferImpactTitle {
+    final decision = transferDecision.value;
+    if (decision == null) {
+      return 'تأثير الصفقة التالية';
+    }
+    if (!decision.isAllowed) {
+      return 'سبب الإيقاف';
+    }
+    if (decision.wildcardApplied) {
+      return 'الصفقة التالية محمية';
+    }
+    if (decision.hitApplied) {
+      return 'الصفقة التالية بخصم';
+    }
+    return 'الصفقة التالية';
+  }
+
+  String get nextTransferImpactMessage {
+    final decision = transferDecision.value;
+    if (decision == null) {
+      return 'لا يمكن احتساب أثر الصفقة التالية قبل اكتمال حالة الجولة الحالية.';
+    }
+    if (!decision.isAllowed) {
+      return decision.blockedReason ??
+          'السوق مغلق حاليًا، لذلك لا يوجد أثر متوقع لصفقة جديدة.';
+    }
+
+    final costLabel = decision.pointsDelta == 0
+        ? 'بدون خصم نقاط'
+        : 'مع خصم ${decision.pointsDelta.abs()} نقاط';
+    return 'الحالة الحالية: $costLabel. بعد الصفقة سيصبح رصيدك ${decision.freeTransfersAfter} تبديل مجاني.';
+  }
+
+  String describeSquadSlot(FantasySquadMember member) {
+    if (member.slot.isStartingXI) {
+      return 'أساسي';
+    }
+    return 'بديل ${member.slot.benchPriority}';
   }
 
   Future<void> replacePlayer({

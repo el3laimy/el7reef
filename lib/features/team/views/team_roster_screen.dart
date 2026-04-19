@@ -239,6 +239,16 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
             ],
           ],
         ),
+        const SizedBox(height: AppDimensions.sm),
+        SizedBox(
+          width: double.infinity,
+          child: El7reefButton(
+            text: 'مشاركة رابط الانضمام للفريق',
+            icon: Icons.share_rounded,
+            isOutlined: true,
+            onPressed: controller.shareTeamInviteLink,
+          ),
+        ),
       ],
     );
   }
@@ -663,6 +673,14 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
       ));
     }
 
+    if (entry.isGuest) {
+      items.add(const PopupMenuDivider());
+      items.add(const PopupMenuItem(
+        value: _RosterAction.shareGuestClaim,
+        child: Text('إرسال رابط استلام الملف'),
+      ));
+    }
+
     return items;
   }
 
@@ -731,6 +749,10 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
         );
         if (confirmed == true) {
           await controller.removeMembership(membership);
+        }
+      case _RosterAction.shareGuestClaim:
+        if (membership.guestPlayerId != null) {
+          await controller.shareGuestPlayerClaimLink(membership.guestPlayerId!);
         }
     }
   }
@@ -1171,6 +1193,7 @@ enum _RosterAction {
   markUnavailable,
   markInjured,
   remove,
+  shareGuestClaim,
 }
 
 enum _TemplateAction {

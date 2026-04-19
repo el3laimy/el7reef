@@ -129,11 +129,16 @@ class AuditService {
   // ── Query Methods ──
 
   /// جلب سجل تدقيق كيان محدد
-  Future<List<AuditEvent>> getEntityTimeline(
-    String entityId, {
+  Future<List<AuditEvent>> getEntityTimeline({
+    required AuditEntityType entityType,
+    required String entityId,
     int limit = 50,
   }) {
-    return _repository.getEntityAuditEvents(entityId, limit: limit);
+    return _repository.getEntityAuditEvents(
+      entityType: entityType,
+      entityId: entityId,
+      limit: limit,
+    );
   }
 
   /// جلب سجل تدقيق ممثل (actor) محدد

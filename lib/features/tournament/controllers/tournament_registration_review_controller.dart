@@ -12,6 +12,8 @@ import '../../../domain/repositories/guest_team_repository.dart';
 import '../../../domain/repositories/team_repository.dart';
 import '../../../domain/repositories/tournament_registration_repository.dart';
 import '../../../domain/repositories/tournament_repository.dart';
+import '../../../core/services/share_link_service.dart';
+import 'package:share_plus/share_plus.dart';
 
 class TournamentRegistrationReviewController extends GetxController {
   final AuthSession _authSession;
@@ -20,6 +22,7 @@ class TournamentRegistrationReviewController extends GetxController {
   final TeamRepository _teamRepository;
   final GuestTeamRepository _guestTeamRepository;
   final TournamentRegistrationService _registrationService;
+  final ShareLinkService _shareLinkService;
 
   TournamentRegistrationReviewController({
     required AuthSession authSession,
@@ -28,12 +31,14 @@ class TournamentRegistrationReviewController extends GetxController {
     required TeamRepository teamRepository,
     required GuestTeamRepository guestTeamRepository,
     required TournamentRegistrationService registrationService,
+    required ShareLinkService shareLinkService,
   })  : _authSession = authSession,
         _registrationRepository = registrationRepository,
         _tournamentRepository = tournamentRepository,
         _teamRepository = teamRepository,
         _guestTeamRepository = guestTeamRepository,
-        _registrationService = registrationService;
+        _registrationService = registrationService,
+        _shareLinkService = shareLinkService;
 
   final rejectionNotesController = TextEditingController();
 
@@ -194,5 +199,32 @@ class TournamentRegistrationReviewController extends GetxController {
   void onClose() {
     rejectionNotesController.dispose();
     super.onClose();
+  }
+
+  Future<void> shareGuestTeamClaimLink() async {
+    final guestTeamId = registration.value?.guestTeamId;
+    final actorId = currentUserId;
+
+    if (guestTeamId == null || guestTeamId.isEmpty) {
+      Get.snackbar('خطأ', 'الفريق ليس فريق ضيف.');
+      return;
+    }
+    if (actorId == null || actorId.isEmpty) {
+      Get.snackbar('خطأ', 'سجّل الدخول أولًا.');
+      return;
+    }
+
+    try {
+      isSubmitting.value = true;
+      final shareLink = await _shareLinkService.createGuestTeamClaimLink(
+        guestTeamId: guestTeamId,
+        actorId: actorId,
+      );
+      await Share.share(shareLink.shareText);
+    } catch (e) {
+      Get.snackbar('خطأ', _normalizeError(e));
+    } finally {
+      isSubmitting.value = false;
+    }
   }
 }

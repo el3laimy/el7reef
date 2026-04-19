@@ -61,7 +61,7 @@ class FantasyLifecycleBanner extends StatelessWidget {
               runSpacing: 8,
               children: [
                 _Chip(
-                  label: state.isLocked ? 'Locked' : 'Open',
+                  label: state.isLocked ? 'مقفولة' : 'قابلة للتعديل',
                   color: accentColor,
                 ),
                 _Chip(
@@ -90,19 +90,24 @@ class FantasyLifecycleBanner extends StatelessWidget {
   }
 
   String _statusMessage(FantasyLeagueLifecycle lifecycle) {
-    if (lifecycle.phase == FantasyLeaguePhase.transferWindow) {
-      return 'يمكنك تنفيذ الانتقالات حالياً قبل انطلاق الجولة التالية.';
+    switch (lifecycle.phase) {
+      case FantasyLeaguePhase.upcoming:
+        return 'الدوري لم يبدأ بعد. جهّز تشكيلتك مبكرًا وتابع موعد فتح الجولة الأولى.';
+      case FantasyLeaguePhase.draft:
+        return 'التشكيلة ما زالت قابلة للتعديل. راجع الكابتن والبدلاء قبل موعد الإغلاق.';
+      case FantasyLeaguePhase.transferWindow:
+        return 'نافذة الانتقالات مفتوحة الآن، ويمكنك إعادة ترتيب فريقك قبل الجولة التالية.';
+      case FantasyLeaguePhase.live:
+        return 'الجولة تُلعب الآن. النقاط المعروضة مباشرة وتظل قابلة للتغير حتى اعتماد نتائج matchday.';
+      case FantasyLeaguePhase.locked:
+        return 'تم قفل التشكيلة لهذه الجولة. الانتقالات وتعديل الأدوار متوقفة حتى انتهاء التسوية.';
+      case FantasyLeaguePhase.settled:
+        return 'تم اعتماد نتائج الجولة الحالية. راجع النقاط النهائية وانتظر فتح الجولة التالية.';
+      case FantasyLeaguePhase.completed:
+        return 'انتهى هذا الدوري بالفعل، لذلك الواجهة هنا للمراجعة فقط.';
+      case FantasyLeaguePhase.cancelled:
+        return 'تم إلغاء هذا الدوري، لذلك لا يمكن تنفيذ تعديلات جديدة عليه.';
     }
-    if (lifecycle.isSettled) {
-      return 'تم احتساب واعتماد نتائج هذه الجولة، ويمكنك مراجعة النقاط والترتيب.';
-    }
-    if (lifecycle.isLocked) {
-      return 'الجولة مغلقة حالياً، لذلك التعديلات المباشرة على التشكيلة والانتقالات متوقفة.';
-    }
-    if (lifecycle.allowsDraftEdits) {
-      return 'التشكيلة ما زالت قابلة للتعديل قبل موعد الإغلاق.';
-    }
-    return 'الدوري في حالة نشطة حالياً، راقب الموعد النهائي وحالة الجولة قبل أي تعديل.';
   }
 
   Color _accentColor(FantasyLeagueLifecycle lifecycle) {

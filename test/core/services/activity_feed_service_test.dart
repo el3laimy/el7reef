@@ -6,6 +6,7 @@ import 'package:el7reef/core/enums/tournament_enums.dart';
 import 'package:el7reef/core/services/activity_feed_service.dart';
 import 'package:el7reef/data/repositories/match_repository_impl.dart';
 import 'package:el7reef/data/repositories/player_repository_impl.dart';
+import 'package:el7reef/data/repositories/team_repository_impl.dart';
 import 'package:el7reef/data/repositories/tournament_repository_impl.dart';
 import 'package:el7reef/domain/entities/player.dart';
 
@@ -20,6 +21,7 @@ void main() {
         playerRepository: PlayerRepositoryImpl(firestore: firestore),
         matchRepository: MatchRepositoryImpl(db: firestore),
         tournamentRepository: TournamentRepositoryImpl(db: firestore),
+        teamRepository: TeamRepositoryImpl(firestore: firestore),
       );
     });
 

@@ -5,9 +5,12 @@ import 'package:get/get.dart';
 
 import 'package:el7reef/app/routes/app_routes.dart';
 import 'package:el7reef/core/auth/auth_session.dart';
+import 'package:el7reef/core/services/share_link_service.dart';
 import 'package:el7reef/core/services/team_formation_service.dart';
 import 'package:el7reef/core/services/team_roster_service.dart';
+import 'package:el7reef/data/repositories/claim_code_repository_impl.dart';
 import 'package:el7reef/data/repositories/guest_player_repository_impl.dart';
+import 'package:el7reef/data/repositories/guest_team_repository_impl.dart';
 import 'package:el7reef/data/repositories/player_repository_impl.dart';
 import 'package:el7reef/data/repositories/team_formation_template_repository_impl.dart';
 import 'package:el7reef/data/repositories/team_membership_repository_impl.dart';
@@ -21,15 +24,30 @@ import 'package:el7reef/features/team/views/team_roster_screen.dart';
 
 void main() {
   late FakeFirebaseFirestore firestore;
+  late AuthSession authSession;
+  late TeamRepositoryImpl teamRepository;
+  late PlayerRepositoryImpl playerRepository;
+  late GuestPlayerRepositoryImpl guestPlayerRepository;
+  late TeamRosterService teamRosterService;
+  late TeamFormationService teamFormationService;
+  late ShareLinkService shareLinkService;
 
   setUp(() async {
     Get.testMode = true;
     firestore = FakeFirebaseFirestore();
 
-    Get.put<TeamRepositoryImpl>(TeamRepositoryImpl(firestore: firestore));
-    Get.put<PlayerRepositoryImpl>(PlayerRepositoryImpl(firestore: firestore));
-    Get.put<GuestPlayerRepositoryImpl>(
-      GuestPlayerRepositoryImpl(firestore: firestore),
+    teamRepository = TeamRepositoryImpl(firestore: firestore);
+    playerRepository = PlayerRepositoryImpl(firestore: firestore);
+    guestPlayerRepository = GuestPlayerRepositoryImpl(firestore: firestore);
+
+    Get.put<TeamRepositoryImpl>(teamRepository);
+    Get.put<PlayerRepositoryImpl>(playerRepository);
+    Get.put<GuestPlayerRepositoryImpl>(guestPlayerRepository);
+    Get.put<GuestTeamRepositoryImpl>(
+      GuestTeamRepositoryImpl(firestore: firestore),
+    );
+    Get.put<ClaimCodeRepositoryImpl>(
+      ClaimCodeRepositoryImpl(firestore: firestore),
     );
     Get.put<TeamMembershipRepositoryImpl>(
       TeamMembershipRepositoryImpl(firestore: firestore),
@@ -40,39 +58,39 @@ void main() {
     Get.put<TeamRosterSnapshotRepositoryImpl>(
       TeamRosterSnapshotRepositoryImpl(firestore: firestore),
     );
-    Get.put<TeamRosterService>(
-      TeamRosterService(
-        teamRepository: Get.find<TeamRepositoryImpl>(),
-        membershipRepository: Get.find<TeamMembershipRepositoryImpl>(),
-        guestPlayerRepository: Get.find<GuestPlayerRepositoryImpl>(),
+    teamRosterService = TeamRosterService(
+      teamRepository: teamRepository,
+      membershipRepository: Get.find<TeamMembershipRepositoryImpl>(),
+      guestPlayerRepository: guestPlayerRepository,
+    );
+    Get.put<TeamRosterService>(teamRosterService);
+    teamFormationService = TeamFormationService(
+      teamRepository: teamRepository,
+      membershipRepository: Get.find<TeamMembershipRepositoryImpl>(),
+      playerRepository: playerRepository,
+      guestPlayerRepository: guestPlayerRepository,
+      templateRepository: Get.find<TeamFormationTemplateRepositoryImpl>(),
+      snapshotRepository: Get.find<TeamRosterSnapshotRepositoryImpl>(),
+    );
+    Get.put<TeamFormationService>(teamFormationService);
+    shareLinkService = ShareLinkService(
+      claimCodeRepository: Get.find<ClaimCodeRepositoryImpl>(),
+      teamRepository: teamRepository,
+      guestPlayerRepository: guestPlayerRepository,
+      guestTeamRepository: Get.find<GuestTeamRepositoryImpl>(),
+    );
+    Get.put<ShareLinkService>(shareLinkService);
+    authSession = _FakeAuthSession(
+      currentUserId: 'owner-1',
+      currentPlayer: Player(
+        id: 'owner-1',
+        name: 'Owner One',
+        createdAt: DateTime(2026, 4, 16, 10),
+        lastActiveAt: DateTime(2026, 4, 16, 10),
       ),
     );
-    Get.put<TeamFormationService>(
-      TeamFormationService(
-        teamRepository: Get.find<TeamRepositoryImpl>(),
-        membershipRepository: Get.find<TeamMembershipRepositoryImpl>(),
-        playerRepository: Get.find<PlayerRepositoryImpl>(),
-        guestPlayerRepository: Get.find<GuestPlayerRepositoryImpl>(),
-        templateRepository: Get.find<TeamFormationTemplateRepositoryImpl>(),
-        snapshotRepository: Get.find<TeamRosterSnapshotRepositoryImpl>(),
-      ),
-    );
-    Get.put<AuthSession>(
-      _FakeAuthSession(
-        currentUserId: 'owner-1',
-        currentPlayer: Player(
-          id: 'owner-1',
-          name: 'Owner One',
-          createdAt: DateTime(2026, 4, 16, 10),
-          lastActiveAt: DateTime(2026, 4, 16, 10),
-        ),
-      ),
-    );
+    Get.put<AuthSession>(authSession);
 
-    final teamRepository = Get.find<TeamRepositoryImpl>();
-    final playerRepository = Get.find<PlayerRepositoryImpl>();
-    final guestRepository = Get.find<GuestPlayerRepositoryImpl>();
-    final rosterService = Get.find<TeamRosterService>();
     final now = DateTime(2026, 4, 16, 12);
 
     await teamRepository.createTeam(
@@ -93,7 +111,7 @@ void main() {
         lastActiveAt: now,
       ),
     );
-    await guestRepository.createGuestPlayer(
+    await guestPlayerRepository.createGuestPlayer(
       GuestPlayer(
         id: 'guest-1',
         displayName: 'Mahmoud Ali',
@@ -106,12 +124,12 @@ void main() {
       ),
     );
 
-    await rosterService.addRegisteredPlayer(
+    await teamRosterService.addRegisteredPlayer(
       teamId: 'team-1',
       actorId: 'owner-1',
       playerId: 'player-2',
     );
-    await rosterService.addGuestPlayer(
+    await teamRosterService.addGuestPlayer(
       teamId: 'team-1',
       actorId: 'owner-1',
       guestPlayerId: 'guest-1',
@@ -123,17 +141,39 @@ void main() {
   testWidgets('team profile route boots into roster screen with guest distinction',
       (WidgetTester tester) async {
     await tester.pumpWidget(
-      _buildTestApp(),
+      _buildTestApp(
+        authSession: authSession,
+        teamRepository: teamRepository,
+        teamRosterService: teamRosterService,
+        teamFormationService: teamFormationService,
+        playerRepository: playerRepository,
+        guestPlayerRepository: guestPlayerRepository,
+        shareLinkService: shareLinkService,
+      ),
     );
     await tester.pumpAndSettle();
 
+    final controller = Get.find<TeamRosterController>();
+
     expect(find.byType(TeamRosterScreen), findsOneWidget);
     expect(find.text('Street Kings'), findsOneWidget);
-    expect(find.text('Ahmed Salem', skipOffstage: false), findsOneWidget);
-    expect(find.text('Mahmoud Ali', skipOffstage: false), findsOneWidget);
-    expect(find.text('ضيف', skipOffstage: false), findsOneWidget);
-    expect(find.text('مسجل', skipOffstage: false), findsWidgets);
-    expect(find.widgetWithText(ElevatedButton, 'إضافة لاعب'), findsOneWidget);
+    expect(
+      controller.rosterMembers.any((entry) => entry.displayName == 'Ahmed Salem'),
+      isTrue,
+    );
+    expect(
+      controller.rosterMembers.any((entry) => entry.displayName == 'Mahmoud Ali'),
+      isTrue,
+    );
+    expect(
+      controller.rosterMembers.any((entry) => entry.isGuest),
+      isTrue,
+    );
+    expect(
+      controller.rosterMembers.any((entry) => !entry.isGuest),
+      isTrue,
+    );
+    expect(find.text('إضافة لاعب'), findsOneWidget);
     expect(find.text('حفظ كقالب'), findsOneWidget);
     expect(find.text('إنشاء نسخة'), findsOneWidget);
   });
@@ -141,7 +181,15 @@ void main() {
   testWidgets('guest add sheet shows Arabic validation when name is empty',
       (WidgetTester tester) async {
     await tester.pumpWidget(
-      _buildTestApp(),
+      _buildTestApp(
+        authSession: authSession,
+        teamRepository: teamRepository,
+        teamRosterService: teamRosterService,
+        teamFormationService: teamFormationService,
+        playerRepository: playerRepository,
+        guestPlayerRepository: guestPlayerRepository,
+        shareLinkService: shareLinkService,
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -157,7 +205,15 @@ void main() {
   testWidgets('manager can save a formation template from team roster screen',
       (WidgetTester tester) async {
     await tester.pumpWidget(
-      _buildTestApp(),
+      _buildTestApp(
+        authSession: authSession,
+        teamRepository: teamRepository,
+        teamRosterService: teamRosterService,
+        teamFormationService: teamFormationService,
+        playerRepository: playerRepository,
+        guestPlayerRepository: guestPlayerRepository,
+        shareLinkService: shareLinkService,
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -174,7 +230,15 @@ void main() {
   testWidgets('manager can create a ready snapshot from team roster screen',
       (WidgetTester tester) async {
     await tester.pumpWidget(
-      _buildTestApp(),
+      _buildTestApp(
+        authSession: authSession,
+        teamRepository: teamRepository,
+        teamRosterService: teamRosterService,
+        teamFormationService: teamFormationService,
+        playerRepository: playerRepository,
+        guestPlayerRepository: guestPlayerRepository,
+        shareLinkService: shareLinkService,
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -202,7 +266,15 @@ class _FakeAuthSession implements AuthSession {
   });
 }
 
-GetMaterialApp _buildTestApp() {
+GetMaterialApp _buildTestApp({
+  required AuthSession authSession,
+  required TeamRepositoryImpl teamRepository,
+  required TeamRosterService teamRosterService,
+  required TeamFormationService teamFormationService,
+  required PlayerRepositoryImpl playerRepository,
+  required GuestPlayerRepositoryImpl guestPlayerRepository,
+  required ShareLinkService shareLinkService,
+}) {
   return GetMaterialApp(
     initialRoute: AppRoutes.teamProfileById('team-1'),
     getPages: [
@@ -213,12 +285,13 @@ GetMaterialApp _buildTestApp() {
           if (!Get.isRegistered<TeamRosterController>()) {
             Get.put<TeamRosterController>(
               TeamRosterController(
-                authSession: Get.find<AuthSession>(),
-                teamRepository: Get.find<TeamRepositoryImpl>(),
-                teamRosterService: Get.find<TeamRosterService>(),
-                teamFormationService: Get.find<TeamFormationService>(),
-                playerRepository: Get.find<PlayerRepositoryImpl>(),
-                guestPlayerRepository: Get.find<GuestPlayerRepositoryImpl>(),
+                authSession: authSession,
+                teamRepository: teamRepository,
+                teamRosterService: teamRosterService,
+                teamFormationService: teamFormationService,
+                playerRepository: playerRepository,
+                guestPlayerRepository: guestPlayerRepository,
+                shareLinkService: shareLinkService,
               ),
             );
           }

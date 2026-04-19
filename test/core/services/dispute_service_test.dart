@@ -2,6 +2,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:el7reef/core/constants/firebase_paths.dart';
+import 'package:el7reef/core/enums/audit_action.dart';
 import 'package:el7reef/core/enums/dispute_enums.dart';
 import 'package:el7reef/core/enums/match_status.dart';
 import 'package:el7reef/core/services/audit_service.dart';
@@ -9,7 +10,9 @@ import 'package:el7reef/core/services/dispute_service.dart';
 import 'package:el7reef/data/repositories/audit_repository_impl.dart';
 import 'package:el7reef/data/repositories/dispute_repository_impl.dart';
 import 'package:el7reef/data/repositories/match_repository_impl.dart';
+import 'package:el7reef/domain/entities/audit_event.dart';
 import 'package:el7reef/domain/entities/match.dart';
+import 'package:el7reef/domain/repositories/audit_repository.dart';
 
 void main() {
   group('DisputeService', () {
@@ -29,7 +32,7 @@ void main() {
       );
     });
 
-    Future<void> _seedMatch(String matchId, {MatchStatus status = MatchStatus.completed}) async {
+    Future<void> seedMatch(String matchId, {MatchStatus status = MatchStatus.completed}) async {
       await matchRepository.createMatch(
         Match(
           id: matchId,
@@ -43,7 +46,7 @@ void main() {
     }
 
     test('opens a score dispute and auto-freezes the match', () async {
-      await _seedMatch('match-1');
+      await seedMatch('match-1');
       final now = DateTime(2026, 4, 17, 20);
 
       final result = await service.openDispute(
@@ -74,7 +77,7 @@ void main() {
     });
 
     test('opens a lineup dispute without freezing the match', () async {
-      await _seedMatch('match-2');
+      await seedMatch('match-2');
       final now = DateTime(2026, 4, 17, 20);
 
       final result = await service.openDispute(
@@ -90,7 +93,7 @@ void main() {
     });
 
     test('rejects opening a duplicate dispute of the same type', () async {
-      await _seedMatch('match-3');
+      await seedMatch('match-3');
       final now = DateTime(2026, 4, 17, 20);
 
       await service.openDispute(
@@ -118,7 +121,7 @@ void main() {
     });
 
     test('resolves a dispute and unfreezes the match', () async {
-      await _seedMatch('match-4');
+      await seedMatch('match-4');
       final now = DateTime(2026, 4, 17, 20);
 
       final opened = await service.openDispute(
@@ -149,7 +152,7 @@ void main() {
     });
 
     test('rejects a dispute and unfreezes the match', () async {
-      await _seedMatch('match-5');
+      await seedMatch('match-5');
       final now = DateTime(2026, 4, 17, 20);
 
       final opened = await service.openDispute(
@@ -171,7 +174,7 @@ void main() {
     });
 
     test('cannot resolve an already-closed dispute', () async {
-      await _seedMatch('match-6');
+      await seedMatch('match-6');
       final now = DateTime(2026, 4, 17, 20);
 
       final opened = await service.openDispute(
@@ -205,7 +208,7 @@ void main() {
     });
 
     test('expires overdue disputes automatically', () async {
-      await _seedMatch('match-7');
+      await seedMatch('match-7');
       final now = DateTime(2026, 4, 17, 20);
 
       await service.openDispute(
@@ -234,7 +237,7 @@ void main() {
     });
 
     test('retrieves all match disputes', () async {
-      await _seedMatch('match-8');
+      await seedMatch('match-8');
       final now = DateTime(2026, 4, 17, 20);
 
       await service.openDispute(
@@ -255,5 +258,65 @@ void main() {
       final disputes = await service.getMatchDisputes('match-8');
       expect(disputes, hasLength(2));
     });
+
+    test('openDispute still succeeds when audit persistence fails', () async {
+      await seedMatch('match-safe-open');
+
+      final resilientService = DisputeService(
+        disputeRepository: DisputeRepositoryImpl(db: firestore),
+        matchRepository: matchRepository,
+        auditService: AuditService(
+          repository: _ThrowingAuditRepository(),
+        ),
+      );
+
+      final result = await resilientService.openDispute(
+        matchId: 'match-safe-open',
+        type: DisputeType.scoreDispute,
+        raisedBy: 'player-1',
+        description: 'audit failure should not break dispute flow',
+        now: DateTime(2026, 4, 18, 12),
+      );
+
+      expect(result.dispute.status, DisputeStatus.open);
+
+      final matchDoc = await firestore
+          .collection(FirebasePaths.matches)
+          .doc('match-safe-open')
+          .get();
+      expect(matchDoc.data()?['isFrozen'], isTrue);
+    });
   });
+}
+
+class _ThrowingAuditRepository implements AuditRepository {
+  @override
+  Future<void> createAuditEvent(AuditEvent event) async {
+    throw Exception('audit unavailable');
+  }
+
+  @override
+  Future<List<AuditEvent>> getActorAuditEvents(
+    String actorId, {
+    int limit = 50,
+  }) async {
+    return const <AuditEvent>[];
+  }
+
+  @override
+  Future<List<AuditEvent>> getAuditEventsByType(
+    String entityType, {
+    int limit = 50,
+  }) async {
+    return const <AuditEvent>[];
+  }
+
+  @override
+  Future<List<AuditEvent>> getEntityAuditEvents({
+    required AuditEntityType entityType,
+    required String entityId,
+    int limit = 50,
+  }) async {
+    return const <AuditEvent>[];
+  }
 }

@@ -19,6 +19,8 @@ import '../../../domain/entities/team_roster_snapshot.dart';
 import '../../../domain/repositories/guest_player_repository.dart';
 import '../../../domain/repositories/player_repository.dart';
 import '../../../domain/repositories/team_repository.dart';
+import '../../../core/services/share_link_service.dart';
+import 'package:share_plus/share_plus.dart';
 
 class TeamRosterMemberViewData {
   final TeamMembership membership;
@@ -45,6 +47,7 @@ class TeamRosterController extends GetxController {
   final TeamFormationService _teamFormationService;
   final PlayerRepository _playerRepository;
   final GuestPlayerRepository _guestPlayerRepository;
+  final ShareLinkService _shareLinkService;
   final Uuid _uuid;
 
   TeamRosterController({
@@ -54,6 +57,7 @@ class TeamRosterController extends GetxController {
     required TeamFormationService teamFormationService,
     required PlayerRepository playerRepository,
     required GuestPlayerRepository guestPlayerRepository,
+    required ShareLinkService shareLinkService,
     Uuid? uuid,
   })  : _authSession = authSession,
         _teamRepository = teamRepository,
@@ -61,6 +65,7 @@ class TeamRosterController extends GetxController {
         _teamFormationService = teamFormationService,
         _playerRepository = playerRepository,
         _guestPlayerRepository = guestPlayerRepository,
+        _shareLinkService = shareLinkService,
         _uuid = uuid ?? const Uuid();
 
   final Rxn<Team> team = Rxn<Team>();
@@ -614,5 +619,48 @@ class TeamRosterController extends GetxController {
       return message.replaceFirst('Exception: ', '');
     }
     return message;
+  }
+
+  Future<void> shareTeamInviteLink() async {
+    final targetTeamId = teamId;
+    final actorId = currentUserId;
+    if (targetTeamId == null || actorId == null) {
+      Get.snackbar('خطأ', 'يجب تسجيل الدخول أولاً.');
+      return;
+    }
+
+    try {
+      isSubmitting.value = true;
+      final shareLink = await _shareLinkService.createTeamInviteLink(
+        teamId: targetTeamId,
+        actorId: actorId,
+      );
+      await Share.share(shareLink.shareText);
+    } catch (e) {
+      Get.snackbar('خطأ', _readableError(e));
+    } finally {
+      isSubmitting.value = false;
+    }
+  }
+
+  Future<void> shareGuestPlayerClaimLink(String guestPlayerId) async {
+    final actorId = currentUserId;
+    if (actorId == null) {
+      Get.snackbar('خطأ', 'يجب تسجيل الدخول أولاً.');
+      return;
+    }
+
+    try {
+      isSubmitting.value = true;
+      final shareLink = await _shareLinkService.createGuestPlayerClaimLink(
+        guestPlayerId: guestPlayerId,
+        actorId: actorId,
+      );
+      await Share.share(shareLink.shareText);
+    } catch (e) {
+      Get.snackbar('خطأ', _readableError(e));
+    } finally {
+      isSubmitting.value = false;
+    }
   }
 }

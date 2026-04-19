@@ -9,7 +9,10 @@ import 'package:el7reef/core/enums/guest_claim_status.dart';
 import 'package:el7reef/core/enums/tournament_enums.dart';
 import 'package:el7reef/core/enums/tournament_registration_mode.dart';
 import 'package:el7reef/core/enums/tournament_registration_status.dart';
+import 'package:el7reef/core/services/share_link_service.dart';
 import 'package:el7reef/core/services/tournament_registration_service.dart';
+import 'package:el7reef/data/repositories/claim_code_repository_impl.dart';
+import 'package:el7reef/data/repositories/guest_player_repository_impl.dart';
 import 'package:el7reef/data/repositories/guest_team_repository_impl.dart';
 import 'package:el7reef/data/repositories/player_repository_impl.dart';
 import 'package:el7reef/data/repositories/team_repository_impl.dart';
@@ -33,6 +36,8 @@ void main() {
   late TournamentRepositoryImpl tournamentRepository;
   late TeamRepositoryImpl teamRepository;
   late GuestTeamRepositoryImpl guestTeamRepository;
+  late ClaimCodeRepositoryImpl claimCodeRepository;
+  late ShareLinkService shareLinkService;
 
   setUp(() async {
     Get.testMode = true;
@@ -53,6 +58,13 @@ void main() {
     tournamentRepository = Get.find<TournamentRepositoryImpl>();
     teamRepository = Get.find<TeamRepositoryImpl>();
     guestTeamRepository = Get.find<GuestTeamRepositoryImpl>();
+    claimCodeRepository = ClaimCodeRepositoryImpl(firestore: firestore);
+    shareLinkService = ShareLinkService(
+      claimCodeRepository: claimCodeRepository,
+      guestPlayerRepository: GuestPlayerRepositoryImpl(firestore: firestore),
+      teamRepository: teamRepository,
+      guestTeamRepository: guestTeamRepository,
+    );
 
     final now = DateTime(2026, 4, 16, 20);
     await tournamentRepository.createTournament(
@@ -139,6 +151,7 @@ void main() {
         tournamentRepository: tournamentRepository,
         teamRepository: teamRepository,
         guestTeamRepository: guestTeamRepository,
+        shareLinkService: shareLinkService,
       ),
     );
     await tester.pumpAndSettle();
@@ -179,6 +192,7 @@ void main() {
         tournamentRepository: tournamentRepository,
         teamRepository: teamRepository,
         guestTeamRepository: guestTeamRepository,
+        shareLinkService: shareLinkService,
       ),
     );
     await tester.pumpAndSettle();
@@ -235,6 +249,7 @@ void main() {
         tournamentRepository: tournamentRepository,
         teamRepository: teamRepository,
         guestTeamRepository: guestTeamRepository,
+        shareLinkService: shareLinkService,
       ),
     );
     await tester.pumpAndSettle();
@@ -310,6 +325,7 @@ void main() {
         tournamentRepository: tournamentRepository,
         teamRepository: teamRepository,
         guestTeamRepository: guestTeamRepository,
+        shareLinkService: shareLinkService,
       ),
     );
     await tester.pumpAndSettle();
@@ -351,6 +367,7 @@ GetMaterialApp _buildApp({
   required TournamentRepositoryImpl tournamentRepository,
   required TeamRepositoryImpl teamRepository,
   required GuestTeamRepositoryImpl guestTeamRepository,
+  required ShareLinkService shareLinkService,
 }) {
   return GetMaterialApp(
     initialRoute: initialRoute,
@@ -386,6 +403,7 @@ GetMaterialApp _buildApp({
                 teamRepository: teamRepository,
                 guestTeamRepository: guestTeamRepository,
                 registrationService: registrationService,
+                shareLinkService: shareLinkService,
               ),
             );
           }

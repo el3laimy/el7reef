@@ -41,12 +41,14 @@ import '../../features/social/views/qr_scanner_screen.dart';
 import '../../features/social/views/friends_screen.dart';
 import '../../features/social/views/search_players_screen.dart';
 import '../../features/social/bindings/friend_binding.dart';
-import '../../features/guest_claim/views/claim_entry_screen.dart';
-import '../../features/guest_claim/views/guest_player_claim_screen.dart';
-import '../../features/guest_claim/views/guest_team_claim_screen.dart';
 import '../../features/guest_claim/bindings/claim_entry_binding.dart';
 import '../../features/guest_claim/bindings/guest_player_claim_binding.dart';
 import '../../features/guest_claim/bindings/guest_team_claim_binding.dart';
+import '../../features/guest_claim/bindings/team_invite_entry_binding.dart';
+import '../../features/guest_claim/views/claim_entry_screen.dart';
+import '../../features/guest_claim/views/guest_player_claim_screen.dart';
+import '../../features/guest_claim/views/guest_team_claim_screen.dart';
+import '../../features/guest_claim/views/team_invite_entry_screen.dart';
 import '../../features/fantasy/presentation/screens/fantasy_league_list_screen.dart';
 import '../../features/fantasy/presentation/screens/create_fantasy_team_screen.dart';
 import '../../features/fantasy/presentation/screens/fantasy_team_screen.dart';
@@ -319,7 +321,13 @@ class AppPages {
                   'تم إيقاف شاشات استلام اللاعبين والفرق الضيوف مؤقتًا في هذا البناء.',
             ),
       binding: ClaimEntryBinding(),
-      transition: Transition.fadeIn,
+    ),
+
+    // ── Generic Invite Entry (deep link / QR landing) ──
+    GetPage(
+      name: AppRoutes.inviteEntry,
+      page: () => const TeamInviteEntryScreen(),
+      binding: TeamInviteEntryBinding(),
     ),
 
     // ── Guest Player Claim ──

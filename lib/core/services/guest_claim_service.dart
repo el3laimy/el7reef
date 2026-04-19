@@ -17,6 +17,7 @@ import '../../domain/entities/guest_team.dart';
 import '../../domain/entities/player.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/entities/team_membership.dart';
+import 'analytics_service.dart';
 import 'team_roster_policy.dart';
 
 enum GuestPlayerClaimOutcome {
@@ -87,12 +88,15 @@ class GuestTeamClaimResult {
 class GuestClaimService {
   final FirebaseFirestore _firestore;
   final TeamRosterPolicy _teamRosterPolicy;
+  final AnalyticsService _analyticsService;
 
   GuestClaimService({
     FirebaseFirestore? firestore,
     TeamRosterPolicy? teamRosterPolicy,
+    AnalyticsService? analyticsService,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _teamRosterPolicy = teamRosterPolicy ?? const TeamRosterPolicy();
+        _teamRosterPolicy = teamRosterPolicy ?? const TeamRosterPolicy(),
+        _analyticsService = analyticsService ?? AnalyticsService();
 
   CollectionReference<Map<String, dynamic>> get _claimCodesRef =>
       _firestore.collection(FirebasePaths.claimCodes);
@@ -460,6 +464,12 @@ class GuestClaimService {
       );
       transaction.update(claimRef, ClaimCodeModel.fromEntity(updatedClaim).toJson());
 
+      _analyticsService.trackClaimCompletion(
+        type: 'guest_player',
+        targetId: guestPlayer.id,
+        actorId: effectiveActorId,
+      );
+
       return GuestPlayerClaimResult(
         outcome: GuestPlayerClaimOutcome.claimed,
         claimCode: updatedClaim.code,
@@ -691,6 +701,12 @@ class GuestClaimService {
             ClaimCodeModel.fromEntity(updatedClaim).toJson(),
           );
 
+          _analyticsService.trackClaimCompletion(
+            type: 'guest_team',
+            targetId: updatedGuestTeam.id,
+            actorId: actorId,
+          );
+
           return GuestTeamClaimResult(
             outcome: GuestTeamClaimOutcome.claimed,
             claimCode: updatedClaim.code,
@@ -730,6 +746,12 @@ class GuestClaimService {
           transaction.update(
             claimRef,
             ClaimCodeModel.fromEntity(updatedClaim).toJson(),
+          );
+
+          _analyticsService.trackClaimCompletion(
+            type: 'guest_team',
+            targetId: updatedGuestTeam.id,
+            actorId: actorId,
           );
 
           return GuestTeamClaimResult(

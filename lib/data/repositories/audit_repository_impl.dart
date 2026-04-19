@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/constants/firebase_paths.dart';
+import '../../core/enums/audit_action.dart';
 import '../../domain/entities/audit_event.dart';
 import '../../domain/repositories/audit_repository.dart';
 import '../models/audit_event_model.dart';
@@ -22,11 +23,13 @@ class AuditRepositoryImpl implements AuditRepository {
   }
 
   @override
-  Future<List<AuditEvent>> getEntityAuditEvents(
-    String entityId, {
+  Future<List<AuditEvent>> getEntityAuditEvents({
+    required AuditEntityType entityType,
+    required String entityId,
     int limit = 50,
   }) async {
     final snapshot = await _auditRef
+        .where('entityType', isEqualTo: entityType.name)
         .where('entityId', isEqualTo: entityId)
         .orderBy('createdAt', descending: true)
         .limit(limit)

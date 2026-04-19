@@ -67,23 +67,30 @@ class TransferMarketScreen extends GetView<TransferMarketController> {
             const SizedBox(height: 16),
             if (!controller.canTransfer)
               _InfoBanner(
-                title: 'الانتقالات غير متاحة',
-                subtitle: controller.blockedTransferReason ??
-                    'لا يمكن تنفيذ انتقالات حالياً.',
+                title: controller.transferWindowTitle,
+                subtitle: controller.transferWindowSubtitle,
                 color: const Color(0xFFF97316),
               )
             else if (controller.wildcardActive)
               _InfoBanner(
-                title: 'Wildcard مفعّل',
-                subtitle: controller.transferStatusMessage,
+                title: controller.transferWindowTitle,
+                subtitle: controller.transferWindowSubtitle,
                 color: const Color(0xFFF59E0B),
               )
             else
               _InfoBanner(
-                title: 'سياسة الانتقالات',
-                subtitle: controller.transferStatusMessage,
+                title: controller.transferWindowTitle,
+                subtitle: controller.transferWindowSubtitle,
                 color: const Color(0xFF38BDF8),
               ),
+            const SizedBox(height: 12),
+            _InfoBanner(
+              title: controller.nextTransferImpactTitle,
+              subtitle: controller.nextTransferImpactMessage,
+              color: controller.canTransfer
+                  ? const Color(0xFF22C55E)
+                  : const Color(0xFF94A3B8),
+            ),
             const SizedBox(height: 20),
             const Text(
               'اختر لاعباً للاستبدال',
@@ -92,6 +99,11 @@ class TransferMarketScreen extends GetView<TransferMarketController> {
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
               ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'وضوح التكلفة هنا يعتمد على حالة الجولة الحالية: تبديل مجاني، Wildcard، أو خصم نقاط.',
+              style: const TextStyle(color: Colors.white54, height: 1.5),
             ),
             const SizedBox(height: 12),
             ...controller.squad.map(
@@ -169,10 +181,11 @@ class TransferMarketScreen extends GetView<TransferMarketController> {
             spacing: 10,
             runSpacing: 8,
             children: [
+              _Tag(label: controller.describeSquadSlot(member)),
               _Tag(label: member.marketPlayer.positionCode),
               _Tag(label: '${member.marketPlayer.value.currentPrice}M'),
-              if (!member.slot.isStartingXI)
-                _Tag(label: 'Bench ${member.slot.benchPriority}'),
+              if (member.isCaptain) const _Tag(label: 'كابتن'),
+              if (member.isViceCaptain) const _Tag(label: 'نائب'),
             ],
           ),
         ),
@@ -183,7 +196,7 @@ class TransferMarketScreen extends GetView<TransferMarketController> {
           style: FilledButton.styleFrom(
             backgroundColor: const Color(0xFF38BDF8),
           ),
-          child: const Text('استبدال'),
+          child: Text(controller.canTransfer ? 'استبدال' : 'مغلق'),
         ),
       ),
     );

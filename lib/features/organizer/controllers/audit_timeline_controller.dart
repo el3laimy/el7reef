@@ -16,9 +16,11 @@ class AuditTimelineController extends GetxController {
 
   /// معرف الكيان المستهدف (matchId أو tournamentId)
   final String entityId;
+  final AuditEntityType entityType;
 
   AuditTimelineController({
     required this.entityId,
+    required this.entityType,
     AuditService? auditService,
   }) : _auditService = auditService ??
             AuditService(repository: AuditRepositoryImpl());
@@ -33,7 +35,10 @@ class AuditTimelineController extends GetxController {
     try {
       isLoading.value = true;
       errorMessage.value = '';
-      events.value = await _auditService.getEntityTimeline(entityId);
+      events.value = await _auditService.getEntityTimeline(
+        entityType: entityType,
+        entityId: entityId,
+      );
     } catch (error) {
       AppLogger.error('AuditTimelineController.loadTimeline', error);
       errorMessage.value = 'تعذر تحميل سجل التدقيق';

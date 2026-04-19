@@ -501,6 +501,197 @@ void main() {
       expect(benchSlot.data()?['isStartingXI'], isFalse);
       expect(benchSlot.data()?['pointsEarned'], 6);
     });
+
+    test('matchday truth keeps a starter eligible when stats are missing',
+        () async {
+      final openedAt = DateTime(2026, 8, 1, 12);
+      final completedAt = DateTime(2026, 8, 1, 14);
+
+      await _seedLifecycle(
+        firestore,
+        FantasyLeagueLifecycle(
+          leagueId: 'global',
+          currentGameweek: 5,
+          phase: FantasyLeaguePhase.live,
+          isGlobal: true,
+          openedAt: openedAt,
+          updatedAt: openedAt,
+        ),
+      );
+      await _seedTeam(
+        firestore,
+        FantasyTeam(
+          id: 'team-4',
+          ownerPlayerId: 'owner-4',
+          teamName: 'Delta',
+          createdAt: openedAt,
+          updatedAt: openedAt,
+        ),
+      );
+      await _seedSlot(
+        firestore,
+        const FantasySlot(
+          id: 'slot-truth-start',
+          fantasyTeamId: 'team-4',
+          playerId: 'starter-player',
+          isStartingXI: true,
+        ),
+      );
+      await _seedSlot(
+        firestore,
+        const FantasySlot(
+          id: 'slot-truth-bench',
+          fantasyTeamId: 'team-4',
+          playerId: 'bench-scorer',
+          isStartingXI: false,
+          benchPriority: 1,
+        ),
+      );
+      await _seedSettledMatch(
+        firestore,
+        matchId: 'm-truth-1',
+        completedAt: completedAt,
+        playerIds: const ['starter-player', 'bench-scorer'],
+      );
+      await _seedMatchStat(
+        firestore,
+        matchId: 'm-truth-1',
+        playerId: 'bench-scorer',
+        position: 'forward',
+        goals: 1,
+      );
+      await _seedAttendanceTruth(
+        firestore,
+        matchId: 'm-truth-1',
+        playerId: 'starter-player',
+        teamId: 'team-a',
+        played: true,
+        startedMatch: true,
+      );
+
+      final result = await settlementService.settleRound(
+        leagueId: 'global',
+        settlementType: 'matchday_truth_missing_stats',
+        settledAt: DateTime(2026, 8, 1, 18),
+      );
+
+      final starterSlot = await firestore
+          .collection(FirebasePaths.fantasySlots)
+          .doc('slot-truth-start')
+          .get();
+      final benchSlot = await firestore
+          .collection(FirebasePaths.fantasySlots)
+          .doc('slot-truth-bench')
+          .get();
+
+      expect(result.totalPointsApplied, 2);
+      expect(starterSlot.data()?['pointsEarned'], 2);
+      expect(starterSlot.data()?['isStartingXI'], isTrue);
+      expect(benchSlot.data()?['pointsEarned'], 0);
+      expect(benchSlot.data()?['isStartingXI'], isFalse);
+    });
+
+    test('matchday truth overrides inferred participation and unlocks autosub',
+        () async {
+      final openedAt = DateTime(2026, 9, 1, 12);
+      final completedAt = DateTime(2026, 9, 1, 14);
+
+      await _seedLifecycle(
+        firestore,
+        FantasyLeagueLifecycle(
+          leagueId: 'global',
+          currentGameweek: 6,
+          phase: FantasyLeaguePhase.live,
+          isGlobal: true,
+          openedAt: openedAt,
+          updatedAt: openedAt,
+        ),
+      );
+      await _seedTeam(
+        firestore,
+        FantasyTeam(
+          id: 'team-5',
+          ownerPlayerId: 'owner-5',
+          teamName: 'Epsilon',
+          createdAt: openedAt,
+          updatedAt: openedAt,
+        ),
+      );
+      await _seedSlot(
+        firestore,
+        const FantasySlot(
+          id: 'slot-override-start',
+          fantasyTeamId: 'team-5',
+          playerId: 'starter-ghost',
+          isStartingXI: true,
+        ),
+      );
+      await _seedSlot(
+        firestore,
+        const FantasySlot(
+          id: 'slot-override-bench',
+          fantasyTeamId: 'team-5',
+          playerId: 'bench-hero',
+          isStartingXI: false,
+          benchPriority: 1,
+        ),
+      );
+      await _seedSettledMatch(
+        firestore,
+        matchId: 'm-truth-2',
+        completedAt: completedAt,
+        playerIds: const ['starter-ghost', 'bench-hero'],
+      );
+      await _seedMatchStat(
+        firestore,
+        matchId: 'm-truth-2',
+        playerId: 'starter-ghost',
+        position: 'forward',
+        goals: 1,
+      );
+      await _seedMatchStat(
+        firestore,
+        matchId: 'm-truth-2',
+        playerId: 'bench-hero',
+        position: 'forward',
+        goals: 1,
+      );
+      await _seedAttendanceTruth(
+        firestore,
+        matchId: 'm-truth-2',
+        playerId: 'starter-ghost',
+        teamId: 'team-a',
+        played: false,
+      );
+      await _seedAttendanceTruth(
+        firestore,
+        matchId: 'm-truth-2',
+        playerId: 'bench-hero',
+        teamId: 'team-a',
+        played: true,
+      );
+
+      final result = await settlementService.settleRound(
+        leagueId: 'global',
+        settlementType: 'matchday_truth_override',
+        settledAt: DateTime(2026, 9, 1, 18),
+      );
+
+      final starterSlot = await firestore
+          .collection(FirebasePaths.fantasySlots)
+          .doc('slot-override-start')
+          .get();
+      final benchSlot = await firestore
+          .collection(FirebasePaths.fantasySlots)
+          .doc('slot-override-bench')
+          .get();
+
+      expect(result.totalPointsApplied, 6);
+      expect(starterSlot.data()?['pointsEarned'], 0);
+      expect(starterSlot.data()?['isStartingXI'], isFalse);
+      expect(benchSlot.data()?['pointsEarned'], 6);
+      expect(benchSlot.data()?['isStartingXI'], isTrue);
+    });
   });
 }
 
@@ -604,6 +795,34 @@ Future<void> _seedMatchStat(
     'cleanSheet': false,
     'yellowCard': false,
     'redCard': false,
-    'rating': 7.0,
+      'rating': 7.0,
+  });
+}
+
+Future<void> _seedAttendanceTruth(
+  FakeFirebaseFirestore firestore, {
+  required String matchId,
+  required String playerId,
+  required String teamId,
+  required bool played,
+  bool startedMatch = false,
+}) async {
+  final now = DateTime(2026, 4, 18, 15);
+  await firestore
+      .collection(FirebasePaths.matchAttendances)
+      .doc('attendance::$matchId::$playerId')
+      .set({
+    'matchId': matchId,
+    'teamId': teamId,
+    'playerId': playerId,
+    'status': played ? 'present' : 'absent',
+    'includedInLockedLineup': true,
+    'startedMatch': startedMatch,
+    'played': played,
+    'currentlyOnPitch': false,
+    'firstEnteredMinute': played ? 0 : null,
+    'createdBy': 'organizer-1',
+    'createdAt': now.millisecondsSinceEpoch,
+    'updatedAt': now.millisecondsSinceEpoch,
   });
 }

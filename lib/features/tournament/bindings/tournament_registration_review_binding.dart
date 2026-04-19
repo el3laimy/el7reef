@@ -9,6 +9,7 @@ import '../../../data/repositories/tournament_registration_repository_impl.dart'
 import '../../../data/repositories/tournament_repository_impl.dart';
 import '../../../services/auth_service.dart';
 import '../controllers/tournament_registration_review_controller.dart';
+import '../../../core/services/share_link_service.dart';
 
 class TournamentRegistrationReviewBinding extends Bindings {
   @override
@@ -33,6 +34,10 @@ class TournamentRegistrationReviewBinding extends Bindings {
       );
     }
 
+    if (!Get.isRegistered<ShareLinkService>()) {
+      Get.lazyPut<ShareLinkService>(() => ShareLinkService());
+    }
+
     final authSession = Get.isRegistered<AuthSession>()
         ? Get.find<AuthSession>()
         : Get.isRegistered<AuthService>()
@@ -47,6 +52,7 @@ class TournamentRegistrationReviewBinding extends Bindings {
         teamRepository: Get.find<TeamRepositoryImpl>(),
         guestTeamRepository: Get.find<GuestTeamRepositoryImpl>(),
         registrationService: Get.find<TournamentRegistrationService>(),
+        shareLinkService: Get.find<ShareLinkService>(),
       ),
     );
   }

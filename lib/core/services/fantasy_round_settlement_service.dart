@@ -7,6 +7,7 @@ import '../../data/models/fantasy_league_lifecycle_model.dart';
 import '../../data/models/fantasy_round_settlement_marker_model.dart';
 import '../../data/models/fantasy_slot_model.dart';
 import '../../data/models/fantasy_team_model.dart';
+import '../../data/models/match_attendance_model.dart';
 import '../../data/models/match_model.dart';
 import '../../data/models/player_match_stats_model.dart';
 import '../../data/repositories/fantasy_round_settlement_repository_impl.dart';
@@ -215,6 +216,7 @@ class FantasyRoundSettlementService {
     final doubleAwards = <String, Set<String>>{};
 
     for (final match in matches) {
+      final matchStatsByPlayerId = <String, PlayerMatchStats>{};
       final statsSnapshot = await _firestore
           .collection(FirebasePaths.matches)
           .doc(match.id)
@@ -222,6 +224,42 @@ class FantasyRoundSettlementService {
           .get();
       for (final doc in statsSnapshot.docs) {
         final stats = PlayerMatchStatsModel.fromJson(doc.data(), doc.id).toEntity();
+        matchStatsByPlayerId[stats.playerId] = stats;
+      }
+
+      final attendanceSnapshot = await _firestore
+          .collection(FirebasePaths.matchAttendances)
+          .where('matchId', isEqualTo: match.id)
+          .get();
+      for (final doc in attendanceSnapshot.docs) {
+        final attendance =
+            MatchAttendanceModel.fromJson(doc.data(), doc.id).toEntity();
+        final playerId = attendance.playerId;
+        if (playerId == null || playerId.isEmpty) {
+          continue;
+        }
+
+        final existingStats = matchStatsByPlayerId[playerId];
+        if (existingStats != null) {
+          matchStatsByPlayerId[playerId] = existingStats.copyWith(
+            played: attendance.played,
+            teamId: attendance.teamId ?? existingStats.teamId,
+          );
+          continue;
+        }
+
+        if (attendance.played) {
+          matchStatsByPlayerId[playerId] = PlayerMatchStats(
+            playerId: playerId,
+            matchId: match.id,
+            teamId: attendance.teamId ?? '',
+            played: true,
+            position: MatchPosition.mixed,
+          );
+        }
+      }
+
+      for (final stats in matchStatsByPlayerId.values) {
         statsByPlayerId.putIfAbsent(stats.playerId, () => <PlayerMatchStats>[])
             .add(stats);
       }

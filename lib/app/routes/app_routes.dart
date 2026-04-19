@@ -43,6 +43,7 @@ abstract class AppRoutes {
   static const String searchPlayers = '/social/search';
   static const String activityFeed = '/social/feed';
   static const String claimEntry = '/claim';
+  static const String inviteEntry = '/invite';
   static const String guestPlayerClaim = '/guest-player/:guestPlayerId/claim';
   static const String guestTeamClaim = '/guest-team/:guestTeamId/claim';
   static const String myTeams = '/teams';
@@ -75,13 +76,21 @@ abstract class AppRoutes {
       '/fantasy/transfers/$leagueId';
   static String fantasyLeaderboardForLeague(String leagueId) =>
       '/fantasy/leaderboard/$leagueId';
-  static String auditTimelineForEntity(String entityId) =>
-      '/organizer/audit/$entityId';
+  static String auditTimelineForEntity(
+    String entityId, {
+    String? entityType,
+  }) => _withQuery(
+        '/organizer/audit/$entityId',
+        {'entityType': entityType},
+      );
   static String disputeViewerForMatch(String matchId) =>
       '/organizer/disputes/$matchId';
 
   static String claimEntryWithQuery(Map<String, String?> queryParameters) =>
       _withQuery(claimEntry, queryParameters);
+
+  static String inviteEntryWithQuery(Map<String, String?> queryParameters) =>
+      _withQuery(inviteEntry, queryParameters);
 
   static String guestPlayerClaimById(
     String guestPlayerId, {

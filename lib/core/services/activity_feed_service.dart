@@ -7,6 +7,8 @@ import '../../domain/entities/tournament.dart';
 import '../../domain/repositories/match_repository.dart';
 import '../../domain/repositories/player_repository.dart';
 import '../../domain/repositories/tournament_repository.dart';
+import '../../domain/repositories/team_repository.dart';
+import '../../data/repositories/team_repository_impl.dart';
 
 class ActivityFeedEntry {
   final String id;
@@ -52,15 +54,18 @@ class ActivityFeedService {
   final PlayerRepository _playerRepository;
   final MatchRepository _matchRepository;
   final TournamentRepository _tournamentRepository;
+  final TeamRepository _teamRepository;
 
   ActivityFeedService({
     PlayerRepository? playerRepository,
     MatchRepository? matchRepository,
     TournamentRepository? tournamentRepository,
+    TeamRepository? teamRepository,
   })  : _playerRepository = playerRepository ?? PlayerRepositoryImpl(),
         _matchRepository = matchRepository ?? MatchRepositoryImpl(),
         _tournamentRepository =
-            tournamentRepository ?? TournamentRepositoryImpl();
+            tournamentRepository ?? TournamentRepositoryImpl(),
+        _teamRepository = teamRepository ?? TeamRepositoryImpl();
 
   Future<List<ActivityFeedEntry>> buildFeedForPlayer(
     Player currentPlayer, {
@@ -108,9 +113,61 @@ class ActivityFeedService {
       deduped[entry.id] = entry;
     }
 
+    // Add personal prompts
+    final personalPrompts = await _buildPersonalPrompts(currentPlayer);
+    for (final prompt in personalPrompts) {
+      deduped[prompt.id] = prompt;
+    }
+
     final sorted = deduped.values.toList()
       ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
     return sorted.take(limit).toList();
+  }
+
+  Future<List<ActivityFeedEntry>> _buildPersonalPrompts(Player currentPlayer) async {
+    final prompts = <ActivityFeedEntry>[];
+
+    // 1. Rating Prompt
+    final recentMatches = await _matchRepository.getPlayerMatches(currentPlayer.id, limit: 3);
+    for (final match in recentMatches) {
+      if (_isFeedReadyStatus(match) && _isRecent(match.completedAt ?? match.createdAt)) {
+        // Assume player hasn't rated if the match is very recent (this is a simplified check)
+        prompts.add(
+          ActivityFeedEntry(
+            id: 'prompt-rating-${match.id}',
+            actorId: currentPlayer.id,
+            actorName: 'إشعار',
+            actionText: 'لديك تقييم معلق لمباراة انتهت بنتيجة',
+            highlightText: '${match.scoreTeamA ?? '-'}-${match.scoreTeamB ?? '-'}',
+            occurredAt: match.completedAt ?? match.createdAt,
+            iconEmoji: '⏱️',
+          ),
+        );
+        break; // Only show one rating prompt
+      }
+    }
+
+    // 2. Team Addition Prompt
+    if (currentPlayer.teamIds.isNotEmpty) {
+      final teams = await Future.wait(currentPlayer.teamIds.take(3).map(_teamRepository.getTeam));
+      for (final team in teams) {
+        if (team != null && _isRecent(team.createdAt, days: 7)) {
+          prompts.add(
+            ActivityFeedEntry(
+              id: 'prompt-team-${team.id}',
+              actorId: currentPlayer.id,
+              actorName: 'إشعار',
+              actionText: 'تمت إضافتك مؤخراً إلى فريق',
+              highlightText: team.name,
+              occurredAt: team.createdAt,
+              iconEmoji: '🛡️',
+            ),
+          );
+        }
+      }
+    }
+
+    return prompts;
   }
 
   ActivityFeedEntry? _buildMatchEntry(Player actor, List<Match> matches) {

@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 
 import '../../../../app/routes/app_routes.dart';
 import '../../../../core/auth/auth_session.dart';
+import '../../../../core/enums/fantasy_league_phase.dart';
 import '../../../../core/services/chip_manager_service.dart';
 import '../../../../core/services/fantasy_lifecycle_service.dart';
 import '../../../../core/services/fantasy_market_service.dart';
@@ -79,6 +80,10 @@ class FantasyTeamController extends GetxController {
 
   bool get isJoinedLeague => team.value?.leagueIds.contains(leagueId) ?? false;
   bool get isRoundLocked => lifecycle.value?.isLocked ?? false;
+  bool get isRoundLive => lifecycle.value?.phase == FantasyLeaguePhase.live;
+  bool get isRoundSettled => lifecycle.value?.isSettled ?? false;
+  bool get hasBenchBoostActive =>
+      currentGameweek > 0 && isChipActive(ChipType.benchBoost);
   TransferPolicyDecision? get transferPolicyDecision {
     final currentTeam = team.value;
     final currentLifecycle = lifecycle.value;
@@ -94,6 +99,8 @@ class FantasyTeamController extends GetxController {
 
   bool get canOpenTransfers => transferPolicyDecision?.isAllowed ?? false;
   String? get transferBlockedReason => transferPolicyDecision?.blockedReason;
+  String get transferActionLabel =>
+      canOpenTransfers ? 'افتح الانتقالات' : 'الانتقالات مغلقة';
   int get currentGameweek => lifecycle.value?.currentGameweek ?? 0;
   List<ChipType> get availableChipTypes => const [
         ChipType.tripleCaptain,
@@ -111,6 +118,82 @@ class FantasyTeamController extends GetxController {
     }
 
     return currentTeam.activeChipsForGameweek(currentGameweek);
+  }
+
+  String get roundStatusTitle {
+    final phase = lifecycle.value?.phase;
+    if (phase == null) {
+      return 'حالة الجولة غير واضحة';
+    }
+
+    return switch (phase) {
+      FantasyLeaguePhase.upcoming => 'الدوري لم يبدأ بعد',
+      FantasyLeaguePhase.draft => 'التشكيلة قابلة للتعديل',
+      FantasyLeaguePhase.transferWindow => 'نافذة الانتقالات مفتوحة',
+      FantasyLeaguePhase.live => 'فريقك مباشر الآن',
+      FantasyLeaguePhase.locked => 'التشكيلة مقفولة',
+      FantasyLeaguePhase.settled => 'الجولة تم اعتمادها',
+      FantasyLeaguePhase.completed => 'الدوري اكتمل',
+      FantasyLeaguePhase.cancelled => 'الدوري أُلغي',
+    };
+  }
+
+  String get roundStatusMessage {
+    final currentTeam = team.value;
+    final currentLifecycle = lifecycle.value;
+    if (currentTeam == null || currentLifecycle == null) {
+      return 'سيظهر شرح الجولة الحالية بمجرد اكتمال تحميل بيانات فريقك.';
+    }
+
+    final gameweekLabel = currentLifecycle.currentGameweek > 0
+        ? 'الجولة ${currentLifecycle.currentGameweek}'
+        : 'هذه الجولة';
+
+    return switch (currentLifecycle.phase) {
+      FantasyLeaguePhase.upcoming =>
+        'الدوري لم ينطلق بعد. يمكنك تجهيز تشكيلتك مبكرًا قبل فتح الجولة الأولى.',
+      FantasyLeaguePhase.draft =>
+        '$gameweekLabel ما زالت مفتوحة. راجع الكابتن والبدلاء والخواص قبل الإغلاق.',
+      FantasyLeaguePhase.transferWindow =>
+        '$gameweekLabel التالية قيد التحضير الآن. لديك ${currentTeam.freeTransfers} تبديل مجاني ويمكنك فتح السوق قبل الموعد النهائي.',
+      FantasyLeaguePhase.live =>
+        '$gameweekLabel جارية الآن. نقاطك الحالية (${currentTeam.currentGameweekPoints}) ما زالت مباشرة وقابلة للتغير حتى اعتماد نتائج matchday.',
+      FantasyLeaguePhase.locked =>
+        'تم إغلاق $gameweekLabel. لا يمكن تعديل الكابتن أو التشكيلة الآن، والنقاط المعروضة تظل مؤقتة حتى التسوية.',
+      FantasyLeaguePhase.settled =>
+        'تم اعتماد $gameweekLabel بنتيجة نهائية ${currentTeam.currentGameweekPoints} نقطة. راجع أثر الانتقالات والخواص قبل الجولة التالية.',
+      FantasyLeaguePhase.completed =>
+        'تم إغلاق هذا الدوري نهائيًا. يمكنك فقط مراجعة النقاط والترتيب النهائيين.',
+      FantasyLeaguePhase.cancelled =>
+        'هذا الدوري لم يعد نشطًا، لذلك شاشة الفريق هنا متاحة للمراجعة فقط.',
+    };
+  }
+
+  String describeSquadSlot(FantasySquadMember member) {
+    if (member.slot.isStartingXI) {
+      return 'أساسي';
+    }
+    return 'بديل ${member.slot.benchPriority}';
+  }
+
+  String describeSquadPoints(FantasySquadMember member) {
+    return 'رصيد التشكيلة ${member.slot.pointsEarned}';
+  }
+
+  String? describeSquadAvailability(FantasySquadMember member) {
+    if (member.slot.isEliminated) {
+      return 'هذا اللاعب خرج من البطولة ويحتاج تبديلًا قبل الجولة القادمة.';
+    }
+    if (member.slot.isStartingXI && hasBenchBoostActive) {
+      return 'Bench Boost نشطة الآن، لذلك احتساب النقاط يشمل البدلاء أيضًا.';
+    }
+    if (isRoundLive) {
+      return 'الجولة مباشرة الآن، لذلك التغييرات على الأدوار والانتقالات متوقفة.';
+    }
+    if (isRoundLocked) {
+      return 'التشكيلة الحالية مقفولة لهذه الجولة حتى انتهاء التسوية.';
+    }
+    return null;
   }
 
   @override

@@ -17,6 +17,7 @@ import '../../domain/repositories/claim_code_repository.dart';
 import '../../domain/repositories/guest_player_repository.dart';
 import '../../domain/repositories/guest_team_repository.dart';
 import '../../domain/repositories/team_repository.dart';
+import 'analytics_service.dart';
 import 'team_roster_policy.dart';
 
 class ShareLinkService {
@@ -25,6 +26,7 @@ class ShareLinkService {
   final GuestTeamRepository _guestTeamRepository;
   final TeamRepository _teamRepository;
   final TeamRosterPolicy _teamRosterPolicy;
+  final AnalyticsService _analyticsService;
   final Uuid _uuid;
 
   static const String appScheme = 'el7reef';
@@ -36,6 +38,7 @@ class ShareLinkService {
     GuestTeamRepository? guestTeamRepository,
     TeamRepository? teamRepository,
     TeamRosterPolicy? teamRosterPolicy,
+    AnalyticsService? analyticsService,
     Uuid? uuid,
   })  : _claimCodeRepository = claimCodeRepository ?? ClaimCodeRepositoryImpl(),
         _guestPlayerRepository =
@@ -43,6 +46,7 @@ class ShareLinkService {
         _guestTeamRepository = guestTeamRepository ?? GuestTeamRepositoryImpl(),
         _teamRepository = teamRepository ?? TeamRepositoryImpl(),
         _teamRosterPolicy = teamRosterPolicy ?? const TeamRosterPolicy(),
+        _analyticsService = analyticsService ?? AnalyticsService(),
         _uuid = uuid ?? const Uuid();
 
   Future<GeneratedShareLink> createGuestPlayerClaimLink({
@@ -82,11 +86,19 @@ class ShareLinkService {
       );
     }
 
-    return _buildShareLink(
+    final link = _buildShareLink(
       claimCode: claimCode,
       label: 'استلم مكانك كلاعب داخل EL7REEF',
       subjectName: guestPlayer.displayName,
     );
+
+    _analyticsService.trackInviteSent(
+      type: 'guest_player',
+      targetId: guestPlayerId,
+      actorId: actorId,
+    );
+
+    return link;
   }
 
   Future<GeneratedShareLink> createGuestTeamClaimLink({
@@ -130,11 +142,19 @@ class ShareLinkService {
       );
     }
 
-    return _buildShareLink(
+    final link = _buildShareLink(
       claimCode: claimCode,
       label: 'استلم ملكية الفريق داخل EL7REEF',
       subjectName: guestTeam.name,
     );
+
+    _analyticsService.trackInviteSent(
+      type: 'guest_team',
+      targetId: guestTeamId,
+      actorId: actorId,
+    );
+
+    return link;
   }
 
   Future<GeneratedShareLink> createTeamInviteLink({
@@ -159,11 +179,19 @@ class ShareLinkService {
       requiresApproval: false,
     );
 
-    return _buildShareLink(
+    final link = _buildShareLink(
       claimCode: claimCode,
       label: 'انضم إلى فريق ${team.name} على EL7REEF',
       subjectName: team.name,
     );
+
+    _analyticsService.trackInviteSent(
+      type: 'team_invite',
+      targetId: teamId,
+      actorId: actorId,
+    );
+
+    return link;
   }
 
   ClaimPayload parsePayloadFromUri(Uri uri) {

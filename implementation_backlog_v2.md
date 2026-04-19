@@ -660,7 +660,7 @@ Acceptance:
 Parent: `EPIC-G`
 Priority: `P1`
 Estimate: `M`
-Status: `Todo`
+Status: `Done`
 Depends On: `V2-013`, `V2-017`
 Likely Touchpoints:
 - `lib/core/services/`
@@ -678,7 +678,7 @@ Acceptance:
 Parent: `EPIC-G`
 Priority: `P1`
 Estimate: `M`
-Status: `Todo`
+Status: `Done`
 Depends On: `V2-033`
 Likely Touchpoints:
 - route handling and lightweight entry screens
@@ -694,7 +694,7 @@ Acceptance:
 Parent: `EPIC-G`
 Priority: `P1`
 Estimate: `M`
-Status: `Todo`
+Status: `Done`
 Depends On: `V2-014`, `V2-025`, `V2-029`
 Likely Touchpoints:
 - `lib/core/services/activity_feed_service.dart`
@@ -712,7 +712,7 @@ Acceptance:
 Parent: `EPIC-G`
 Priority: `P2`
 Estimate: `S`
-Status: `Todo`
+Status: `Done`
 Depends On: `V2-033` to `V2-035`
 Likely Touchpoints:
 - telemetry or analytics layer if present
@@ -730,7 +730,7 @@ Acceptance:
 Parent: `EPIC-H`
 Priority: `P1`
 Estimate: `L`
-Status: `Todo`
+Status: `Done`
 Depends On: `V2-025`, `V2-026`
 Likely Touchpoints:
 - `lib/core/services/fantasy_round_settlement_service.dart`
@@ -748,7 +748,7 @@ Acceptance:
 Parent: `EPIC-H`
 Priority: `P1`
 Estimate: `M`
-Status: `Todo`
+Status: `Done`
 Depends On: `V2-037`
 Likely Touchpoints:
 - `lib/features/fantasy/presentation/`
@@ -904,9 +904,6 @@ Acceptance:
 
 ## Next Ticket To Start
 
-Start with `V2-033`.
-Epic F (Audit & Disputes) is complete. `AuditService` records events uniformly
-across match, tournament, claim, and dispute flows. `DisputeService` supports
-open, resolve, reject, freeze, and deadline expiry with full audit integration.
-Organizer UI screens for timeline and dispute management are wired via routes.
-The next goal is building growth and sharing flows for team invites and claims.
+Start with `V2-039`.
+Matchday truth now feeds fantasy eligibility, and the fantasy team plus transfer UX surfaces clearer live-round state, transfer impact, and lifecycle-aware copy.
+The next goal is adding organizer lifecycle controls so registration phases, lineup lock windows, and fantasy lifecycle moves are managed through protected policies and audit-backed flows.

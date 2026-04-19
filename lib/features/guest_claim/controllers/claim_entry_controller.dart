@@ -4,8 +4,13 @@ import 'package:get/get.dart';
 import '../../../app/routes/app_routes.dart';
 import '../../../core/constants/feature_flags.dart';
 import '../../../core/enums/claim_target_type.dart';
+import '../../../core/services/analytics_service.dart';
 
 class ClaimEntryController extends GetxController {
+  final AnalyticsService _analyticsService;
+
+  ClaimEntryController({AnalyticsService? analyticsService})
+      : _analyticsService = analyticsService ?? AnalyticsService();
   final isLoading = true.obs;
   final errorMessage = ''.obs;
 
@@ -30,6 +35,13 @@ class ClaimEntryController extends GetxController {
 
     final resolvedTargetType = _parseTargetType(targetTypeValue);
     final resolvedTargetId = targetId;
+
+    if (resolvedTargetType != null && resolvedTargetId != null) {
+      _analyticsService.trackClaimOpen(
+        type: resolvedTargetType.name,
+        targetId: resolvedTargetId,
+      );
+    }
     if (code == null || code!.isEmpty) {
       errorMessage.value = 'رابط الـ claim لا يحتوي على code صالح.';
       isLoading.value = false;
@@ -63,9 +75,7 @@ class ClaimEntryController extends GetxController {
         );
         return;
       case ClaimTargetType.teamInvite:
-        errorMessage.value =
-            'رابط الدعوة هذا غير مدعوم بعد داخل شاشات الـ claim الحالية.';
-        isLoading.value = false;
+        Get.offNamed(AppRoutes.inviteEntryWithQuery(forwardedQuery));
         return;
     }
   }

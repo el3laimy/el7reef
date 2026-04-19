@@ -65,6 +65,14 @@ class TournamentRegistrationReviewScreen
                       if (registration.verifiedBy != null &&
                           registration.verifiedBy!.isNotEmpty)
                         Text('تم الاعتماد بواسطة: ${registration.verifiedBy}'),
+                      if (registration.isGuestRegistration) ...[
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: controller.shareGuestTeamClaimLink,
+                          icon: const Icon(Icons.share_rounded),
+                          label: const Text('إرسال رابط تسليم الفريق'),
+                        ),
+                      ],
                     ],
                   ),
                 ),

@@ -12,6 +12,7 @@ import '../../../data/repositories/team_repository_impl.dart';
 import '../../../data/repositories/team_roster_snapshot_repository_impl.dart';
 import '../../../features/team/controllers/team_roster_controller.dart';
 import '../../../services/auth_service.dart';
+import '../../../core/services/share_link_service.dart';
 
 class TeamRosterBinding extends Bindings {
   @override
@@ -68,6 +69,10 @@ class TeamRosterBinding extends Bindings {
             ? AuthServiceSession(Get.find<AuthService>())
             : const _AnonymousAuthSession();
 
+    if (!Get.isRegistered<ShareLinkService>()) {
+      Get.lazyPut<ShareLinkService>(() => ShareLinkService());
+    }
+
     Get.lazyPut<TeamRosterController>(
       () => TeamRosterController(
         authSession: authSession,
@@ -76,6 +81,7 @@ class TeamRosterBinding extends Bindings {
         teamFormationService: Get.find<TeamFormationService>(),
         playerRepository: Get.find<PlayerRepositoryImpl>(),
         guestPlayerRepository: Get.find<GuestPlayerRepositoryImpl>(),
+        shareLinkService: Get.find<ShareLinkService>(),
       ),
     );
   }

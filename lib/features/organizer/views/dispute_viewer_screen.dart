@@ -281,7 +281,7 @@ class _DisputeCard extends StatelessWidget {
               Navigator.of(ctx).pop();
               controller.resolveDispute(
                 disputeId: dispute.id,
-                resolvedBy: 'current-organizer', // TODO: use actual auth user
+                resolvedBy: controller.currentUserId ?? '',
                 resolutionNote: noteController.text.trim().isNotEmpty
                     ? noteController.text.trim()
                     : 'تم الحل',
@@ -322,7 +322,7 @@ class _DisputeCard extends StatelessWidget {
               Navigator.of(ctx).pop();
               controller.rejectDispute(
                 disputeId: dispute.id,
-                rejectedBy: 'current-organizer', // TODO: use actual auth user
+                rejectedBy: controller.currentUserId ?? '',
                 rejectionNote: noteController.text.trim().isNotEmpty
                     ? noteController.text.trim()
                     : 'النزاع مرفوض',
