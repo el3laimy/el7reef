@@ -10,6 +10,8 @@ import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../core/widgets/el7reef_button.dart';
 import '../../../domain/entities/match.dart';
 import '../controllers/match_controller.dart';
+import '../controllers/challenge_controller.dart';
+import '../widgets/challenge_card.dart';
 
 /// شاشة اكتشاف المباريات المتاحة + إنشاء مباراة جديدة
 class MatchDiscoverScreen extends GetView<MatchController> {
@@ -17,129 +19,41 @@ class MatchDiscoverScreen extends GetView<MatchController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('المباريات'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
-            onPressed: controller.loadLiveMatches,
-          ),
-        ],
-      ),
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
-        child: Obx(() {
-          if (controller.isLoading.value && controller.liveMatches.isEmpty) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            );
-          }
-
-          return RefreshIndicator(
-            onRefresh: controller.loadLiveMatches,
-            color: AppColors.primary,
-            child: CustomScrollView(
-              slivers: [
-                // ── زر إنشاء مباراة ──
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppDimensions.pagePadding),
-                    child: El7reefButton(
-                      text: 'ابدأ مباراة جديدة',
-                      icon: Icons.sports_soccer,
-                      onPressed: () => _showCreateMatchSheet(context),
-                    ).animate().fadeIn(duration: 400.ms),
-                  ),
-                ),
-
-                // ── Header ──
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimensions.pagePadding,
-                    ),
-                    child: Row(
-                      children: [
-                        Text('المباريات الجارية',
-                            style: AppTextStyles.titleLarge),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.success.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 8, height: 8,
-                                decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: AppColors.success,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                '${controller.liveMatches.length} مباراة',
-                                style: AppTextStyles.labelSmall.copyWith(
-                                  color: AppColors.success,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: AppDimensions.md)),
-
-                // ── قائمة المباريات ──
-                controller.liveMatches.isEmpty
-                    ? SliverToBoxAdapter(child: _buildEmptyState())
-                    : SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) => Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppDimensions.pagePadding,
-                              vertical: AppDimensions.xs,
-                            ),
-                            child: _MatchCard(
-                              match: controller.liveMatches[index],
-                              index: index,
-                              controller: controller,
-                            ),
-                          ),
-                          childCount: controller.liveMatches.length,
-                        ),
-                      ),
-
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: AppDimensions.xxl),
-                ),
-              ],
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('المباريات'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
+              onPressed: () {
+                controller.loadLiveMatches();
+                controller.loadMyMatches();
+              },
             ),
-          );
-        }),
+          ],
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'مبارياتي'),
+              Tab(text: 'اكتشاف'),
+              Tab(text: 'التحديات'),
+            ],
+            indicatorColor: AppColors.primary,
+            labelColor: AppColors.primary,
+          ),
+        ),
+        body: Container(
+          decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+          child: const TabBarView(
+            children: [
+              _MyMatchesTab(),
+              _DiscoverTab(),
+              _ChallengesTab(),
+            ],
+          ),
+        ),
       ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Padding(
-      padding: const EdgeInsets.all(AppDimensions.xxl),
-      child: Column(
-        children: [
-          const Text('⚽', style: TextStyle(fontSize: 64)),
-          const SizedBox(height: AppDimensions.md),
-          Text('ما فيش مباريات دلوقتي', style: AppTextStyles.headlineMedium),
-          const SizedBox(height: AppDimensions.sm),
-          Text('كن أول من يبدأ!', style: AppTextStyles.bodyMedium),
-        ],
-      ).animate().fadeIn(),
     );
   }
 
@@ -148,6 +62,204 @@ class MatchDiscoverScreen extends GetView<MatchController> {
       _CreateMatchSheet(controller: controller),
       isScrollControlled: true,
     );
+  }
+}
+
+class _MyMatchesTab extends GetView<MatchController> {
+  const _MyMatchesTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      if (controller.isLoading.value && controller.myMatches.isEmpty) {
+        return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+      }
+
+      if (controller.myMatches.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.sports_soccer, size: 64, color: AppColors.textMuted),
+              const SizedBox(height: AppDimensions.md),
+              Text('ليس لديك أي مباريات قادمة', style: AppTextStyles.bodyLarge),
+              const SizedBox(height: AppDimensions.lg),
+              El7reefButton(
+                text: 'أنشئ مباراة جديدة',
+                onPressed: () => Get.find<MatchDiscoverScreen>()._showCreateMatchSheet(context),
+              ),
+            ],
+          ),
+        );
+      }
+
+      return RefreshIndicator(
+        onRefresh: controller.loadMyMatches,
+        color: AppColors.primary,
+        child: ListView.builder(
+          padding: const EdgeInsets.all(AppDimensions.pagePadding),
+          itemCount: controller.myMatches.length,
+          itemBuilder: (context, index) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppDimensions.md),
+              child: _MatchCard(match: controller.myMatches[index], index: index, controller: controller),
+            );
+          },
+        ),
+      );
+    });
+  }
+}
+
+class _DiscoverTab extends GetView<MatchController> {
+  const _DiscoverTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      if (controller.isLoading.value && controller.liveMatches.isEmpty) {
+        return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+      }
+
+      return RefreshIndicator(
+        onRefresh: controller.loadLiveMatches,
+        color: AppColors.primary,
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(AppDimensions.pagePadding),
+                child: El7reefButton(
+                  text: 'ابدأ مباراة جديدة',
+                  icon: Icons.sports_soccer,
+                  onPressed: () => Get.find<MatchDiscoverScreen>()._showCreateMatchSheet(context),
+                ).animate().fadeIn(duration: 400.ms),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
+                child: Row(
+                  children: [
+                    Text('المباريات الجارية', style: AppTextStyles.titleLarge),
+                    const Spacer(),
+                    Text('${controller.liveMatches.length} مباراة', style: AppTextStyles.labelSmall.copyWith(color: AppColors.success)),
+                  ],
+                ),
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: AppDimensions.md)),
+            if (controller.liveMatches.isEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: Text('لا توجد مباريات جارية حالياً', style: AppTextStyles.bodyLarge),
+                ),
+              )
+            else
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final match = controller.liveMatches[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(
+                        left: AppDimensions.pagePadding,
+                        right: AppDimensions.pagePadding,
+                        bottom: AppDimensions.md,
+                      ),
+                      child: _MatchCard(match: match, index: index, controller: controller).animate().fadeIn(delay: (100 * index).ms),
+                    );
+                  },
+                  childCount: controller.liveMatches.length,
+                ),
+              ),
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          ],
+        ),
+      );
+    });
+  }
+}
+
+class _ChallengesTab extends GetView<ChallengeController> {
+  const _ChallengesTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      if (controller.isLoading.value && controller.sentChallenges.isEmpty && controller.receivedChallenges.isEmpty) {
+        return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+      }
+
+      return RefreshIndicator(
+        onRefresh: controller.loadChallenges,
+        color: AppColors.primary,
+        child: CustomScrollView(
+          slivers: [
+            if (controller.receivedChallenges.isNotEmpty) ...[
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppDimensions.pagePadding),
+                  child: Text('تحديات واردة', style: AppTextStyles.titleLarge),
+                ),
+              ),
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final challenge = controller.receivedChallenges[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding, vertical: AppDimensions.xs),
+                      child: ChallengeCard(
+                        challenge: challenge,
+                        isSentByMe: false,
+                        otherPartyName: 'لاعب ${challenge.challengerId.substring(0, 5)}', // This needs proper name loading later
+                        onAccept: () => controller.acceptChallenge(challenge),
+                        onDecline: () => controller.declineChallenge(challenge.id),
+                      ),
+                    );
+                  },
+                  childCount: controller.receivedChallenges.length,
+                ),
+              ),
+            ],
+            
+            if (controller.sentChallenges.isNotEmpty) ...[
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppDimensions.pagePadding),
+                  child: Text('تحديات أرسلتها', style: AppTextStyles.titleLarge),
+                ),
+              ),
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final challenge = controller.sentChallenges[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding, vertical: AppDimensions.xs),
+                      child: ChallengeCard(
+                        challenge: challenge,
+                        isSentByMe: true,
+                        otherPartyName: 'لاعب ${challenge.challengedId.substring(0, 5)}', // This needs proper name loading later
+                        onCancel: () => controller.cancelChallenge(challenge.id),
+                      ),
+                    );
+                  },
+                  childCount: controller.sentChallenges.length,
+                ),
+              ),
+            ],
+
+            if (controller.receivedChallenges.isEmpty && controller.sentChallenges.isEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: Text('لا توجد تحديات حالياً', style: AppTextStyles.bodyLarge),
+                ),
+              ),
+              
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          ],
+        ),
+      );
+    });
   }
 }
 
@@ -423,8 +535,9 @@ class _CreateMatchSheet extends StatelessWidget {
           top: Radius.circular(AppDimensions.radiusXl),
         ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Center(
@@ -496,6 +609,7 @@ class _CreateMatchSheet extends StatelessWidget {
                 },
               )),
         ],
+      ),
       ),
     );
   }

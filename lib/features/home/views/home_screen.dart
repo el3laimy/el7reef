@@ -7,6 +7,7 @@ import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../core/widgets/rank_tier_badge.dart';
+import '../../../core/widgets/loading_shimmer.dart';
 import '../../../services/auth_service.dart';
 import '../../match/views/match_discover_screen.dart';
 import '../../match/controllers/match_controller.dart';
@@ -60,6 +61,11 @@ class _HomeScreenState extends State<HomeScreen> {
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
           onTap: (index) => setState(() => _currentIndex = index),
+          backgroundColor: AppColors.surface,
+          selectedItemColor: AppColors.primary,
+          unselectedItemColor: AppColors.textMuted,
+          type: BottomNavigationBarType.fixed,
+          elevation: 0,
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.home_outlined),
@@ -319,11 +325,9 @@ class _HomeTab extends StatelessWidget {
                   final liveMatches = matchCtrl.liveMatches;
 
                   if (matchCtrl.isLoading.value && liveMatches.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.all(AppDimensions.xl),
-                      child: Center(
-                        child: CircularProgressIndicator(color: AppColors.primary),
-                      ),
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
+                      child: LoadingShimmer.list(count: 2),
                     );
                   }
 
@@ -394,6 +398,13 @@ class _HomeTab extends StatelessWidget {
                 child: Obx(() {
                   final matchCtrl = Get.find<MatchController>();
                   final myMatches = matchCtrl.myMatches;
+
+                  if (matchCtrl.isLoading.value && myMatches.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
+                      child: LoadingShimmer.list(count: 2),
+                    );
+                  }
 
                   if (myMatches.isEmpty) {
                     return Padding(

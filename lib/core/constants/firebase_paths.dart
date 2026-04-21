@@ -32,6 +32,7 @@ abstract class FirebasePaths {
   static const String friendships = 'friendships';
   static const String friendRequests = 'friendRequests';
   static const String matchInvitations = 'matchInvitations';
+  static const String challenges = 'challenges';
   static const String userVotes = 'userVotes';       // Fan voting
   static const String fanVotingSessions = 'fanVotingSessions';
   static const String fantasySlots = 'fantasySlots';

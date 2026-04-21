@@ -44,9 +44,19 @@ class InviteFriendsSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppDimensions.lg),
-          Text(
-            'ادعُ أصدقاءك لفريق $side',
-            style: AppTextStyles.headlineMedium,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'ادعُ أصدقاءك لفريق $side',
+                style: AppTextStyles.headlineMedium,
+              ),
+              TextButton.icon(
+                onPressed: () => _showAddGuestDialog(context),
+                icon: const Icon(Icons.person_add_alt),
+                label: const Text('إضافة ضيف'),
+              ),
+            ],
           ),
           const SizedBox(height: AppDimensions.md),
           Expanded(
@@ -109,6 +119,38 @@ class InviteFriendsSheet extends StatelessWidget {
                 },
               );
             }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddGuestDialog(BuildContext context) {
+    final nameController = TextEditingController();
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('إضافة لاعب ضيف'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(
+            labelText: 'اسم اللاعب',
+            hintText: 'أدخل اسم اللاعب الضيف',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('إلغاء'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (nameController.text.trim().isNotEmpty) {
+                Get.back(); // close dialog
+                lobbyController.addGuestPlayer(nameController.text.trim(), side);
+              }
+            },
+            child: const Text('إضافة'),
           ),
         ],
       ),

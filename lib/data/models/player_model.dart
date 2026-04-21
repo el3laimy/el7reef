@@ -28,6 +28,7 @@ class PlayerModel {
   final List<String> followingIds;
   final List<String> blockedIds;
   final String privacySetting;
+  final bool isGuest;
   final DateTime createdAt;
   final DateTime lastActiveAt;
 
@@ -56,6 +57,7 @@ class PlayerModel {
     this.followingIds = const [],
     this.blockedIds = const [],
     this.privacySetting = 'public',
+    this.isGuest = false,
     required this.createdAt,
     required this.lastActiveAt,
   });
@@ -92,6 +94,7 @@ class PlayerModel {
       blockedIds: (json['blockedIds'] as List<dynamic>?)
               ?.map((e) => e as String).toList() ?? [],
       privacySetting: json['privacySetting'] as String? ?? 'public',
+      isGuest: json['isGuest'] as bool? ?? false,
       createdAt: json['createdAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(
               (json['createdAt'] as num).toInt())
@@ -131,6 +134,7 @@ class PlayerModel {
       'followingIds': followingIds,
       'blockedIds': blockedIds,
       'privacySetting': privacySetting,
+      'isGuest': isGuest,
       'createdAt': createdAt.millisecondsSinceEpoch,
       'lastActiveAt': lastActiveAt.millisecondsSinceEpoch,
     };
@@ -163,6 +167,7 @@ class PlayerModel {
       followingIds: followingIds,
       blockedIds: blockedIds,
       privacySetting: privacySetting,
+      isGuest: isGuest,
       createdAt: createdAt,
       lastActiveAt: lastActiveAt,
     );
@@ -195,6 +200,7 @@ class PlayerModel {
       followingIds: player.followingIds,
       blockedIds: player.blockedIds,
       privacySetting: player.privacySetting,
+      isGuest: player.isGuest,
       createdAt: player.createdAt,
       lastActiveAt: player.lastActiveAt,
     );

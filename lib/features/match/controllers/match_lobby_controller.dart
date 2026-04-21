@@ -9,6 +9,7 @@ import '../../../domain/repositories/match_invitation_repository.dart';
 import '../../../data/repositories/player_repository_impl.dart';
 import '../../../services/auth_service.dart';
 import '../../../core/enums/match_status.dart';
+import '../../../core/enums/user_role.dart';
 import '../../../core/utils/app_logger.dart';
 
 /// Controller لشاشة لوبي المباراة
@@ -134,6 +135,44 @@ class MatchLobbyController extends GetxController {
     } catch (e) {
       AppLogger.error('MatchLobbyController.addPlayer', e);
       Get.snackbar('خطأ', 'فشل إضافة اللاعب');
+    }
+  }
+
+  /// إضافة لاعب ضيف (Guest)
+  Future<void> addGuestPlayer(String name, String side) async {
+    try {
+      final guestId = const Uuid().v4();
+      final guestPlayer = Player(
+        id: guestId,
+        name: name,
+        isGuest: true,
+        role: UserRole.player,
+        createdAt: DateTime.now(),
+        lastActiveAt: DateTime.now(),
+      );
+
+      // Save to players collection
+      await _playerRepo.createPlayer(guestPlayer);
+
+      // Add to match
+      await _matchRepo.addPlayerToMatch(
+        matchId: matchId,
+        playerId: guestId,
+        side: side,
+      );
+
+      if (side == 'A') {
+        teamAPlayers.add(guestPlayer);
+      } else {
+        teamBPlayers.add(guestPlayer);
+      }
+      
+      Get.back(); // close dialog
+      Get.snackbar('تم', 'تم إضافة اللاعب الضيف $name بنجاح', snackPosition: SnackPosition.BOTTOM);
+      await _refreshMatch();
+    } catch (e) {
+      AppLogger.error('MatchLobbyController.addGuestPlayer', e);
+      Get.snackbar('خطأ', 'فشل إضافة اللاعب الضيف');
     }
   }
 

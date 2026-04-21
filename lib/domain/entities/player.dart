@@ -27,6 +27,7 @@ class Player {
   final List<String> followingIds;    // أحادية — أنت تتابعهم
   final List<String> blockedIds;      // حجب كامل
   final String privacySetting;        // public | friends_only | private
+  final bool isGuest;                 // Phase 4: هل هو لاعب ضيف؟
   final DateTime createdAt;
   final DateTime lastActiveAt;
 
@@ -55,6 +56,7 @@ class Player {
     this.followingIds = const [],
     this.blockedIds = const [],
     this.privacySetting = 'public',
+    this.isGuest = false,
     required this.createdAt,
     required this.lastActiveAt,
   });
@@ -101,6 +103,7 @@ class Player {
     List<String>? followingIds,
     List<String>? blockedIds,
     String? privacySetting,
+    bool? isGuest,
     DateTime? createdAt,
     DateTime? lastActiveAt,
   }) {
@@ -129,6 +132,7 @@ class Player {
       followingIds: followingIds ?? this.followingIds,
       blockedIds: blockedIds ?? this.blockedIds,
       privacySetting: privacySetting ?? this.privacySetting,
+      isGuest: isGuest ?? this.isGuest,
       createdAt: createdAt ?? this.createdAt,
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
     );
