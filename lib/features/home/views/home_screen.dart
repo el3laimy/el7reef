@@ -35,12 +35,12 @@ class _HomeScreenState extends State<HomeScreen> {
     // Controllers مسجلة عبر HomeBinding في app_pages.dart
   }
 
-  final _pages = const [
-    _HomeTab(),
-    MatchDiscoverScreen(),
-    TournamentListScreen(),
-    MyTeamsScreen(),
-    ProfileScreen(),
+  late final List<Widget> _pages = [
+    _HomeTab(onNavigateToTab: (i) => setState(() => _currentIndex = i)),
+    const MatchDiscoverScreen(),
+    const TournamentListScreen(),
+    const MyTeamsScreen(),
+    const ProfileScreen(),
   ];
 
   @override
@@ -95,7 +95,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
 /// ── تاب الرئيسية ──
 class _HomeTab extends StatelessWidget {
-  const _HomeTab();
+  final void Function(int index) onNavigateToTab;
+  const _HomeTab({required this.onNavigateToTab});
 
   @override
   Widget build(BuildContext context) {
@@ -107,8 +108,17 @@ class _HomeTab extends StatelessWidget {
         child: Obx(() {
           final player = authService.currentPlayer.value;
 
-          return CustomScrollView(
-            slivers: [
+          return RefreshIndicator(
+            onRefresh: () async {
+              final matchCtrl = Get.find<MatchController>();
+              await Future.wait([
+                matchCtrl.loadLiveMatches(),
+                matchCtrl.loadMyMatches(),
+              ]);
+            },
+            color: AppColors.primary,
+            child: CustomScrollView(
+             slivers: [
               // ── Header ──
               SliverToBoxAdapter(
                 child: Padding(
@@ -130,10 +140,23 @@ class _HomeTab extends StatelessWidget {
                           ],
                         ),
                       ).animate().fadeIn(duration: 500.ms),
-                      if (player != null)
+                      const SizedBox(width: AppDimensions.sm),
+                      if (player != null) ...[                        
                         RankTierBadge(rating: player.rating)
                             .animate()
                             .fadeIn(delay: 200.ms),
+                        const SizedBox(width: AppDimensions.sm),
+                        CircleAvatar(
+                          radius: 22,
+                          backgroundColor: AppColors.primarySurface,
+                          backgroundImage: player.photoThumbUrl != null
+                              ? NetworkImage(player.photoThumbUrl!)
+                              : null,
+                          child: player.photoThumbUrl == null
+                              ? const Icon(Icons.person, color: AppColors.primary, size: 22)
+                              : null,
+                        ).animate().fadeIn(delay: 300.ms),
+                      ],
                     ],
                   ),
                 ),
@@ -278,9 +301,7 @@ class _HomeTab extends StatelessWidget {
                           .animate().fadeIn(delay: 500.ms),
                       const Spacer(),
                       GestureDetector(
-                        onTap: () {
-                          // الانتقال لتاب اكتشاف
-                        },
+                        onTap: () => onNavigateToTab(1),
                         child: Text('عرض الكل',
                             style: AppTextStyles.labelMedium.copyWith(
                               color: AppColors.primary,
@@ -345,7 +366,10 @@ class _HomeTab extends StatelessWidget {
                       itemCount: liveMatches.length.clamp(0, 5),
                       itemBuilder: (context, index) {
                         final match = liveMatches[index];
-                        return _LiveMatchCard(match: match, index: index);
+                        return GestureDetector(
+                          onTap: () => Get.toNamed('/match/lobby/${match.id}'),
+                          child: _LiveMatchCard(match: match, index: index),
+                        );
                       },
                     ),
                   );
@@ -407,7 +431,10 @@ class _HomeTab extends StatelessWidget {
                           AppDimensions.pagePadding, 0,
                           AppDimensions.pagePadding, AppDimensions.sm,
                         ),
-                        child: _MyMatchCard(match: e.value, index: e.key),
+                        child: GestureDetector(
+                          onTap: () => Get.toNamed('/match/lobby/${e.value.id}'),
+                          child: _MyMatchCard(match: e.value, index: e.key),
+                        ),
                       );
                     }).toList(),
                   );
@@ -415,7 +442,8 @@ class _HomeTab extends StatelessWidget {
               ),
 
             ],
-          );
+          ),  // CustomScrollView
+          );  // RefreshIndicator
         }),
       ),
     );
@@ -480,7 +508,7 @@ class _LiveMatchCard extends StatelessWidget {
 
     return Container(
       width: 200,
-      margin: const EdgeInsets.only(left: AppDimensions.sm),
+      margin: const EdgeInsetsDirectional.only(end: AppDimensions.sm),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
@@ -568,6 +596,7 @@ class _LiveMatchCard extends StatelessWidget {
     ).animate(delay: (100 * index).ms).fadeIn(duration: 400.ms).slideX(begin: 0.2);
   }
 }
+
 
 // ── بطاقة مبارياتي الأخيرة ──
 class _MyMatchCard extends StatelessWidget {

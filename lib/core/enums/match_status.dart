@@ -8,4 +8,5 @@ enum MatchStatus {
   settled,        // تمت التسوية
   pendingReview,  // قيد المراجعة (شذوذ)
   frozen,         // مجمدة من المنظم
+  cancelled,      // ملغاة من المنظم (soft-delete)
 }

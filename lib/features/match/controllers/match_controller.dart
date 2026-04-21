@@ -53,7 +53,7 @@ class MatchController extends GetxController {
   }
 
   /// إنشاء مباراة جديدة
-  Future<void> createMatch({
+  Future<String?> createMatch({
     required List<String> teamAIds,
     required List<String> teamBIds,
     String? location,
@@ -61,9 +61,10 @@ class MatchController extends GetxController {
     double? lng,
     bool isOrganized = false,
     String? tournamentId,
+    int? teamSize,
   }) async {
     final uid = _authService.currentUserId;
-    if (uid == null) return;
+    if (uid == null) return null;
 
     try {
       isLoading.value = true;
@@ -75,14 +76,13 @@ class MatchController extends GetxController {
         organizerId: uid,
         teamAPlayerIds: teamAIds,
         teamBPlayerIds: teamBIds,
-        status: MatchStatus.live,
+        status: MatchStatus.open,
         location: location,
         latitude: lat,
         longitude: lng,
         isOrganized: isOrganized,
         tournamentId: tournamentId,
         createdAt: now,
-        startedAt: now,
       );
 
       await _matchRepo.createMatch(match);
@@ -91,8 +91,10 @@ class MatchController extends GetxController {
 
       Get.snackbar('تم ✅', 'تم إنشاء المباراة!',
           snackPosition: SnackPosition.BOTTOM);
+      return match.id;
     } catch (e) {
       errorMessage.value = 'فشل إنشاء المباراة: $e';
+      return null;
     } finally {
       isLoading.value = false;
     }
@@ -163,6 +165,62 @@ class MatchController extends GetxController {
       Get.snackbar('خطأ', 'فشل اعتماد النتيجة');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  /// إلغاء مباراة (soft-delete)
+  Future<void> cancelMatch(String matchId) async {
+    try {
+      await _matchRepo.cancelMatch(matchId);
+      liveMatches.removeWhere((m) => m.id == matchId);
+      myMatches.removeWhere((m) => m.id == matchId);
+      Get.snackbar('تم الإلغاء ❌', 'تم إلغاء المباراة',
+          snackPosition: SnackPosition.BOTTOM);
+    } catch (e) {
+      AppLogger.error('MatchController.cancelMatch', e);
+      Get.snackbar('خطأ', 'فشل إلغاء المباراة');
+    }
+  }
+
+  /// بدء المباراة (open → live)
+  Future<void> startMatch(String matchId) async {
+    try {
+      await _matchRepo.updateMatch(
+        (await _matchRepo.getMatch(matchId))!.copyWith(
+          status: MatchStatus.live,
+          startedAt: DateTime.now(),
+        ),
+      );
+      await loadLiveMatches();
+      Get.snackbar('بدأت المباراة ⚽', 'تم بدء المباراة!',
+          snackPosition: SnackPosition.BOTTOM);
+    } catch (e) {
+      AppLogger.error('MatchController.startMatch', e);
+      Get.snackbar('خطأ', 'فشل بدء المباراة');
+    }
+  }
+
+  /// إضافة لاعب لمباراة
+  Future<void> addPlayer(String matchId, String playerId, String side) async {
+    try {
+      await _matchRepo.addPlayerToMatch(
+        matchId: matchId, playerId: playerId, side: side,
+      );
+    } catch (e) {
+      AppLogger.error('MatchController.addPlayer', e);
+      Get.snackbar('خطأ', 'فشل إضافة اللاعب');
+    }
+  }
+
+  /// إزالة لاعب من مباراة
+  Future<void> removePlayer(String matchId, String playerId, String side) async {
+    try {
+      await _matchRepo.removePlayerFromMatch(
+        matchId: matchId, playerId: playerId, side: side,
+      );
+    } catch (e) {
+      AppLogger.error('MatchController.removePlayer', e);
+      Get.snackbar('خطأ', 'فشل إزالة اللاعب');
     }
   }
 }

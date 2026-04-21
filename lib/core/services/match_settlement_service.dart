@@ -3,11 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/firebase_paths.dart';
 import '../../core/enums/match_status.dart';
 import '../../data/models/match_model.dart';
-import '../../data/models/player_model.dart';
 import '../../core/enums/tournament_ops_enums.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/player.dart';
 import '../../domain/entities/player_match_stats.dart';
+import 'official_match_roster_service.dart';
 import 'rating_engine.dart';
 import 'tournament_lifecycle_service.dart';
 
@@ -28,6 +28,7 @@ class MatchSettlementResult {
 class MatchSettlementService {
   final FirebaseFirestore _firestore;
   final TournamentLifecycleService _tournamentLifecycleService;
+  final OfficialMatchRosterService _officialRosterService;
 
   MatchSettlementService({
     FirebaseFirestore? firestore,
@@ -37,7 +38,10 @@ class MatchSettlementService {
            tournamentLifecycleService ??
            TournamentLifecycleService(
              firestore: firestore ?? FirebaseFirestore.instance,
-           );
+           ),
+       _officialRosterService = OfficialMatchRosterService(
+         firestore: firestore ?? FirebaseFirestore.instance,
+       );
 
   Future<MatchSettlementResult> submitScore({
     required String matchId,
@@ -46,6 +50,25 @@ class MatchSettlementService {
     String? mvpPlayerId,
     List<PlayerMatchStats> detailedStats = const [],
   }) async {
+    final officialRoster = await _officialRosterService.loadRegisteredRoster(
+      matchId: matchId,
+    );
+    final eligiblePlayerIds = officialRoster.allPlayerIds.toSet();
+    final normalizedMvpId = _normalizeOptionalId(mvpPlayerId);
+    if (normalizedMvpId != null &&
+        eligiblePlayerIds.isNotEmpty &&
+        !eligiblePlayerIds.contains(normalizedMvpId)) {
+      throw StateError('لا يمكن اختيار MVP خارج roster الرسمية للمباراة.');
+    }
+    final invalidStats = detailedStats.where(
+      (stats) =>
+          eligiblePlayerIds.isNotEmpty &&
+          !eligiblePlayerIds.contains(stats.playerId),
+    );
+    if (invalidStats.isNotEmpty) {
+      throw StateError('توجد إحصائيات مرتبطة بلاعب خارج roster الرسمية.');
+    }
+
     return _firestore.runTransaction((transaction) async {
       final matchRef = _firestore
           .collection(FirebasePaths.matches)
@@ -80,7 +103,7 @@ class MatchSettlementService {
       final updatedMatch = rawMatch.copyWith(
         scoreTeamA: scoreA,
         scoreTeamB: scoreB,
-        mvpPlayerId: mvpPlayerId,
+        mvpPlayerId: normalizedMvpId,
         completedAt: submittedAt,
         isAnomaly: isAnomaly,
         status: isAnomaly ? MatchStatus.pendingReview : MatchStatus.completed,
@@ -89,7 +112,7 @@ class MatchSettlementService {
       transaction.update(matchRef, {
         'scoreTeamA': scoreA,
         'scoreTeamB': scoreB,
-        'mvpPlayerId': mvpPlayerId,
+        'mvpPlayerId': normalizedMvpId,
         'completedAt': submittedAt.millisecondsSinceEpoch,
         'isAnomaly': isAnomaly,
         'status': updatedMatch.status.name,
@@ -106,6 +129,7 @@ class MatchSettlementService {
         openedAt: submittedAt,
         sessionRef: fanVotingRef,
         sessionExists: fanVotingSnapshot.exists,
+        eligiblePlayerIds: officialRoster.allPlayerIds,
       );
 
       return MatchSettlementResult(
@@ -116,6 +140,9 @@ class MatchSettlementService {
   }
 
   Future<MatchSettlementResult> approveScore({required String matchId}) async {
+    final officialRoster = await _officialRosterService.loadRegisteredRoster(
+      matchId: matchId,
+    );
     Match? tournamentMatch;
     final result = await _firestore.runTransaction((transaction) async {
       final matchRef = _firestore
@@ -154,20 +181,8 @@ class MatchSettlementService {
         fanVotingRef: fanVotingRef,
         fanVotingSnapshot: fanVotingSnapshot,
       );
-
-      final playersById = await _loadPlayers(
-        transaction: transaction,
-        playerIds: [...match.teamAPlayerIds, ...match.teamBPlayerIds],
-      );
-
-      final teamAPlayers = match.teamAPlayerIds
-          .map((playerId) => playersById[playerId])
-          .whereType<Player>()
-          .toList();
-      final teamBPlayers = match.teamBPlayerIds
-          .map((playerId) => playersById[playerId])
-          .whereType<Player>()
-          .toList();
+      final teamAPlayers = officialRoster.teamAPlayers;
+      final teamBPlayers = officialRoster.teamBPlayers;
 
       final avgA = _avgRating(teamAPlayers);
       final avgB = _avgRating(teamBPlayers);
@@ -248,6 +263,7 @@ class MatchSettlementService {
     required DateTime openedAt,
     required DocumentReference<Map<String, dynamic>> sessionRef,
     required bool sessionExists,
+    required List<String> eligiblePlayerIds,
   }) async {
     if (sessionExists) {
       return;
@@ -261,6 +277,7 @@ class MatchSettlementService {
           .millisecondsSinceEpoch,
       'totalVotes': 0,
       'playerVotes': <String, int>{},
+      'eligiblePlayerIds': eligiblePlayerIds,
       'winnerPlayerId': null,
     });
   }
@@ -290,27 +307,6 @@ class MatchSettlementService {
         'position': stats.position.name,
       });
     }
-  }
-
-  Future<Map<String, Player>> _loadPlayers({
-    required Transaction transaction,
-    required List<String> playerIds,
-  }) async {
-    final players = <String, Player>{};
-    for (final playerId in playerIds.toSet()) {
-      final playerRef = _firestore
-          .collection(FirebasePaths.players)
-          .doc(playerId);
-      final playerSnapshot = await transaction.get(playerRef);
-      if (!playerSnapshot.exists || playerSnapshot.data() == null) {
-        continue;
-      }
-      players[playerId] = PlayerModel.fromJson(
-        playerSnapshot.data()!,
-        playerSnapshot.id,
-      ).toEntity();
-    }
-    return players;
   }
 
   void _updatePlayerAggregate({
@@ -391,6 +387,14 @@ class MatchSettlementService {
         .map((player) => player.rating)
         .fold<int>(0, (a, b) => a + b);
     return total / players.length;
+  }
+
+  String? _normalizeOptionalId(String? value) {
+    if (value == null) {
+      return null;
+    }
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   bool _isSettled(DocumentSnapshot<Map<String, dynamic>> matchSnapshot) {

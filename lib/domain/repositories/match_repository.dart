@@ -30,4 +30,15 @@ abstract class MatchRepository {
   Future<void> freezeMatch(String matchId);
   Future<void> unfreezeMatch(String matchId);
   Future<void> activateGoldenRating(String matchId);
+  Future<void> cancelMatch(String matchId);
+  Future<void> addPlayerToMatch({
+    required String matchId,
+    required String playerId,
+    required String side,
+  });
+  Future<void> removePlayerFromMatch({
+    required String matchId,
+    required String playerId,
+    required String side,
+  });
 }

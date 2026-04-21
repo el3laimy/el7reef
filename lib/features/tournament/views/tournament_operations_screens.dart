@@ -845,6 +845,11 @@ class _TournamentFixturesScreenState extends State<TournamentFixturesScreen> {
                 (fixture) => _FixtureOperationsCard(
                   fixture: fixture,
                   controller: controller,
+                  onStartMatch:
+                      controller.isActing.value ||
+                          !controller.canStartFixture(fixture)
+                      ? null
+                      : () => controller.startFixture(fixture.id),
                   onSchedule:
                       controller.isActing.value ||
                           fixture.isOfficialTournamentResult
@@ -1762,11 +1767,13 @@ class _ParticipantCard extends StatelessWidget {
 class _FixtureOperationsCard extends StatelessWidget {
   final Match fixture;
   final TournamentOperationsController controller;
+  final VoidCallback? onStartMatch;
   final VoidCallback? onSchedule;
 
   const _FixtureOperationsCard({
     required this.fixture,
     required this.controller,
+    required this.onStartMatch,
     required this.onSchedule,
   });
 
@@ -1855,8 +1862,12 @@ class _FixtureOperationsCard extends StatelessWidget {
             Text(
               fixture.isOfficialTournamentResult
                   ? 'النتيجة معتمدة وتؤثر مباشرة على الترتيب أو الإقصاء.'
+                  : fixture.status == MatchStatus.live
+                  ? 'المباراة جارية الآن ويمكن الدخول مباشرة إلى مراجعة النتيجة.'
                   : fixture.fixtureStatus == FixtureStatus.draft
-                  ? 'هذه fixture ما زالت draft ويمكن تعديل توقيتها قبل النشر.'
+                  ? 'هذه fixture ما زالت draft ويجب نشرها قبل بدء المباراة.'
+                  : fixture.status == MatchStatus.open
+                  ? 'بعد check-in وقفل التشكيل للطرفين يمكنك بدء المباراة من هنا.'
                   : fixture.scheduledAt == null
                   ? 'يفضل تحديد الموعد والملعب قبل يوم التشغيل.'
                   : 'الـ fixture جاهزة للوصول السريع إلى التشغيل أو مراجعة النتيجة.',
@@ -1872,6 +1883,11 @@ class _FixtureOperationsCard extends StatelessWidget {
                       Get.toNamed(AppRoutes.matchDetailsById(fixture.id)),
                   icon: const Icon(Icons.sports_soccer),
                   label: const Text('Matchday'),
+                ),
+                FilledButton.icon(
+                  onPressed: onStartMatch,
+                  icon: const Icon(Icons.play_arrow),
+                  label: const Text('Start Match'),
                 ),
                 OutlinedButton.icon(
                   onPressed: fixture.status == MatchStatus.open
@@ -2261,6 +2277,7 @@ String _matchStatusLabel(MatchStatus status) => switch (status) {
   MatchStatus.settled => 'Settled',
   MatchStatus.ratingWindow => 'Rating Window',
   MatchStatus.frozen => 'Frozen',
+  MatchStatus.cancelled => 'Cancelled',
 };
 
 String _formatDateTime(DateTime? value) {

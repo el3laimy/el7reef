@@ -1,0 +1,32 @@
+import 'package:get/get.dart';
+import '../controllers/match_lobby_controller.dart';
+import '../../../domain/repositories/match_repository.dart';
+import '../../../data/repositories/match_repository_impl.dart';
+import '../../../domain/repositories/match_invitation_repository.dart';
+import '../../../data/repositories/match_invitation_repository_impl.dart';
+import '../../../data/repositories/friend_repository_impl.dart';
+import '../../social/controllers/friend_controller.dart';
+
+class MatchLobbyBinding extends Bindings {
+  @override
+  void dependencies() {
+    final matchId = Get.parameters['id'] ?? '';
+    
+    if (!Get.isRegistered<MatchRepository>()) {
+      Get.lazyPut<MatchRepository>(() => MatchRepositoryImpl());
+    }
+    if (!Get.isRegistered<MatchInvitationRepository>()) {
+      Get.lazyPut<MatchInvitationRepository>(() => MatchInvitationRepositoryImpl());
+    }
+    if (!Get.isRegistered<FriendRepositoryImpl>()) {
+      Get.lazyPut(() => FriendRepositoryImpl());
+    }
+    if (!Get.isRegistered<FriendController>()) {
+      Get.lazyPut(() => FriendController(Get.find<FriendRepositoryImpl>()));
+    }
+
+    Get.lazyPut<MatchLobbyController>(
+      () => MatchLobbyController(matchId: matchId),
+    );
+  }
+}

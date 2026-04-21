@@ -9,6 +9,7 @@ class GuestPlayerModel {
   final int? jerseyNumber;
   final String? preferredPosition;
   final String? teamId;
+  final String? guestTeamId;
   final String? tournamentId;
   final String createdBy;
   final DateTime createdAt;
@@ -26,6 +27,7 @@ class GuestPlayerModel {
     this.jerseyNumber,
     this.preferredPosition,
     this.teamId,
+    this.guestTeamId,
     this.tournamentId,
     required this.createdBy,
     required this.createdAt,
@@ -45,6 +47,7 @@ class GuestPlayerModel {
       jerseyNumber: (json['jerseyNumber'] as num?)?.toInt(),
       preferredPosition: json['preferredPosition'] as String?,
       teamId: json['teamId'] as String?,
+      guestTeamId: json['guestTeamId'] as String?,
       tournamentId: json['tournamentId'] as String?,
       createdBy: json['createdBy'] as String? ?? '',
       createdAt: json['createdAt'] != null
@@ -72,6 +75,7 @@ class GuestPlayerModel {
       'jerseyNumber': jerseyNumber,
       'preferredPosition': preferredPosition,
       'teamId': teamId,
+      'guestTeamId': guestTeamId,
       'tournamentId': tournamentId,
       'createdBy': createdBy,
       'createdAt': createdAt.millisecondsSinceEpoch,
@@ -92,6 +96,7 @@ class GuestPlayerModel {
       jerseyNumber: jerseyNumber,
       preferredPosition: preferredPosition,
       teamId: teamId,
+      guestTeamId: guestTeamId,
       tournamentId: tournamentId,
       createdBy: createdBy,
       createdAt: createdAt,
@@ -112,6 +117,7 @@ class GuestPlayerModel {
       jerseyNumber: guestPlayer.jerseyNumber,
       preferredPosition: guestPlayer.preferredPosition,
       teamId: guestPlayer.teamId,
+      guestTeamId: guestPlayer.guestTeamId,
       tournamentId: guestPlayer.tournamentId,
       createdBy: guestPlayer.createdBy,
       createdAt: guestPlayer.createdAt,

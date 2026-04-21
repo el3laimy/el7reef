@@ -8,6 +8,7 @@ import '../../data/repositories/claim_code_repository_impl.dart';
 import '../../data/repositories/guest_player_repository_impl.dart';
 import '../../data/repositories/guest_team_repository_impl.dart';
 import '../../data/repositories/team_repository_impl.dart';
+import '../../data/repositories/tournament_repository_impl.dart';
 import '../../domain/entities/claim_code.dart';
 import '../../domain/entities/claim_payload.dart';
 import '../../domain/entities/generated_share_link.dart';
@@ -17,15 +18,19 @@ import '../../domain/repositories/claim_code_repository.dart';
 import '../../domain/repositories/guest_player_repository.dart';
 import '../../domain/repositories/guest_team_repository.dart';
 import '../../domain/repositories/team_repository.dart';
+import '../../domain/repositories/tournament_repository.dart';
 import 'analytics_service.dart';
 import 'team_roster_policy.dart';
+import 'tournament_permission_service.dart';
 
 class ShareLinkService {
   final ClaimCodeRepository _claimCodeRepository;
   final GuestPlayerRepository _guestPlayerRepository;
   final GuestTeamRepository _guestTeamRepository;
   final TeamRepository _teamRepository;
+  TournamentRepository? _tournamentRepository;
   final TeamRosterPolicy _teamRosterPolicy;
+  final TournamentPermissionService _tournamentPermissionService;
   final AnalyticsService _analyticsService;
   final Uuid _uuid;
 
@@ -37,17 +42,25 @@ class ShareLinkService {
     GuestPlayerRepository? guestPlayerRepository,
     GuestTeamRepository? guestTeamRepository,
     TeamRepository? teamRepository,
+    TournamentRepository? tournamentRepository,
     TeamRosterPolicy? teamRosterPolicy,
+    TournamentPermissionService? tournamentPermissionService,
     AnalyticsService? analyticsService,
     Uuid? uuid,
-  })  : _claimCodeRepository = claimCodeRepository ?? ClaimCodeRepositoryImpl(),
-        _guestPlayerRepository =
-            guestPlayerRepository ?? GuestPlayerRepositoryImpl(),
-        _guestTeamRepository = guestTeamRepository ?? GuestTeamRepositoryImpl(),
-        _teamRepository = teamRepository ?? TeamRepositoryImpl(),
-        _teamRosterPolicy = teamRosterPolicy ?? const TeamRosterPolicy(),
-        _analyticsService = analyticsService ?? AnalyticsService(),
-        _uuid = uuid ?? const Uuid();
+  }) : _claimCodeRepository = claimCodeRepository ?? ClaimCodeRepositoryImpl(),
+       _guestPlayerRepository =
+           guestPlayerRepository ?? GuestPlayerRepositoryImpl(),
+       _guestTeamRepository = guestTeamRepository ?? GuestTeamRepositoryImpl(),
+       _teamRepository = teamRepository ?? TeamRepositoryImpl(),
+       _tournamentRepository = tournamentRepository,
+       _teamRosterPolicy = teamRosterPolicy ?? const TeamRosterPolicy(),
+       _tournamentPermissionService =
+           tournamentPermissionService ?? TournamentPermissionService(),
+       _analyticsService = analyticsService ?? AnalyticsService(),
+       _uuid = uuid ?? const Uuid();
+
+  TournamentRepository get _resolvedTournamentRepository =>
+      _tournamentRepository ??= TournamentRepositoryImpl();
 
   Future<GeneratedShareLink> createGuestPlayerClaimLink({
     required String guestPlayerId,
@@ -55,7 +68,9 @@ class ShareLinkService {
     Duration ttl = const Duration(days: 7),
     bool requiresApproval = false,
   }) async {
-    final guestPlayer = await _guestPlayerRepository.getGuestPlayer(guestPlayerId);
+    final guestPlayer = await _guestPlayerRepository.getGuestPlayer(
+      guestPlayerId,
+    );
     if (guestPlayer == null) {
       throw Exception('اللاعب الضيف المطلوب غير موجود.');
     }
@@ -124,8 +139,9 @@ class ShareLinkService {
             ? guestTeam.tournamentIds.first
             : null,
       ),
-      tournamentId:
-          guestTeam.tournamentIds.isNotEmpty ? guestTeam.tournamentIds.first : null,
+      tournamentId: guestTeam.tournamentIds.isNotEmpty
+          ? guestTeam.tournamentIds.first
+          : null,
       actorId: actorId,
       ttl: ttl,
       requiresApproval: requiresApproval,
@@ -257,10 +273,7 @@ class ShareLinkService {
       }
 
       await _claimCodeRepository.updateClaimCode(
-        existing.copyWith(
-          status: ClaimCodeStatus.expired,
-          updatedAt: now,
-        ),
+        existing.copyWith(status: ClaimCodeStatus.expired, updatedAt: now),
       );
     }
 
@@ -285,7 +298,11 @@ class ShareLinkService {
 
   Future<String> _generateUniqueCode() async {
     for (var attempt = 0; attempt < 6; attempt += 1) {
-      final candidate = _uuid.v4().replaceAll('-', '').substring(0, 12).toUpperCase();
+      final candidate = _uuid
+          .v4()
+          .replaceAll('-', '')
+          .substring(0, 12)
+          .toUpperCase();
       final existing = await _claimCodeRepository.getClaimCode(candidate);
       if (existing == null) {
         return candidate;
@@ -294,10 +311,7 @@ class ShareLinkService {
     throw Exception('تعذر توليد claim code فريد حالياً.');
   }
 
-  ClaimPayloadScope _inferScope({
-    String? teamId,
-    String? tournamentId,
-  }) {
+  ClaimPayloadScope _inferScope({String? teamId, String? tournamentId}) {
     final hasTeam = teamId != null && teamId.isNotEmpty;
     final hasTournament = tournamentId != null && tournamentId.isNotEmpty;
 
@@ -324,7 +338,30 @@ class ShareLinkService {
     final teamId = guestPlayer.teamId;
     if (teamId != null && teamId.isNotEmpty) {
       final team = await _teamRepository.getTeam(teamId);
-      if (team != null && _teamRosterPolicy.canManageRoster(team: team, actorId: actorId)) {
+      if (team != null &&
+          _teamRosterPolicy.canManageRoster(team: team, actorId: actorId)) {
+        return;
+      }
+    }
+
+    final guestTeamId = guestPlayer.guestTeamId;
+    if (guestTeamId != null && guestTeamId.isNotEmpty) {
+      final guestTeam = await _guestTeamRepository.getGuestTeam(guestTeamId);
+      if (guestTeam != null && guestTeam.creatorId == actorId) {
+        return;
+      }
+    }
+
+    final tournamentId = guestPlayer.tournamentId;
+    if (tournamentId != null && tournamentId.isNotEmpty) {
+      final tournament = await _resolvedTournamentRepository.getTournament(
+        tournamentId,
+      );
+      if (tournament != null &&
+          _tournamentPermissionService.canIssueGuestClaims(
+            tournament,
+            actorId,
+          )) {
         return;
       }
     }

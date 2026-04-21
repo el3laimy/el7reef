@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/enums/audit_action.dart';
 import '../../data/repositories/audit_repository_impl.dart';
+import '../../domain/entities/guest_player.dart';
+import '../../domain/entities/guest_team.dart';
 import '../../domain/entities/tournament.dart';
 import 'audit_service.dart';
 
@@ -173,6 +175,27 @@ class TournamentAuditEmitter {
     );
   }
 
+  Future<void> fixtureStarted({
+    required Tournament tournament,
+    required String actorId,
+    required String matchId,
+    required DateTime startedAt,
+    required int teamAProjectedPlayers,
+    required int teamBProjectedPlayers,
+  }) {
+    return _auditService.recordMatchEvent(
+      matchId: matchId,
+      action: AuditAction.fixtureStarted,
+      actorId: actorId,
+      metadata: {
+        'tournamentId': tournament.id,
+        'startedAt': startedAt.millisecondsSinceEpoch,
+        'teamAProjectedPlayers': teamAProjectedPlayers,
+        'teamBProjectedPlayers': teamBProjectedPlayers,
+      },
+    );
+  }
+
   Future<void> fixturesPublished({
     required Tournament tournament,
     required String actorId,
@@ -211,5 +234,100 @@ class TournamentAuditEmitter {
       actorId: actorId,
       metadata: {'winnerParticipantId': winnerParticipantId},
     );
+  }
+
+  Future<void> guestPlayerCreated({
+    required Tournament tournament,
+    required String guestTeamId,
+    required String actorId,
+    required GuestPlayer guestPlayer,
+  }) {
+    return _auditService.record(
+      entityType: AuditEntityType.guestPlayer,
+      entityId: guestPlayer.id,
+      action: AuditAction.guestPlayerCreated,
+      actorId: actorId,
+      afterPayload: _guestPlayerPayload(guestPlayer),
+      metadata: {'tournamentId': tournament.id, 'guestTeamId': guestTeamId},
+    );
+  }
+
+  Future<void> guestPlayerUpdated({
+    required Tournament tournament,
+    required String guestTeamId,
+    required String actorId,
+    required GuestPlayer before,
+    required GuestPlayer after,
+  }) {
+    return _auditService.record(
+      entityType: AuditEntityType.guestPlayer,
+      entityId: after.id,
+      action: AuditAction.guestPlayerUpdated,
+      actorId: actorId,
+      beforePayload: _guestPlayerPayload(before),
+      afterPayload: _guestPlayerPayload(after),
+      metadata: {'tournamentId': tournament.id, 'guestTeamId': guestTeamId},
+    );
+  }
+
+  Future<void> guestPlayerArchived({
+    required Tournament tournament,
+    required String guestTeamId,
+    required String actorId,
+    required GuestPlayer before,
+    required GuestPlayer after,
+  }) {
+    return _auditService.record(
+      entityType: AuditEntityType.guestPlayer,
+      entityId: after.id,
+      action: AuditAction.guestPlayerArchived,
+      actorId: actorId,
+      beforePayload: _guestPlayerPayload(before),
+      afterPayload: _guestPlayerPayload(after),
+      metadata: {'tournamentId': tournament.id, 'guestTeamId': guestTeamId},
+    );
+  }
+
+  Future<void> guestTeamCaptainUpdated({
+    required Tournament tournament,
+    required String actorId,
+    required GuestTeam before,
+    required GuestTeam after,
+  }) {
+    return _auditService.record(
+      entityType: AuditEntityType.guestTeam,
+      entityId: after.id,
+      action: AuditAction.guestTeamCaptainUpdated,
+      actorId: actorId,
+      beforePayload: _guestTeamPayload(before),
+      afterPayload: _guestTeamPayload(after),
+      metadata: {'tournamentId': tournament.id},
+    );
+  }
+
+  Map<String, dynamic> _guestPlayerPayload(GuestPlayer guestPlayer) {
+    return {
+      'displayName': guestPlayer.displayName,
+      'normalizedName': guestPlayer.normalizedName,
+      'phoneNumber': guestPlayer.phoneNumber,
+      'jerseyNumber': guestPlayer.jerseyNumber,
+      'preferredPosition': guestPlayer.preferredPosition,
+      'teamId': guestPlayer.teamId,
+      'guestTeamId': guestPlayer.guestTeamId,
+      'tournamentId': guestPlayer.tournamentId,
+      'claimStatus': guestPlayer.claimStatus.name,
+      'linkedPlayerId': guestPlayer.linkedPlayerId,
+      'notes': guestPlayer.notes,
+    };
+  }
+
+  Map<String, dynamic> _guestTeamPayload(GuestTeam guestTeam) {
+    return {
+      'name': guestTeam.name,
+      'captainGuestPlayerId': guestTeam.captainGuestPlayerId,
+      'linkedTeamId': guestTeam.linkedTeamId,
+      'claimStatus': guestTeam.claimStatus.name,
+      'tournamentIds': guestTeam.tournamentIds,
+    };
   }
 }

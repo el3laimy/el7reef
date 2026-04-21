@@ -63,3 +63,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+## 5. Context & Initialization Rules
+
+**CRITICAL: Always ignore IDE background open files metadata.**
+NEVER assume the user's context from background files at the start of a conversation. DO NOT open or read any file unless the user explicitly names it or provides the exact path. Wait for explicit instructions.

@@ -250,6 +250,13 @@ class TournamentOperationsController extends GetxController {
     return participant.isActive && canReplaceParticipants;
   }
 
+  bool canStartFixture(Match fixture) {
+    return !isBlockedByManualMigration &&
+        fixture.fixtureStatus == FixtureStatus.published &&
+        fixture.status == MatchStatus.open &&
+        !fixture.isFrozen;
+  }
+
   bool canReactivateParticipant(TournamentParticipant participant) {
     return !participant.isActive &&
         !isBlockedByManualMigration &&
@@ -672,7 +679,15 @@ class TournamentOperationsController extends GetxController {
         participantId: participantId,
         actorId: tournament.value?.organizerId ?? 'system',
       ),
-      onSuccess: (_) => _refreshParticipantsOnly(refreshTournament: true),
+      onSuccess: (result) async {
+        _upsertParticipants(<TournamentParticipant>[
+          result.reactivatedParticipant,
+          if (result.withdrawnReplacement != null) result.withdrawnReplacement!,
+        ]);
+        _syncTournamentParticipantCountLocal(
+          overrideCount: result.activeParticipantCount,
+        );
+      },
     );
   }
 
@@ -711,7 +726,15 @@ class TournamentOperationsController extends GetxController {
         replacementSourceEntityId: replacementSourceEntityId,
         actorId: tournament.value?.organizerId ?? 'system',
       ),
-      onSuccess: (_) => _refreshParticipantsOnly(),
+      onSuccess: (result) async {
+        _upsertParticipants(<TournamentParticipant>[
+          result.replacedParticipant,
+          result.replacementParticipant,
+        ]);
+        _syncTournamentParticipantCountLocal(
+          overrideCount: result.activeParticipantCount,
+        );
+      },
     );
   }
 
@@ -839,6 +862,19 @@ class TournamentOperationsController extends GetxController {
     );
   }
 
+  Future<void> startFixture(String fixtureId) async {
+    await _runAction(
+      message: 'تم بدء المباراة وأصبحت جارية الآن.',
+      action: () => _fixtureService.startMatch(
+        matchId: fixtureId,
+        actorId: tournament.value?.organizerId ?? 'system',
+      ),
+      onSuccess: (updatedFixture) async {
+        _upsertFixture(updatedFixture);
+      },
+    );
+  }
+
   Future<void> _runAction<T>({
     required String message,
     required Future<T> Function() action,
@@ -905,6 +941,7 @@ class TournamentOperationsController extends GetxController {
       participantsResult: nextParticipants,
       groupsResult: groups.toList(growable: false),
     );
+    _syncTournamentParticipantCountLocal();
   }
 
   void _applyGroups(List<TournamentGroup> nextGroups) {
@@ -916,14 +953,20 @@ class TournamentOperationsController extends GetxController {
   }
 
   void _upsertParticipant(TournamentParticipant participant) {
+    _upsertParticipants(<TournamentParticipant>[participant]);
+  }
+
+  void _upsertParticipants(List<TournamentParticipant> updatedParticipants) {
     final nextParticipants = participants.toList(growable: true);
-    final index = nextParticipants.indexWhere(
-      (item) => item.id == participant.id,
-    );
-    if (index == -1) {
-      nextParticipants.add(participant);
-    } else {
-      nextParticipants[index] = participant;
+    for (final participant in updatedParticipants) {
+      final index = nextParticipants.indexWhere(
+        (item) => item.id == participant.id,
+      );
+      if (index == -1) {
+        nextParticipants.add(participant);
+      } else {
+        nextParticipants[index] = participant;
+      }
     }
     nextParticipants.sort((left, right) {
       final leftSeed = left.seed ?? 1 << 20;
@@ -1006,6 +1049,22 @@ class TournamentOperationsController extends GetxController {
     _participantById = const <String, TournamentParticipant>{};
     _groupNameById = const <String, String>{};
     _participantsByGroupId = const <String, List<TournamentParticipant>>{};
+  }
+
+  void _syncTournamentParticipantCountLocal({int? overrideCount}) {
+    final currentTournament = tournament.value;
+    if (currentTournament == null) {
+      return;
+    }
+    final nextCount =
+        overrideCount ??
+        participants.where((participant) => participant.isActive).length;
+    if (currentTournament.activeParticipantCount == nextCount) {
+      return;
+    }
+    tournament.value = currentTournament.copyWith(
+      activeParticipantCount: nextCount,
+    );
   }
 }
 

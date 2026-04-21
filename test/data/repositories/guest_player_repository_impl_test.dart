@@ -18,7 +18,7 @@ void main() {
     });
 
     test(
-      'creates guest players and filters them by team and tournament',
+      'creates guest players and filters them by team, guest team, and tournament',
       () async {
         await repository.createGuestPlayer(
           GuestPlayer(
@@ -26,6 +26,7 @@ void main() {
             displayName: 'Mahmoud Ali',
             normalizedName: 'mahmoud ali',
             teamId: 'team-1',
+            guestTeamId: 'guest-team-1',
             tournamentId: 'tournament-1',
             createdBy: 'captain-1',
             createdAt: now,
@@ -38,6 +39,7 @@ void main() {
             displayName: 'Youssef Samy',
             normalizedName: 'youssef samy',
             teamId: 'team-1',
+            guestTeamId: 'guest-team-1',
             tournamentId: 'tournament-1',
             createdBy: 'captain-1',
             createdAt: now.add(const Duration(minutes: 1)),
@@ -50,6 +52,7 @@ void main() {
             displayName: 'Other Player',
             normalizedName: 'other player',
             teamId: 'team-2',
+            guestTeamId: 'guest-team-2',
             tournamentId: 'tournament-2',
             createdBy: 'captain-2',
             createdAt: now,
@@ -58,12 +61,16 @@ void main() {
         );
 
         final byTeam = await repository.getTeamGuestPlayers('team-1');
+        final byGuestTeam = await repository.getGuestTeamPlayers(
+          'guest-team-1',
+        );
         final byTournament = await repository.getTournamentGuestPlayers(
           'tournament-1',
         );
         final guestPlayer = await repository.getGuestPlayer('gp-1');
 
         expect(byTeam.map((player) => player.id), ['gp-1', 'gp-2']);
+        expect(byGuestTeam.map((player) => player.id), ['gp-1', 'gp-2']);
         expect(byTournament.map((player) => player.id), ['gp-1', 'gp-2']);
         expect(guestPlayer?.displayName, 'Mahmoud Ali');
       },
@@ -92,6 +99,7 @@ void main() {
           jerseyNumber: 10,
           preferredPosition: 'MID',
           teamId: 'team-1',
+          guestTeamId: 'guest-team-1',
           tournamentId: 'tournament-1',
           createdBy: 'captain-1',
           createdAt: now,
@@ -109,6 +117,7 @@ void main() {
       expect(guestPlayer?.displayName, 'Mahmoud Ali Updated');
       expect(guestPlayer?.phoneNumber, '01000000000');
       expect(guestPlayer?.claimCode, 'code-1');
+      expect(guestPlayer?.guestTeamId, 'guest-team-1');
       expect(guestPlayer?.claimStatus, GuestClaimStatus.archived);
     });
 

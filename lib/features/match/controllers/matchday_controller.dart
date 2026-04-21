@@ -727,7 +727,6 @@ class MatchdayController extends GetxController {
 
   Future<void> _loadGuestSideState(MatchdayManagedSide side) async {
     final guestTeamId = side.guestTeamId!;
-    final activeTournament = tournament.value;
     final results = await Future.wait<dynamic>([
       _checkInRepository.getCheckInByGuestTeamId(
         matchId: matchId,
@@ -745,20 +744,16 @@ class MatchdayController extends GetxController {
         matchId: matchId,
         guestTeamId: guestTeamId,
       ),
-      activeTournament != null
-          ? _guestPlayerRepository.getTournamentGuestPlayers(
-              activeTournament.id,
-            )
-          : Future.value(const <GuestPlayer>[]),
+      _guestPlayerRepository.getGuestTeamPlayers(guestTeamId),
     ]);
     final checkIn = results[0] as MatchCheckIn?;
     final attendances = results[1] as List<MatchAttendance>;
     final snapshot = results[2] as MatchLineupSnapshot?;
     final substitutions = results[3] as List<MatchSubstitution>;
-    final tournamentGuestPlayers = results[4] as List<GuestPlayer>;
+    final guestTeamPlayers = results[4] as List<GuestPlayer>;
 
     final candidateGuestPlayers = <String, GuestPlayer>{};
-    for (final guestPlayer in tournamentGuestPlayers) {
+    for (final guestPlayer in guestTeamPlayers) {
       candidateGuestPlayers[guestPlayer.id] = guestPlayer;
     }
     final missingGuestPlayerIds = <String>[];

@@ -168,7 +168,7 @@ class _MatchCard extends StatelessWidget {
     final isOrganizer = match.organizerId ==
         controller.authService.currentUserId;
     final canOpenMatchday =
-        match.isOrganized || match.teamAId != null || match.teamBId != null;
+        isOrganizer || match.isOrganized || match.teamAId != null || match.teamBId != null;
 
     return GlassmorphicContainer(
       padding: const EdgeInsets.all(AppDimensions.md),
@@ -207,10 +207,9 @@ class _MatchCard extends StatelessWidget {
                 child: Column(
                   children: [
                     const Text('🔵', style: TextStyle(fontSize: 28)),
-                    Text('فريق A', style: AppTextStyles.titleMedium),
                     Text(
                       '${match.teamAPlayerIds.length} لاعب',
-                      style: AppTextStyles.labelSmall,
+                      style: AppTextStyles.titleMedium,
                     ),
                   ],
                 ),
@@ -230,10 +229,9 @@ class _MatchCard extends StatelessWidget {
                 child: Column(
                   children: [
                     const Text('🔴', style: TextStyle(fontSize: 28)),
-                    Text('فريق B', style: AppTextStyles.titleMedium),
                     Text(
                       '${match.teamBPlayerIds.length} لاعب',
-                      style: AppTextStyles.labelSmall,
+                      style: AppTextStyles.titleMedium,
                     ),
                   ],
                 ),
@@ -308,6 +306,21 @@ class _MatchCard extends StatelessWidget {
               ],
             ),
 
+          // ── زر إلغاء المباراة (للمنظم فقط) ──
+          if (isOrganizer && match.status == MatchStatus.open)
+            Padding(
+              padding: const EdgeInsets.only(top: AppDimensions.sm),
+              child: OutlinedButton.icon(
+                onPressed: () => _confirmCancel(context),
+                icon: const Icon(Icons.cancel_outlined, size: 18),
+                label: const Text('إلغاء المباراة'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.error),
+                ),
+              ),
+            ),
+
           if (isOrganizer &&
               (match.status == MatchStatus.completed ||
                   match.status == MatchStatus.pendingReview))
@@ -331,6 +344,28 @@ class _MatchCard extends StatelessWidget {
       ),
     ).animate(delay: (80 * index).ms).fadeIn(duration: 400.ms).slideY(begin: 0.1);
   }
+
+  void _confirmCancel(BuildContext context) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('إلغاء المباراة'),
+        content: const Text('هل أنت متأكد من إلغاء هذه المباراة؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('لا'),
+          ),
+          TextButton(
+            onPressed: () {
+              Get.back();
+              controller.cancelMatch(match.id);
+            },
+            child: const Text('نعم، إلغاء', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Badge حالة المباراة
@@ -348,6 +383,7 @@ class _StatusBadge extends StatelessWidget {
       MatchStatus.pendingReview => (AppColors.warning, '🟠 قيد المراجعة'),
       MatchStatus.frozen => (AppColors.error, '🔒 مجمدة'),
       MatchStatus.full => (AppColors.accent, '🔴 مكتملة'),
+      MatchStatus.cancelled => (AppColors.error, '❌ ملغاة'),
       _ => (AppColors.textMuted, '⏸ معلقة'),
     };
 
@@ -367,15 +403,18 @@ class _StatusBadge extends StatelessWidget {
 /// Sheet إنشاء مباراة
 class _CreateMatchSheet extends StatelessWidget {
   final MatchController controller;
-  const _CreateMatchSheet({required this.controller});
+  _CreateMatchSheet({required this.controller});
+
+  final _locationController = TextEditingController();
+  final _selectedTeamSize = 5.obs;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.only(
-        left: AppDimensions.lg,
-        right: AppDimensions.lg,
-        top: AppDimensions.lg,
+      padding: EdgeInsets.symmetric(
+        horizontal: AppDimensions.lg,
+        vertical: AppDimensions.lg,
+      ).copyWith(
         bottom: MediaQuery.of(context).viewInsets.bottom + AppDimensions.lg,
       ),
       decoration: const BoxDecoration(
@@ -401,23 +440,59 @@ class _CreateMatchSheet extends StatelessWidget {
           Text('ابدأ مباراة جديدة ⚽', style: AppTextStyles.headlineMedium),
           const SizedBox(height: AppDimensions.sm),
           Text(
-            'هيتم إنشاء مباراة فورية وتقدر تضيف اللاعبين',
+            'أنشئ المباراة وادعُ اللاعبين للانضمام',
             style: AppTextStyles.bodySmall,
           ),
           const SizedBox(height: AppDimensions.lg),
 
+          // ── المكان ──
+          TextField(
+            controller: _locationController,
+            decoration: const InputDecoration(
+              labelText: 'المكان (اختياري)',
+              prefixIcon: Icon(Icons.location_on_outlined),
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: AppDimensions.md),
+
+          // ── عدد اللاعبين ──
+          Text('عدد اللاعبين لكل فريق', style: AppTextStyles.titleSmall),
+          const SizedBox(height: AppDimensions.sm),
+          Obx(() => Row(
+            children: [5, 6, 7, 11].map((size) => Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: ChoiceChip(
+                  label: Text('$size v $size'),
+                  selected: _selectedTeamSize.value == size,
+                  onSelected: (_) => _selectedTeamSize.value = size,
+                  selectedColor: AppColors.primarySurface,
+                ),
+              ),
+            )).toList(),
+          )),
+          const SizedBox(height: AppDimensions.lg),
+
           Obx(() => El7reefButton(
-                text: 'ابدأ المباراة',
+                text: 'إنشاء المباراة',
                 icon: Icons.play_arrow_rounded,
                 isLoading: controller.isLoading.value,
                 onPressed: () async {
                   final uid = controller.authService.currentUserId;
                   if (uid == null) return;
-                  await controller.createMatch(
+                  final matchId = await controller.createMatch(
                     teamAIds: [uid],
                     teamBIds: [],
+                    location: _locationController.text.trim().isNotEmpty
+                        ? _locationController.text.trim()
+                        : null,
+                    teamSize: _selectedTeamSize.value,
                   );
                   Get.back();
+                  if (matchId != null) {
+                    Get.toNamed('/match/lobby/$matchId');
+                  }
                 },
               )),
         ],

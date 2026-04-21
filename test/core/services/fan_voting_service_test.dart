@@ -23,24 +23,26 @@ void main() {
 
       await firestore.collection(FirebasePaths.players).doc('voter').set({
         'name': 'Eligible Fan',
-        'createdAt': DateTime(2024)
-            .subtract(const Duration(days: 10))
-            .millisecondsSinceEpoch,
+        'createdAt': DateTime(
+          2024,
+        ).subtract(const Duration(days: 10)).millisecondsSinceEpoch,
         'lastActiveAt': DateTime(2024).millisecondsSinceEpoch,
       });
     });
 
     test('openSession does not overwrite an existing voting session', () async {
-      await firestore.collection(FirebasePaths.fanVotingSessions).doc('m1').set({
-        'matchId': 'm1',
-        'opensAt': DateTime(2024).millisecondsSinceEpoch,
-        'closesAt': DateTime(2024)
-            .add(const Duration(minutes: 90))
-            .millisecondsSinceEpoch,
-        'totalVotes': 3,
-        'playerVotes': {'player_a': 3},
-        'winnerPlayerId': 'player_a',
-      });
+      await firestore.collection(FirebasePaths.fanVotingSessions).doc('m1').set(
+        {
+          'matchId': 'm1',
+          'opensAt': DateTime(2024).millisecondsSinceEpoch,
+          'closesAt': DateTime(
+            2024,
+          ).add(const Duration(minutes: 90)).millisecondsSinceEpoch,
+          'totalVotes': 3,
+          'playerVotes': {'player_a': 3},
+          'winnerPlayerId': 'player_a',
+        },
+      );
 
       await service.openSession('m1');
 
@@ -53,28 +55,57 @@ void main() {
       expect(session.data()?['winnerPlayerId'], 'player_a');
     });
 
-    test('voteForPlayer stores one vote and increments counters atomically',
-        () async {
-      await service.openSession('m1');
+    test(
+      'voteForPlayer stores one vote and increments counters atomically',
+      () async {
+        await service.openSession('m1');
 
-      await service.voteForPlayer(
-        matchId: 'm1',
-        userId: 'voter',
-        targetPlayerId: 'player_a',
-      );
+        await service.voteForPlayer(
+          matchId: 'm1',
+          userId: 'voter',
+          targetPlayerId: 'player_a',
+        );
 
-      final session = await firestore
-          .collection(FirebasePaths.fanVotingSessions)
-          .doc('m1')
-          .get();
-      final vote = await firestore
-          .collection(FirebasePaths.userVotes)
-          .doc('m1_voter')
-          .get();
+        final session = await firestore
+            .collection(FirebasePaths.fanVotingSessions)
+            .doc('m1')
+            .get();
+        final vote = await firestore
+            .collection(FirebasePaths.userVotes)
+            .doc('m1_voter')
+            .get();
 
-      expect(vote.exists, isTrue);
-      expect(session.data()?['totalVotes'], 1);
-      expect(session.data()?['playerVotes']['player_a'], 1);
-    });
+        expect(vote.exists, isTrue);
+        expect(session.data()?['totalVotes'], 1);
+        expect(session.data()?['playerVotes']['player_a'], 1);
+      },
+    );
+
+    test(
+      'voteForPlayer rejects a participating player based on official roster',
+      () async {
+        await firestore.collection(FirebasePaths.players).doc('player_a').set({
+          'name': 'Team Player',
+          'createdAt': DateTime(
+            2024,
+          ).subtract(const Duration(days: 20)).millisecondsSinceEpoch,
+          'lastActiveAt': DateTime(2024).millisecondsSinceEpoch,
+        });
+        await service.openSession('m1');
+
+        expect(
+          () => service.voteForPlayer(
+            matchId: 'm1',
+            userId: 'player_a',
+            targetPlayerId: 'player_b',
+          ),
+          throwsA(
+            predicate(
+              (error) => error.toString().contains('لا يحق لهم التصويت'),
+            ),
+          ),
+        );
+      },
+    );
   });
 }

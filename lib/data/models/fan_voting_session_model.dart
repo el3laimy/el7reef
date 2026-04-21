@@ -7,6 +7,7 @@ class FanVotingSessionModel {
   final DateTime closesAt;
   final int totalVotes;
   final Map<String, int> playerVotes;
+  final List<String> eligiblePlayerIds;
   final String? winnerPlayerId;
 
   const FanVotingSessionModel({
@@ -16,23 +17,34 @@ class FanVotingSessionModel {
     required this.closesAt,
     required this.totalVotes,
     required this.playerVotes,
+    this.eligiblePlayerIds = const [],
     this.winnerPlayerId,
   });
 
-  factory FanVotingSessionModel.fromJson(Map<String, dynamic> json, String docId) {
+  factory FanVotingSessionModel.fromJson(
+    Map<String, dynamic> json,
+    String docId,
+  ) {
     return FanVotingSessionModel(
       id: docId,
       matchId: json['matchId'] as String? ?? '',
-      opensAt: json['opensAt'] != null 
+      opensAt: json['opensAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(json['opensAt'] as int)
           : DateTime.now(),
-      closesAt: json['closesAt'] != null 
+      closesAt: json['closesAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(json['closesAt'] as int)
           : DateTime.now().add(const Duration(minutes: 90)),
       totalVotes: (json['totalVotes'] as num?)?.toInt() ?? 0,
-      playerVotes: (json['playerVotes'] as Map<String, dynamic>?)?.map(
+      playerVotes:
+          (json['playerVotes'] as Map<String, dynamic>?)?.map(
             (k, e) => MapEntry(k, (e as num).toInt()),
-          ) ?? {},
+          ) ??
+          {},
+      eligiblePlayerIds:
+          (json['eligiblePlayerIds'] as List<dynamic>?)
+              ?.map((entry) => entry as String)
+              .toList(growable: false) ??
+          const <String>[],
       winnerPlayerId: json['winnerPlayerId'] as String?,
     );
   }
@@ -44,6 +56,7 @@ class FanVotingSessionModel {
       'closesAt': closesAt.millisecondsSinceEpoch,
       'totalVotes': totalVotes,
       'playerVotes': playerVotes,
+      'eligiblePlayerIds': eligiblePlayerIds,
       'winnerPlayerId': winnerPlayerId,
     };
   }
@@ -56,6 +69,7 @@ class FanVotingSessionModel {
       closesAt: closesAt,
       totalVotes: totalVotes,
       playerVotes: playerVotes,
+      eligiblePlayerIds: eligiblePlayerIds,
       winnerPlayerId: winnerPlayerId,
     );
   }
@@ -68,6 +82,7 @@ class FanVotingSessionModel {
       closesAt: entity.closesAt,
       totalVotes: entity.totalVotes,
       playerVotes: entity.playerVotes,
+      eligiblePlayerIds: entity.eligiblePlayerIds,
       winnerPlayerId: entity.winnerPlayerId,
     );
   }

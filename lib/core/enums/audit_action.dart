@@ -29,14 +29,18 @@ enum AuditAction {
   groupStageGenerated,
   groupStageRegenerated,
   fixtureScheduled,
+  fixtureStarted,
   fixturesPublished,
   knockoutGenerated,
   tournamentCompleted,
 
   // ── Guest Claim ──
   guestPlayerCreated,
+  guestPlayerUpdated,
+  guestPlayerArchived,
   guestPlayerClaimed,
   guestTeamCreated,
+  guestTeamCaptainUpdated,
   guestTeamClaimed,
   claimCodeGenerated,
   claimCodeConsumed,

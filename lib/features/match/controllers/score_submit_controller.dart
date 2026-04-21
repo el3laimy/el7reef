@@ -2,8 +2,8 @@ import 'package:get/get.dart';
 
 import '../../../core/enums/match_status.dart';
 import '../../../core/services/match_settlement_service.dart';
+import '../../../core/services/official_match_roster_service.dart';
 import '../../../data/repositories/match_repository_impl.dart';
-import '../../../data/repositories/player_repository_impl.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/entities/player.dart';
 import '../../../domain/entities/player_match_stats.dart';
@@ -12,8 +12,9 @@ import 'match_controller.dart';
 class ScoreSubmitController extends GetxController {
   final String matchId;
   final MatchRepositoryImpl _matchRepo = MatchRepositoryImpl();
-  final PlayerRepositoryImpl _playerRepo = PlayerRepositoryImpl();
   final MatchSettlementService _settlementService = MatchSettlementService();
+  final OfficialMatchRosterService _officialRosterService =
+      OfficialMatchRosterService();
 
   ScoreSubmitController({required this.matchId});
 
@@ -48,16 +49,12 @@ class ScoreSubmitController extends GetxController {
       match.value = loadedMatch;
       selectedMvpId.value = loadedMatch.mvpPlayerId ?? '';
 
-      final futuresA =
-          loadedMatch.teamAPlayerIds.map((id) => _playerRepo.getPlayer(id));
-      final futuresB =
-          loadedMatch.teamBPlayerIds.map((id) => _playerRepo.getPlayer(id));
-
-      final resultsA = await Future.wait(futuresA);
-      final resultsB = await Future.wait(futuresB);
-
-      teamAPlayers.value = resultsA.whereType<Player>().toList();
-      teamBPlayers.value = resultsB.whereType<Player>().toList();
+      final roster = await _officialRosterService.loadRegisteredRoster(
+        matchId: loadedMatch.id,
+        match: loadedMatch,
+      );
+      teamAPlayers.value = roster.teamAPlayers;
+      teamBPlayers.value = roster.teamBPlayers;
 
       for (final player in [...teamAPlayers, ...teamBPlayers]) {
         playerStats[player.id] = <String, dynamic>{
@@ -132,8 +129,7 @@ class ScoreSubmitController extends GetxController {
         matchId: currentMatch.id,
         scoreA: scoreA,
         scoreB: scoreB,
-        mvpPlayerId:
-            selectedMvpId.value.isEmpty ? null : selectedMvpId.value,
+        mvpPlayerId: selectedMvpId.value.isEmpty ? null : selectedMvpId.value,
         detailedStats: detailedStats,
       );
 

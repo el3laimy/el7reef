@@ -20,10 +20,12 @@ import '../../features/match/views/match_discover_screen.dart';
 import '../../features/match/views/matchday_screen.dart';
 import '../../features/match/views/score_submit_screen.dart';
 import '../../features/match/views/fan_voting_screen.dart';
+import '../../features/match/views/match_lobby_screen.dart';
 import '../../features/match/bindings/match_binding.dart';
 import '../../features/match/bindings/matchday_binding.dart';
 import '../../features/match/bindings/score_submit_binding.dart';
 import '../../features/match/bindings/fan_voting_binding.dart';
+import '../../features/match/bindings/match_lobby_binding.dart';
 import '../../features/tournament/views/tournament_list_screen.dart';
 import '../../features/tournament/views/tournament_detail_screen.dart';
 import '../../features/tournament/views/tournament_registration_screen.dart';
@@ -146,6 +148,14 @@ class AppPages {
       name: AppRoutes.findMatch,
       page: () => const MatchDiscoverScreen(),
       binding: MatchBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    // ── Match Lobby ──
+    GetPage(
+      name: AppRoutes.matchLobby,
+      page: () => const MatchLobbyScreen(),
+      binding: MatchLobbyBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 

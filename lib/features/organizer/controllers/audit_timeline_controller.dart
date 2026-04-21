@@ -98,6 +98,8 @@ class AuditTimelineController extends GetxController {
         return 'تمت إعادة توليد المجموعات';
       case AuditAction.fixtureScheduled:
         return 'تمت جدولة fixture';
+      case AuditAction.fixtureStarted:
+        return 'تم بدء المباراة';
       case AuditAction.fixturesPublished:
         return 'تم نشر fixtures البطولة';
       case AuditAction.knockoutGenerated:
@@ -106,10 +108,16 @@ class AuditTimelineController extends GetxController {
         return 'تم إنهاء البطولة';
       case AuditAction.guestPlayerCreated:
         return 'تم إضافة لاعب ضيف';
+      case AuditAction.guestPlayerUpdated:
+        return 'تم تحديث بيانات لاعب ضيف';
+      case AuditAction.guestPlayerArchived:
+        return 'تمت أرشفة لاعب ضيف';
       case AuditAction.guestPlayerClaimed:
         return 'تم ربط لاعب ضيف';
       case AuditAction.guestTeamCreated:
         return 'تم إضافة فريق ضيف';
+      case AuditAction.guestTeamCaptainUpdated:
+        return 'تم تحديث قائد الفريق الضيف';
       case AuditAction.guestTeamClaimed:
         return 'تم ربط فريق ضيف';
       case AuditAction.claimCodeGenerated:

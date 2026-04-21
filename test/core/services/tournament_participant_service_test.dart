@@ -166,10 +166,19 @@ void main() {
           'tournament-1',
         );
 
-        expect(replacement.status, TournamentParticipantStatus.finalized);
-        expect(replacement.replacementForParticipantId, participantId);
+        expect(
+          replacement.replacementParticipant.status,
+          TournamentParticipantStatus.finalized,
+        );
+        expect(
+          replacement.replacementParticipant.replacementForParticipantId,
+          participantId,
+        );
         expect(replaced.status, TournamentParticipantStatus.replaced);
-        expect(replaced.replacedByParticipantId, replacement.id);
+        expect(
+          replaced.replacedByParticipantId,
+          replacement.replacementParticipant.id,
+        );
         expect(tournament?.activeParticipantCount, 2);
       },
     );
@@ -235,8 +244,11 @@ void main() {
         final tournament = await tournamentRepository.getTournament(
           'tournament-1',
         );
-        expect(reactivated.status, TournamentParticipantStatus.finalized);
-        expect(reactivated.withdrawnAt, isNull);
+        expect(
+          reactivated.reactivatedParticipant.status,
+          TournamentParticipantStatus.finalized,
+        );
+        expect(reactivated.reactivatedParticipant.withdrawnAt, isNull);
         expect(tournament?.activeParticipantCount, 2);
       },
     );
@@ -268,11 +280,21 @@ void main() {
           'tournament-1',
         );
         final withdrawnReplacement = participants.firstWhere(
-          (item) => item.id == replacement.id,
+          (item) => item.id == replacement.replacementParticipant.id,
         );
 
-        expect(reactivated.status, TournamentParticipantStatus.approved);
-        expect(reactivated.replacedByParticipantId, isNull);
+        expect(
+          reactivated.reactivatedParticipant.status,
+          TournamentParticipantStatus.approved,
+        );
+        expect(
+          reactivated.reactivatedParticipant.replacedByParticipantId,
+          isNull,
+        );
+        expect(
+          reactivated.withdrawnReplacement?.id,
+          replacement.replacementParticipant.id,
+        );
         expect(
           withdrawnReplacement.status,
           TournamentParticipantStatus.withdrawn,

@@ -227,7 +227,12 @@ class TournamentLifecycleService {
       actorId: actorId,
       fixturesCount: publishedFixtures.length,
     );
-    return await _loadMatches(tournamentId: tournamentId);
+    final publishedById = {
+      for (final fixture in publishedFixtures) fixture.id: fixture,
+    };
+    return fixtures
+        .map((fixture) => publishedById[fixture.id] ?? fixture)
+        .toList(growable: false);
   }
 
   Future<KnockoutBuildResult> startKnockout({

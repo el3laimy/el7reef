@@ -6,7 +6,11 @@ import 'package:get/get.dart';
 import 'package:el7reef/app/routes/app_pages.dart';
 import 'package:el7reef/app/routes/app_routes.dart';
 import 'package:el7reef/core/constants/firebase_paths.dart';
+import 'package:el7reef/core/enums/match_attendance_status.dart';
+import 'package:el7reef/core/enums/match_check_in_status.dart';
 import 'package:el7reef/core/enums/match_status.dart';
+import 'package:el7reef/core/enums/team_member_availability.dart';
+import 'package:el7reef/core/enums/team_membership_role.dart';
 import 'package:el7reef/core/enums/tournament_enums.dart';
 import 'package:el7reef/core/enums/tournament_ops_enums.dart';
 import 'package:el7reef/core/services/tournament_fixture_service.dart';
@@ -14,6 +18,8 @@ import 'package:el7reef/core/services/tournament_lifecycle_service.dart';
 import 'package:el7reef/core/services/tournament_ops_migration_service.dart';
 import 'package:el7reef/core/services/tournament_participant_service.dart';
 import 'package:el7reef/core/services/tournament_registration_service.dart';
+import 'package:el7reef/data/models/match_check_in_model.dart';
+import 'package:el7reef/data/models/match_lineup_snapshot_model.dart';
 import 'package:el7reef/data/repositories/guest_team_repository_impl.dart';
 import 'package:el7reef/data/repositories/group_standing_snapshot_repository_impl.dart';
 import 'package:el7reef/data/repositories/knockout_bracket_repository_impl.dart';
@@ -25,6 +31,10 @@ import 'package:el7reef/data/repositories/tournament_repository_impl.dart';
 import 'package:el7reef/domain/entities/player.dart';
 import 'package:el7reef/domain/entities/team.dart';
 import 'package:el7reef/domain/entities/tournament.dart';
+import 'package:el7reef/domain/entities/match.dart';
+import 'package:el7reef/domain/entities/match_check_in.dart';
+import 'package:el7reef/domain/entities/match_lineup_entry.dart';
+import 'package:el7reef/domain/entities/match_lineup_snapshot.dart';
 import 'package:el7reef/features/tournament/controllers/tournament_operations_controller.dart';
 import 'package:el7reef/services/auth_service.dart';
 
@@ -487,6 +497,43 @@ void main() {
     expect(controller.refreshAllCalls, 1);
   });
 
+  test('startFixture updates local state without full refresh', () async {
+    final controller = _buildTrackingController();
+    final lifecycleService = TournamentLifecycleService(firestore: firestore);
+    await lifecycleService.finalizeParticipants(
+      tournamentId: 'tournament-1',
+      actorId: 'organizer-1',
+    );
+    await lifecycleService.startGroupStage(
+      tournamentId: 'tournament-1',
+      actorId: 'organizer-1',
+    );
+    final publishedFixtures = await lifecycleService.publishFixtures(
+      tournamentId: 'tournament-1',
+      actorId: 'organizer-1',
+    );
+    final fixture = publishedFixtures.single;
+    await _seedReadyRegisteredFixtureForOps(
+      firestore: firestore,
+      fixture: fixture,
+      now: DateTime(2026, 4, 20, 18),
+    );
+
+    await controller.refreshAll();
+    controller.blockRefreshAll = true;
+
+    await controller.startFixture(fixture.id);
+
+    final updatedFixture = controller.fixtures.firstWhere(
+      (entry) => entry.id == fixture.id,
+    );
+    expect(updatedFixture.status, MatchStatus.live);
+    expect(updatedFixture.startedAt, isNotNull);
+    expect(updatedFixture.teamAPlayerIds, hasLength(2));
+    expect(updatedFixture.teamBPlayerIds, hasLength(2));
+    expect(controller.refreshAllCalls, 1);
+  });
+
   test('participant actions update local state without full refresh', () async {
     final controller = _buildTrackingController();
 
@@ -679,6 +726,104 @@ Future<TournamentLifecycleService> _seedOfficialGroupStandings(
   );
   await lifecycleService.refreshGroupStandings(tournamentId: 'tournament-1');
   return lifecycleService;
+}
+
+Future<void> _seedReadyRegisteredFixtureForOps({
+  required FakeFirebaseFirestore firestore,
+  required Match fixture,
+  required DateTime now,
+}) async {
+  await _seedRegisteredCheckInForOps(
+    firestore: firestore,
+    matchId: fixture.id,
+    teamId: fixture.teamAId!,
+    now: now,
+  );
+  await _seedRegisteredCheckInForOps(
+    firestore: firestore,
+    matchId: fixture.id,
+    teamId: fixture.teamBId!,
+    now: now,
+  );
+  await _seedRegisteredSnapshotForOps(
+    firestore: firestore,
+    matchId: fixture.id,
+    teamId: fixture.teamAId!,
+    now: now,
+  );
+  await _seedRegisteredSnapshotForOps(
+    firestore: firestore,
+    matchId: fixture.id,
+    teamId: fixture.teamBId!,
+    now: now,
+  );
+}
+
+Future<void> _seedRegisteredCheckInForOps({
+  required FakeFirebaseFirestore firestore,
+  required String matchId,
+  required String teamId,
+  required DateTime now,
+}) async {
+  final checkIn = MatchCheckIn(
+    id: 'checkin::$matchId::$teamId',
+    matchId: matchId,
+    teamId: teamId,
+    status: MatchCheckInStatus.verified,
+    createdBy: 'organizer-1',
+    createdAt: now,
+    updatedAt: now,
+    checkedInBy: 'organizer-1',
+    checkedInAt: now,
+    verifiedBy: 'organizer-1',
+    verifiedAt: now,
+  );
+  await firestore
+      .collection(FirebasePaths.matchCheckIns)
+      .doc(checkIn.id)
+      .set(MatchCheckInModel.fromEntity(checkIn).toJson());
+}
+
+Future<void> _seedRegisteredSnapshotForOps({
+  required FakeFirebaseFirestore firestore,
+  required String matchId,
+  required String teamId,
+  required DateTime now,
+}) async {
+  final snapshot = MatchLineupSnapshot(
+    id: 'snapshot::$matchId::$teamId',
+    matchId: matchId,
+    teamId: teamId,
+    checkInId: 'checkin::$matchId::$teamId',
+    starters: <MatchLineupEntry>[
+      MatchLineupEntry(
+        attendanceId: 'attendance::$matchId::$teamId::starter',
+        teamMembershipId: 'membership::$teamId::starter',
+        playerId: '$teamId-player-1',
+        role: TeamMembershipRole.player,
+        availability: TeamMemberAvailability.available,
+        attendanceStatus: MatchAttendanceStatus.present,
+        displayName: '$teamId Starter',
+      ),
+    ],
+    bench: <MatchLineupEntry>[
+      MatchLineupEntry(
+        attendanceId: 'attendance::$matchId::$teamId::bench',
+        teamMembershipId: 'membership::$teamId::bench',
+        playerId: '$teamId-player-2',
+        role: TeamMembershipRole.player,
+        availability: TeamMemberAvailability.available,
+        attendanceStatus: MatchAttendanceStatus.present,
+        displayName: '$teamId Bench',
+      ),
+    ],
+    lockedBy: 'organizer-1',
+    lockedAt: now,
+  );
+  await firestore
+      .collection(FirebasePaths.matchLineupSnapshots)
+      .doc(snapshot.id)
+      .set(MatchLineupSnapshotModel.fromEntity(snapshot).toJson());
 }
 
 class _FakeAuthService extends GetxService implements AuthService {

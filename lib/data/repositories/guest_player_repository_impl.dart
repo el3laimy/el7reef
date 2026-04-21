@@ -77,6 +77,18 @@ class GuestPlayerRepositoryImpl implements GuestPlayerRepository {
   }
 
   @override
+  Future<List<GuestPlayer>> getGuestTeamPlayers(String guestTeamId) async {
+    final snapshot = await _guestPlayersRef
+        .where('guestTeamId', isEqualTo: guestTeamId)
+        .orderBy('createdAt')
+        .get();
+
+    return snapshot.docs
+        .map((doc) => GuestPlayerModel.fromJson(doc.data(), doc.id).toEntity())
+        .toList(growable: false);
+  }
+
+  @override
   Future<List<GuestPlayer>> getTournamentGuestPlayers(
     String tournamentId,
   ) async {

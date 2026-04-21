@@ -91,6 +91,7 @@ class MatchRepositoryImpl implements MatchRepository {
             MatchStatus.live.name,
             MatchStatus.completed.name,
             MatchStatus.pendingReview.name,
+            // cancelled is intentionally excluded
           ],
         )
         .orderBy('createdAt', descending: true)
@@ -178,5 +179,36 @@ class MatchRepositoryImpl implements MatchRepository {
   @override
   Future<void> activateGoldenRating(String matchId) async {
     await _matchesRef.doc(matchId).update({'isGoldenRating': true});
+  }
+
+  @override
+  Future<void> cancelMatch(String matchId) async {
+    await _matchesRef.doc(matchId).update({
+      'status': MatchStatus.cancelled.name,
+    });
+  }
+
+  @override
+  Future<void> addPlayerToMatch({
+    required String matchId,
+    required String playerId,
+    required String side,
+  }) async {
+    final field = side == 'A' ? 'teamAPlayerIds' : 'teamBPlayerIds';
+    await _matchesRef.doc(matchId).update({
+      field: FieldValue.arrayUnion([playerId]),
+    });
+  }
+
+  @override
+  Future<void> removePlayerFromMatch({
+    required String matchId,
+    required String playerId,
+    required String side,
+  }) async {
+    final field = side == 'A' ? 'teamAPlayerIds' : 'teamBPlayerIds';
+    await _matchesRef.doc(matchId).update({
+      field: FieldValue.arrayRemove([playerId]),
+    });
   }
 }

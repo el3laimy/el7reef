@@ -1,10 +1,13 @@
 # EL7REEF Implementation Backlog V2
 
-Version: 2026-04-19
+Version: 2026-04-20
 Source Docs:
 - [product_plan.md](product_plan.md)
 - [engineering_plan.md](engineering_plan.md)
 - [tournament_tos_execution_rules.md](tournament_tos_execution_rules.md)
+- [tournament_cross_app_flow_gap_report_ar.md](tournament_cross_app_flow_gap_report_ar.md)
+- [tournament_repair_sprint_plan_ar.md](tournament_repair_sprint_plan_ar.md)
+- [master_reference_alignment_gap_plan_ar.md](master_reference_alignment_gap_plan_ar.md)
 
 Status Model:
 - `Todo`
@@ -35,10 +38,13 @@ These items are already in place and should be treated as foundation rather than
 3. `V2-012` to `V2-018`
 4. `V2-019` to `V2-023`
 5. `TOS-001` to `TOS-010`
-6. `V2-024` to `V2-028`
-7. `V2-029` to `V2-032`
-8. `V2-033` to `V2-036`
-9. `V2-037` to `V2-044`
+6. `TOS-FIX-001` to `TOS-FIX-031`
+7. `V2-024` to `V2-028`
+8. `V2-029` to `V2-032`
+9. `V2-033` to `V2-036`
+10. `V2-037` to `V2-044`
+11. `V2-045` to `V2-056`
+12. `TOS-FIX-032` to `TOS-FIX-045` when full mixed guest-player fantasy becomes active scope
 
 ## Tournament Operating System Reset
 
@@ -71,15 +77,61 @@ Execution Snapshot: `2026-04-19`
 - `TOS-007` `Done`: single-elimination knockout build and winner advancement are implemented with canonical bracket and tie persistence.
 - `TOS-008` `Done`: the Tournament Operations Dashboard now supports `manual add`, `replace participant`, `withdraw`, fixture scheduling, fixture publication, and guarded group regeneration.
 - `TOS-009` `Done`: real-data screens for participants, groups, fixtures, standings, and bracket now cover day-to-day organizer flows with operator-grade filtering, drill-downs, state clarity, and participant recovery/seed controls.
-- `TOS-010` `In Progress`: audit events and service/UI coverage are in place; canonical `activeParticipantCount` is now synced on tournament writes, player tournament reads prefer canonical participants with legacy fallback, tournament registration capacity checks now prefer canonical participant summary before any legacy arrays, the old raw `status flip` repository/controller path has been retired, new tournament writes no longer persist empty legacy `groupRoundIds` / `knockoutRoundIds` while historical values remain preserved on read/update, organizer dashboard refresh avoids maintenance work in the default path, organizer dashboard group/knockout screens now load persisted state instead of forcing lifecycle recalculation on every open, organizer operations UI now uses cached derived labels for groups / fixtures / bracket instead of repeated list scans and raw IDs, frequent organizer actions now use targeted partial state updates instead of `refreshAll()` whenever a full reload is unnecessary, tournament registration / matchday flows now use more batched reads to reduce round trips and mobile data usage, standings / knockout refresh now skip persistence when no tournament state actually changed, participant search now uses debounce + short-lived caching, approved-registration participant sync now skips redundant participant rewrites when the canonical record is already current, participant summary refresh now skips tournament writes when `activeParticipantCount` is already correct, and key organizer commands like `finalizeParticipants`, `scheduleFixture`, `completeTournament`, `withdrawParticipant`, and unchanged `seed` edits now avoid duplicate writes / duplicate audit when the requested state is already current. Broader cleanup and any remaining low-value legacy retirement still remain.
+- `TOS-010` `In Progress`: audit events and service/UI coverage are in place; canonical `activeParticipantCount` is now synced on tournament writes, player tournament reads prefer canonical participants with legacy fallback, tournament registration capacity checks now prefer canonical participant summary before any legacy arrays, the old raw `status flip` repository/controller path has been retired, new tournament writes no longer persist empty legacy `groupRoundIds` / `knockoutRoundIds` while historical values remain preserved on read/update, organizer dashboard refresh avoids maintenance work in the default path, organizer dashboard group/knockout screens now load persisted state instead of forcing lifecycle recalculation on every open, organizer operations UI now uses cached derived labels for groups / fixtures / bracket instead of repeated list scans and raw IDs, frequent organizer actions now use targeted partial state updates instead of `refreshAll()` whenever a full reload is unnecessary, tournament registration / matchday flows now use more batched reads to reduce round trips and mobile data usage, standings / knockout refresh now skip persistence when no tournament state actually changed, participant search now uses debounce + short-lived caching, approved-registration participant sync now skips redundant participant rewrites when the canonical record is already current, participant summary refresh now skips tournament writes when `activeParticipantCount` is already correct, `replace/reactivate` participant flows now update local ops state directly instead of reloading the full participants list, `publishFixtures` now returns the post-publish fixture state without an extra repository reload, pilot smoke coverage now exercises the approval-driven tournament flow from groups through champion, and key organizer commands like `finalizeParticipants`, `scheduleFixture`, `completeTournament`, `withdrawParticipant`, and unchanged `seed` edits now avoid duplicate writes / duplicate audit when the requested state is already current. Broader cleanup and any remaining low-value legacy retirement still remain.
 
 Current Focus:
 
+- execute the new tournament repair workstream before returning to organizer hybrid/fantasy expansion: close `start match`, guest-team roster ownership, and guest-result flow gaps first
 - production-first hardening for organizer flows: reduce non-essential reads/writes, remove maintenance work from default operating paths, and keep dashboard actions centered on real tournament ops
 - treat current tournament data as resettable test data; do not create new migration-heavy work unless it directly unlocks production behavior
-- finish `TOS-009` state polish where needed, but without reopening placeholder-style UI work
+- begin `pilot pass readiness` with smoke coverage and a manual organizer checklist before full real-world validation
 - widen `TOS-010` cleanup, regression hardening, and legacy retirement
 - keep migration/compatibility work secondary and manual-only unless it directly protects a production flow
+- keep full mixed guest-player fantasy explicitly outside the critical path unless it is deliberately scheduled as follow-on scope
+- preserve the broader product vision in parallel planning: player identity depth, discovery, notifications, and provider-abstraction work are now scheduled as post-tournament-repair backlog, not forgotten intent
+
+## Master Vision Alignment Snapshot
+
+Status: `Updated`
+
+This snapshot keeps the master project vision tied directly to execution
+reality so the backlog is judged against product truth, not only module-by-module
+progress.
+
+- `Player Identity` `Partial`: baseline profile, ratings, stats, and trust exist; richer football identity, participation history, and credibility surfaces are queued in `V2-045` to `V2-048`.
+- `Team Operations` `Partial`: roster, invite, claim, lineup, and role foundations exist; user-initiated join requests are queued in `V2-051`.
+- `Tournament Operations` `In Repair`: the TOS core is built, but cross-app match activation, guest roster ownership, and guest-result completion remain the current blocking work in `TOS-FIX-001` to `TOS-FIX-031`.
+- `Match / Result Canonical Truth` `Partial`: internal matchday and settlement truth are strong enough for current tournament operations; external match-data and provider boundaries are formalized later in `V2-056`.
+- `Search / Discovery` `Weak`: search exists in isolated surfaces; unified search and Explore remain queued in `V2-049` and `V2-050`.
+- `Notifications / Communication` `Weak`: operational events are still underrepresented as a product layer; canonical notifications and inbox work are queued in `V2-052` and `V2-053`.
+- `Unregistered Entities And Claim Flows` `Strong`: guest players, guest teams, claim flows, and placeholder-friendly growth logic are established foundations and remain central to the roadmap.
+- `Provider Flexibility / Architecture Boundaries` `Partial`: repositories and service separation are present, but auth, storage, map, and external-data abstraction seams remain queued in `V2-054` to `V2-056`.
+- `Fantasy / Analytics Future Layer` `Planned`: current fantasy foundations exist, but mixed guest-player fantasy remains explicitly outside the critical path until tournament repair is complete.
+
+Execution Rule:
+
+- do not open `V2-045` to `V2-056` until `TOS-FIX-001` to `TOS-FIX-031` materially close the tournament repair path
+- treat `V2-045` to `V2-056` as backlog that preserves the long-term vision, not as distraction from current tournament blockers
+
+## Post-Tournament Vision Priority Order
+
+Status: `Planned`
+
+Once `TOS-FIX-001` to `TOS-FIX-031` are materially closed, continue in this order:
+
+1. close the already-nearby organizer hybrid/fantasy hardening slice in `V2-039` to `V2-044`
+2. open the minimum identity foundation in `V2-045` so player discovery and credibility are not built on thin profile data
+3. execute the growth-loop surface in `V2-049` to `V2-053` to unlock unified search, explore, join requests, and essential notifications
+4. complete the deeper player credibility layer in `V2-046` to `V2-048`
+5. finish platform-boundary work in `V2-054` to `V2-056`, preferably when the touched modules are actively being expanded again
+
+Why this order:
+
+- `V2-039` to `V2-044` are adjacent to the tournament work already in flight and should be closed before opening broader product surfaces
+- `V2-045` is the smallest high-leverage schema step that makes later search, cards, and profile credibility materially better
+- `V2-049` to `V2-053` best express the product vision’s growth loops: discover players and teams, request to join, and receive action-triggered updates
+- `V2-046` to `V2-048` become more meaningful after discovery and notifications are real product surfaces rather than isolated profile upgrades
+- `V2-054` to `V2-056` matter structurally, but they should not delay user-facing growth surfaces unless provider pressure or new backend integration work makes them immediately valuable
 
 Execution Rules:
 
@@ -106,6 +158,209 @@ This is the short list that still blocks calling the tournament module `100% com
 - `FG-07` `Done`: `Bracket` screen now groups ties by round, includes knockout/final summary cards, and provides direct navigation from ties to the underlying fixture workflow.
 - `FG-08` `Done`: tournament UI regression coverage now includes dedicated widget tests for `Fixtures`, `Standings`, `Bracket`, `TournamentDetailScreen`, and an organizer happy-path navigation regression across the operating surfaces.
 - `FG-09` `Done`: participant picker/search dialogs now use debounced auto-search plus short-lived candidate caching to reduce repeated query churn without removing manual search control.
+
+## Tournament Cross-App Repair Workstream
+
+Status: `Ready`
+
+The TOS reset solved the tournament operating core, but cross-surface execution
+still has real blockers around `startMatch`, guest-team roster ownership,
+score submission, and tournament-linked fantasy. This workstream turns the gap
+report into execution-ready tickets.
+
+Execution policy:
+
+- finish `TOS-FIX-001` to `TOS-FIX-031` before resuming `V2-039` or any mixed guest-team fantasy expansion
+- keep current tournament data disposable and do not create migration-heavy work unless it directly unlocks production behavior
+- treat `TOS-FIX-032` to `TOS-FIX-045` as a separate optional path for full mixed guest-player fantasy, not as a blocker to closing tournament ops
+
+### Tournament Repair Sprint 1 — Match Activation and Live Result Flow
+
+Status: `Ready`
+
+Goal:
+
+- make tournament fixtures playable end-to-end through `open -> live -> submit score -> approve score`
+
+Tasks:
+
+- `TOS-FIX-001`: add a guarded `startMatch` command for tournament fixtures
+- `TOS-FIX-002`: add `Start Match` actions in the Tournament Operations Dashboard and fixture rows
+- `TOS-FIX-003`: block `startMatch` until both sides are checked in and lineups are locked
+- `TOS-FIX-004`: project locked lineups into a live match roster representation
+- `TOS-FIX-005`: update score submission to read the official match roster instead of relying only on `teamAPlayerIds` / `teamBPlayerIds`
+- `TOS-FIX-006`: wire fan voting and settlement to the official live match roster
+- `TOS-FIX-007`: add service/UI regression coverage for `open -> live -> submit -> approve`
+
+Definition of Done:
+
+- a tournament fixture can be started from the tournament flow
+- score submission opens naturally after match start
+- registered-team tournament matches work without workaround paths
+
+### Tournament Repair Sprint 2 — Guest Team Roster Domain and Permissions
+
+Status: `In Progress`
+
+Goal:
+
+- give guest teams a real roster model inside tournament operations
+
+Tasks:
+
+- `TOS-FIX-008`: add `guestTeamId` to `GuestPlayer` and `GuestPlayerModel`
+- `TOS-FIX-009`: add guest-player repository queries scoped by `guestTeamId`
+- `TOS-FIX-010`: build a `TournamentGuestRosterService` / `GuestTeamRosterService`
+- `TOS-FIX-011`: add create, update, archive, and captain-management commands for guest players
+- `TOS-FIX-012`: expand `TournamentPermissionService` with guest-team and guest-roster permissions
+- `TOS-FIX-013`: map guest-roster permissions into assistant roles instead of relying on broad `canManageTeams` only
+- `TOS-FIX-014`: emit audit events for guest roster operations
+- `TOS-FIX-015`: add repository/service tests for ownership and guest-team isolation
+
+Progress Snapshot:
+
+- `Done`: `TOS-FIX-008`, `TOS-FIX-009`, `TOS-FIX-010`, `TOS-FIX-011`, `TOS-FIX-012`, `TOS-FIX-013`, `TOS-FIX-014`, `TOS-FIX-015` foundation
+- `What shipped`:
+  - `GuestPlayer` now carries `guestTeamId`
+  - guest-player repository now supports `getGuestTeamPlayers(guestTeamId)`
+  - `GuestTeamRosterService` now supports `create`, `update`, `archive`, and `setCaptain`
+  - `TournamentPermissionService` now exposes explicit guest-roster permissions
+  - guest-roster audit events now exist and are covered by tests
+  - `MatchdayController` guest side now loads the selected guest-team roster instead of a tournament-wide guest list
+- `Still remaining in Sprint 2`:
+  - expose guest-roster management through tournament UI
+  - connect guest-roster management to share/claim affordances more directly in organizer flows
+
+Definition of Done:
+
+- every guest player belongs explicitly to a guest team
+- organizers can manage guest players without relying on generic team flows
+- guest players are isolated by guest team, not by tournament-wide guest lists
+
+### Tournament Repair Sprint 3 — Guest Team Roster UI and Matchday Integration
+
+Status: `Ready`
+
+Goal:
+
+- expose guest-team roster operations in the tournament UI and bind matchday to the correct roster
+
+Tasks:
+
+- `TOS-FIX-016`: build a `Guest Team Roster` screen under tournament operations
+- `TOS-FIX-017`: add deep links from `Participants`, `Groups`, and `Fixtures` to guest-team roster management
+- `TOS-FIX-018`: update `MatchdayController` to load guest players by `guestTeamId` only
+- `TOS-FIX-019`: remove the current tournament-wide guest-player fallback from guest-team matchday management
+- `TOS-FIX-020`: expose guest-player claim link actions from the guest-team roster UI
+- `TOS-FIX-021`: support position, jersey-number, and note editing in the guest roster UI
+- `TOS-FIX-022`: add UI/integration tests for guest roster and matchday linking
+
+Definition of Done:
+
+- organizers can open and manage a guest-team roster from the tournament module
+- guest-team matchday surfaces only show players belonging to that guest team
+- guest roster editing is operationally usable before matchday
+
+### Tournament Repair Sprint 4 — Guest Match Result Completion
+
+Status: `Ready`
+
+Goal:
+
+- make guest-team matches fully playable, scorable, and approvable
+
+Tasks:
+
+- `TOS-FIX-023`: update score submission to support mixed lineups containing registered and guest players
+- `TOS-FIX-024`: update `MatchSettlementService` to handle guest-player-backed match rosters correctly
+- `TOS-FIX-025`: support MVP, player stats, and attendance truth for guest players through score approval
+- `TOS-FIX-026`: preserve automatic standings / bracket refresh after official approval for guest-team matches
+- `TOS-FIX-027`: add end-to-end tests for a group-stage fixture involving a guest team
+
+Definition of Done:
+
+- a guest team can complete a tournament match from check-in to approved result
+- approved guest-team results update standings or knockout progression correctly
+
+### Tournament Repair Sprint 5 — Pilot Pass and Production Hardening
+
+Status: `Ready`
+
+Goal:
+
+- run the real organizer flow on fresh data and close operational friction before declaring the tournament path complete
+
+Tasks:
+
+- `TOS-FIX-028`: execute a full pilot pass on a tournament that includes registered teams and guest teams
+- `TOS-FIX-029`: record operator friction points, permission issues, and runtime bottlenecks from the pilot
+- `TOS-FIX-030`: fix high-priority friction found during pilot execution
+- `TOS-FIX-031`: widen regression coverage around any repaired tournament flows
+
+Definition of Done:
+
+- the organizer can run a tournament end-to-end on fresh data without core blockers
+- guest-team operations are no longer a broken edge case in tournament execution
+- the tournament repair path is ready to exit the critical path
+
+### Tournament Repair Sprint 6 — Competition Player Core
+
+Status: `Planned`
+
+Goal:
+
+- introduce a unified competitive identity for registered and guest players if mixed fantasy becomes active scope
+
+Tasks:
+
+- `TOS-FIX-032`: define `CompetitionPlayer` / `TournamentAthlete` domain model
+- `TOS-FIX-033`: add canonical fields for tournament, participant, source type, source ids, position, and fantasy eligibility
+- `TOS-FIX-034`: build repository/service support for syncing competition players from real rosters
+- `TOS-FIX-035`: route match stats, MVP, and roster truth through the unified competition-player identity
+- `TOS-FIX-036`: add domain/service tests for the unified identity layer
+
+Definition of Done:
+
+- every player affecting tournament results has a unified competitive identity, whether registered or guest
+
+### Tournament Repair Sprint 7 — Mixed Fantasy Market and Slots
+
+Status: `Planned`
+
+Goal:
+
+- move tournament-linked fantasy from raw `playerId` assumptions to competition-player eligibility
+
+Tasks:
+
+- `TOS-FIX-037`: evolve fantasy slots toward `competitionPlayerId`
+- `TOS-FIX-038`: add market values / eligibility for guest-backed competition players
+- `TOS-FIX-039`: update fantasy create-team, squad, and transfer flows to use the new identity layer
+- `TOS-FIX-040`: update leaderboard and transfer-market surfaces for mixed tournament fantasy
+- `TOS-FIX-041`: add UI/service regression coverage for the mixed fantasy market path
+
+Definition of Done:
+
+- tournament-linked fantasy can represent eligible guest-backed players without breaking existing registered-player flows
+
+### Tournament Repair Sprint 8 — Fantasy Settlement and Elimination Wiring
+
+Status: `Planned`
+
+Goal:
+
+- connect approved tournament results and knockout elimination to mixed fantasy settlement
+
+Tasks:
+
+- `TOS-FIX-042`: update round settlement to score by competition-player identity
+- `TOS-FIX-043`: wire tournament lifecycle transitions explicitly into fantasy lifecycle progression
+- `TOS-FIX-044`: connect elimination/emergency-transfer logic to real tournament progression
+- `TOS-FIX-045`: add smoke coverage for tournament + mixed fantasy end-to-end flow
+
+Definition of Done:
+
+- approved tournament results and eliminations affect mixed fantasy correctly in tournament-linked leagues
 
 ## Epic A: Hybrid Identity Foundation
 
@@ -937,6 +1192,236 @@ Implementation:
 Acceptance:
 - V2 can be enabled progressively and safely.
 
+## Epic J: Player Identity And Credibility
+
+### V2-045: Expand player identity schema beyond basic profile stats
+
+Parent: `EPIC-J`
+Priority: `P1`
+Estimate: `M`
+Status: `Todo`
+Depends On: None
+Likely Touchpoints:
+- `lib/domain/entities/player.dart`
+- `lib/data/models/player_model.dart`
+- `lib/features/profile/`
+
+Implementation:
+- Add missing football identity fields needed by the master vision, such as `preferredFoot`, lightweight `playingStyleTags`, and a short profile summary without over-modeling too early.
+- Keep the schema backward-safe and focused on fields that materially improve player identity, discoverability, and credibility.
+
+Acceptance:
+- Player identity is no longer limited to name, photo, rating, and primary position only.
+
+### V2-046: Build player participation history and identity rollups
+
+Parent: `EPIC-J`
+Priority: `P1`
+Estimate: `L`
+Status: `Todo`
+Depends On: `V2-045`, `TOS-FIX-031`
+Likely Touchpoints:
+- `lib/features/profile/`
+- profile aggregation or query layer
+- team / tournament read models
+
+Implementation:
+- Surface real team history, tournament appearances, and recent official participation on the player profile from canonical product truth.
+- Avoid fake counters; derive history from existing participation data where possible.
+
+Acceptance:
+- A player profile can explain where the player actually played, not just show static stats.
+
+### V2-047: Build reliability and reputation signals from real operations
+
+Parent: `EPIC-J`
+Priority: `P1`
+Estimate: `L`
+Status: `Todo`
+Depends On: `V2-046`, `V2-029`, `V2-032`
+Likely Touchpoints:
+- `lib/domain/entities/player.dart`
+- rating / trust services
+- audit / dispute / matchday truth services
+
+Implementation:
+- Turn trust into a more meaningful product signal by deriving reliability or reputation summaries from attendance truth, dispute history, completion patterns, and organizer-approved results.
+- Keep the first version explainable and auditable.
+
+Acceptance:
+- Player credibility is grounded in actual football operations rather than a mostly opaque number.
+
+### V2-048: Upgrade player profile and player-card UX
+
+Parent: `EPIC-J`
+Priority: `P1`
+Estimate: `M`
+Status: `Todo`
+Depends On: `V2-045` to `V2-047`
+Likely Touchpoints:
+- `lib/features/profile/`
+- player cards in search / leaderboard / team surfaces
+
+Implementation:
+- Upgrade profile UI and reusable player cards to expose the richer identity, reputation, and participation history clearly.
+- Keep the design Arabic-first and operationally credible rather than decorative only.
+
+Acceptance:
+- Player identity feels like a meaningful football profile, not a thin social card.
+
+## Epic K: Discovery, Join, And Notifications
+
+### V2-049: Build unified search service for players, teams, and tournaments
+
+Parent: `EPIC-K`
+Priority: `P1`
+Estimate: `M`
+Status: `Todo`
+Depends On: `V2-019`, `V2-045`
+Likely Touchpoints:
+- search repositories or a new search service
+- `lib/features/social/`
+- team / tournament list surfaces
+
+Implementation:
+- Move from isolated per-screen search toward a unified search contract that can return players, teams, and tournaments.
+- Keep the first version simple and fast before recommendations or nearby logic.
+
+Acceptance:
+- Search is a product capability, not a set of isolated text fields.
+
+### V2-050: Build Explore and discovery entry surfaces
+
+Parent: `EPIC-K`
+Priority: `P1`
+Estimate: `M`
+Status: `Todo`
+Depends On: `V2-049`
+Likely Touchpoints:
+- home / discover surfaces
+- player / team / tournament cards
+
+Implementation:
+- Add an Explore surface for players, teams, and tournaments with clear entry points and action CTAs.
+- Make it easier to discover opportunities and entities beyond direct search.
+
+Acceptance:
+- The app has a real `Search / Explore` product surface aligned with the master vision.
+
+### V2-051: Add team join-request lifecycle and captain review flow
+
+Parent: `EPIC-K`
+Priority: `P1`
+Estimate: `M`
+Status: `Todo`
+Depends On: `V2-006`, `V2-033`
+Likely Touchpoints:
+- team membership lifecycle
+- team roster screens
+- captain review flows
+
+Implementation:
+- Add user-initiated join requests so team growth is not invite-only.
+- Support captain review, accept/reject, and clear membership-state transitions.
+
+Acceptance:
+- Joining a team is a first-class flow, not only a share-link side path.
+
+### V2-052: Build notification domain, repository, and in-app inbox
+
+Parent: `EPIC-K`
+Priority: `P1`
+Estimate: `L`
+Status: `Todo`
+Depends On: `V2-019`, `V2-029`, `V2-033`
+Likely Touchpoints:
+- notification entity / repository layer
+- in-app inbox UI
+- action deep-link routing
+
+Implementation:
+- Introduce canonical notifications for invites, claims, registration updates, tournament actions, and match reminders.
+- Separate notification storage from delivery so the product can evolve without provider lock-in.
+
+Acceptance:
+- Essential football actions can produce persistent in-app notifications instead of snackbar-only feedback.
+
+### V2-053: Route essential operational notifications and action deep links
+
+Parent: `EPIC-K`
+Priority: `P1`
+Estimate: `M`
+Status: `Todo`
+Depends On: `V2-051`, `V2-052`
+Likely Touchpoints:
+- invite / claim / tournament services
+- notification routing
+- inbox and entry screens
+
+Implementation:
+- Fan out essential events into the inbox with deep links, especially for team invites, join requests, guest claims, tournament approvals, and upcoming match reminders.
+- Keep the first version in-app first; push delivery can be layered later.
+
+Acceptance:
+- Core actions reach users through a real notification loop with usable action routing.
+
+## Epic L: Platform Abstractions And Data Interfaces
+
+### V2-054: Extract auth and session provider boundary
+
+Parent: `EPIC-L`
+Priority: `P1`
+Estimate: `M`
+Status: `Todo`
+Depends On: None
+Likely Touchpoints:
+- `lib/services/auth_service.dart`
+- auth session / app bootstrap
+
+Implementation:
+- Introduce a cleaner auth/session contract so UI and higher-level services are not tightly coupled to `FirebaseAuth` and `GoogleSignIn` details.
+- Preserve current behavior while creating a seam for future provider flexibility.
+
+Acceptance:
+- Authentication is consumed through a clearer boundary than direct provider-specific service code alone.
+
+### V2-055: Extract storage and media provider boundary
+
+Parent: `EPIC-L`
+Priority: `P1`
+Estimate: `M`
+Status: `Todo`
+Depends On: None
+Likely Touchpoints:
+- `lib/core/services/photo_upload_service.dart`
+- any future team / tournament media upload flows
+
+Implementation:
+- Replace direct storage coupling in media-facing services with a storage abstraction suitable for profile, team, and tournament media.
+- Keep current Firebase-backed behavior as the first adapter, not the permanent contract.
+
+Acceptance:
+- Media upload and retrieval no longer depend on a single storage provider at the service boundary.
+
+### V2-056: Define map and external match-data provider contracts
+
+Parent: `EPIC-L`
+Priority: `P1`
+Estimate: `M`
+Status: `Todo`
+Depends On: None
+Likely Touchpoints:
+- future map/location services
+- backend sync planning docs
+- fantasy or analytics data ingestion boundaries
+
+Implementation:
+- Define `MapService` and `MatchDataProvider` contracts before map-heavy or live-data-heavy work expands.
+- Make explicit that third-party match data should enrich or sync through backend-owned logic, not define core client business truth.
+
+Acceptance:
+- The codebase has a clear architecture seam for maps and future external sports data ingestion.
+
 ## Suggested Sprint Split
 
 ### Sprint 1
@@ -959,6 +1444,26 @@ Acceptance:
 
 - `TOS-001` to `TOS-010`
 
+### Tournament Repair Sprint 1
+
+- `TOS-FIX-001` to `TOS-FIX-007`
+
+### Tournament Repair Sprint 2
+
+- `TOS-FIX-008` to `TOS-FIX-015`
+
+### Tournament Repair Sprint 3
+
+- `TOS-FIX-016` to `TOS-FIX-022`
+
+### Tournament Repair Sprint 4
+
+- `TOS-FIX-023` to `TOS-FIX-027`
+
+### Tournament Repair Sprint 5
+
+- `TOS-FIX-028` to `TOS-FIX-031`
+
 ### Sprint 5
 
 - `V2-024` to `V2-028`
@@ -975,11 +1480,28 @@ Acceptance:
 
 - `V2-037` to `V2-044`
 
+### Sprint 9
+
+- `V2-045` to `V2-048`
+
+### Sprint 10
+
+- `V2-049` to `V2-053`
+
+### Sprint 11
+
+- `V2-054` to `V2-056`
+
+### Tournament Repair Sprint 6 to 8
+
+- `TOS-FIX-032` to `TOS-FIX-045` if full mixed guest-player fantasy becomes direct product scope
+
 ## Next Ticket To Start
 
-Continue with `TOS-010`.
-The tournament module now has a working operations core, guarded fixture ops,
-and organizer participant actions. The next ticket is broader cleanup,
-regression hardening, and legacy retirement, with only limited `TOS-009` state
-polish remaining where real-data screens still need refinement. `V2-039`
-remains blocked until `TOS-010` is materially stronger.
+Start with `TOS-FIX-001`.
+The tournament module now has a working operations core, but the next real
+blocker is the broken cross-app match flow: tournament fixtures still need a
+first-class `startMatch` transition and a live roster projection before score
+submission can be considered complete. `V2-039` and any mixed guest-player
+fantasy work remain blocked until `TOS-FIX-001` to `TOS-FIX-031` materially
+close the tournament repair path.

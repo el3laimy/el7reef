@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:get/get.dart';
 
 import '../../../core/services/fan_voting_service.dart';
+import '../../../core/services/official_match_roster_service.dart';
 import '../../../data/repositories/match_repository_impl.dart';
 import '../../../data/repositories/player_repository_impl.dart';
 import '../../../domain/entities/fan_voting_session.dart';
@@ -15,6 +16,8 @@ class FanVotingController extends GetxController {
   final FanVotingService _votingService = FanVotingService();
   final MatchRepositoryImpl _matchRepo = MatchRepositoryImpl();
   final PlayerRepositoryImpl _playerRepo = PlayerRepositoryImpl();
+  final OfficialMatchRosterService _officialRosterService =
+      OfficialMatchRosterService();
   final AuthService _authService = Get.find<AuthService>();
 
   FanVotingController({required this.matchId});
@@ -68,11 +71,13 @@ class FanVotingController extends GetxController {
         );
       }
 
-      final playerIds = [...loadedMatch.teamAPlayerIds, ...loadedMatch.teamBPlayerIds];
-      final results = await Future.wait(
-        playerIds.map((id) => _playerRepo.getPlayer(id)),
-      );
-      players.value = results.whereType<Player>().toList();
+      final playerIds = session.value!.eligiblePlayerIds.isNotEmpty
+          ? session.value!.eligiblePlayerIds
+          : (await _officialRosterService.loadRegisteredRoster(
+              matchId: loadedMatch.id,
+              match: loadedMatch,
+            )).allPlayerIds;
+      players.value = await _playerRepo.getPlayersByIds(playerIds);
       _startTimer();
     } catch (error) {
       errorMessage.value = 'حدث خطأ أثناء تحميل بيانات التصويت: $error';
@@ -143,8 +148,7 @@ class FanVotingController extends GetxController {
       hasVoted.value = true;
       successMessage.value = 'تم إرسال تصويتك بنجاح! شكراً لمشاركتك.';
     } catch (error) {
-      errorMessage.value =
-          error.toString().replaceAll('Exception:', '').trim();
+      errorMessage.value = error.toString().replaceAll('Exception:', '').trim();
     } finally {
       isLoading.value = false;
     }

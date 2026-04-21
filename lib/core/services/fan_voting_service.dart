@@ -2,14 +2,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/firebase_paths.dart';
 import '../../domain/entities/fan_voting_session.dart';
 import '../../data/models/fan_voting_session_model.dart';
+import 'official_match_roster_service.dart';
 
 /// خدمة إدارة تصويت الجماهير (Fan Voting)
 /// تعنى بضمان شفافية التصويت من خلال Transactions
 class FanVotingService {
   final FirebaseFirestore _firestore;
+  final OfficialMatchRosterService _officialRosterService;
 
   FanVotingService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance,
+      _officialRosterService = OfficialMatchRosterService(firestore: firestore);
 
   CollectionReference get _sessionsRef =>
       _firestore.collection(FirebasePaths.fanVotingSessions);
@@ -20,6 +23,9 @@ class FanVotingService {
   /// إنشاء أو فتح جلسة التصويت لمباراة حالية
   Future<void> openSession(String matchId, {int durationMinutes = 90}) async {
     final now = DateTime.now();
+    final roster = await _officialRosterService.loadRegisteredRoster(
+      matchId: matchId,
+    );
     await _firestore.runTransaction((transaction) async {
       final sessionRef = _sessionsRef.doc(matchId);
       final existingSession = await transaction.get(sessionRef);
@@ -34,6 +40,7 @@ class FanVotingService {
         closesAt: now.add(Duration(minutes: durationMinutes)),
         totalVotes: 0,
         playerVotes: {},
+        eligiblePlayerIds: roster.allPlayerIds,
         winnerPlayerId: null,
       );
 
@@ -47,8 +54,9 @@ class FanVotingService {
     if (!doc.exists || doc.data() == null) return null;
 
     return FanVotingSessionModel.fromJson(
-            doc.data()! as Map<String, dynamic>, doc.id)
-        .toEntity();
+      doc.data()! as Map<String, dynamic>,
+      doc.id,
+    ).toEntity();
   }
 
   /// التحقق إن كان المستخدم صوّت بالفعل في هذه المباراة
@@ -75,8 +83,10 @@ class FanVotingService {
       }
 
       final session = FanVotingSessionModel.fromJson(
-              sessionSnapshot.data() as Map<String, dynamic>, sessionSnapshot.id)
-          .toEntity();
+        sessionSnapshot.data() as Map<String, dynamic>,
+        sessionSnapshot.id,
+      ).toEntity();
+      var eligiblePlayerIds = session.eligiblePlayerIds;
 
       // 2. التحقق من توقيت الجلسة (ضمان عدم التلاعب)
       if (session.isClosed) {
@@ -93,8 +103,25 @@ class FanVotingService {
         throw Exception('لقد قمت بالتصويت مسبقاً في هذه المباراة.');
       }
 
+      if (eligiblePlayerIds.isEmpty) {
+        final matchSnapshot = await transaction.get(
+          _firestore.collection(FirebasePaths.matches).doc(matchId),
+        );
+        if (matchSnapshot.exists && matchSnapshot.data() != null) {
+          final matchData = matchSnapshot.data() as Map<String, dynamic>;
+          eligiblePlayerIds = <String>[
+            ...List<String>.from(matchData['teamAPlayerIds'] ?? const []),
+            ...List<String>.from(matchData['teamBPlayerIds'] ?? const []),
+          ];
+        }
+      }
+
+      if (!eligiblePlayerIds.contains(targetPlayerId)) {
+        throw Exception('اللاعب المختار ليس ضمن roster الرسمية لهذه المباراة.');
+      }
+
       // 4. تطبيق قواعد مكافحة التلاعب (Anti-Manipulation Rules)
-      
+
       // أ. جلب بيانات المستخدم لفحص عمر الحساب
       final userSnapshot = await transaction.get(
         _firestore.collection(FirebasePaths.players).doc(userId),
@@ -105,23 +132,16 @@ class FanVotingService {
         if (createdAtMs != null) {
           final createdAt = DateTime.fromMillisecondsSinceEpoch(createdAtMs);
           if (DateTime.now().difference(createdAt).inDays < 7) {
-            throw Exception('يجب أن يمر 7 أيام على إنشاء حسابك حتى تتمكن من التصويت في الجماهير.');
+            throw Exception(
+              'يجب أن يمر 7 أيام على إنشاء حسابك حتى تتمكن من التصويت في الجماهير.',
+            );
           }
         }
       }
 
       // ب. التأكد من أن المستخدم ليس من المشاركين في هذه المباراة
-      final matchSnapshot = await transaction.get(
-        _firestore.collection(FirebasePaths.matches).doc(matchId),
-      );
-      if (matchSnapshot.exists) {
-        final matchData = matchSnapshot.data() as Map<String, dynamic>;
-        final teamA = List<String>.from(matchData['teamAPlayerIds'] ?? []);
-        final teamB = List<String>.from(matchData['teamBPlayerIds'] ?? []);
-        
-        if (teamA.contains(userId) || teamB.contains(userId)) {
-          throw Exception('اللاعبون المشاركون في المباراة لا يحق لهم التصويت.');
-        }
+      if (eligiblePlayerIds.contains(userId)) {
+        throw Exception('اللاعبون المشاركون في المباراة لا يحق لهم التصويت.');
       }
 
       // 5. تسجيل الصوت باسم اللاعب المختار
@@ -135,7 +155,7 @@ class FanVotingService {
       // 6. تحديث عدادات الجلسة
       final playerVotes = Map<String, int>.from(session.playerVotes);
       playerVotes[targetPlayerId] = (playerVotes[targetPlayerId] ?? 0) + 1;
-      
+
       transaction.update(sessionDocRef, {
         'totalVotes': FieldValue.increment(1),
         'playerVotes': playerVotes,

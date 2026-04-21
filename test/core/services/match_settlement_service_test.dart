@@ -2,15 +2,29 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:el7reef/core/enums/match_status.dart';
+import 'package:el7reef/core/enums/match_attendance_status.dart';
+import 'package:el7reef/core/enums/match_check_in_status.dart';
+import 'package:el7reef/core/enums/team_member_availability.dart';
+import 'package:el7reef/core/enums/team_membership_role.dart';
 import 'package:el7reef/core/enums/tournament_enums.dart';
+import 'package:el7reef/core/services/tournament_fixture_service.dart';
 import 'package:el7reef/core/services/match_settlement_service.dart';
 import 'package:el7reef/core/services/tournament_lifecycle_service.dart';
 import 'package:el7reef/core/services/tournament_registration_service.dart';
+import 'package:el7reef/core/constants/firebase_paths.dart';
+import 'package:el7reef/data/models/match_check_in_model.dart';
+import 'package:el7reef/data/models/match_lineup_snapshot_model.dart';
 import 'package:el7reef/data/repositories/group_standing_snapshot_repository_impl.dart';
 import 'package:el7reef/data/repositories/knockout_tie_repository_impl.dart';
 import 'package:el7reef/data/repositories/match_repository_impl.dart';
+import 'package:el7reef/data/repositories/player_repository_impl.dart';
 import 'package:el7reef/data/repositories/team_repository_impl.dart';
 import 'package:el7reef/data/repositories/tournament_repository_impl.dart';
+import 'package:el7reef/domain/entities/match.dart';
+import 'package:el7reef/domain/entities/match_check_in.dart';
+import 'package:el7reef/domain/entities/match_lineup_entry.dart';
+import 'package:el7reef/domain/entities/match_lineup_snapshot.dart';
+import 'package:el7reef/domain/entities/player.dart';
 import 'package:el7reef/domain/entities/team.dart';
 import 'package:el7reef/domain/entities/tournament.dart';
 
@@ -22,9 +36,11 @@ void main() {
     late MatchRepositoryImpl matchRepository;
     late TournamentRegistrationService registrationService;
     late TournamentLifecycleService lifecycleService;
+    late TournamentFixtureService fixtureService;
     late MatchSettlementService settlementService;
     late GroupStandingSnapshotRepositoryImpl standingsRepository;
     late KnockoutTieRepositoryImpl tieRepository;
+    late PlayerRepositoryImpl playerRepository;
     late DateTime now;
 
     setUp(() async {
@@ -34,6 +50,7 @@ void main() {
       matchRepository = MatchRepositoryImpl(db: firestore);
       registrationService = TournamentRegistrationService(firestore: firestore);
       lifecycleService = TournamentLifecycleService(firestore: firestore);
+      fixtureService = TournamentFixtureService(firestore: firestore);
       settlementService = MatchSettlementService(
         firestore: firestore,
         tournamentLifecycleService: lifecycleService,
@@ -42,6 +59,7 @@ void main() {
         firestore: firestore,
       );
       tieRepository = KnockoutTieRepositoryImpl(firestore: firestore);
+      playerRepository = PlayerRepositoryImpl(firestore: firestore);
       now = DateTime(2026, 4, 19, 22);
 
       await tournamentRepository.createTournament(
@@ -180,7 +198,280 @@ void main() {
         expect(advancedTie?.winnerParticipantId, finalMatch.teamAParticipantId);
       },
     );
+
+    test(
+      'pilot smoke flow completes tournament through approval-driven progression',
+      () async {
+        final groupStage = await lifecycleService.startGroupStage(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 15)),
+        );
+        final publishedFixtures = await lifecycleService.publishFixtures(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 16)),
+        );
+
+        final scheduledGroupFixture = await fixtureService.scheduleFixture(
+          matchId: publishedFixtures.first.id,
+          actorId: 'organizer-1',
+          scheduledAt: now.add(const Duration(days: 1)),
+          venueId: 'Pitch-1',
+        );
+
+        expect(scheduledGroupFixture.scheduledAt, isNotNull);
+        expect(scheduledGroupFixture.venueId, 'Pitch-1');
+
+        for (final fixture in publishedFixtures) {
+          final score = _groupScoreFor(fixture.teamAId!, fixture.teamBId!);
+          await settlementService.submitScore(
+            matchId: fixture.id,
+            scoreA: score.$1,
+            scoreB: score.$2,
+          );
+          await settlementService.approveScore(matchId: fixture.id);
+        }
+
+        final savedStandings = await standingsRepository.getGroupStageSnapshots(
+          groupStage.groupStageId,
+        );
+        expect(savedStandings, hasLength(1));
+        expect(
+          savedStandings.single.entries.any((entry) => entry.points > 0),
+          isTrue,
+        );
+
+        final knockout = await lifecycleService.startKnockout(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 25)),
+        );
+        final scheduledFinal = await fixtureService.scheduleFixture(
+          matchId: knockout.matches.single.id,
+          actorId: 'organizer-1',
+          scheduledAt: now.add(const Duration(days: 2)),
+          venueId: 'Main Court',
+        );
+
+        expect(scheduledFinal.venueId, 'Main Court');
+
+        await settlementService.submitScore(
+          matchId: scheduledFinal.id,
+          scoreA: 2,
+          scoreB: 1,
+        );
+        await settlementService.approveScore(matchId: scheduledFinal.id);
+
+        final finalTie = await tieRepository.getTie(knockout.ties.single.id);
+        final completedTournament = await lifecycleService.completeTournament(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 35)),
+        );
+
+        expect(finalTie?.winnerParticipantId, isNotNull);
+        expect(completedTournament.status, TournamentStatus.completed);
+        expect(completedTournament.winnerParticipantId, isNotNull);
+        expect(
+          completedTournament.winnerParticipantId,
+          finalTie?.winnerParticipantId,
+        );
+      },
+    );
+
+    test(
+      'submit and approve score use official roster when legacy match arrays are empty',
+      () async {
+        await _seedRegisteredPlayersForFixture(
+          playerRepository: playerRepository,
+          now: now,
+          fixtureTeamIds: <String>['team-1', 'team-2'],
+        );
+        await lifecycleService.startGroupStage(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 15)),
+        );
+        final publishedFixtures = await lifecycleService.publishFixtures(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 16)),
+        );
+        final fixture = publishedFixtures.first;
+
+        await _seedRegisteredFixtureReadyState(
+          firestore: firestore,
+          fixture: fixture,
+          now: now.add(const Duration(minutes: 17)),
+        );
+        final startedFixture = await fixtureService.startMatch(
+          matchId: fixture.id,
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 18)),
+        );
+        await matchRepository.updateMatch(
+          startedFixture.copyWith(
+            teamAPlayerIds: const <String>[],
+            teamBPlayerIds: const <String>[],
+          ),
+        );
+
+        await settlementService.submitScore(
+          matchId: fixture.id,
+          scoreA: 2,
+          scoreB: 1,
+          mvpPlayerId: 'team-1-player-1',
+        );
+
+        final fanVotingSession = await firestore
+            .collection(FirebasePaths.fanVotingSessions)
+            .doc(fixture.id)
+            .get();
+        expect(
+          fanVotingSession.data()?['eligiblePlayerIds'],
+          containsAll(<String>[
+            'team-1-player-1',
+            'team-1-player-2',
+            'team-2-player-1',
+            'team-2-player-2',
+          ]),
+        );
+
+        await settlementService.approveScore(matchId: fixture.id);
+
+        final homeStarter = await playerRepository.getPlayer('team-1-player-1');
+        final awayStarter = await playerRepository.getPlayer('team-2-player-1');
+        expect(homeStarter?.totalMatches, 1);
+        expect(awayStarter?.totalMatches, 1);
+      },
+    );
   });
+}
+
+Future<void> _seedRegisteredPlayersForFixture({
+  required PlayerRepositoryImpl playerRepository,
+  required DateTime now,
+  required List<String> fixtureTeamIds,
+}) async {
+  for (final teamId in fixtureTeamIds) {
+    await playerRepository.createPlayer(
+      Player(
+        id: '$teamId-player-1',
+        name: '$teamId Starter',
+        position: 'MID',
+        createdAt: now,
+        lastActiveAt: now,
+      ),
+    );
+    await playerRepository.createPlayer(
+      Player(
+        id: '$teamId-player-2',
+        name: '$teamId Bench',
+        position: 'DEF',
+        createdAt: now,
+        lastActiveAt: now,
+      ),
+    );
+  }
+}
+
+Future<void> _seedRegisteredFixtureReadyState({
+  required FakeFirebaseFirestore firestore,
+  required Match fixture,
+  required DateTime now,
+}) async {
+  await _seedSingleRegisteredCheckIn(
+    firestore: firestore,
+    matchId: fixture.id,
+    teamId: fixture.teamAId!,
+    now: now,
+  );
+  await _seedSingleRegisteredCheckIn(
+    firestore: firestore,
+    matchId: fixture.id,
+    teamId: fixture.teamBId!,
+    now: now,
+  );
+  await _seedSingleRegisteredSnapshot(
+    firestore: firestore,
+    matchId: fixture.id,
+    teamId: fixture.teamAId!,
+    now: now,
+  );
+  await _seedSingleRegisteredSnapshot(
+    firestore: firestore,
+    matchId: fixture.id,
+    teamId: fixture.teamBId!,
+    now: now,
+  );
+}
+
+Future<void> _seedSingleRegisteredCheckIn({
+  required FakeFirebaseFirestore firestore,
+  required String matchId,
+  required String teamId,
+  required DateTime now,
+}) async {
+  final checkIn = MatchCheckIn(
+    id: 'match::$matchId::team::$teamId::checkin',
+    matchId: matchId,
+    teamId: teamId,
+    status: MatchCheckInStatus.verified,
+    createdBy: 'organizer-1',
+    createdAt: now,
+    updatedAt: now,
+    checkedInBy: 'organizer-1',
+    checkedInAt: now,
+    verifiedBy: 'organizer-1',
+    verifiedAt: now,
+  );
+  await firestore
+      .collection(FirebasePaths.matchCheckIns)
+      .doc(checkIn.id)
+      .set(MatchCheckInModel.fromEntity(checkIn).toJson());
+}
+
+Future<void> _seedSingleRegisteredSnapshot({
+  required FakeFirebaseFirestore firestore,
+  required String matchId,
+  required String teamId,
+  required DateTime now,
+}) async {
+  final snapshot = MatchLineupSnapshot(
+    id: 'match::$matchId::team::$teamId::lineup',
+    matchId: matchId,
+    teamId: teamId,
+    checkInId: 'match::$matchId::team::$teamId::checkin',
+    starters: <MatchLineupEntry>[
+      MatchLineupEntry(
+        attendanceId: 'attendance::$matchId::$teamId::starter',
+        teamMembershipId: 'membership::$teamId::starter',
+        playerId: '$teamId-player-1',
+        role: TeamMembershipRole.player,
+        availability: TeamMemberAvailability.available,
+        attendanceStatus: MatchAttendanceStatus.present,
+        displayName: '$teamId Starter',
+      ),
+    ],
+    bench: <MatchLineupEntry>[
+      MatchLineupEntry(
+        attendanceId: 'attendance::$matchId::$teamId::bench',
+        teamMembershipId: 'membership::$teamId::bench',
+        playerId: '$teamId-player-2',
+        role: TeamMembershipRole.player,
+        availability: TeamMemberAvailability.available,
+        attendanceStatus: MatchAttendanceStatus.present,
+        displayName: '$teamId Bench',
+      ),
+    ],
+    lockedBy: 'organizer-1',
+    lockedAt: now,
+  );
+  await firestore
+      .collection(FirebasePaths.matchLineupSnapshots)
+      .doc(snapshot.id)
+      .set(MatchLineupSnapshotModel.fromEntity(snapshot).toJson());
 }
 
 (int, int) _groupScoreFor(String teamAId, String teamBId) {

@@ -9,6 +9,7 @@ class GuestPlayer {
   final int? jerseyNumber;
   final String? preferredPosition;
   final String? teamId;
+  final String? guestTeamId;
   final String? tournamentId;
   final String createdBy;
   final DateTime createdAt;
@@ -26,6 +27,7 @@ class GuestPlayer {
     this.jerseyNumber,
     this.preferredPosition,
     this.teamId,
+    this.guestTeamId,
     this.tournamentId,
     required this.createdBy,
     required this.createdAt,
@@ -39,7 +41,8 @@ class GuestPlayer {
   bool get isClaimed => claimStatus == GuestClaimStatus.claimed;
   bool get isArchived => claimStatus == GuestClaimStatus.archived;
   bool get hasClaimCode => claimCode != null && claimCode!.isNotEmpty;
-  bool get hasLinkedPlayer => linkedPlayerId != null && linkedPlayerId!.isNotEmpty;
+  bool get hasLinkedPlayer =>
+      linkedPlayerId != null && linkedPlayerId!.isNotEmpty;
 
   GuestPlayer copyWith({
     String? id,
@@ -49,6 +52,7 @@ class GuestPlayer {
     int? jerseyNumber,
     String? preferredPosition,
     String? teamId,
+    String? guestTeamId,
     String? tournamentId,
     String? createdBy,
     DateTime? createdAt,
@@ -66,6 +70,7 @@ class GuestPlayer {
       jerseyNumber: jerseyNumber ?? this.jerseyNumber,
       preferredPosition: preferredPosition ?? this.preferredPosition,
       teamId: teamId ?? this.teamId,
+      guestTeamId: guestTeamId ?? this.guestTeamId,
       tournamentId: tournamentId ?? this.tournamentId,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,

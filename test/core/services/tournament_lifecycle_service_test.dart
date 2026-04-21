@@ -163,6 +163,58 @@ void main() {
     );
 
     test(
+      'publishFixtures is a no-op when all fixtures are already published',
+      () async {
+        await lifecycleService.finalizeParticipants(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 10)),
+        );
+        final groupStage = await lifecycleService.startGroupStage(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 15)),
+        );
+
+        final firstPublished = await lifecycleService.publishFixtures(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 16)),
+        );
+        final fixtureDocBefore = await firestore
+            .collection(FirebasePaths.matches)
+            .doc(groupStage.fixtures.first.id)
+            .get();
+        final auditBefore = await firestore
+            .collection(FirebasePaths.auditEvents)
+            .where('action', isEqualTo: 'fixturesPublished')
+            .get();
+
+        final secondPublished = await lifecycleService.publishFixtures(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 20)),
+        );
+        final fixtureDocAfter = await firestore
+            .collection(FirebasePaths.matches)
+            .doc(groupStage.fixtures.first.id)
+            .get();
+        final auditAfter = await firestore
+            .collection(FirebasePaths.auditEvents)
+            .where('action', isEqualTo: 'fixturesPublished')
+            .get();
+
+        expect(firstPublished, hasLength(groupStage.fixtures.length));
+        expect(secondPublished, hasLength(groupStage.fixtures.length));
+        expect(
+          fixtureDocAfter.data()?['publishedAt'],
+          fixtureDocBefore.data()?['publishedAt'],
+        );
+        expect(auditAfter.docs, hasLength(auditBefore.docs.length));
+      },
+    );
+
+    test(
       'startGroupStage is idempotent and does not duplicate fixtures',
       () async {
         await lifecycleService.finalizeParticipants(

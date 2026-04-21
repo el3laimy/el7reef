@@ -143,11 +143,13 @@ class TournamentParticipantService {
       );
     }
     if (refreshTournamentSummary) {
-      tournament ??= await _loadTournament(registration.tournamentId);
-      await refreshTournamentParticipantSummary(
-        tournamentId: registration.tournamentId,
-        tournament: tournament,
-      );
+      if (existing == null) {
+        tournament ??= await _loadTournament(registration.tournamentId);
+        await _syncTournamentActiveParticipantCount(
+          tournament: tournament,
+          delta: participant.isActive ? 1 : 0,
+        );
+      }
     }
     if (!shouldWrite) {
       return existing;
@@ -207,9 +209,9 @@ class TournamentParticipantService {
       },
     );
     if (refreshTournamentSummary) {
-      await refreshTournamentParticipantSummary(
-        tournamentId: tournamentId,
+      await _syncTournamentActiveParticipantCount(
         tournament: tournament,
+        delta: participant.isActive ? 1 : 0,
       );
     }
     return participant;
@@ -236,9 +238,9 @@ class TournamentParticipantService {
       afterPayload: {'deleted': true},
     );
     if (refreshTournamentSummary) {
-      await refreshTournamentParticipantSummary(
-        tournamentId: participant.tournamentId,
+      await _syncTournamentActiveParticipantCount(
         tournament: tournament,
+        delta: participant.isActive ? -1 : 0,
       );
     }
   }
@@ -271,15 +273,15 @@ class TournamentParticipantService {
       afterPayload: {'status': updated.status.name},
     );
     if (refreshTournamentSummary) {
-      await refreshTournamentParticipantSummary(
-        tournamentId: participant.tournamentId,
+      await _syncTournamentActiveParticipantCount(
         tournament: tournament,
+        delta: participant.isActive ? -1 : 0,
       );
     }
     return updated;
   }
 
-  Future<TournamentParticipant> reactivateParticipant({
+  Future<TournamentParticipantReactivationResult> reactivateParticipant({
     required String participantId,
     required String actorId,
     DateTime? now,
@@ -290,7 +292,16 @@ class TournamentParticipantService {
     final tournament = await _loadTournament(participant.tournamentId);
     _assertCanReactivateParticipant(tournament);
     if (participant.isActive) {
-      return participant;
+      return TournamentParticipantReactivationResult(
+        reactivatedParticipant: participant,
+        withdrawnReplacement: null,
+        activeParticipantCount:
+            tournament.activeParticipantCount ??
+            (await refreshTournamentParticipantSummary(
+              tournamentId: participant.tournamentId,
+              tournament: tournament,
+            )),
+      );
     }
 
     final reactivatedStatus = tournament.participantListFinalizedAt != null
@@ -346,16 +357,23 @@ class TournamentParticipantService {
         'replacementWithdrawnId': withdrawnReplacement?.id,
       },
     );
+    int? activeParticipantCount;
     if (refreshTournamentSummary) {
-      await refreshTournamentParticipantSummary(
-        tournamentId: participant.tournamentId,
+      final delta = withdrawnReplacement == null ? 1 : 0;
+      activeParticipantCount = await _syncTournamentActiveParticipantCount(
         tournament: tournament,
+        delta: delta,
       );
     }
-    return reactivated;
+    return TournamentParticipantReactivationResult(
+      reactivatedParticipant: reactivated,
+      withdrawnReplacement: withdrawnReplacement,
+      activeParticipantCount:
+          activeParticipantCount ?? tournament.activeParticipantCount,
+    );
   }
 
-  Future<TournamentParticipant> replaceParticipant({
+  Future<TournamentParticipantReplacementResult> replaceParticipant({
     required String participantId,
     required TournamentParticipantSourceType replacementSourceType,
     required String replacementSourceEntityId,
@@ -445,13 +463,19 @@ class TournamentParticipantService {
         'replacementForParticipantId': current.id,
       },
     );
+    int? activeParticipantCount;
     if (refreshTournamentSummary) {
-      await refreshTournamentParticipantSummary(
-        tournamentId: current.tournamentId,
+      activeParticipantCount = await _syncTournamentActiveParticipantCount(
         tournament: tournament,
+        delta: 0,
       );
     }
-    return replacementParticipant;
+    return TournamentParticipantReplacementResult(
+      replacedParticipant: replaced,
+      replacementParticipant: replacementParticipant,
+      activeParticipantCount:
+          activeParticipantCount ?? tournament.activeParticipantCount,
+    );
   }
 
   Future<TournamentParticipant> updateParticipantSeed({
@@ -509,6 +533,27 @@ class TournamentParticipantService {
       'activeParticipantCount': activeCount,
     });
     return activeCount;
+  }
+
+  Future<int> _syncTournamentActiveParticipantCount({
+    required Tournament tournament,
+    required int delta,
+  }) async {
+    final currentCount = tournament.activeParticipantCount;
+    if (currentCount == null) {
+      return refreshTournamentParticipantSummary(
+        tournamentId: tournament.id,
+        tournament: tournament,
+      );
+    }
+    final nextCount = currentCount + delta;
+    if (nextCount == currentCount) {
+      return currentCount;
+    }
+    await _tournamentsRef.doc(tournament.id).update({
+      'activeParticipantCount': nextCount < 0 ? 0 : nextCount,
+    });
+    return nextCount < 0 ? 0 : nextCount;
   }
 
   bool _hasSameSyncedParticipantState(
@@ -675,5 +720,29 @@ class _ParticipantSource {
     required this.entityId,
     required this.displayName,
     required this.sourceType,
+  });
+}
+
+class TournamentParticipantReplacementResult {
+  final TournamentParticipant replacedParticipant;
+  final TournamentParticipant replacementParticipant;
+  final int? activeParticipantCount;
+
+  const TournamentParticipantReplacementResult({
+    required this.replacedParticipant,
+    required this.replacementParticipant,
+    this.activeParticipantCount,
+  });
+}
+
+class TournamentParticipantReactivationResult {
+  final TournamentParticipant reactivatedParticipant;
+  final TournamentParticipant? withdrawnReplacement;
+  final int? activeParticipantCount;
+
+  const TournamentParticipantReactivationResult({
+    required this.reactivatedParticipant,
+    required this.withdrawnReplacement,
+    this.activeParticipantCount,
   });
 }

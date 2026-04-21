@@ -6,6 +6,7 @@ abstract class GuestPlayerRepository {
   Future<void> createGuestPlayer(GuestPlayer guestPlayer);
   Future<void> updateGuestPlayer(GuestPlayer guestPlayer);
   Future<List<GuestPlayer>> getTeamGuestPlayers(String teamId);
+  Future<List<GuestPlayer>> getGuestTeamPlayers(String guestTeamId);
   Future<List<GuestPlayer>> getTournamentGuestPlayers(String tournamentId);
   Future<void> archiveGuestPlayer(String guestPlayerId);
 }
