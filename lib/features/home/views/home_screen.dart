@@ -135,6 +135,16 @@ class _HomeTab extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.asset(
+                                'assets/images/logo_icon.png',
+                                height: 36,
+                                width: 36,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            const SizedBox(height: AppDimensions.sm),
                             Text(
                               'أهلاً ${player?.name ?? 'يا حريف'} 👋',
                               style: AppTextStyles.headlineMedium,

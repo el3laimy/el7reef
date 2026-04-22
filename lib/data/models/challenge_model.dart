@@ -34,11 +34,11 @@ class ChallengeModel extends Challenge {
       message: json['message'] as String?,
       location: json['location'] as String?,
       teamSize: (json['teamSize'] as num?)?.toInt() ?? 5,
-      createdAt: (json['createdAt'] as Timestamp).toDate(),
+      createdAt: json['createdAt'] != null ? (json['createdAt'] as Timestamp).toDate() : DateTime.now(),
       respondedAt: json['respondedAt'] != null
           ? (json['respondedAt'] as Timestamp).toDate()
           : null,
-      expiresAt: (json['expiresAt'] as Timestamp).toDate(),
+      expiresAt: json['expiresAt'] != null ? (json['expiresAt'] as Timestamp).toDate() : DateTime.now().add(const Duration(days: 3)),
     );
   }
 

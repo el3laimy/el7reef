@@ -9,6 +9,7 @@ import '../../../core/enums/match_status.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../core/widgets/el7reef_button.dart';
 import '../../../domain/entities/match.dart';
+import '../../team/controllers/team_controller.dart';
 import '../controllers/match_controller.dart';
 import '../controllers/challenge_controller.dart';
 import '../widgets/challenge_card.dart';
@@ -23,7 +24,13 @@ class MatchDiscoverScreen extends GetView<MatchController> {
       length: 3,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('المباريات'),
+          title: Row(
+            children: [
+              Image.asset('assets/images/logo_icon.png', height: 28),
+              const SizedBox(width: AppDimensions.sm),
+              const Text('المباريات'),
+            ],
+          ),
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
@@ -56,13 +63,15 @@ class MatchDiscoverScreen extends GetView<MatchController> {
       ),
     );
   }
+}
 
-  void _showCreateMatchSheet(BuildContext context) {
-    Get.bottomSheet(
-      _CreateMatchSheet(controller: controller),
-      isScrollControlled: true,
-    );
-  }
+// Global method or extension? Let's just use Get.bottomSheet directly where needed or fetch controller.
+void showCreateMatchSheetGlobal() {
+  final controller = Get.find<MatchController>();
+  Get.bottomSheet(
+    _CreateMatchSheet(controller: controller),
+    isScrollControlled: true,
+  );
 }
 
 class _MyMatchesTab extends GetView<MatchController> {
@@ -86,7 +95,7 @@ class _MyMatchesTab extends GetView<MatchController> {
               const SizedBox(height: AppDimensions.lg),
               El7reefButton(
                 text: 'أنشئ مباراة جديدة',
-                onPressed: () => Get.find<MatchDiscoverScreen>()._showCreateMatchSheet(context),
+                onPressed: showCreateMatchSheetGlobal,
               ),
             ],
           ),
@@ -132,7 +141,7 @@ class _DiscoverTab extends GetView<MatchController> {
                 child: El7reefButton(
                   text: 'ابدأ مباراة جديدة',
                   icon: Icons.sports_soccer,
-                  onPressed: () => Get.find<MatchDiscoverScreen>()._showCreateMatchSheet(context),
+                  onPressed: showCreateMatchSheetGlobal,
                 ).animate().fadeIn(duration: 400.ms),
               ),
             ),
@@ -211,7 +220,7 @@ class _ChallengesTab extends GetView<ChallengeController> {
                       child: ChallengeCard(
                         challenge: challenge,
                         isSentByMe: false,
-                        otherPartyName: 'لاعب ${challenge.challengerId.substring(0, 5)}', // This needs proper name loading later
+                        otherPartyName: controller.getPlayerName(challenge.challengerId),
                         onAccept: () => controller.acceptChallenge(challenge),
                         onDecline: () => controller.declineChallenge(challenge.id),
                       ),
@@ -238,7 +247,7 @@ class _ChallengesTab extends GetView<ChallengeController> {
                       child: ChallengeCard(
                         challenge: challenge,
                         isSentByMe: true,
-                        otherPartyName: 'لاعب ${challenge.challengedId.substring(0, 5)}', // This needs proper name loading later
+                        otherPartyName: controller.getPlayerName(challenge.challengedId),
                         onCancel: () => controller.cancelChallenge(challenge.id),
                       ),
                     );
@@ -250,12 +259,13 @@ class _ChallengesTab extends GetView<ChallengeController> {
 
             if (controller.receivedChallenges.isEmpty && controller.sentChallenges.isEmpty)
               SliverFillRemaining(
+                hasScrollBody: false,
                 child: Center(
                   child: Text('لا توجد تحديات حالياً', style: AppTextStyles.bodyLarge),
                 ),
-              ),
-              
-            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+              )
+            else
+              const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         ),
       );
@@ -513,15 +523,32 @@ class _StatusBadge extends StatelessWidget {
 }
 
 /// Sheet إنشاء مباراة
-class _CreateMatchSheet extends StatelessWidget {
+class _CreateMatchSheet extends StatefulWidget {
   final MatchController controller;
-  _CreateMatchSheet({required this.controller});
+  const _CreateMatchSheet({required this.controller});
 
+  @override
+  State<_CreateMatchSheet> createState() => _CreateMatchSheetState();
+}
+
+class _CreateMatchSheetState extends State<_CreateMatchSheet> {
   final _locationController = TextEditingController();
   final _selectedTeamSize = 5.obs;
+  final RxBool _playAsTeam = false.obs;
+  final RxnString _selectedTeamId = RxnString();
+
+  @override
+  void dispose() {
+    _locationController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Try to find TeamController to fetch user's teams
+    final hasTeamController = Get.isRegistered<TeamController>();
+    final teamCtrl = hasTeamController ? Get.find<TeamController>() : null;
+
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: AppDimensions.lg,
@@ -558,6 +585,75 @@ class _CreateMatchSheet extends StatelessWidget {
           ),
           const SizedBox(height: AppDimensions.lg),
 
+          // ── نوع المشاركة (فرد أم فريق) ──
+          if (teamCtrl != null && teamCtrl.myTeams.isNotEmpty) ...[
+            Text('كيف ستلعب هذه المباراة؟', style: AppTextStyles.titleSmall),
+            const SizedBox(height: AppDimensions.sm),
+            Obx(() => Row(
+              children: [
+                Expanded(
+                  child: ChoiceChip(
+                    label: const Center(child: Text('كلاعب فردي (Pickup)')),
+                    selected: !_playAsTeam.value,
+                    onSelected: (val) {
+                      if (val) {
+                        _playAsTeam.value = false;
+                        _selectedTeamId.value = null;
+                      }
+                    },
+                    selectedColor: AppColors.primarySurface,
+                  ),
+                ),
+                const SizedBox(width: AppDimensions.sm),
+                Expanded(
+                  child: ChoiceChip(
+                    label: const Center(child: Text('باسم فريقي')),
+                    selected: _playAsTeam.value,
+                    onSelected: (val) {
+                      if (val) {
+                        _playAsTeam.value = true;
+                        if (teamCtrl.myTeams.isNotEmpty) {
+                          _selectedTeamId.value = teamCtrl.myTeams.first.id;
+                        }
+                      }
+                    },
+                    selectedColor: AppColors.primarySurface,
+                  ),
+                ),
+              ],
+            )),
+            Obx(() {
+              if (_playAsTeam.value && teamCtrl.myTeams.isNotEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: AppDimensions.md),
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'اختر فريقك',
+                      border: OutlineInputBorder(),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedTeamId.value,
+                        isExpanded: true,
+                        items: teamCtrl.myTeams.map((team) {
+                          return DropdownMenuItem(
+                            value: team.id,
+                            child: Text(team.name),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          _selectedTeamId.value = val;
+                        },
+                      ),
+                    ),
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            }),
+            const SizedBox(height: AppDimensions.md),
+          ],
+
           // ── المكان ──
           TextField(
             controller: _locationController,
@@ -590,13 +686,20 @@ class _CreateMatchSheet extends StatelessWidget {
           Obx(() => El7reefButton(
                 text: 'إنشاء المباراة',
                 icon: Icons.play_arrow_rounded,
-                isLoading: controller.isLoading.value,
+                isLoading: widget.controller.isLoading.value,
                 onPressed: () async {
-                  final uid = controller.authService.currentUserId;
+                  final uid = widget.controller.authService.currentUserId;
                   if (uid == null) return;
-                  final matchId = await controller.createMatch(
+                  
+                  // if playing as individual, add uid to teamAIds.
+                  // if playing as team, teamAId is set, and uid is not strictly needed in teamAIds 
+                  // but we can add it anyway so the creator is part of the match.
+                  final isTeam = _playAsTeam.value && _selectedTeamId.value != null;
+                  
+                  final matchId = await widget.controller.createMatch(
                     teamAIds: [uid],
                     teamBIds: [],
+                    teamAId: isTeam ? _selectedTeamId.value : null,
                     location: _locationController.text.trim().isNotEmpty
                         ? _locationController.text.trim()
                         : null,

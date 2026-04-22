@@ -15,6 +15,7 @@ import '../../../domain/entities/player.dart';
 import '../../../domain/entities/team.dart';
 import '../../../domain/entities/team_formation_template.dart';
 import '../../../domain/entities/team_roster_snapshot.dart';
+import '../../match/widgets/send_challenge_sheet.dart';
 import '../controllers/team_roster_controller.dart';
 
 class TeamRosterScreen extends GetView<TeamRosterController> {
@@ -205,9 +206,32 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
     if (!controller.canManageRoster) {
       return GlassmorphicContainer(
         padding: const EdgeInsets.all(AppDimensions.md),
-        child: Text(
-          'يمكنك مشاهدة القائمة حالياً، لكن إدارة التشكيلة متاحة فقط لمالك الفريق أو نوابه.',
-          style: AppTextStyles.bodyMedium,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'يمكنك مشاهدة القائمة حالياً، لكن إدارة التشكيلة متاحة فقط لمالك الفريق أو نوابه.',
+              style: AppTextStyles.bodyMedium,
+            ),
+            const SizedBox(height: AppDimensions.md),
+            El7reefButton(
+              text: 'تحدي هذا الفريق ⚔️',
+              icon: Icons.flash_on,
+              onPressed: () {
+                final team = controller.team.value;
+                if (team != null) {
+                  Get.bottomSheet(
+                    SendChallengeSheet(
+                      challengedId: team.ownerId,
+                      challengedName: team.name,
+                      challengedTeamId: team.id,
+                    ),
+                    isScrollControlled: true,
+                  );
+                }
+              },
+            ),
+          ],
         ),
       );
     }

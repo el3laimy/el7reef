@@ -11,6 +11,8 @@ import '../../../core/widgets/rank_tier_badge.dart';
 import '../../../domain/entities/player.dart';
 import '../controllers/search_players_controller.dart';
 import '../controllers/friend_controller.dart';
+import '../../match/widgets/send_challenge_sheet.dart';
+import '../../match/controllers/challenge_controller.dart';
 
 class SearchPlayersScreen extends GetView<SearchPlayersController> {
   const SearchPlayersScreen({super.key});
@@ -206,6 +208,32 @@ class SearchPlayersScreen extends GetView<SearchPlayersController> {
             ),
           ),
           
+          // Challenge Button
+          IconButton(
+            icon: const Icon(Icons.flash_on, color: AppColors.secondary),
+            padding: const EdgeInsets.all(12),
+            style: IconButton.styleFrom(
+              backgroundColor: AppColors.secondary.withValues(alpha: 0.1),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+               if (Get.isRegistered<ChallengeController>()) {
+                 final challengeCtrl = Get.find<ChallengeController>();
+                 if (challengeCtrl.currentUserId == player.id) {
+                   Get.snackbar('تنبيه', 'لا يمكنك إرسال تحدي لنفسك!');
+                   return;
+                 }
+               }
+               Get.bottomSheet(
+                 SendChallengeSheet(
+                   challengedId: player.id,
+                   challengedName: player.name,
+                 ),
+                 isScrollControlled: true,
+               );
+            },
+          ),
+          const SizedBox(width: AppDimensions.sm),
           // Add Friend Button
           IconButton(
             icon: const Icon(Icons.person_add, color: AppColors.accent),

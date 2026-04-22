@@ -101,26 +101,30 @@ class _SplashScreenState extends State<SplashScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    width: 120,
-                    height: 120,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: AppColors.primaryGradient,
+                      borderRadius: BorderRadius.circular(32),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.4),
-                          blurRadius: 30,
-                          spreadRadius: 5,
+                          color: const Color(0xFF2E7D32).withValues(alpha: 0.4),
+                          blurRadius: 40,
+                          spreadRadius: 8,
                         ),
                       ],
                     ),
-                    child: const Center(
-                      child: Text('⚽', style: TextStyle(fontSize: 56)),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(32),
+                      child: Image.asset(
+                        'assets/images/logo_icon.png',
+                        width: 160,
+                        height: 160,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   )
                       .animate()
                       .scale(begin: const Offset(0.0, 0.0), end: const Offset(1.0, 1.0), duration: 800.ms, curve: Curves.elasticOut)
-                      .fadeIn(duration: 400.ms),
+                      .fadeIn(duration: 400.ms)
+                      .shimmer(delay: 1000.ms, duration: 1500.ms, color: Colors.white.withValues(alpha: 0.2)),
 
                   const SizedBox(height: AppDimensions.lg),
 
@@ -128,20 +132,20 @@ class _SplashScreenState extends State<SplashScreen> {
                     AppConstants.appName,
                     style: AppTextStyles.displayLarge.copyWith(
                       foreground: Paint()
-                        ..shader = AppColors.primaryGradient.createShader(
-                          const Rect.fromLTWH(0, 0, 200, 70),
-                        ),
+                        ..shader = const LinearGradient(
+                          colors: [Color(0xFF4CAF50), Color(0xFF81C784)],
+                        ).createShader(const Rect.fromLTWH(0, 0, 200, 70)),
                     ),
                   )
                       .animate()
                       .fadeIn(delay: 400.ms, duration: 600.ms)
                       .slideY(begin: 0.3, end: 0, duration: 600.ms, curve: Curves.easeOut),
 
-                  const SizedBox(height: AppDimensions.sm),
-
+                  const SizedBox(height: AppDimensions.lg),
+                  
                   Text(
                     AppConstants.appTagline,
-                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textMuted),
+                    style: AppTextStyles.titleMedium.copyWith(color: AppColors.primary),
                   )
                       .animate()
                       .fadeIn(delay: 800.ms, duration: 600.ms)

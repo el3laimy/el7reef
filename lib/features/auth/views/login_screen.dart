@@ -27,21 +27,24 @@ class LoginScreen extends GetView<AuthController> {
 
                 // ── الشعار ──
                 Container(
-                  width: 110,
-                  height: 110,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: AppColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(28),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.4),
+                        color: const Color(0xFF2E7D32).withValues(alpha: 0.3),
                         blurRadius: 30,
                         spreadRadius: 5,
                       ),
                     ],
                   ),
-                  child: const Center(
-                    child: Text('⚽', style: TextStyle(fontSize: 52)),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(28),
+                    child: Image.asset(
+                      'assets/images/logo_icon.png',
+                      width: 130,
+                      height: 130,
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 )
                     .animate()
@@ -55,21 +58,18 @@ class LoginScreen extends GetView<AuthController> {
 
                 const SizedBox(height: AppDimensions.lg),
 
-                // ── الاسم ──
                 Text(
                   AppConstants.appName,
                   style: AppTextStyles.displayLarge.copyWith(
                     foreground: Paint()
-                      ..shader = AppColors.primaryGradient.createShader(
-                        const Rect.fromLTWH(0, 0, 200, 70),
-                      ),
+                      ..shader = const LinearGradient(
+                        colors: [Color(0xFF4CAF50), Color(0xFF81C784)],
+                      ).createShader(const Rect.fromLTWH(0, 0, 200, 70)),
                   ),
                 )
                     .animate()
                     .fadeIn(delay: 300.ms, duration: 600.ms)
                     .slideY(begin: 0.3, duration: 600.ms, curve: Curves.easeOut),
-
-                const SizedBox(height: AppDimensions.sm),
 
                 Text(
                   AppConstants.appTagline,

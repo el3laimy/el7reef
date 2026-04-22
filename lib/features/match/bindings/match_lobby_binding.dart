@@ -5,6 +5,7 @@ import '../../../data/repositories/match_repository_impl.dart';
 import '../../../domain/repositories/match_invitation_repository.dart';
 import '../../../data/repositories/match_invitation_repository_impl.dart';
 import '../../../data/repositories/friend_repository_impl.dart';
+import '../../../data/repositories/player_repository_impl.dart';
 import '../../social/controllers/friend_controller.dart';
 
 class MatchLobbyBinding extends Bindings {
@@ -18,11 +19,14 @@ class MatchLobbyBinding extends Bindings {
     if (!Get.isRegistered<MatchInvitationRepository>()) {
       Get.lazyPut<MatchInvitationRepository>(() => MatchInvitationRepositoryImpl());
     }
+    if (!Get.isRegistered<PlayerRepositoryImpl>()) {
+      Get.lazyPut(() => PlayerRepositoryImpl());
+    }
     if (!Get.isRegistered<FriendRepositoryImpl>()) {
-      Get.lazyPut(() => FriendRepositoryImpl());
+      Get.put(FriendRepositoryImpl());
     }
     if (!Get.isRegistered<FriendController>()) {
-      Get.lazyPut(() => FriendController(Get.find<FriendRepositoryImpl>()));
+      Get.put(FriendController(Get.find<FriendRepositoryImpl>()));
     }
 
     Get.lazyPut<MatchLobbyController>(

@@ -8,6 +8,7 @@ import '../../../core/enums/match_attendance_status.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../domain/entities/match_lineup_snapshot.dart';
 import '../controllers/matchday_controller.dart';
+import '../widgets/matchday_header.dart';
 
 class MatchdayScreen extends GetView<MatchdayController> {
   const MatchdayScreen({super.key});
@@ -48,20 +49,23 @@ class MatchdayScreen extends GetView<MatchdayController> {
             child: ListView(
               padding: const EdgeInsets.all(AppDimensions.pagePadding),
               children: [
-                _MatchSummaryCard(controller: controller),
-                const SizedBox(height: AppDimensions.md),
-                _SideSelector(controller: controller),
+                MatchdayHeader(controller: controller),
                 const SizedBox(height: AppDimensions.md),
                 if (controller.selectedSide != null) ...[
-                  _SideStatusCard(controller: controller),
+                  MatchdayQuickStats(controller: controller),
+                  const SizedBox(height: AppDimensions.md),
+                  MatchdayProgressStepper(controller: controller),
+                  const SizedBox(height: AppDimensions.md),
+                  _SideSelector(controller: controller),
                   const SizedBox(height: AppDimensions.md),
                   _AttendanceSection(controller: controller),
                   const SizedBox(height: AppDimensions.md),
                   _LineupSection(controller: controller),
                   const SizedBox(height: AppDimensions.md),
                   _SubstitutionSection(controller: controller),
-                ] else
-                  _NoManagedSideCard(controller: controller),
+                ] else ...[
+                  _SideSelector(controller: controller),
+                ],
                 const SizedBox(height: AppDimensions.xl),
               ],
             ),
@@ -72,49 +76,6 @@ class MatchdayScreen extends GetView<MatchdayController> {
   }
 }
 
-class _MatchSummaryCard extends StatelessWidget {
-  final MatchdayController controller;
-
-  const _MatchSummaryCard({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    final match = controller.match.value;
-    final tournament = controller.tournament.value;
-
-    return GlassmorphicContainer(
-      padding: const EdgeInsets.all(AppDimensions.md),
-      borderRadius: AppDimensions.radiusLg,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('ملخص المباراة', style: AppTextStyles.titleLarge),
-          const SizedBox(height: AppDimensions.sm),
-          Text(
-            tournament?.name ?? 'مباراة مستقلة',
-            style: AppTextStyles.bodyLarge,
-          ),
-          const SizedBox(height: AppDimensions.xs),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _MetaChip(
-                label: 'الحالة: ${_matchStatusLabel(match?.status.name)}',
-              ),
-              if (tournament != null)
-                _MetaChip(
-                  label: 'عدد الأساسيين: ${tournament.teamSize.value}',
-                ),
-              if (match?.location != null && match!.location!.isNotEmpty)
-                _MetaChip(label: 'المكان: ${match.location!}'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _SideSelector extends StatelessWidget {
   final MatchdayController controller;
@@ -160,80 +121,6 @@ class _SideSelector extends StatelessWidget {
   }
 }
 
-class _SideStatusCard extends StatelessWidget {
-  final MatchdayController controller;
-
-  const _SideStatusCard({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    final side = controller.selectedSide!;
-    final checkIn = controller.activeCheckIn.value;
-    final snapshot = controller.activeSnapshot.value;
-
-    return GlassmorphicContainer(
-      padding: const EdgeInsets.all(AppDimensions.md),
-      borderRadius: AppDimensions.radiusLg,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(side.label, style: AppTextStyles.headlineMedium),
-              ),
-              _StatusBadge(
-                label: side.accessLabel,
-                color: AppColors.secondary,
-              ),
-            ],
-          ),
-          const SizedBox(height: AppDimensions.xs),
-          Text(side.subtitle, style: AppTextStyles.bodyMedium),
-          if (side.usesOpenMatchSlot) ...[
-            const SizedBox(height: AppDimensions.xs),
-            Text(
-              'هذا الطرف يستخدم المساحة المفتوحة داخل المباراة الحالية.',
-              style: AppTextStyles.labelSmall.copyWith(
-                color: AppColors.textMuted,
-              ),
-            ),
-          ],
-          const SizedBox(height: AppDimensions.sm),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _StatusBadge(
-                label: checkIn == null
-                    ? 'لم يتم check-in'
-                    : (checkIn.isVerified ? 'حضور معتمد' : 'تم check-in'),
-                color: checkIn == null
-                    ? AppColors.textMuted
-                    : (checkIn.isVerified
-                        ? AppColors.success
-                        : AppColors.primary),
-              ),
-              _StatusBadge(
-                label: snapshot == null ? 'التشكيل غير مقفول' : 'التشكيل مقفول',
-                color: snapshot == null ? AppColors.warning : AppColors.success,
-              ),
-            ],
-          ),
-          if (side.isGuestTeam) ...[
-            const SizedBox(height: AppDimensions.sm),
-            Text(
-              'ملاحظة: اختيار لاعبي الفريق الضيف يعتمد حاليًا على قائمة ضيوف البطولة المتاحة لهذا اللقاء.',
-              style: AppTextStyles.labelSmall.copyWith(
-                color: AppColors.textMuted,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
 
 class _AttendanceSection extends StatelessWidget {
   final MatchdayController controller;
@@ -442,23 +329,65 @@ class _SubstitutionSection extends StatelessWidget {
             const _SectionHint(message: 'لا توجد تبديلات مسجلة حتى الآن.')
           else
             ...controller.sideSubstitutions.map(
-              (substitution) => ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(
-                  radius: 16,
-                  backgroundColor: AppColors.primarySurface,
-                  child: Text(
-                    '${substitution.minute}',
-                    style: const TextStyle(fontSize: 11),
-                  ),
+              (substitution) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(AppDimensions.sm),
+                decoration: BoxDecoration(
+                  color: AppColors.surface.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+                  border: Border.all(color: AppColors.surfaceBorder),
                 ),
-                title: Text(
-                  '${controller.substitutionLabel(substitution.outgoingAttendanceId)} ⟶ ${controller.substitutionLabel(substitution.incomingAttendanceId)}',
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.warning.withValues(alpha: 0.15),
+                      ),
+                      child: Center(
+                        child: Text(
+                          "${substitution.minute}'",
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.warning,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.arrow_upward_rounded, size: 14, color: AppColors.error),
+                              const SizedBox(width: 4),
+                              Text(
+                                controller.substitutionLabel(substitution.outgoingAttendanceId),
+                                style: AppTextStyles.labelMedium.copyWith(color: AppColors.error),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Icon(Icons.arrow_downward_rounded, size: 14, color: AppColors.success),
+                              const SizedBox(width: 4),
+                              Text(
+                                controller.substitutionLabel(substitution.incomingAttendanceId),
+                                style: AppTextStyles.labelMedium.copyWith(color: AppColors.success),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                subtitle: substitution.notes == null
-                    ? null
-                    : Text(substitution.notes!),
               ),
             ),
         ],
@@ -494,25 +423,41 @@ class _ParticipantAttendanceTile extends StatelessWidget {
         children: [
           Row(
             children: [
+              _AttendanceAvatar(
+                name: participant.displayName,
+                status: currentStatus,
+              ),
+              const SizedBox(width: AppDimensions.sm),
               Expanded(
-                child: Text(
-                  participant.displayName,
-                  style: AppTextStyles.titleMedium,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            participant.displayName,
+                            style: AppTextStyles.titleMedium,
+                          ),
+                        ),
+                        if (participant.isGuest)
+                          const _StatusBadge(label: 'ضيف', color: AppColors.warning),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        participant.position,
+                        participant.statusSeedLabel,
+                      ].whereType<String>().where((value) => value.isNotEmpty).join(' • '),
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              if (participant.isGuest)
-                const _StatusBadge(label: 'ضيف', color: AppColors.warning),
             ],
-          ),
-          const SizedBox(height: AppDimensions.xs),
-          Text(
-            [
-              participant.position,
-              participant.statusSeedLabel,
-            ].whereType<String>().where((value) => value.isNotEmpty).join(' • '),
-            style: AppTextStyles.labelSmall.copyWith(
-              color: AppColors.textMuted,
-            ),
           ),
           const SizedBox(height: AppDimensions.sm),
           Wrap(
@@ -523,6 +468,7 @@ class _ParticipantAttendanceTile extends StatelessWidget {
                   (status) => ChoiceChip(
                     label: Text(_attendanceStatusLabel(status)),
                     selected: currentStatus == status,
+                    selectedColor: _attendanceChipColor(status),
                     onSelected: enabled
                         ? (_) => controller.setAttendanceStatus(
                               participant.selectionId,
@@ -789,23 +735,6 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
-class _MetaChip extends StatelessWidget {
-  final String label;
-
-  const _MetaChip({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-      ),
-      child: Text(label, style: AppTextStyles.labelSmall),
-    );
-  }
-}
 
 class _SubstitutionDropdown extends StatelessWidget {
   final String label;
@@ -860,16 +789,55 @@ String? _safeDropdownValue({
   return selectedValue;
 }
 
-String _matchStatusLabel(String? statusName) {
-  return switch (statusName) {
-    'open' => 'مفتوحة',
-    'full' => 'مكتملة',
-    'live' => 'جارية',
-    'completed' => 'منتهية',
-    'pendingReview' => 'بانتظار المراجعة',
-    'ratingWindow' => 'نافذة التقييم',
-    'settled' => 'مقفلة',
-    'frozen' => 'مجمّدة',
-    _ => 'غير معروفة',
+
+
+Color _attendanceChipColor(MatchAttendanceStatus status) {
+  return switch (status) {
+    MatchAttendanceStatus.present => AppColors.success.withValues(alpha: 0.2),
+    MatchAttendanceStatus.late => AppColors.warning.withValues(alpha: 0.2),
+    MatchAttendanceStatus.absent => AppColors.error.withValues(alpha: 0.2),
+    MatchAttendanceStatus.excused => AppColors.info.withValues(alpha: 0.2),
+    MatchAttendanceStatus.pending => AppColors.surface,
   };
+}
+
+Color _attendanceStatusColor(MatchAttendanceStatus status) {
+  return switch (status) {
+    MatchAttendanceStatus.present => AppColors.success,
+    MatchAttendanceStatus.late => AppColors.warning,
+    MatchAttendanceStatus.absent => AppColors.error,
+    MatchAttendanceStatus.excused => AppColors.info,
+    MatchAttendanceStatus.pending => AppColors.textMuted,
+  };
+}
+
+class _AttendanceAvatar extends StatelessWidget {
+  final String name;
+  final MatchAttendanceStatus status;
+
+  const _AttendanceAvatar({required this.name, required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _attendanceStatusColor(status);
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color.withValues(alpha: 0.15),
+        border: Border.all(color: color, width: 2),
+      ),
+      child: Center(
+        child: Text(
+          name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+      ),
+    );
+  }
 }

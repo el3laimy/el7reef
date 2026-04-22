@@ -7,6 +7,8 @@ import '../../../domain/entities/challenge.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/repositories/challenge_repository.dart';
 import '../../../domain/repositories/match_repository.dart';
+import '../../../domain/repositories/player_repository.dart';
+import '../../../data/repositories/player_repository_impl.dart';
 import '../../../services/auth_service.dart';
 
 class ChallengeController extends GetxController {
@@ -25,6 +27,9 @@ class ChallengeController extends GetxController {
   final RxList<Challenge> sentChallenges = <Challenge>[].obs;
   final RxList<Challenge> receivedChallenges = <Challenge>[].obs;
   final RxBool isLoading = false.obs;
+  final RxMap<String, String> playerNames = <String, String>{}.obs;
+  
+  final PlayerRepository _playerRepo = PlayerRepositoryImpl();
 
   String? get currentUserId => _authService.currentUserId;
 
@@ -55,11 +60,35 @@ class ChallengeController extends GetxController {
       ]);
       sentChallenges.value = results[0];
       receivedChallenges.value = results[1];
+      
+      // Fetch names
+      final allIds = <String>{};
+      for (var c in sentChallenges) {
+        allIds.add(c.challengedId);
+      }
+      for (var c in receivedChallenges) {
+        allIds.add(c.challengerId);
+      }
+      
+      final missingIds = allIds.where((id) => !playerNames.containsKey(id)).toList();
+      if (missingIds.isNotEmpty) {
+        final players = await _playerRepo.getPlayersByIds(missingIds);
+        for (var p in players) {
+          playerNames[p.id] = p.name;
+        }
+      }
     } catch (e) {
       AppLogger.error('ChallengeController.loadChallenges', e);
     } finally {
       isLoading.value = false;
     }
+  }
+
+  String getPlayerName(String id) {
+    if (playerNames.containsKey(id)) {
+      return playerNames[id]!;
+    }
+    return 'لاعب ${id.length >= 5 ? id.substring(0, 5) : id}';
   }
 
   Future<void> sendChallenge({
@@ -100,6 +129,18 @@ class ChallengeController extends GetxController {
   Future<void> acceptChallenge(Challenge challenge) async {
     final uid = currentUserId;
     if (uid == null || challenge.challengedId != uid) return;
+
+    if (challenge.status != ChallengeStatus.pending) {
+      Get.snackbar('عذراً', 'هذا التحدي لم يعد متاحاً', snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+    
+    if (challenge.expiresAt.isBefore(DateTime.now())) {
+      Get.snackbar('عذراً', 'انتهت صلاحية هذا التحدي', snackPosition: SnackPosition.BOTTOM);
+      await _challengeRepo.updateChallengeStatus(challenge.id, ChallengeStatus.expired);
+      await loadChallenges();
+      return;
+    }
 
     try {
       // 1. Create a Match

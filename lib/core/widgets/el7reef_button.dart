@@ -93,10 +93,17 @@ class El7reefButton extends StatelessWidget {
     if (icon != null) {
       return Row(
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: color, size: 20),
           const SizedBox(width: AppDimensions.sm),
-          Text(text, style: AppTextStyles.buttonText.copyWith(color: color)),
+          Flexible(
+            child: Text(
+              text,
+              style: AppTextStyles.buttonText.copyWith(color: color),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       );
     }

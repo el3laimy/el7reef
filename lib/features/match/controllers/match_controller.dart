@@ -56,6 +56,8 @@ class MatchController extends GetxController {
   Future<String?> createMatch({
     required List<String> teamAIds,
     required List<String> teamBIds,
+    String? teamAId,
+    String? teamBId,
     String? location,
     double? lat,
     double? lng,
@@ -76,6 +78,8 @@ class MatchController extends GetxController {
         organizerId: uid,
         teamAPlayerIds: teamAIds,
         teamBPlayerIds: teamBIds,
+        teamAId: teamAId,
+        teamBId: teamBId,
         status: MatchStatus.open,
         location: location,
         latitude: lat,

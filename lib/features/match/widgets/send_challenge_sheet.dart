@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../team/controllers/team_controller.dart';
 import '../controllers/challenge_controller.dart';
 
 class SendChallengeSheet extends StatefulWidget {
@@ -27,6 +28,13 @@ class _SendChallengeSheetState extends State<SendChallengeSheet> {
   final _messageCtrl = TextEditingController();
   final _locationCtrl = TextEditingController();
   int _teamSize = 5;
+  String? _selectedTeamId;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedTeamId = widget.challengerTeamId;
+  }
 
   @override
   void dispose() {
@@ -37,6 +45,9 @@ class _SendChallengeSheetState extends State<SendChallengeSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final hasTeamCtrl = Get.isRegistered<TeamController>();
+    final teamCtrl = hasTeamCtrl ? Get.find<TeamController>() : null;
+
     return Container(
       padding: EdgeInsets.only(
         left: AppDimensions.lg,
@@ -66,10 +77,47 @@ class _SendChallengeSheetState extends State<SendChallengeSheet> {
           ),
           const SizedBox(height: AppDimensions.lg),
           Text(
-            'إرسال تحدي إلى ${widget.challengedName}',
+            widget.challengedTeamId != null 
+                ? 'تحدي فريق ${widget.challengedName}' 
+                : 'إرسال تحدي إلى ${widget.challengedName}',
             style: AppTextStyles.titleLarge,
           ),
           const SizedBox(height: AppDimensions.md),
+          
+          if (widget.challengerTeamId == null && teamCtrl != null && teamCtrl.myTeams.isNotEmpty) ...[
+            Text('من سيلعب؟', style: AppTextStyles.titleSmall),
+            const SizedBox(height: AppDimensions.sm),
+            InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'بصفتك / فريقك',
+                border: OutlineInputBorder(),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String?>(
+                  value: _selectedTeamId,
+                  isExpanded: true,
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('كلاعب فردي (بصفتي الشخصية)'),
+                    ),
+                    ...teamCtrl.myTeams.map((team) {
+                      return DropdownMenuItem<String?>(
+                        value: team.id,
+                        child: Text('باسم فريق: ${team.name}'),
+                      );
+                    }),
+                  ],
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedTeamId = val;
+                    });
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: AppDimensions.md),
+          ],
           
           TextField(
             controller: _locationCtrl,
@@ -116,7 +164,7 @@ class _SendChallengeSheetState extends State<SendChallengeSheet> {
               final challengeCtrl = Get.find<ChallengeController>();
               challengeCtrl.sendChallenge(
                 challengedId: widget.challengedId,
-                challengerTeamId: widget.challengerTeamId,
+                challengerTeamId: _selectedTeamId,
                 challengedTeamId: widget.challengedTeamId,
                 message: _messageCtrl.text.trim().isEmpty ? null : _messageCtrl.text.trim(),
                 location: _locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim(),
