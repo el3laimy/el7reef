@@ -12,6 +12,8 @@ class MatchLineupSnapshot {
   final List<MatchLineupEntry> bench;
   final String lockedBy;
   final DateTime lockedAt;
+  final int? playerCount;
+  final String? formationCode;
   final String? formationLabel;
   final String? notes;
 
@@ -26,12 +28,14 @@ class MatchLineupSnapshot {
     this.bench = const [],
     required this.lockedBy,
     required this.lockedAt,
+    this.playerCount,
+    this.formationCode,
     this.formationLabel,
     this.notes,
   }) : assert(
-          (teamId != null) != (guestTeamId != null),
-          'Exactly one of teamId or guestTeamId must be set.',
-        );
+         (teamId != null) != (guestTeamId != null),
+         'Exactly one of teamId or guestTeamId must be set.',
+       );
 
   bool get isGuestTeam => guestTeamId != null;
   bool get isRegisteredTeam => teamId != null;
@@ -40,7 +44,9 @@ class MatchLineupSnapshot {
   String get participantId => teamId ?? guestTeamId!;
 
   String get summaryLabel {
-    final effectiveFormation = formationLabel?.trim();
+    final effectiveFormation = formationCode?.trim().isNotEmpty == true
+        ? formationCode!.trim()
+        : formationLabel?.trim();
     if (effectiveFormation != null && effectiveFormation.isNotEmpty) {
       return effectiveFormation;
     }

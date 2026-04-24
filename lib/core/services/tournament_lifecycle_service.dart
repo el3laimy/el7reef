@@ -684,6 +684,7 @@ class TournamentLifecycleService {
         left.location == right.location &&
         left.latitude == right.latitude &&
         left.longitude == right.longitude &&
+        left.teamSize == right.teamSize &&
         left.isOrganized == right.isOrganized &&
         left.tournamentId == right.tournamentId &&
         left.isGoldenRating == right.isGoldenRating &&

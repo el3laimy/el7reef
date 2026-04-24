@@ -29,23 +29,24 @@ class AppTheme {
       ),
 
       // ── Typography ──
+      // h1: 28px, h2: 22px, h3: 18px, body: 14px, small: 12px
       textTheme: GoogleFonts.cairoTextTheme(
         const TextTheme(
-          displayLarge: TextStyle(fontSize: 40, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-          displayMedium: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-          displaySmall: TextStyle(fontSize: 28, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-          headlineLarge: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-          headlineMedium: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-          headlineSmall: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+          displayLarge: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          displayMedium: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          displaySmall: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          headlineLarge: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          headlineMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+          headlineSmall: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
           titleLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
           titleMedium: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
           titleSmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
-          bodyLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w400, color: AppColors.textPrimary),
-          bodyMedium: TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: AppColors.textSecondary),
-          bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.textMuted),
-          labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
-          labelMedium: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
-          labelSmall: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: AppColors.textMuted),
+          bodyLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+          bodyMedium: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+          bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted),
+          labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          labelMedium: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+          labelSmall: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textMuted),
         ),
       ),
 
@@ -59,51 +60,52 @@ class AppTheme {
         systemOverlayStyle: SystemUiOverlayStyle.light,
         titleTextStyle: GoogleFonts.cairo(
           fontSize: 18,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700, // SemiBold/Bold
           color: AppColors.textPrimary,
         ),
       ),
 
       // ── Cards ──
       cardTheme: CardThemeData(
-        color: AppColors.surface,
+        color: AppColors.surface, // var(--card) #1E1E1E
         elevation: AppDimensions.cardElevation,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-          side: const BorderSide(color: AppColors.surfaceBorder, width: AppDimensions.cardBorderWidth),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusLg), // 16px
+          side: const BorderSide(color: AppColors.surfaceBorder, width: AppDimensions.cardBorderWidth), // var(--border)
         ),
         margin: EdgeInsets.zero,
       ),
 
-      // ── Elevated Button ──
+      // ── Elevated Button (Primary) ──
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.textOnPrimary,
-          minimumSize: const Size(double.infinity, AppDimensions.buttonHeightMd),
+          foregroundColor: AppColors.textOnPrimary, // Black text
+          minimumSize: const Size(double.infinity, AppDimensions.buttonHeightMd), // 48px
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+            borderRadius: BorderRadius.circular(AppDimensions.radiusMd), // 12px
           ),
-          elevation: 0,
+          elevation: 0, // Glow effect usually applied manually in widgets or wrappers
           textStyle: GoogleFonts.cairo(
             fontSize: 16,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700, // Bold
           ),
         ),
       ),
 
-      // ── Outlined Button ──
+      // ── Outlined Button (Secondary) ──
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primary,
+          foregroundColor: AppColors.primary, // Text color
           minimumSize: const Size(double.infinity, AppDimensions.buttonHeightMd),
+          backgroundColor: Colors.transparent, // Transparent background
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+            borderRadius: BorderRadius.circular(AppDimensions.radiusMd), // 12px
           ),
-          side: const BorderSide(color: AppColors.primary),
+          side: const BorderSide(color: AppColors.primary, width: 1), // 1px border primary
           textStyle: GoogleFonts.cairo(
             fontSize: 16,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700, // Bold
           ),
         ),
       ),
@@ -114,7 +116,7 @@ class AppTheme {
           foregroundColor: AppColors.primary,
           textStyle: GoogleFonts.cairo(
             fontSize: 14,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700, // Bold
           ),
         ),
       ),
@@ -122,9 +124,9 @@ class AppTheme {
       // ── Input Decoration ──
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surfaceLight,
+        fillColor: AppColors.surface, // var(--card)
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusMd), // 12px for inputs typically
           borderSide: const BorderSide(color: AppColors.surfaceBorder),
         ),
         enabledBorder: OutlineInputBorder(
@@ -133,7 +135,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          borderSide: const BorderSide(color: AppColors.primary, width: 2), // Active card/focus color
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
@@ -157,8 +159,8 @@ class AppTheme {
         unselectedItemColor: AppColors.textMuted,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
-        selectedLabelStyle: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.w600),
-        unselectedLabelStyle: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.w400),
+        selectedLabelStyle: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.w700),
+        unselectedLabelStyle: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.w600),
       ),
 
       // ── Divider ──
@@ -168,14 +170,15 @@ class AppTheme {
         space: 0,
       ),
 
-      // ── Chip ──
+      // ── Chip (Tags / Status) ──
       chipTheme: ChipThemeData(
-        backgroundColor: AppColors.surfaceLight,
-        selectedColor: AppColors.primarySurface,
-        labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppColors.textSecondary),
+        backgroundColor: AppColors.primarySurface, // rgba(126, 217, 87, 0.15)
+        selectedColor: AppColors.primary,
+        labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600), // color primary
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), // padding 4px 8px
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-          side: const BorderSide(color: AppColors.surfaceBorder),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusSm), // 8px
+          side: BorderSide.none,
         ),
       ),
 
@@ -183,16 +186,17 @@ class AppTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusLg), // 16px
         ),
       ),
 
       // ── SnackBar ──
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: AppColors.surfaceLight,
+        backgroundColor: AppColors.surface,
         contentTextStyle: GoogleFonts.cairo(
           color: AppColors.textPrimary,
           fontSize: 14,
+          fontWeight: FontWeight.w600,
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppDimensions.radiusMd),

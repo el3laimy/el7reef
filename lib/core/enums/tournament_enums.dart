@@ -49,6 +49,8 @@ enum TournamentTeamSize {
   sixVsSix(6),
   sevenVsSeven(7),
   eightVsEight(8),
+  nineVsNine(9),
+  tenVsTen(10),
   elevenVsEleven(11);
 
   final int value;
@@ -79,6 +81,7 @@ enum TournamentTeamSize {
 enum KnockoutResult {
   teamAWins,
   teamBWins,
+
   /// تعادل ذهب للركلات → الفائز يأخذ Win Bonus كالفوز العادي
   penaltyShootoutA,
   penaltyShootoutB,
@@ -88,13 +91,13 @@ enum KnockoutResult {
 enum TournamentAssistantRole {
   /// مساعد كامل الصلاحيات
   full,
-  
+
   /// إدخال نتائج المباريات فقط
   resultsOnly,
-  
+
   /// مراقب فقط (قراءة وإشراف دون تعديل)
   observer,
-  
+
   /// بديل طارئ — يتولى القيادة مؤقتاً لمدة 72 ساعة في حال غياب المنظم
   emergency,
 }

@@ -18,6 +18,7 @@ class Match {
   final String? location;
   final double? latitude;
   final double? longitude;
+  final int teamSize;
   final bool isOrganized; // هل جزء من دورة؟
   final String? tournamentId;
   final bool isGoldenRating; // منظم فعّل التقييم المميز
@@ -53,6 +54,7 @@ class Match {
     this.location,
     this.latitude,
     this.longitude,
+    this.teamSize = 5,
     this.isOrganized = false,
     this.tournamentId,
     this.isGoldenRating = false,
@@ -114,6 +116,7 @@ class Match {
     String? location,
     double? latitude,
     double? longitude,
+    int? teamSize,
     bool? isOrganized,
     String? tournamentId,
     bool? isGoldenRating,
@@ -149,6 +152,7 @@ class Match {
       location: location ?? this.location,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
+      teamSize: teamSize ?? this.teamSize,
       isOrganized: isOrganized ?? this.isOrganized,
       tournamentId: tournamentId ?? this.tournamentId,
       isGoldenRating: isGoldenRating ?? this.isGoldenRating,

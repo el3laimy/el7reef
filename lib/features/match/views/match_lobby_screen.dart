@@ -5,6 +5,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/enums/match_status.dart';
+import '../../../core/lineup/formation_library.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../core/widgets/qr_code_widget.dart';
 import '../../../domain/entities/player.dart';
@@ -37,8 +38,10 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                   children: [
                     const Text('⚠️', style: TextStyle(fontSize: 48)),
                     const SizedBox(height: AppDimensions.md),
-                    Text('لم يتم العثور على المباراة',
-                        style: AppTextStyles.titleMedium),
+                    Text(
+                      'لم يتم العثور على المباراة',
+                      style: AppTextStyles.titleMedium,
+                    ),
                     const SizedBox(height: AppDimensions.md),
                     TextButton(
                       onPressed: () => Get.back(),
@@ -64,28 +67,52 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                         children: [
                           IconButton(
                             onPressed: () => Get.back(),
-                            icon: const Icon(Icons.arrow_back_ios_new,
-                                color: AppColors.textPrimary),
+                            icon: const Icon(
+                              Icons.arrow_back_ios_new,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('لوبي المباراة',
-                                    style: AppTextStyles.headlineMedium),
+                                Text(
+                                  'لوبي المباراة',
+                                  style: AppTextStyles.headlineMedium,
+                                ),
+                                Text(
+                                  '${controller.effectiveTeamSize}v${controller.effectiveTeamSize}',
+                                  style: AppTextStyles.labelSmall.copyWith(
+                                    color: AppColors.primaryLight,
+                                  ),
+                                ),
                                 if (match.location != null)
                                   Row(
                                     children: [
-                                      const Icon(Icons.location_on_outlined,
-                                          size: 14, color: AppColors.textMuted),
+                                      const Icon(
+                                        Icons.location_on_outlined,
+                                        size: 14,
+                                        color: AppColors.textMuted,
+                                      ),
                                       const SizedBox(width: 4),
-                                      Text(match.location!,
-                                          style: AppTextStyles.bodySmall),
+                                      Text(
+                                        match.location!,
+                                        style: AppTextStyles.bodySmall,
+                                      ),
                                     ],
                                   ),
                               ],
                             ),
                           ),
+                          if (controller.isOrganizer)
+                            IconButton(
+                              onPressed: () => _showMatchSettings(context),
+                              icon: const Icon(
+                                Icons.tune_rounded,
+                                color: AppColors.textPrimary,
+                              ),
+                              tooltip: 'إعدادات المباراة',
+                            ),
                           _StatusChip(status: match.status),
                         ],
                       ).animate().fadeIn(duration: 400.ms),
@@ -97,14 +124,17 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: AppDimensions.pagePadding),
+                          horizontal: AppDimensions.pagePadding,
+                        ),
                         child: GlassmorphicContainer(
                           padding: const EdgeInsets.all(AppDimensions.lg),
                           borderRadius: AppDimensions.radiusLg,
                           child: Column(
                             children: [
-                              Text('ادعُ اللاعبين 📲',
-                                  style: AppTextStyles.titleLarge),
+                              Text(
+                                'ادعُ اللاعبين 📲',
+                                style: AppTextStyles.titleLarge,
+                              ),
                               const SizedBox(height: AppDimensions.md),
                               QrCodeWidget(
                                 data: controller.inviteLink,
@@ -117,14 +147,19 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                               // رابط الدعوة
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: AppDimensions.md,
-                                    vertical: AppDimensions.sm),
+                                  horizontal: AppDimensions.md,
+                                  vertical: AppDimensions.sm,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: AppColors.background.withValues(alpha: 0.5),
+                                  color: AppColors.background.withValues(
+                                    alpha: 0.5,
+                                  ),
                                   borderRadius: BorderRadius.circular(
-                                      AppDimensions.radiusMd),
+                                    AppDimensions.radiusMd,
+                                  ),
                                   border: Border.all(
-                                      color: AppColors.surfaceBorder),
+                                    color: AppColors.surfaceBorder,
+                                  ),
                                 ),
                                 child: Row(
                                   children: [
@@ -137,8 +172,11 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                                     ),
                                     IconButton(
                                       onPressed: controller.copyInviteLink,
-                                      icon: const Icon(Icons.copy,
-                                          size: 18, color: AppColors.primary),
+                                      icon: const Icon(
+                                        Icons.copy,
+                                        size: 18,
+                                        color: AppColors.primary,
+                                      ),
                                       tooltip: 'نسخ الرابط',
                                     ),
                                   ],
@@ -151,7 +189,8 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                     ),
 
                   const SliverToBoxAdapter(
-                      child: SizedBox(height: AppDimensions.lg)),
+                    child: SizedBox(height: AppDimensions.lg),
+                  ),
 
                   // ── فريق A ──
                   SliverToBoxAdapter(
@@ -176,7 +215,8 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                   ),
 
                   const SliverToBoxAdapter(
-                      child: SizedBox(height: AppDimensions.md)),
+                    child: SizedBox(height: AppDimensions.md),
+                  ),
 
                   // ── فريق B ──
                   SliverToBoxAdapter(
@@ -201,22 +241,27 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                   ),
 
                   const SliverToBoxAdapter(
-                      child: SizedBox(height: AppDimensions.xl)),
+                    child: SizedBox(height: AppDimensions.xl),
+                  ),
 
                   // ── خطة اللعب (Pitch) ──
                   SliverToBoxAdapter(
-                    child: MatchFormationSection(controller: controller).animate().fadeIn(delay: 500.ms),
+                    child: MatchFormationSection(
+                      controller: controller,
+                    ).animate().fadeIn(delay: 500.ms),
                   ),
 
                   const SliverToBoxAdapter(
-                      child: SizedBox(height: AppDimensions.xl)),
+                    child: SizedBox(height: AppDimensions.xl),
+                  ),
 
                   // ── أزرار الإجراءات ──
                   if (controller.isOrganizer)
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: AppDimensions.pagePadding),
+                          horizontal: AppDimensions.pagePadding,
+                        ),
                         child: Column(
                           children: [
                             if (isOpen)
@@ -230,10 +275,12 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                                     backgroundColor: AppColors.success,
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
-                                        vertical: AppDimensions.md),
+                                      vertical: AppDimensions.md,
+                                    ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(
-                                          AppDimensions.radiusMd),
+                                        AppDimensions.radiusMd,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -249,9 +296,11 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: AppColors.error,
                                     side: const BorderSide(
-                                        color: AppColors.error),
+                                      color: AppColors.error,
+                                    ),
                                     padding: const EdgeInsets.symmetric(
-                                        vertical: AppDimensions.md),
+                                      vertical: AppDimensions.md,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -262,7 +311,8 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                     ),
 
                   const SliverToBoxAdapter(
-                      child: SizedBox(height: AppDimensions.xl)),
+                    child: SizedBox(height: AppDimensions.xl),
+                  ),
                 ],
               ),
             );
@@ -278,17 +328,121 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
         title: const Text('إلغاء المباراة'),
         content: const Text('هل أنت متأكد من إلغاء هذه المباراة؟'),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('لا'),
-          ),
+          TextButton(onPressed: () => Get.back(), child: const Text('لا')),
           TextButton(
             onPressed: () {
               Get.back();
               controller.cancelMatch();
             },
-            child: const Text('نعم، إلغاء',
-                style: TextStyle(color: AppColors.error)),
+            child: const Text(
+              'نعم، إلغاء',
+              style: TextStyle(color: AppColors.error),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMatchSettings(BuildContext context) {
+    Get.bottomSheet(
+      _MatchSettingsSheet(controller: controller),
+      isScrollControlled: true,
+    );
+  }
+}
+
+class _MatchSettingsSheet extends StatelessWidget {
+  final MatchLobbyController controller;
+
+  const _MatchSettingsSheet({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.all(AppDimensions.lg),
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppDimensions.radiusXl),
+          ),
+        ),
+        child: Obx(() {
+          final match = controller.match.value;
+          final isTournament = match?.tournamentId != null;
+          final currentSize = controller.effectiveTeamSize;
+          final canChange = controller.canChangeTeamSize;
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('إعدادات المباراة', style: AppTextStyles.headlineSmall),
+              const SizedBox(height: AppDimensions.sm),
+              Text(
+                isTournament
+                    ? 'حجم مباراة البطولة يتم تحديده من إعدادات البطولة/الجدول.'
+                    : canChange
+                    ? 'تغيير عدد اللاعبين يؤثر على الفريقين والتشكيلات المفتوحة.'
+                    : 'لا يمكن تغيير عدد اللاعبين بعد بدء المباراة أو بعد قفل أي تشكيلة.',
+                style: AppTextStyles.bodySmall,
+              ),
+              const SizedBox(height: AppDimensions.lg),
+              Text('عدد اللاعبين لكل فريق', style: AppTextStyles.titleSmall),
+              const SizedBox(height: AppDimensions.sm),
+              Wrap(
+                spacing: AppDimensions.sm,
+                runSpacing: AppDimensions.sm,
+                children: supportedPlayerCounts
+                    .map((size) {
+                      final selected = size == currentSize;
+                      return ChoiceChip(
+                        label: Text('${size}v$size'),
+                        selected: selected,
+                        onSelected: canChange && !selected
+                            ? (_) => _confirmTeamSizeChange(size)
+                            : null,
+                        selectedColor: AppColors.primarySurface,
+                        side: BorderSide(
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.surfaceBorder,
+                        ),
+                      );
+                    })
+                    .toList(growable: false),
+              ),
+              const SizedBox(height: AppDimensions.lg),
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('إغلاق'),
+              ),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+
+  void _confirmTeamSizeChange(int size) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('تغيير حجم المباراة'),
+        content: Text(
+          'سيتم تغيير المباراة إلى ${size}v$size. هذا يؤثر على الفريقين، '
+          'وقد ينقل لاعبين زائدين إلى البدلاء في التشكيلات المفتوحة. هل أنت متأكد؟',
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('إلغاء')),
+          FilledButton(
+            onPressed: () async {
+              Get.back();
+              final saved = await controller.updateTeamSize(size);
+              if (saved) {
+                Get.back();
+              }
+            },
+            child: const Text('تأكيد'),
           ),
         ],
       ),
@@ -319,8 +473,9 @@ class _TeamSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding:
-          const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimensions.pagePadding,
+      ),
       child: GlassmorphicContainer(
         padding: const EdgeInsets.all(AppDimensions.md),
         borderRadius: AppDimensions.radiusLg,
@@ -343,33 +498,42 @@ class _TeamSection extends StatelessWidget {
                     ),
                   ),
                 const SizedBox(width: AppDimensions.sm),
-                Obx(() => Text(
-                      '${players.length} لاعب',
-                      style: AppTextStyles.labelMedium.copyWith(
-                          color: AppColors.textMuted),
-                    )),
+                Obx(
+                  () => Text(
+                    '${players.length} لاعب',
+                    style: AppTextStyles.labelMedium.copyWith(
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: AppDimensions.sm),
             Obx(() {
               if (players.isEmpty) {
                 return Padding(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: AppDimensions.md),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: AppDimensions.md,
+                  ),
                   child: Center(
-                    child: Text('لا يوجد لاعبين بعد',
-                        style: AppTextStyles.bodySmall
-                            .copyWith(color: AppColors.textMuted)),
+                    child: Text(
+                      'لا يوجد لاعبين بعد',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textMuted,
+                      ),
+                    ),
                   ),
                 );
               }
               return Column(
                 children: players
-                    .map((player) => _PlayerTile(
-                          player: player,
-                          canRemove: isOrganizer && isOpen,
-                          onRemove: () => onRemove(player.id),
-                        ))
+                    .map(
+                      (player) => _PlayerTile(
+                        player: player,
+                        canRemove: isOrganizer && isOpen,
+                        onRemove: () => onRemove(player.id),
+                      ),
+                    )
                     .toList(),
               );
             }),
@@ -409,14 +573,15 @@ class _PlayerTile extends StatelessWidget {
                 : null,
           ),
           const SizedBox(width: AppDimensions.sm),
-          Expanded(
-            child: Text(player.name, style: AppTextStyles.bodyMedium),
-          ),
+          Expanded(child: Text(player.name, style: AppTextStyles.bodyMedium)),
           if (canRemove)
             IconButton(
               onPressed: onRemove,
-              icon: const Icon(Icons.remove_circle_outline,
-                  size: 20, color: AppColors.error),
+              icon: const Icon(
+                Icons.remove_circle_outline,
+                size: 20,
+                color: AppColors.error,
+              ),
               tooltip: 'إزالة',
             ),
         ],
@@ -447,8 +612,10 @@ class _StatusChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
         border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
-      child: Text(label,
-          style: AppTextStyles.labelSmall.copyWith(color: color)),
+      child: Text(
+        label,
+        style: AppTextStyles.labelSmall.copyWith(color: color),
+      ),
     );
   }
 }

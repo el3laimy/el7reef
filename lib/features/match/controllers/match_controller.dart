@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/enums/match_status.dart';
+import '../../../core/lineup/formation_library.dart';
 import '../../../core/services/match_settlement_service.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../data/repositories/match_repository_impl.dart';
@@ -49,7 +50,9 @@ class MatchController extends GetxController {
     if (uid == null) return;
     try {
       myMatches.value = await _matchRepo.getPlayerMatches(uid);
-    } catch (e) { AppLogger.error('MatchController.loadMyMatches', e); }
+    } catch (e) {
+      AppLogger.error('MatchController.loadMyMatches', e);
+    }
   }
 
   /// إنشاء مباراة جديدة
@@ -84,6 +87,7 @@ class MatchController extends GetxController {
         location: location,
         latitude: lat,
         longitude: lng,
+        teamSize: normalizeMatchTeamSize(teamSize),
         isOrganized: isOrganized,
         tournamentId: tournamentId,
         createdAt: now,
@@ -93,8 +97,11 @@ class MatchController extends GetxController {
       currentMatch.value = match;
       liveMatches.insert(0, match);
 
-      Get.snackbar('تم ✅', 'تم إنشاء المباراة!',
-          snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'تم ✅',
+        'تم إنشاء المباراة!',
+        snackPosition: SnackPosition.BOTTOM,
+      );
       return match.id;
     } catch (e) {
       errorMessage.value = 'فشل إنشاء المباراة: $e';
@@ -110,8 +117,11 @@ class MatchController extends GetxController {
   Future<void> freezeMatch(String matchId) async {
     try {
       await _matchRepo.freezeMatch(matchId);
-      Get.snackbar('تم التجميد 🔒', 'تم تجميد المباراة',
-          snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'تم التجميد 🔒',
+        'تم تجميد المباراة',
+        snackPosition: SnackPosition.BOTTOM,
+      );
       await loadLiveMatches();
     } catch (e) {
       AppLogger.error('MatchController.freezeMatch', e);
@@ -123,8 +133,11 @@ class MatchController extends GetxController {
   Future<void> unfreezeMatch(String matchId) async {
     try {
       await _matchRepo.unfreezeMatch(matchId);
-      Get.snackbar('تم الرفع 🔓', 'تم رفع تجميد المباراة',
-          snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'تم الرفع 🔓',
+        'تم رفع تجميد المباراة',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     } catch (e) {
       AppLogger.error('MatchController.unfreezeMatch', e);
       Get.snackbar('خطأ', 'فشل رفع التجميد');
@@ -135,8 +148,11 @@ class MatchController extends GetxController {
   Future<void> activateGoldenRating(String matchId) async {
     try {
       await _matchRepo.activateGoldenRating(matchId);
-      Get.snackbar('تقييم ذهبي ⭐', 'تم تفعيل التقييم المضاعف',
-          snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'تقييم ذهبي ⭐',
+        'تم تفعيل التقييم المضاعف',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     } catch (e) {
       AppLogger.error('MatchController.activateGoldenRating', e);
       Get.snackbar('خطأ', 'فشل تفعيل التقييم الذهبي');
@@ -178,8 +194,11 @@ class MatchController extends GetxController {
       await _matchRepo.cancelMatch(matchId);
       liveMatches.removeWhere((m) => m.id == matchId);
       myMatches.removeWhere((m) => m.id == matchId);
-      Get.snackbar('تم الإلغاء ❌', 'تم إلغاء المباراة',
-          snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'تم الإلغاء ❌',
+        'تم إلغاء المباراة',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     } catch (e) {
       AppLogger.error('MatchController.cancelMatch', e);
       Get.snackbar('خطأ', 'فشل إلغاء المباراة');
@@ -190,14 +209,16 @@ class MatchController extends GetxController {
   Future<void> startMatch(String matchId) async {
     try {
       await _matchRepo.updateMatch(
-        (await _matchRepo.getMatch(matchId))!.copyWith(
-          status: MatchStatus.live,
-          startedAt: DateTime.now(),
-        ),
+        (await _matchRepo.getMatch(
+          matchId,
+        ))!.copyWith(status: MatchStatus.live, startedAt: DateTime.now()),
       );
       await loadLiveMatches();
-      Get.snackbar('بدأت المباراة ⚽', 'تم بدء المباراة!',
-          snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'بدأت المباراة ⚽',
+        'تم بدء المباراة!',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     } catch (e) {
       AppLogger.error('MatchController.startMatch', e);
       Get.snackbar('خطأ', 'فشل بدء المباراة');
@@ -208,7 +229,9 @@ class MatchController extends GetxController {
   Future<void> addPlayer(String matchId, String playerId, String side) async {
     try {
       await _matchRepo.addPlayerToMatch(
-        matchId: matchId, playerId: playerId, side: side,
+        matchId: matchId,
+        playerId: playerId,
+        side: side,
       );
     } catch (e) {
       AppLogger.error('MatchController.addPlayer', e);
@@ -217,10 +240,16 @@ class MatchController extends GetxController {
   }
 
   /// إزالة لاعب من مباراة
-  Future<void> removePlayer(String matchId, String playerId, String side) async {
+  Future<void> removePlayer(
+    String matchId,
+    String playerId,
+    String side,
+  ) async {
     try {
       await _matchRepo.removePlayerFromMatch(
-        matchId: matchId, playerId: playerId, side: side,
+        matchId: matchId,
+        playerId: playerId,
+        side: side,
       );
     } catch (e) {
       AppLogger.error('MatchController.removePlayer', e);

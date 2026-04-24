@@ -120,6 +120,7 @@ class KnockoutBuilder {
             teamAParticipantId: participantAId,
             teamBParticipantId: participantBId,
             status: MatchStatus.open,
+            teamSize: tournament.teamSize.value,
             isOrganized: true,
             tournamentId: tournament.id,
             stageType: TournamentStageType.knockoutStage,

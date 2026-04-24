@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/lineup/formation_library.dart';
 import '../../team/controllers/team_controller.dart';
 import '../controllers/challenge_controller.dart';
 
@@ -77,14 +78,16 @@ class _SendChallengeSheetState extends State<SendChallengeSheet> {
           ),
           const SizedBox(height: AppDimensions.lg),
           Text(
-            widget.challengedTeamId != null 
-                ? 'تحدي فريق ${widget.challengedName}' 
+            widget.challengedTeamId != null
+                ? 'تحدي فريق ${widget.challengedName}'
                 : 'إرسال تحدي إلى ${widget.challengedName}',
             style: AppTextStyles.titleLarge,
           ),
           const SizedBox(height: AppDimensions.md),
-          
-          if (widget.challengerTeamId == null && teamCtrl != null && teamCtrl.myTeams.isNotEmpty) ...[
+
+          if (widget.challengerTeamId == null &&
+              teamCtrl != null &&
+              teamCtrl.myTeams.isNotEmpty) ...[
             Text('من سيلعب؟', style: AppTextStyles.titleSmall),
             const SizedBox(height: AppDimensions.sm),
             InputDecorator(
@@ -118,7 +121,7 @@ class _SendChallengeSheetState extends State<SendChallengeSheet> {
             ),
             const SizedBox(height: AppDimensions.md),
           ],
-          
+
           TextField(
             controller: _locationCtrl,
             decoration: const InputDecoration(
@@ -127,7 +130,7 @@ class _SendChallengeSheetState extends State<SendChallengeSheet> {
             ),
           ),
           const SizedBox(height: AppDimensions.md),
-          
+
           TextField(
             controller: _messageCtrl,
             decoration: const InputDecoration(
@@ -136,12 +139,12 @@ class _SendChallengeSheetState extends State<SendChallengeSheet> {
             ),
           ),
           const SizedBox(height: AppDimensions.lg),
-          
+
           Text('عدد اللاعبين الأساسيين', style: AppTextStyles.titleMedium),
           const SizedBox(height: AppDimensions.sm),
           Wrap(
             spacing: AppDimensions.sm,
-            children: [5, 6, 7, 11].map((size) {
+            children: supportedPlayerCounts.map((size) {
               final isSelected = _teamSize == size;
               return ChoiceChip(
                 label: Text('${size}v$size'),
@@ -156,9 +159,9 @@ class _SendChallengeSheetState extends State<SendChallengeSheet> {
               );
             }).toList(),
           ),
-          
+
           const SizedBox(height: AppDimensions.xl),
-          
+
           ElevatedButton(
             onPressed: () {
               final challengeCtrl = Get.find<ChallengeController>();
@@ -166,8 +169,12 @@ class _SendChallengeSheetState extends State<SendChallengeSheet> {
                 challengedId: widget.challengedId,
                 challengerTeamId: _selectedTeamId,
                 challengedTeamId: widget.challengedTeamId,
-                message: _messageCtrl.text.trim().isEmpty ? null : _messageCtrl.text.trim(),
-                location: _locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim(),
+                message: _messageCtrl.text.trim().isEmpty
+                    ? null
+                    : _messageCtrl.text.trim(),
+                location: _locationCtrl.text.trim().isEmpty
+                    ? null
+                    : _locationCtrl.text.trim(),
                 teamSize: _teamSize,
               );
             },

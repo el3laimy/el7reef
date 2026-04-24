@@ -9,6 +9,7 @@ import '../../core/enums/team_member_availability.dart';
 import '../../core/enums/team_membership_role.dart';
 import '../../core/enums/team_membership_status.dart';
 import '../../core/enums/tournament_registration_status.dart';
+import '../../core/lineup/formation_library.dart';
 import '../../data/models/guest_player_model.dart';
 import '../../data/models/guest_team_model.dart';
 import '../../data/models/match_attendance_model.dart';
@@ -37,10 +38,7 @@ import '../../domain/entities/tournament_registration.dart';
 import 'team_roster_policy.dart';
 import 'tournament_permission_service.dart';
 
-enum MatchdayCheckInOutcome {
-  checkedIn,
-  verified,
-}
+enum MatchdayCheckInOutcome { checkedIn, verified }
 
 class MatchdayCheckInResult {
   final MatchdayCheckInOutcome outcome;
@@ -72,10 +70,7 @@ class MatchdayLineupValidationResult {
   });
 }
 
-enum MatchdayLineupLockOutcome {
-  locked,
-  alreadyLocked,
-}
+enum MatchdayLineupLockOutcome { locked, alreadyLocked }
 
 class MatchdayLineupLockResult {
   final MatchdayLineupLockOutcome outcome;
@@ -112,11 +107,11 @@ class MatchdayService {
     TournamentPermissionService? tournamentPermissionService,
     TeamRosterPolicy? teamRosterPolicy,
     Uuid? uuid,
-  })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _tournamentPermissionService =
-            tournamentPermissionService ?? TournamentPermissionService(),
-        _teamRosterPolicy = teamRosterPolicy ?? const TeamRosterPolicy(),
-        _uuid = uuid ?? const Uuid();
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _tournamentPermissionService =
+           tournamentPermissionService ?? TournamentPermissionService(),
+       _teamRosterPolicy = teamRosterPolicy ?? const TeamRosterPolicy(),
+       _uuid = uuid ?? const Uuid();
 
   CollectionReference<Map<String, dynamic>> get _matchesRef =>
       _firestore.collection(FirebasePaths.matches);
@@ -173,7 +168,9 @@ class MatchdayService {
       throw Exception('لا يمكن تنفيذ check-in لفريق لا يملك قائمة نشطة.');
     }
 
-    final membershipIds = memberships.map((membership) => membership.id).toSet();
+    final membershipIds = memberships
+        .map((membership) => membership.id)
+        .toSet();
     for (final membershipId in membershipStatuses.keys) {
       if (!membershipIds.contains(membershipId)) {
         throw Exception('توجد عضوية غير معروفة داخل check-in الحالي.');
@@ -196,7 +193,8 @@ class MatchdayService {
             playerId: membership.playerId,
             guestPlayerId: membership.guestPlayerId,
             claimedFromGuestPlayerId: membership.claimedFromGuestPlayerId,
-            status: membershipStatuses[membership.id] ??
+            status:
+                membershipStatuses[membership.id] ??
                 _defaultAttendanceStatusForMembership(membership),
             createdBy: actorId,
             createdAt: effectiveNow,
@@ -219,8 +217,8 @@ class MatchdayService {
     final targetStatus = existingCheckIn?.isVerified == true
         ? MatchCheckInStatus.verified
         : (context.canVerify
-            ? MatchCheckInStatus.verified
-            : MatchCheckInStatus.checkedIn);
+              ? MatchCheckInStatus.verified
+              : MatchCheckInStatus.checkedIn);
     final updatedCheckIn = MatchCheckIn(
       id: checkInId,
       matchId: matchId,
@@ -244,10 +242,13 @@ class MatchdayService {
     await _firestore.runTransaction((transaction) async {
       final checkInRef = _checkInsRef.doc(checkInId);
       final checkInSnapshot = await transaction.get(checkInRef);
-      final attendanceSnapshots = <String, DocumentSnapshot<Map<String, dynamic>>>{};
+      final attendanceSnapshots =
+          <String, DocumentSnapshot<Map<String, dynamic>>>{};
       for (final attendance in attendanceDrafts) {
         final attendanceRef = _attendancesRef.doc(attendance.id);
-        attendanceSnapshots[attendance.id] = await transaction.get(attendanceRef);
+        attendanceSnapshots[attendance.id] = await transaction.get(
+          attendanceRef,
+        );
       }
 
       if (checkInSnapshot.exists && checkInSnapshot.data() != null) {
@@ -333,7 +334,10 @@ class MatchdayService {
             matchId: matchId,
             guestTeamId: guestTeamId,
             tournamentRegistrationId: context.registration?.id,
-            checkInId: _guestCheckInId(matchId: matchId, guestTeamId: guestTeamId),
+            checkInId: _guestCheckInId(
+              matchId: matchId,
+              guestTeamId: guestTeamId,
+            ),
             guestPlayerId: entry.key,
             status: entry.value,
             createdBy: actorId,
@@ -350,15 +354,18 @@ class MatchdayService {
       matchId: matchId,
       guestTeamId: guestTeamId,
     );
-    final checkInId = _guestCheckInId(matchId: matchId, guestTeamId: guestTeamId);
+    final checkInId = _guestCheckInId(
+      matchId: matchId,
+      guestTeamId: guestTeamId,
+    );
     final outcome = context.canVerify
         ? MatchdayCheckInOutcome.verified
         : MatchdayCheckInOutcome.checkedIn;
     final targetStatus = existingCheckIn?.isVerified == true
         ? MatchCheckInStatus.verified
         : (context.canVerify
-            ? MatchCheckInStatus.verified
-            : MatchCheckInStatus.checkedIn);
+              ? MatchCheckInStatus.verified
+              : MatchCheckInStatus.checkedIn);
     final updatedCheckIn = MatchCheckIn(
       id: checkInId,
       matchId: matchId,
@@ -382,10 +389,13 @@ class MatchdayService {
     await _firestore.runTransaction((transaction) async {
       final checkInRef = _checkInsRef.doc(checkInId);
       final checkInSnapshot = await transaction.get(checkInRef);
-      final attendanceSnapshots = <String, DocumentSnapshot<Map<String, dynamic>>>{};
+      final attendanceSnapshots =
+          <String, DocumentSnapshot<Map<String, dynamic>>>{};
       for (final attendance in attendanceDrafts) {
         final attendanceRef = _attendancesRef.doc(attendance.id);
-        attendanceSnapshots[attendance.id] = await transaction.get(attendanceRef);
+        attendanceSnapshots[attendance.id] = await transaction.get(
+          attendanceRef,
+        );
       }
 
       if (checkInSnapshot.exists && checkInSnapshot.data() != null) {
@@ -439,18 +449,25 @@ class MatchdayService {
     required String actorId,
     required List<String> starterMembershipIds,
     List<String> benchMembershipIds = const [],
+    bool allowIncompleteFriendlyLineup = false,
   }) async {
     final context = await _loadRegisteredContext(
       matchId: matchId,
       teamId: teamId,
       actorId: actorId,
     );
-    final checkIn = await _requireCheckedInTeam(matchId: matchId, teamId: teamId);
+    final checkIn = await _requireCheckedInTeam(
+      matchId: matchId,
+      teamId: teamId,
+    );
     final memberships = await _loadActiveMemberships(teamId);
     final membershipMap = {
       for (final membership in memberships) membership.id: membership,
     };
-    final attendances = await _getAttendancesForTeam(matchId: matchId, teamId: teamId);
+    final attendances = await _getAttendancesForTeam(
+      matchId: matchId,
+      teamId: teamId,
+    );
     final attendanceMap = {
       for (final attendance in attendances)
         if (attendance.teamMembershipId != null)
@@ -468,6 +485,10 @@ class MatchdayService {
     _assertStarterCount(
       requiredStarterCount: requiredStarterCount,
       selectedStarters: starterMembershipIds.length,
+      allowIncompleteLineup:
+          allowIncompleteFriendlyLineup &&
+          context.tournament == null &&
+          !context.match.isOrganized,
     );
 
     final selectedMembershipIds = <String>{
@@ -513,7 +534,9 @@ class MatchdayService {
       match: context.match,
       checkIn: checkIn,
       requiredStarterCount: requiredStarterCount,
-      eligibleParticipants: attendances.where((attendance) => attendance.isPresent).length,
+      eligibleParticipants: attendances
+          .where((attendance) => attendance.isPresent)
+          .length,
       starters: starters,
       bench: bench,
     );
@@ -525,6 +548,7 @@ class MatchdayService {
     required String actorId,
     required List<String> starterGuestPlayerIds,
     List<String> benchGuestPlayerIds = const [],
+    bool allowIncompleteFriendlyLineup = false,
   }) async {
     final context = await _loadGuestContext(
       matchId: matchId,
@@ -541,7 +565,8 @@ class MatchdayService {
     );
     final attendanceMap = {
       for (final attendance in attendances)
-        if (attendance.guestPlayerId != null) attendance.guestPlayerId!: attendance,
+        if (attendance.guestPlayerId != null)
+          attendance.guestPlayerId!: attendance,
     };
 
     _ensureUniqueLineupSelection(
@@ -555,6 +580,10 @@ class MatchdayService {
     _assertStarterCount(
       requiredStarterCount: requiredStarterCount,
       selectedStarters: starterGuestPlayerIds.length,
+      allowIncompleteLineup:
+          allowIncompleteFriendlyLineup &&
+          context.tournament == null &&
+          !context.match.isOrganized,
     );
 
     final selectedGuestPlayerIds = <String>{
@@ -585,7 +614,9 @@ class MatchdayService {
       match: context.match,
       checkIn: checkIn,
       requiredStarterCount: requiredStarterCount,
-      eligibleParticipants: attendances.where((attendance) => attendance.isPresent).length,
+      eligibleParticipants: attendances
+          .where((attendance) => attendance.isPresent)
+          .length,
       starters: starters,
       bench: bench,
     );
@@ -597,6 +628,8 @@ class MatchdayService {
     required String actorId,
     required List<String> starterMembershipIds,
     List<String> benchMembershipIds = const [],
+    bool allowIncompleteFriendlyLineup = false,
+    String? formationCode,
     String? formationLabel,
     String? notes,
     DateTime? now,
@@ -613,69 +646,80 @@ class MatchdayService {
       actorId: actorId,
       starterMembershipIds: starterMembershipIds,
       benchMembershipIds: benchMembershipIds,
+      allowIncompleteFriendlyLineup: allowIncompleteFriendlyLineup,
     );
-    final attendances = await _getAttendancesForTeam(matchId: matchId, teamId: teamId);
+    final attendances = await _getAttendancesForTeam(
+      matchId: matchId,
+      teamId: teamId,
+    );
     final attendanceUpdates = _buildLockAttendanceUpdates(
       attendances: attendances,
-      starterAttendanceIds:
-          validation.starters.map((entry) => entry.attendanceId).toSet(),
-      benchAttendanceIds: validation.bench.map((entry) => entry.attendanceId).toSet(),
+      starterAttendanceIds: validation.starters
+          .map((entry) => entry.attendanceId)
+          .toSet(),
+      benchAttendanceIds: validation.bench
+          .map((entry) => entry.attendanceId)
+          .toSet(),
       actorId: actorId,
       now: effectiveNow,
     );
     final snapshotId = _registeredSnapshotId(matchId: matchId, teamId: teamId);
     final snapshotRef = _snapshotsRef.doc(snapshotId);
 
-    final transactionResult = await _firestore.runTransaction<_SnapshotTransactionResult>(
-      (transaction) async {
-        final snapshotSnapshot = await transaction.get(snapshotRef);
-        if (snapshotSnapshot.exists && snapshotSnapshot.data() != null) {
-          return _SnapshotTransactionResult(
-            outcome: MatchdayLineupLockOutcome.alreadyLocked,
-            snapshot: MatchLineupSnapshotModel.fromJson(
-              snapshotSnapshot.data()!,
-              snapshotSnapshot.id,
-            ).toEntity(),
+    final transactionResult = await _firestore
+        .runTransaction<_SnapshotTransactionResult>((transaction) async {
+          final snapshotSnapshot = await transaction.get(snapshotRef);
+          if (snapshotSnapshot.exists && snapshotSnapshot.data() != null) {
+            return _SnapshotTransactionResult(
+              outcome: MatchdayLineupLockOutcome.alreadyLocked,
+              snapshot: MatchLineupSnapshotModel.fromJson(
+                snapshotSnapshot.data()!,
+                snapshotSnapshot.id,
+              ).toEntity(),
+            );
+          }
+
+          final matchSnapshot = await transaction.get(_matchesRef.doc(matchId));
+          if (!matchSnapshot.exists || matchSnapshot.data() == null) {
+            throw Exception('المباراة المطلوبة غير موجودة.');
+          }
+          final match = MatchModel.fromJson(
+            matchSnapshot.data()!,
+            matchSnapshot.id,
+          ).toEntity();
+          _ensureMatchAvailableForPreKickoff(match);
+
+          final snapshot = MatchLineupSnapshot(
+            id: snapshotId,
+            matchId: matchId,
+            teamId: teamId,
+            tournamentRegistrationId: context.registration?.id,
+            checkInId: validation.checkIn.id,
+            starters: validation.starters,
+            bench: validation.bench,
+            lockedBy: actorId,
+            lockedAt: effectiveNow,
+            playerCount: validation.requiredStarterCount,
+            formationCode: _normalizeOptionalText(formationCode),
+            formationLabel: _normalizeOptionalText(formationLabel),
+            notes: _normalizeOptionalText(notes),
           );
-        }
-
-        final matchSnapshot = await transaction.get(_matchesRef.doc(matchId));
-        if (!matchSnapshot.exists || matchSnapshot.data() == null) {
-          throw Exception('المباراة المطلوبة غير موجودة.');
-        }
-        final match = MatchModel.fromJson(
-          matchSnapshot.data()!,
-          matchSnapshot.id,
-        ).toEntity();
-        _ensureMatchAvailableForPreKickoff(match);
-
-        final snapshot = MatchLineupSnapshot(
-          id: snapshotId,
-          matchId: matchId,
-          teamId: teamId,
-          tournamentRegistrationId: context.registration?.id,
-          checkInId: validation.checkIn.id,
-          starters: validation.starters,
-          bench: validation.bench,
-          lockedBy: actorId,
-          lockedAt: effectiveNow,
-          formationLabel: _normalizeOptionalText(formationLabel),
-          notes: _normalizeOptionalText(notes),
-        );
-        transaction.set(
-          snapshotRef,
-          MatchLineupSnapshotModel.fromEntity(snapshot).toJson(),
-        );
-        _applyAttendanceUpdates(
-          transaction: transaction,
-          updatesByAttendanceId: attendanceUpdates,
-        );
-        return _SnapshotTransactionResult(
-          outcome: MatchdayLineupLockOutcome.locked,
-          snapshot: snapshot,
-        );
-      },
-    );
+          transaction.set(
+            snapshotRef,
+            MatchLineupSnapshotModel.fromEntity(snapshot).toJson(),
+          );
+          transaction.update(_matchesRef.doc(matchId), {
+            'lineupSnapshotIds.$teamId': snapshotId,
+          });
+          _applyAttendanceUpdates(
+            transaction: transaction,
+            updatesByAttendanceId: attendanceUpdates,
+          );
+          return _SnapshotTransactionResult(
+            outcome: MatchdayLineupLockOutcome.locked,
+            snapshot: snapshot,
+          );
+        });
 
     return MatchdayLineupLockResult(
       outcome: transactionResult.outcome,
@@ -690,6 +734,8 @@ class MatchdayService {
     required String actorId,
     required List<String> starterGuestPlayerIds,
     List<String> benchGuestPlayerIds = const [],
+    bool allowIncompleteFriendlyLineup = false,
+    String? formationCode,
     String? formationLabel,
     String? notes,
     DateTime? now,
@@ -706,6 +752,7 @@ class MatchdayService {
       actorId: actorId,
       starterGuestPlayerIds: starterGuestPlayerIds,
       benchGuestPlayerIds: benchGuestPlayerIds,
+      allowIncompleteFriendlyLineup: allowIncompleteFriendlyLineup,
     );
     final attendances = await _getAttendancesForGuestTeam(
       matchId: matchId,
@@ -713,9 +760,12 @@ class MatchdayService {
     );
     final attendanceUpdates = _buildLockAttendanceUpdates(
       attendances: attendances,
-      starterAttendanceIds:
-          validation.starters.map((entry) => entry.attendanceId).toSet(),
-      benchAttendanceIds: validation.bench.map((entry) => entry.attendanceId).toSet(),
+      starterAttendanceIds: validation.starters
+          .map((entry) => entry.attendanceId)
+          .toSet(),
+      benchAttendanceIds: validation.bench
+          .map((entry) => entry.attendanceId)
+          .toSet(),
       actorId: actorId,
       now: effectiveNow,
     );
@@ -725,56 +775,60 @@ class MatchdayService {
     );
     final snapshotRef = _snapshotsRef.doc(snapshotId);
 
-    final transactionResult = await _firestore.runTransaction<_SnapshotTransactionResult>(
-      (transaction) async {
-        final snapshotSnapshot = await transaction.get(snapshotRef);
-        if (snapshotSnapshot.exists && snapshotSnapshot.data() != null) {
-          return _SnapshotTransactionResult(
-            outcome: MatchdayLineupLockOutcome.alreadyLocked,
-            snapshot: MatchLineupSnapshotModel.fromJson(
-              snapshotSnapshot.data()!,
-              snapshotSnapshot.id,
-            ).toEntity(),
+    final transactionResult = await _firestore
+        .runTransaction<_SnapshotTransactionResult>((transaction) async {
+          final snapshotSnapshot = await transaction.get(snapshotRef);
+          if (snapshotSnapshot.exists && snapshotSnapshot.data() != null) {
+            return _SnapshotTransactionResult(
+              outcome: MatchdayLineupLockOutcome.alreadyLocked,
+              snapshot: MatchLineupSnapshotModel.fromJson(
+                snapshotSnapshot.data()!,
+                snapshotSnapshot.id,
+              ).toEntity(),
+            );
+          }
+
+          final matchSnapshot = await transaction.get(_matchesRef.doc(matchId));
+          if (!matchSnapshot.exists || matchSnapshot.data() == null) {
+            throw Exception('المباراة المطلوبة غير موجودة.');
+          }
+          final match = MatchModel.fromJson(
+            matchSnapshot.data()!,
+            matchSnapshot.id,
+          ).toEntity();
+          _ensureMatchAvailableForPreKickoff(match);
+
+          final snapshot = MatchLineupSnapshot(
+            id: snapshotId,
+            matchId: matchId,
+            guestTeamId: guestTeamId,
+            tournamentRegistrationId: context.registration?.id,
+            checkInId: validation.checkIn.id,
+            starters: validation.starters,
+            bench: validation.bench,
+            lockedBy: actorId,
+            lockedAt: effectiveNow,
+            playerCount: validation.requiredStarterCount,
+            formationCode: _normalizeOptionalText(formationCode),
+            formationLabel: _normalizeOptionalText(formationLabel),
+            notes: _normalizeOptionalText(notes),
           );
-        }
-
-        final matchSnapshot = await transaction.get(_matchesRef.doc(matchId));
-        if (!matchSnapshot.exists || matchSnapshot.data() == null) {
-          throw Exception('المباراة المطلوبة غير موجودة.');
-        }
-        final match = MatchModel.fromJson(
-          matchSnapshot.data()!,
-          matchSnapshot.id,
-        ).toEntity();
-        _ensureMatchAvailableForPreKickoff(match);
-
-        final snapshot = MatchLineupSnapshot(
-          id: snapshotId,
-          matchId: matchId,
-          guestTeamId: guestTeamId,
-          tournamentRegistrationId: context.registration?.id,
-          checkInId: validation.checkIn.id,
-          starters: validation.starters,
-          bench: validation.bench,
-          lockedBy: actorId,
-          lockedAt: effectiveNow,
-          formationLabel: _normalizeOptionalText(formationLabel),
-          notes: _normalizeOptionalText(notes),
-        );
-        transaction.set(
-          snapshotRef,
-          MatchLineupSnapshotModel.fromEntity(snapshot).toJson(),
-        );
-        _applyAttendanceUpdates(
-          transaction: transaction,
-          updatesByAttendanceId: attendanceUpdates,
-        );
-        return _SnapshotTransactionResult(
-          outcome: MatchdayLineupLockOutcome.locked,
-          snapshot: snapshot,
-        );
-      },
-    );
+          transaction.set(
+            snapshotRef,
+            MatchLineupSnapshotModel.fromEntity(snapshot).toJson(),
+          );
+          transaction.update(_matchesRef.doc(matchId), {
+            'guestLineupSnapshotIds.$guestTeamId': snapshotId,
+          });
+          _applyAttendanceUpdates(
+            transaction: transaction,
+            updatesByAttendanceId: attendanceUpdates,
+          );
+          return _SnapshotTransactionResult(
+            outcome: MatchdayLineupLockOutcome.locked,
+            snapshot: snapshot,
+          );
+        });
 
     return MatchdayLineupLockResult(
       outcome: transactionResult.outcome,
@@ -800,8 +854,14 @@ class MatchdayService {
       actorId: actorId,
       requirePreKickoff: false,
     );
-    final checkIn = await _requireCheckedInTeam(matchId: matchId, teamId: teamId);
-    final snapshot = await _requireSnapshotByTeamId(matchId: matchId, teamId: teamId);
+    final checkIn = await _requireCheckedInTeam(
+      matchId: matchId,
+      teamId: teamId,
+    );
+    final snapshot = await _requireSnapshotByTeamId(
+      matchId: matchId,
+      teamId: teamId,
+    );
 
     return _recordSubstitution(
       matchId: matchId,
@@ -930,7 +990,9 @@ class MatchdayService {
     );
 
     if (!hasOrganizerLevelAccess && guestTeam.creatorId != actorId) {
-      throw Exception('لا تملك صلاحية إدارة check-in أو lineup لهذا الفريق الضيف.');
+      throw Exception(
+        'لا تملك صلاحية إدارة check-in أو lineup لهذا الفريق الضيف.',
+      );
     }
 
     final registration = await _loadApprovedRegistrationForGuestTeam(
@@ -1024,14 +1086,18 @@ class MatchdayService {
         .limit(1)
         .get();
     if (snapshot.docs.isEmpty) {
-      throw Exception('الفريق الضيف غير مسجل داخل الدورة المرتبطة بهذه المباراة.');
+      throw Exception(
+        'الفريق الضيف غير مسجل داخل الدورة المرتبطة بهذه المباراة.',
+      );
     }
     final registration = TournamentRegistrationModel.fromJson(
       snapshot.docs.first.data(),
       snapshot.docs.first.id,
     ).toEntity();
     if (registration.status != TournamentRegistrationStatus.approved) {
-      throw Exception('لا يمكن تشغيل matchday لفريق ضيف لم يتم اعتماد تسجيله بعد.');
+      throw Exception(
+        'لا يمكن تشغيل matchday لفريق ضيف لم يتم اعتماد تسجيله بعد.',
+      );
     }
     return registration;
   }
@@ -1047,7 +1113,9 @@ class MatchdayService {
     if (tournament == null) {
       return false;
     }
-    if (!tournament.assistants.any((assistant) => assistant.userId == actorId)) {
+    if (!tournament.assistants.any(
+      (assistant) => assistant.userId == actorId,
+    )) {
       return false;
     }
     return _tournamentPermissionService.canManageTeams(tournament, actorId);
@@ -1098,7 +1166,9 @@ class MatchdayService {
         match.status == MatchStatus.pendingReview ||
         match.status == MatchStatus.ratingWindow ||
         match.status == MatchStatus.settled) {
-      throw Exception('لا يمكن تنفيذ check-in أو lineup lock بعد انطلاق المباراة.');
+      throw Exception(
+        'لا يمكن تنفيذ check-in أو lineup lock بعد انطلاق المباراة.',
+      );
     }
   }
 
@@ -1120,8 +1190,12 @@ class MatchdayService {
         .where('teamId', isEqualTo: teamId)
         .get();
     final memberships = snapshot.docs
-        .map((doc) => TeamMembershipModel.fromJson(doc.data(), doc.id).toEntity())
-        .where((membership) => membership.status != TeamMembershipStatus.inactive)
+        .map(
+          (doc) => TeamMembershipModel.fromJson(doc.data(), doc.id).toEntity(),
+        )
+        .where(
+          (membership) => membership.status != TeamMembershipStatus.inactive,
+        )
         .toList(growable: true);
     memberships.sort((left, right) => left.joinedAt.compareTo(right.joinedAt));
     return memberships;
@@ -1134,7 +1208,10 @@ class MatchdayService {
       if (!snapshot.exists || snapshot.data() == null) {
         continue;
       }
-      result[playerId] = PlayerModel.fromJson(snapshot.data()!, snapshot.id).toEntity();
+      result[playerId] = PlayerModel.fromJson(
+        snapshot.data()!,
+        snapshot.id,
+      ).toEntity();
     }
     return result;
   }
@@ -1148,8 +1225,10 @@ class MatchdayService {
       if (!snapshot.exists || snapshot.data() == null) {
         continue;
       }
-      result[guestPlayerId] =
-          GuestPlayerModel.fromJson(snapshot.data()!, snapshot.id).toEntity();
+      result[guestPlayerId] = GuestPlayerModel.fromJson(
+        snapshot.data()!,
+        snapshot.id,
+      ).toEntity();
     }
     return result;
   }
@@ -1255,7 +1334,10 @@ class MatchdayService {
     required String matchId,
     required String teamId,
   }) async {
-    final snapshot = await _getSnapshotByTeamId(matchId: matchId, teamId: teamId);
+    final snapshot = await _getSnapshotByTeamId(
+      matchId: matchId,
+      teamId: teamId,
+    );
     if (snapshot == null) {
       throw Exception('يجب قفل التشكيل أولاً قبل تسجيل التبديلات.');
     }
@@ -1285,9 +1367,13 @@ class MatchdayService {
         .where('teamId', isEqualTo: teamId)
         .get();
     final attendances = snapshot.docs
-        .map((doc) => MatchAttendanceModel.fromJson(doc.data(), doc.id).toEntity())
+        .map(
+          (doc) => MatchAttendanceModel.fromJson(doc.data(), doc.id).toEntity(),
+        )
         .toList(growable: true);
-    attendances.sort((left, right) => left.createdAt.compareTo(right.createdAt));
+    attendances.sort(
+      (left, right) => left.createdAt.compareTo(right.createdAt),
+    );
     return attendances;
   }
 
@@ -1300,9 +1386,13 @@ class MatchdayService {
         .where('guestTeamId', isEqualTo: guestTeamId)
         .get();
     final attendances = snapshot.docs
-        .map((doc) => MatchAttendanceModel.fromJson(doc.data(), doc.id).toEntity())
+        .map(
+          (doc) => MatchAttendanceModel.fromJson(doc.data(), doc.id).toEntity(),
+        )
         .toList(growable: true);
-    attendances.sort((left, right) => left.createdAt.compareTo(right.createdAt));
+    attendances.sort(
+      (left, right) => left.createdAt.compareTo(right.createdAt),
+    );
     return attendances;
   }
 
@@ -1572,23 +1662,29 @@ class MatchdayService {
     }
   }
 
-  int? _resolveRequiredStarterCount({
+  int _resolveRequiredStarterCount({
     required Match match,
     required Tournament? tournament,
   }) {
     if (tournament != null) {
       return tournament.teamSize.value;
     }
-    return null;
+    return normalizeMatchTeamSize(match.teamSize);
   }
 
   void _assertStarterCount({
-    required int? requiredStarterCount,
+    required int requiredStarterCount,
     required int selectedStarters,
+    bool allowIncompleteLineup = false,
   }) {
-    if (requiredStarterCount == null) {
+    if (allowIncompleteLineup) {
       if (selectedStarters <= 0) {
         throw Exception('يجب اختيار أساسي واحد على الأقل قبل قفل التشكيل.');
+      }
+      if (selectedStarters > requiredStarterCount) {
+        throw Exception(
+          'لا يمكن اختيار أكثر من $requiredStarterCount لاعبين أساسيين لهذه المباراة.',
+        );
       }
       return;
     }
@@ -1617,7 +1713,8 @@ class MatchdayService {
     String? guestTeamId,
   }) {
     if (teamId != null) {
-      if (outgoingAttendance.teamId != teamId || incomingAttendance.teamId != teamId) {
+      if (outgoingAttendance.teamId != teamId ||
+          incomingAttendance.teamId != teamId) {
         throw Exception('التبديل يجب أن يتم داخل نفس الفريق المسجل.');
       }
       return;
@@ -1652,8 +1749,7 @@ class MatchdayService {
       TeamMemberAvailability.available => MatchAttendanceStatus.present,
       TeamMemberAvailability.pending => MatchAttendanceStatus.pending,
       TeamMemberAvailability.unavailable ||
-      TeamMemberAvailability.injured =>
-        MatchAttendanceStatus.absent,
+      TeamMemberAvailability.injured => MatchAttendanceStatus.absent,
     };
   }
 

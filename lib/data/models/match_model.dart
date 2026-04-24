@@ -1,5 +1,7 @@
 import '../../core/enums/match_status.dart';
 import '../../core/enums/tournament_ops_enums.dart';
+import '../../core/lineup/formation_library.dart';
+import '../../core/utils/app_logger.dart';
 import '../../domain/entities/match.dart';
 
 /// نموذج بيانات المباراة — تحويل Firestore
@@ -19,6 +21,7 @@ class MatchModel {
   final String? location;
   final double? latitude;
   final double? longitude;
+  final int teamSize;
   final bool isOrganized;
   final String? tournamentId;
   final bool isGoldenRating;
@@ -54,6 +57,7 @@ class MatchModel {
     this.location,
     this.latitude,
     this.longitude,
+    this.teamSize = 5,
     this.isOrganized = false,
     this.tournamentId,
     this.isGoldenRating = false,
@@ -75,6 +79,14 @@ class MatchModel {
   });
 
   factory MatchModel.fromJson(Map<String, dynamic> json, String docId) {
+    final rawTeamSize = (json['teamSize'] as num?)?.toInt();
+    final normalizedTeamSize = normalizeMatchTeamSize(rawTeamSize);
+    if (rawTeamSize != null && rawTeamSize != normalizedTeamSize) {
+      AppLogger.warning(
+        'MatchModel.fromJson',
+        'Invalid teamSize "$rawTeamSize" for match "$docId"; falling back to $normalizedTeamSize.',
+      );
+    }
     return MatchModel(
       id: docId,
       organizerId: json['organizerId'] as String? ?? '',
@@ -99,6 +111,7 @@ class MatchModel {
       location: json['location'] as String?,
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
+      teamSize: normalizedTeamSize,
       isOrganized: json['isOrganized'] as bool? ?? false,
       tournamentId: json['tournamentId'] as String?,
       isGoldenRating: json['isGoldenRating'] as bool? ?? false,
@@ -156,6 +169,7 @@ class MatchModel {
     'location': location,
     'latitude': latitude,
     'longitude': longitude,
+    'teamSize': normalizeMatchTeamSize(teamSize),
     'isOrganized': isOrganized,
     'tournamentId': tournamentId,
     'isGoldenRating': isGoldenRating,
@@ -192,6 +206,7 @@ class MatchModel {
     location: location,
     latitude: latitude,
     longitude: longitude,
+    teamSize: normalizeMatchTeamSize(teamSize),
     isOrganized: isOrganized,
     tournamentId: tournamentId,
     isGoldenRating: isGoldenRating,
@@ -236,6 +251,7 @@ class MatchModel {
     location: m.location,
     latitude: m.latitude,
     longitude: m.longitude,
+    teamSize: normalizeMatchTeamSize(m.teamSize),
     isOrganized: m.isOrganized,
     tournamentId: m.tournamentId,
     isGoldenRating: m.isGoldenRating,

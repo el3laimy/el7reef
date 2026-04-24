@@ -14,6 +14,9 @@ abstract class AppRoutes {
   static const String createMatch = '/match/create';
   static const String matchLobby = '/match/lobby/:id';
   static const String matchDetails = '/match/details/:id';
+  static const String teamLineupEditor =
+      '/match/:matchId/lineup/editor/:teamId';
+  static const String matchResultLineup = '/match/:matchId/lineup/result';
   static const String rating = '/rating/:matchId';
   static const String mvpVote = '/rating/mvp/:matchId';
   static const String createTournament = '/tournament/create';
@@ -82,6 +85,12 @@ abstract class AppRoutes {
       '/organizer/score/$matchId';
   static String matchDetailsById(String matchId) => '/match/details/$matchId';
   static String matchLobbyById(String matchId) => '/match/lobby/$matchId';
+  static String teamLineupEditorForMatch({
+    required String matchId,
+    required String teamId,
+  }) => '/match/$matchId/lineup/editor/$teamId';
+  static String matchResultLineupById(String matchId) =>
+      '/match/$matchId/lineup/result';
   static String mvpVoteForMatch(String matchId) => '/rating/mvp/$matchId';
   static String fantasyPickTeamForLeague(String leagueId) =>
       '/fantasy/pick/$leagueId';

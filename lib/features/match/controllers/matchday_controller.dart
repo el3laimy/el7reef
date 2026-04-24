@@ -202,7 +202,8 @@ class MatchdayController extends GetxController {
     return null;
   }
 
-  int? get requiredStarterCount => tournament.value?.teamSize.value;
+  int? get requiredStarterCount =>
+      tournament.value?.teamSize.value ?? match.value?.teamSize;
   bool get isLineupLocked => activeSnapshot.value != null;
   bool get isMatchLive => match.value?.status == MatchStatus.live;
   bool get canEditPreKickoff =>

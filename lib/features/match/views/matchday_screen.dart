@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
@@ -76,7 +77,6 @@ class MatchdayScreen extends GetView<MatchdayController> {
   }
 }
 
-
 class _SideSelector extends StatelessWidget {
   final MatchdayController controller;
 
@@ -120,7 +120,6 @@ class _SideSelector extends StatelessWidget {
     );
   }
 }
-
 
 class _AttendanceSection extends StatelessWidget {
   final MatchdayController controller;
@@ -182,8 +181,7 @@ class _LineupSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final snapshot = controller.activeSnapshot.value;
-    final startersCount = controller
-        .lineupDrafts.values
+    final startersCount = controller.lineupDrafts.values
         .where((value) => value == MatchdayLineupSlot.starter.name)
         .length;
 
@@ -204,12 +202,41 @@ class _LineupSection extends StatelessWidget {
           const SizedBox(height: AppDimensions.md),
           if (snapshot != null) ...[
             _SnapshotReadonlyView(snapshot: snapshot),
+            const SizedBox(height: AppDimensions.md),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => Get.toNamed(
+                  AppRoutes.matchResultLineupById(controller.matchId),
+                ),
+                icon: const Icon(Icons.ios_share_rounded),
+                label: const Text('عرض تشكيلة النتيجة'),
+              ),
+            ),
           ] else ...[
+            if (controller.selectedSide?.isRegisteredTeam == true &&
+                (controller.selectedSide?.teamId ?? '').isNotEmpty) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => Get.toNamed(
+                    AppRoutes.teamLineupEditorForMatch(
+                      matchId: controller.matchId,
+                      teamId: controller.selectedSide!.teamId!,
+                    ),
+                  ),
+                  icon: const Icon(Icons.tune_rounded),
+                  label: const Text('فتح محرر التشكيلة الاحترافي'),
+                ),
+              ),
+              const SizedBox(height: AppDimensions.md),
+            ],
             ...controller.participants.map(
               (participant) => _LineupParticipantTile(
                 controller: controller,
                 participant: participant,
-                enabled: controller.canEditPreKickoff &&
+                enabled:
+                    controller.canEditPreKickoff &&
                     !controller.isSubmitting.value,
               ),
             ),
@@ -217,7 +244,8 @@ class _LineupSection extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: controller.canEditPreKickoff &&
+                onPressed:
+                    controller.canEditPreKickoff &&
                         !controller.isSubmitting.value
                     ? controller.lockLineup
                     : null,
@@ -257,7 +285,9 @@ class _SubstitutionSection extends StatelessWidget {
           ),
           const SizedBox(height: AppDimensions.md),
           if (snapshot == null)
-            const _SectionHint(message: 'اقفل التشكيل أولًا لتفعيل سجل التبديلات.')
+            const _SectionHint(
+              message: 'اقفل التشكيل أولًا لتفعيل سجل التبديلات.',
+            )
           else ...[
             _SubstitutionDropdown(
               label: 'اللاعب الخارج',
@@ -277,7 +307,8 @@ class _SubstitutionSection extends StatelessWidget {
                   .toList(growable: false),
               onChanged: controller.isSubmitting.value
                   ? null
-                  : (value) => controller.selectedOutgoingAttendanceId.value = value,
+                  : (value) =>
+                        controller.selectedOutgoingAttendanceId.value = value,
             ),
             const SizedBox(height: AppDimensions.sm),
             _SubstitutionDropdown(
@@ -298,7 +329,8 @@ class _SubstitutionSection extends StatelessWidget {
                   .toList(growable: false),
               onChanged: controller.isSubmitting.value
                   ? null
-                  : (value) => controller.selectedIncomingAttendanceId.value = value,
+                  : (value) =>
+                        controller.selectedIncomingAttendanceId.value = value,
             ),
             const SizedBox(height: AppDimensions.sm),
             TextField(
@@ -362,24 +394,45 @@ class _SubstitutionSection extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Text(
+                            '${controller.substitutionLabel(substitution.outgoingAttendanceId)} ⟶ ${controller.substitutionLabel(substitution.incomingAttendanceId)}',
+                            style: AppTextStyles.labelMedium,
+                          ),
+                          const SizedBox(height: 2),
                           Row(
                             children: [
-                              Icon(Icons.arrow_upward_rounded, size: 14, color: AppColors.error),
+                              Icon(
+                                Icons.arrow_upward_rounded,
+                                size: 14,
+                                color: AppColors.error,
+                              ),
                               const SizedBox(width: 4),
                               Text(
-                                controller.substitutionLabel(substitution.outgoingAttendanceId),
-                                style: AppTextStyles.labelMedium.copyWith(color: AppColors.error),
+                                controller.substitutionLabel(
+                                  substitution.outgoingAttendanceId,
+                                ),
+                                style: AppTextStyles.labelMedium.copyWith(
+                                  color: AppColors.error,
+                                ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 2),
                           Row(
                             children: [
-                              Icon(Icons.arrow_downward_rounded, size: 14, color: AppColors.success),
+                              Icon(
+                                Icons.arrow_downward_rounded,
+                                size: 14,
+                                color: AppColors.success,
+                              ),
                               const SizedBox(width: 4),
                               Text(
-                                controller.substitutionLabel(substitution.incomingAttendanceId),
-                                style: AppTextStyles.labelMedium.copyWith(color: AppColors.success),
+                                controller.substitutionLabel(
+                                  substitution.incomingAttendanceId,
+                                ),
+                                style: AppTextStyles.labelMedium.copyWith(
+                                  color: AppColors.success,
+                                ),
                               ),
                             ],
                           ),
@@ -441,15 +494,18 @@ class _ParticipantAttendanceTile extends StatelessWidget {
                           ),
                         ),
                         if (participant.isGuest)
-                          const _StatusBadge(label: 'ضيف', color: AppColors.warning),
+                          const _StatusBadge(
+                            label: 'ضيف',
+                            color: AppColors.warning,
+                          ),
                       ],
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      [
-                        participant.position,
-                        participant.statusSeedLabel,
-                      ].whereType<String>().where((value) => value.isNotEmpty).join(' • '),
+                      [participant.position, participant.statusSeedLabel]
+                          .whereType<String>()
+                          .where((value) => value.isNotEmpty)
+                          .join(' • '),
                       style: AppTextStyles.labelSmall.copyWith(
                         color: AppColors.textMuted,
                       ),
@@ -471,9 +527,9 @@ class _ParticipantAttendanceTile extends StatelessWidget {
                     selectedColor: _attendanceChipColor(status),
                     onSelected: enabled
                         ? (_) => controller.setAttendanceStatus(
-                              participant.selectionId,
-                              status,
-                            )
+                            participant.selectionId,
+                            status,
+                          )
                         : null,
                   ),
                 )
@@ -499,9 +555,11 @@ class _LineupParticipantTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final slot = controller.lineupSlotFor(participant.selectionId);
-    final isEligible = controller.statusFor(participant.selectionId) ==
+    final isEligible =
+        controller.statusFor(participant.selectionId) ==
             MatchAttendanceStatus.present ||
-        controller.statusFor(participant.selectionId) == MatchAttendanceStatus.late;
+        controller.statusFor(participant.selectionId) ==
+            MatchAttendanceStatus.late;
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppDimensions.sm),
@@ -528,9 +586,7 @@ class _LineupParticipantTile extends StatelessWidget {
           ),
           const SizedBox(height: AppDimensions.xs),
           Text(
-            isEligible
-                ? 'مؤهل للتشكيل'
-                : 'لاعب غير مؤهل قبل تأكيد حضوره.',
+            isEligible ? 'مؤهل للتشكيل' : 'لاعب غير مؤهل قبل تأكيد حضوره.',
             style: AppTextStyles.labelSmall.copyWith(
               color: isEligible ? AppColors.success : AppColors.textMuted,
             ),
@@ -545,9 +601,9 @@ class _LineupParticipantTile extends StatelessWidget {
                 selected: slot == null,
                 onSelected: enabled && isEligible
                     ? (_) => controller.setLineupSlot(
-                          participant.selectionId,
-                          null,
-                        )
+                        participant.selectionId,
+                        null,
+                      )
                     : null,
               ),
               ChoiceChip(
@@ -555,9 +611,9 @@ class _LineupParticipantTile extends StatelessWidget {
                 selected: slot == MatchdayLineupSlot.starter,
                 onSelected: enabled && isEligible
                     ? (_) => controller.setLineupSlot(
-                          participant.selectionId,
-                          MatchdayLineupSlot.starter,
-                        )
+                        participant.selectionId,
+                        MatchdayLineupSlot.starter,
+                      )
                     : null,
               ),
               ChoiceChip(
@@ -565,9 +621,9 @@ class _LineupParticipantTile extends StatelessWidget {
                 selected: slot == MatchdayLineupSlot.bench,
                 onSelected: enabled && isEligible
                     ? (_) => controller.setLineupSlot(
-                          participant.selectionId,
-                          MatchdayLineupSlot.bench,
-                        )
+                        participant.selectionId,
+                        MatchdayLineupSlot.bench,
+                      )
                     : null,
               ),
             ],
@@ -664,10 +720,7 @@ class _ErrorState extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
 
-  const _ErrorState({
-    required this.message,
-    required this.onRetry,
-  });
+  const _ErrorState({required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -714,10 +767,7 @@ class _StatusBadge extends StatelessWidget {
   final String label;
   final Color color;
 
-  const _StatusBadge({
-    required this.label,
-    required this.color,
-  });
+  const _StatusBadge({required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -734,7 +784,6 @@ class _StatusBadge extends StatelessWidget {
     );
   }
 }
-
 
 class _SubstitutionDropdown extends StatelessWidget {
   final String label;
@@ -788,8 +837,6 @@ String? _safeDropdownValue({
   }
   return selectedValue;
 }
-
-
 
 Color _attendanceChipColor(MatchAttendanceStatus status) {
   return switch (status) {

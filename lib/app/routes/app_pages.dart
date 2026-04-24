@@ -26,6 +26,9 @@ import '../../features/match/bindings/matchday_binding.dart';
 import '../../features/match/bindings/score_submit_binding.dart';
 import '../../features/match/bindings/fan_voting_binding.dart';
 import '../../features/match/bindings/match_lobby_binding.dart';
+import '../../features/lineup/bindings/lineup_binding.dart';
+import '../../features/lineup/views/match_result_lineup_screen.dart';
+import '../../features/lineup/views/team_lineup_editor_screen.dart';
 import '../../features/tournament/views/tournament_list_screen.dart';
 import '../../features/tournament/views/tournament_detail_screen.dart';
 import '../../features/tournament/views/tournament_registration_screen.dart';
@@ -170,6 +173,22 @@ class AppPages {
                   'واجهة الحضور والتشكيل والتبديلات ما زالت متوقفة في هذا البناء.',
             ),
       binding: MatchdayBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    // ── One-team editable lineup ──
+    GetPage(
+      name: AppRoutes.teamLineupEditor,
+      page: () => const TeamLineupEditorScreen(),
+      binding: TeamLineupEditorBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    // ── Match result lineup presentation from saved snapshots ──
+    GetPage(
+      name: AppRoutes.matchResultLineup,
+      page: () => const MatchResultLineupScreen(),
+      binding: MatchResultLineupBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 

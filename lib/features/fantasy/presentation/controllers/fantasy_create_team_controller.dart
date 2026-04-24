@@ -43,7 +43,9 @@ class FantasyDraftSlot {
       label: label,
       isStarting: isStarting,
       benchPriority: benchPriority,
-      selectedPlayer: clearPlayer ? null : selectedPlayer ?? this.selectedPlayer,
+      selectedPlayer: clearPlayer
+          ? null
+          : selectedPlayer ?? this.selectedPlayer,
     );
   }
 }
@@ -63,25 +65,27 @@ class FantasyCreateTeamController extends GetxController {
     FantasyMarketService? marketService,
     FantasyLifecycleService? lifecycleService,
     AuthSession? authSession,
-  })  : _fantasyRepository = fantasyRepository ?? FantasyRepositoryImpl(),
-        _tournamentRepository =
-            tournamentRepository ?? TournamentRepositoryImpl(),
-        _marketService = marketService ??
-            (Get.isRegistered<FantasyMarketService>()
-                ? Get.find<FantasyMarketService>()
-                : FantasyMarketService()),
-        _lifecycleService = lifecycleService ??
-            (Get.isRegistered<FantasyLifecycleService>()
-                ? Get.find<FantasyLifecycleService>()
-                : FantasyLifecycleService(
-                    lifecycleRepository:
-                        Get.isRegistered<FantasyLifecycleRepositoryImpl>()
-                            ? Get.find<FantasyLifecycleRepositoryImpl>()
-                            : null,
-                    tournamentRepository:
-                        tournamentRepository ?? TournamentRepositoryImpl(),
-                  )),
-        _authSession = authSession;
+  }) : _fantasyRepository = fantasyRepository ?? FantasyRepositoryImpl(),
+       _tournamentRepository =
+           tournamentRepository ?? TournamentRepositoryImpl(),
+       _marketService =
+           marketService ??
+           (Get.isRegistered<FantasyMarketService>()
+               ? Get.find<FantasyMarketService>()
+               : FantasyMarketService()),
+       _lifecycleService =
+           lifecycleService ??
+           (Get.isRegistered<FantasyLifecycleService>()
+               ? Get.find<FantasyLifecycleService>()
+               : FantasyLifecycleService(
+                   lifecycleRepository:
+                       Get.isRegistered<FantasyLifecycleRepositoryImpl>()
+                       ? Get.find<FantasyLifecycleRepositoryImpl>()
+                       : null,
+                   tournamentRepository:
+                       tournamentRepository ?? TournamentRepositoryImpl(),
+                 )),
+       _authSession = authSession;
 
   final TextEditingController teamNameController = TextEditingController();
   final RxBool isLoading = false.obs;
@@ -89,7 +93,9 @@ class FantasyCreateTeamController extends GetxController {
   final RxString errorMessage = ''.obs;
   final RxString leagueTitle = 'الدوري العالمي'.obs;
   final Rx<TournamentTeamSize> teamSize = TournamentTeamSize.fiveVsFive.obs;
-  final Rx<FantasyLeagueLifecycle?> lifecycle = Rx<FantasyLeagueLifecycle?>(null);
+  final Rx<FantasyLeagueLifecycle?> lifecycle = Rx<FantasyLeagueLifecycle?>(
+    null,
+  );
   final Rx<FantasyTeam?> existingTeam = Rx<FantasyTeam?>(null);
   final RxList<FantasyMarketPlayer> marketPlayers = <FantasyMarketPlayer>[].obs;
   final RxList<FantasyDraftSlot> slots = <FantasyDraftSlot>[].obs;
@@ -180,29 +186,29 @@ class FantasyCreateTeamController extends GetxController {
     var remaining = existingTeam.value?.budget ?? 100.0;
 
     for (final slot in _buildDefaultSlots(teamSize.value)) {
-      final candidates = marketPlayers.where((player) {
-        if (usedIds.contains(player.player.id)) {
-          return false;
-        }
-        if (!_matchesPosition(slot.requiredPosition, player.positionCode)) {
-          return false;
-        }
-        if (player.value.currentPrice > remaining) {
-          return false;
-        }
-        final virtual = <PlayerFantasyValue>[
-          ...selected
-              .map((item) => item.selectedPlayer?.value)
-              .whereType<PlayerFantasyValue>(),
-          player.value,
-        ];
-        return TierSystemEngine.validateTeamTiers(virtual) == null;
-      }).toList()
-        ..sort(
-          (a, b) => b.value.totalFantasyPoints.compareTo(
-            a.value.totalFantasyPoints,
-          ),
-        );
+      final candidates =
+          marketPlayers.where((player) {
+            if (usedIds.contains(player.player.id)) {
+              return false;
+            }
+            if (!_matchesPosition(slot.requiredPosition, player.positionCode)) {
+              return false;
+            }
+            if (player.value.currentPrice > remaining) {
+              return false;
+            }
+            final virtual = <PlayerFantasyValue>[
+              ...selected
+                  .map((item) => item.selectedPlayer?.value)
+                  .whereType<PlayerFantasyValue>(),
+              player.value,
+            ];
+            return TierSystemEngine.validateTeamTiers(virtual) == null;
+          }).toList()..sort(
+            (a, b) => b.value.totalFantasyPoints.compareTo(
+              a.value.totalFantasyPoints,
+            ),
+          );
 
       if (candidates.isEmpty) {
         Get.snackbar(
@@ -354,8 +360,8 @@ class FantasyCreateTeamController extends GetxController {
         totalPoints: existing?.totalPoints ?? 0,
         currentGameweekPoints: existing?.currentGameweekPoints ?? 0,
         freeTransfers: existing?.freeTransfers ?? 1,
-        freeTransfersGameweek: existing != null &&
-                existing.freeTransfersGameweek > 0
+        freeTransfersGameweek:
+            existing != null && existing.freeTransfersGameweek > 0
             ? existing.freeTransfersGameweek
             : (lifecycle.value?.currentGameweek ?? 1),
         totalTransfers: existing?.totalTransfers ?? 0,
@@ -422,37 +428,60 @@ class FantasyCreateTeamController extends GetxController {
       TournamentTeamSize.fiveVsFive => ['GK', 'DEF', 'MID', 'MID', 'FWD'],
       TournamentTeamSize.sixVsSix => ['GK', 'DEF', 'DEF', 'MID', 'MID', 'FWD'],
       TournamentTeamSize.sevenVsSeven => [
-          'GK',
-          'DEF',
-          'DEF',
-          'MID',
-          'MID',
-          'MID',
-          'FWD',
-        ],
+        'GK',
+        'DEF',
+        'DEF',
+        'MID',
+        'MID',
+        'MID',
+        'FWD',
+      ],
       TournamentTeamSize.eightVsEight => [
-          'GK',
-          'DEF',
-          'DEF',
-          'MID',
-          'MID',
-          'MID',
-          'FWD',
-          'FWD',
-        ],
+        'GK',
+        'DEF',
+        'DEF',
+        'DEF',
+        'MID',
+        'MID',
+        'MID',
+        'FWD',
+      ],
+      TournamentTeamSize.nineVsNine => [
+        'GK',
+        'DEF',
+        'DEF',
+        'DEF',
+        'MID',
+        'MID',
+        'MID',
+        'FWD',
+        'FWD',
+      ],
+      TournamentTeamSize.tenVsTen => [
+        'GK',
+        'DEF',
+        'DEF',
+        'DEF',
+        'MID',
+        'MID',
+        'MID',
+        'MID',
+        'FWD',
+        'FWD',
+      ],
       TournamentTeamSize.elevenVsEleven => [
-          'GK',
-          'DEF',
-          'DEF',
-          'DEF',
-          'DEF',
-          'MID',
-          'MID',
-          'MID',
-          'MID',
-          'FWD',
-          'FWD',
-        ],
+        'GK',
+        'DEF',
+        'DEF',
+        'DEF',
+        'DEF',
+        'MID',
+        'MID',
+        'MID',
+        'MID',
+        'FWD',
+        'FWD',
+      ],
     };
 
     final starterSlots = List.generate(starters.length, (index) {
@@ -480,12 +509,14 @@ class FantasyCreateTeamController extends GetxController {
   }
 
   String _formationLabel(TournamentTeamSize size) => switch (size) {
-        TournamentTeamSize.fiveVsFive => '1-2-1',
-        TournamentTeamSize.sixVsSix => '2-2-1',
-        TournamentTeamSize.sevenVsSeven => '2-3-1',
-        TournamentTeamSize.eightVsEight => '2-3-2',
-        TournamentTeamSize.elevenVsEleven => '4-4-2',
-      };
+    TournamentTeamSize.fiveVsFive => '1-2-1',
+    TournamentTeamSize.sixVsSix => '2-2-1',
+    TournamentTeamSize.sevenVsSeven => '2-3-1',
+    TournamentTeamSize.eightVsEight => '3-3-1',
+    TournamentTeamSize.nineVsNine => '3-3-2',
+    TournamentTeamSize.tenVsTen => '3-4-2',
+    TournamentTeamSize.elevenVsEleven => '4-4-2',
+  };
 
   bool _matchesPosition(String slotPosition, String playerPosition) {
     if (slotPosition == 'SUB') {

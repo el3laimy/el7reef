@@ -149,6 +149,7 @@ class GroupStageBuilder {
               teamAParticipantId: homeParticipant.id,
               teamBParticipantId: awayParticipant.id,
               status: MatchStatus.open,
+              teamSize: tournament.teamSize.value,
               isOrganized: true,
               tournamentId: tournament.id,
               stageType: TournamentStageType.groupStage,

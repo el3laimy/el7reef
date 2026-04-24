@@ -1,13 +1,27 @@
 import 'package:flutter/material.dart';
 
-/// لوحة ألوان EL7REEF — مستوحاة من أجواء الملاعب الشعبية
-/// Dark-first design with vibrant accents
+/// لوحة ألوان EL7REEF — النظام التصميمي الجديد
 abstract class AppColors {
-  // ── Primary (أخضر الملعب) ──
-  static const Color primary = Color(0xFF1DB954);
-  static const Color primaryDark = Color(0xFF0D7C3D);
+  // ── Primary ──
+  static const Color primary = Color(0xFF7ED957);
+  static const Color primaryDark = Color(0xFF1F7A3E);
+  static const Color primaryGlow = Color(0x407ED957); // 25% opacity
+  static const Color primarySurface = Color(0x267ED957); // 15% opacity for tags
   static const Color primaryLight = Color(0xFF4ADE80);
-  static const Color primarySurface = Color(0xFF0D3320);
+
+  // ── Neutral ──
+  static const Color black = Color(0xFF0B0B0B);
+  static const Color background = Color(0xFF121212);
+  static const Color backgroundLight = Color(0xFF1A1A1A); // Player Card Background
+  static const Color surface = Color(0xFF1E1E1E);
+  static const Color surfaceLight = Color(0xFF1E1E1E);
+  static const Color surfaceBorder = Color(0xFF2A2A2A);
+
+  // ── Text ──
+  static const Color textPrimary = Color(0xFFFFFFFF);
+  static const Color textSecondary = Color(0xFFA0A0A0);
+  static const Color textMuted = Color(0xFF64748B);
+  static const Color textOnPrimary = Color(0xFF0B0B0B);
 
   // ── Secondary (ذهبي الإنجازات) ──
   static const Color secondary = Color(0xFFF5A623);
@@ -19,23 +33,10 @@ abstract class AppColors {
   static const Color accentDark = Color(0xFF2E6DB5);
   static const Color accentLight = Color(0xFF7DB4F0);
 
-  // ── Background (Dark Theme) ──
-  static const Color background = Color(0xFF0A0E17);
-  static const Color backgroundLight = Color(0xFF131A2B);
-  static const Color surface = Color(0xFF1C2333);
-  static const Color surfaceLight = Color(0xFF252D40);
-  static const Color surfaceBorder = Color(0xFF2E3A50);
-
-  // ── Text ──
-  static const Color textPrimary = Color(0xFFF1F5F9);
-  static const Color textSecondary = Color(0xFF94A3B8);
-  static const Color textMuted = Color(0xFF64748B);
-  static const Color textOnPrimary = Color(0xFFFFFFFF);
-
-  // ── Status ──
-  static const Color success = Color(0xFF43A047);
-  static const Color error = Color(0xFFE53935);
-  static const Color warning = Color(0xFFFF9800);
+  // ── Semantic ──
+  static const Color success = Color(0xFF4CAF50);
+  static const Color error = Color(0xFFFF4D4F);
+  static const Color warning = Color(0xFFFFC107);
   static const Color info = Color(0xFF29B6F6);
 
   // ── Rank Tiers ──
@@ -60,7 +61,7 @@ abstract class AppColors {
   );
 
   static const LinearGradient backgroundGradient = LinearGradient(
-    colors: [background, backgroundLight],
+    colors: [background, black],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );

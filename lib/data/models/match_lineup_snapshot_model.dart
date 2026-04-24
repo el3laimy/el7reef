@@ -1,4 +1,5 @@
 import '../../domain/entities/match_lineup_snapshot.dart';
+import '../../core/lineup/formation_library.dart';
 import 'match_lineup_entry_model.dart';
 
 class MatchLineupSnapshotModel {
@@ -12,6 +13,8 @@ class MatchLineupSnapshotModel {
   final List<MatchLineupEntryModel> bench;
   final String lockedBy;
   final DateTime lockedAt;
+  final int? playerCount;
+  final String? formationCode;
   final String? formationLabel;
   final String? notes;
 
@@ -26,6 +29,8 @@ class MatchLineupSnapshotModel {
     this.bench = const [],
     required this.lockedBy,
     required this.lockedAt,
+    this.playerCount,
+    this.formationCode,
     this.formationLabel,
     this.notes,
   });
@@ -42,14 +47,16 @@ class MatchLineupSnapshotModel {
       tournamentRegistrationId: json['tournamentRegistrationId'] as String?,
       checkInId: json['checkInId'] as String?,
       starters: (json['starters'] as List<dynamic>? ?? const [])
-          .map((item) => MatchLineupEntryModel.fromJson(
-                item as Map<String, dynamic>,
-              ))
+          .map(
+            (item) =>
+                MatchLineupEntryModel.fromJson(item as Map<String, dynamic>),
+          )
           .toList(),
       bench: (json['bench'] as List<dynamic>? ?? const [])
-          .map((item) => MatchLineupEntryModel.fromJson(
-                item as Map<String, dynamic>,
-              ))
+          .map(
+            (item) =>
+                MatchLineupEntryModel.fromJson(item as Map<String, dynamic>),
+          )
           .toList(),
       lockedBy: json['lockedBy'] as String? ?? '',
       lockedAt: json['lockedAt'] != null
@@ -57,6 +64,8 @@ class MatchLineupSnapshotModel {
               (json['lockedAt'] as num).toInt(),
             )
           : DateTime.now(),
+      playerCount: _parsePlayerCount(json['playerCount']),
+      formationCode: json['formationCode'] as String?,
       formationLabel: json['formationLabel'] as String?,
       notes: json['notes'] as String?,
     );
@@ -73,6 +82,10 @@ class MatchLineupSnapshotModel {
       'bench': bench.map((entry) => entry.toJson()).toList(),
       'lockedBy': lockedBy,
       'lockedAt': lockedAt.millisecondsSinceEpoch,
+      'playerCount': playerCount == null
+          ? null
+          : normalizeMatchTeamSize(playerCount),
+      'formationCode': formationCode,
       'formationLabel': formationLabel,
       'notes': notes,
     };
@@ -86,10 +99,14 @@ class MatchLineupSnapshotModel {
       guestTeamId: guestTeamId,
       tournamentRegistrationId: tournamentRegistrationId,
       checkInId: checkInId,
-      starters: starters.map((entry) => entry.toEntity()).toList(growable: false),
+      starters: starters
+          .map((entry) => entry.toEntity())
+          .toList(growable: false),
       bench: bench.map((entry) => entry.toEntity()).toList(growable: false),
       lockedBy: lockedBy,
       lockedAt: lockedAt,
+      playerCount: playerCount,
+      formationCode: formationCode,
       formationLabel: formationLabel,
       notes: notes,
     );
@@ -111,8 +128,20 @@ class MatchLineupSnapshotModel {
           .toList(growable: false),
       lockedBy: snapshot.lockedBy,
       lockedAt: snapshot.lockedAt,
+      playerCount: snapshot.playerCount == null
+          ? null
+          : normalizeMatchTeamSize(snapshot.playerCount),
+      formationCode: snapshot.formationCode,
       formationLabel: snapshot.formationLabel,
       notes: snapshot.notes,
     );
+  }
+
+  static int? _parsePlayerCount(Object? raw) {
+    final value = (raw as num?)?.toInt();
+    if (value == null) {
+      return null;
+    }
+    return normalizeMatchTeamSize(value);
   }
 }

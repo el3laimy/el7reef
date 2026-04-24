@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/firebase_paths.dart';
 import '../../core/enums/match_status.dart';
 import '../../core/enums/tournament_ops_enums.dart';
+import '../../core/lineup/formation_library.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/repositories/match_repository.dart';
 import '../models/match_model.dart';
@@ -15,6 +16,8 @@ class MatchRepositoryImpl implements MatchRepository {
 
   CollectionReference<Map<String, dynamic>> get _matchesRef =>
       _db.collection(FirebasePaths.matches);
+  CollectionReference<Map<String, dynamic>> get _snapshotsRef =>
+      _db.collection(FirebasePaths.matchLineupSnapshots);
 
   @override
   Future<Match?> getMatch(String matchId) async {
@@ -43,6 +46,25 @@ class MatchRepositoryImpl implements MatchRepository {
 
   @override
   Future<void> updateMatch(Match match) async {
+    final currentDoc = await _matchesRef.doc(match.id).get();
+    final currentData = currentDoc.data();
+    if (currentData != null) {
+      final currentTeamSize = normalizeMatchTeamSize(
+        (currentData['teamSize'] as num?)?.toInt(),
+      );
+      final nextTeamSize = normalizeMatchTeamSize(match.teamSize);
+      if (currentTeamSize != nextTeamSize) {
+        final lockedSnapshots = await _snapshotsRef
+            .where('matchId', isEqualTo: match.id)
+            .limit(1)
+            .get();
+        if (lockedSnapshots.docs.isNotEmpty) {
+          throw Exception(
+            'لا يمكن تغيير عدد اللاعبين بعد قفل أي تشكيلة لهذه المباراة.',
+          );
+        }
+      }
+    }
     final model = MatchModel.fromEntity(match);
     await _matchesRef.doc(match.id).update(model.toJson());
   }
