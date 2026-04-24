@@ -209,4 +209,29 @@ class TeamLineup {
   });
 }
 
+/// Maps a roster member to an exact position on the formation pitch.
+///
+/// [membershipId] is always a [TeamMembership.id] — never a raw playerId or
+/// guestPlayerId.  The actual player/guest identity is resolved via the
+/// membership record when building [MatchLineupEntry] instances.
+class SlotAssignment {
+  final String membershipId;
+  final String slotId;
+  final String slotRole; // 'gk', 'def', 'mid', 'att'
+  final int lineIndex;
+  final int slotIndex;
+  final double slotX;
+  final double slotY;
+
+  const SlotAssignment({
+    required this.membershipId,
+    required this.slotId,
+    required this.slotRole,
+    required this.lineIndex,
+    required this.slotIndex,
+    required this.slotX,
+    required this.slotY,
+  });
+}
+
 const Object _unset = Object();

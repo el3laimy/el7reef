@@ -83,7 +83,11 @@ class MatchFormationSection extends StatelessWidget {
                 ),
                 if (controller.isOrganizer)
                   TextButton.icon(
-                    onPressed: () => _showGuestDialog(context, side),
+                    onPressed: () => Get.snackbar(
+                      'إضافة ضيف',
+                      'استخدم محرر التشكيلة لإضافة لاعبين ضيوف.',
+                      snackPosition: SnackPosition.BOTTOM,
+                    ),
                     icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
                     label: const Text('ضيف'),
                   ),
@@ -102,9 +106,6 @@ class MatchFormationSection extends StatelessWidget {
             BenchBar(
               players: bench,
               compact: true,
-              onAddGuest: controller.isOrganizer
-                  ? () => _showGuestDialog(context, side)
-                  : null,
             ),
           ],
         ),
@@ -122,71 +123,4 @@ class MatchFormationSection extends StatelessWidget {
     );
   }
 
-  void _showGuestDialog(BuildContext context, String side) {
-    Get.dialog(_LobbyGuestDialog(controller: controller, side: side));
-  }
-}
-
-class _LobbyGuestDialog extends StatefulWidget {
-  final MatchLobbyController controller;
-  final String side;
-
-  const _LobbyGuestDialog({required this.controller, required this.side});
-
-  @override
-  State<_LobbyGuestDialog> createState() => _LobbyGuestDialogState();
-}
-
-class _LobbyGuestDialogState extends State<_LobbyGuestDialog> {
-  final _nameController = TextEditingController();
-  var _isSubmitting = false;
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (_isSubmitting) return;
-    setState(() => _isSubmitting = true);
-    final saved = await widget.controller.addGuestPlayer(
-      _nameController.text,
-      widget.side,
-    );
-    if (!mounted) return;
-    setState(() => _isSubmitting = false);
-    if (saved) {
-      Get.back();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('إضافة لاعب ضيف'),
-      content: TextField(
-        controller: _nameController,
-        decoration: const InputDecoration(labelText: 'اسم اللاعب'),
-        autofocus: true,
-        onSubmitted: (_) => _submit(),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _isSubmitting ? null : () => Get.back(),
-          child: const Text('إلغاء'),
-        ),
-        FilledButton(
-          onPressed: _isSubmitting ? null : _submit,
-          child: _isSubmitting
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('إضافة'),
-        ),
-      ],
-    );
-  }
 }

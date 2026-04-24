@@ -15,6 +15,14 @@ class MatchLineupEntryModel {
   final String displayName;
   final String? position;
 
+  // ── Slot assignment (nullable for backward compatibility) ──
+  final String? slotId;
+  final String? slotRole;
+  final int? lineIndex;
+  final int? slotIndex;
+  final double? slotX;
+  final double? slotY;
+
   const MatchLineupEntryModel({
     required this.attendanceId,
     this.teamMembershipId,
@@ -26,6 +34,12 @@ class MatchLineupEntryModel {
     required this.attendanceStatus,
     required this.displayName,
     this.position,
+    this.slotId,
+    this.slotRole,
+    this.lineIndex,
+    this.slotIndex,
+    this.slotX,
+    this.slotY,
   });
 
   factory MatchLineupEntryModel.fromJson(Map<String, dynamic> json) {
@@ -54,6 +68,12 @@ class MatchLineupEntryModel {
       ),
       displayName: json['displayName'] as String? ?? '',
       position: json['position'] as String?,
+      slotId: json['slotId'] as String?,
+      slotRole: json['slotRole'] as String?,
+      lineIndex: (json['lineIndex'] as num?)?.toInt(),
+      slotIndex: (json['slotIndex'] as num?)?.toInt(),
+      slotX: (json['slotX'] as num?)?.toDouble(),
+      slotY: (json['slotY'] as num?)?.toDouble(),
     );
   }
 
@@ -69,6 +89,12 @@ class MatchLineupEntryModel {
       'attendanceStatus': attendanceStatus.name,
       'displayName': displayName,
       'position': position,
+      'slotId': slotId,
+      'slotRole': slotRole,
+      'lineIndex': lineIndex,
+      'slotIndex': slotIndex,
+      'slotX': slotX,
+      'slotY': slotY,
     };
   }
 
@@ -84,6 +110,12 @@ class MatchLineupEntryModel {
       attendanceStatus: attendanceStatus,
       displayName: displayName,
       position: position,
+      slotId: slotId,
+      slotRole: slotRole,
+      lineIndex: lineIndex,
+      slotIndex: slotIndex,
+      slotX: slotX,
+      slotY: slotY,
     );
   }
 
@@ -99,6 +131,12 @@ class MatchLineupEntryModel {
       attendanceStatus: entry.attendanceStatus,
       displayName: entry.displayName,
       position: entry.position,
+      slotId: entry.slotId,
+      slotRole: entry.slotRole,
+      lineIndex: entry.lineIndex,
+      slotIndex: entry.slotIndex,
+      slotX: entry.slotX,
+      slotY: entry.slotY,
     );
   }
 }

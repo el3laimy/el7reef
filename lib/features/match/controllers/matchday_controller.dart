@@ -500,6 +500,51 @@ class MatchdayController extends GetxController {
     return attendanceId;
   }
 
+  /// Whether the current lineup can be unlocked for re-editing.
+  /// Allowed only when lineup is locked, match is not completed/settled, and
+  /// not frozen.
+  bool get canUnlockLineup =>
+      isLineupLocked &&
+      match.value?.status != MatchStatus.completed &&
+      match.value?.status != MatchStatus.settled &&
+      match.value?.isFrozen != true;
+
+  /// Deletes the active snapshot so the lineup can be re-edited.
+  Future<void> unlockLineup() async {
+    final snapshot = activeSnapshot.value;
+    if (snapshot == null) return;
+
+    try {
+      isSubmitting.value = true;
+      await _snapshotRepository.deleteSnapshot(snapshot.id);
+      activeSnapshot.value = null;
+      _showSnack('تم فك القفل', 'يمكنك تعديل التشكيلة من جديد.');
+      await _loadSelectedSideState();
+    } catch (error) {
+      _showErrorSnack(error);
+    } finally {
+      isSubmitting.value = false;
+    }
+  }
+
+  /// Navigates to TeamLineupEditorScreen for the currently selected
+  /// registered team. Guest teams use the in-place matchday editor.
+  void openLineupEditor() {
+    final side = selectedSide;
+    if (side == null) return;
+
+    if (side.isRegisteredTeam) {
+      Get.toNamed(
+        '/match/$matchId/lineup/${side.teamId!}',
+      );
+    } else {
+      _showSnack(
+        'فريق ضيف',
+        'استخدم محرر التشكيلة الحالي لإدارة الفريق الضيف.',
+      );
+    }
+  }
+
   Future<List<MatchdayManagedSide>> _discoverManagedSides({
     required Match match,
     required Tournament? tournament,

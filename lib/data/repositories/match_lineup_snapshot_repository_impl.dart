@@ -73,4 +73,9 @@ class MatchLineupSnapshotRepositoryImpl
     final doc = snapshot.docs.first;
     return MatchLineupSnapshotModel.fromJson(doc.data(), doc.id).toEntity();
   }
+
+  @override
+  Future<void> deleteSnapshot(String snapshotId) async {
+    await _snapshotsRef.doc(snapshotId).delete();
+  }
 }

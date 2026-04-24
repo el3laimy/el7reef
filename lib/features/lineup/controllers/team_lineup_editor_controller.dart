@@ -361,6 +361,7 @@ class TeamLineupEditorController extends GetxController {
         allowIncompleteFriendlyLineup: allowIncompleteFriendlyLineup,
         formationCode: formationCode.value,
         formationLabel: formationCode.value,
+        slotAssignments: _buildSlotAssignments(),
       );
       confirmedSnapshot.value = result.snapshot;
       _seedFromSnapshot(result.snapshot);
@@ -440,15 +441,40 @@ class TeamLineupEditorController extends GetxController {
     final lineupPlayers = snapshot.starters
         .map(_playerFromSnapshotEntry)
         .toList(growable: false);
-    final generated = FormationEngine.generateFormationSlots(
-      playerCount: count,
-      formationCode: code,
+
+    // If snapshot carries exact slot positions, use them directly.
+    final hasSavedSlots = snapshot.starters.any(
+      (entry) => entry.hasSlotAssignment,
     );
-    final assigned = LineupUtils.assignPlayersToGeneratedSlots(
-      slots: generated,
-      starters: lineupPlayers,
-    );
-    slots.assignAll(assigned.slots);
+    if (hasSavedSlots) {
+      slots.assignAll(
+        snapshot.starters.map((entry) {
+          final player = _playerFromSnapshotEntry(entry);
+          return FormationSlot(
+            id: entry.slotId!,
+            role: _parseSlotRole(entry.slotRole),
+            lineIndex: entry.lineIndex ?? 0,
+            slotIndex: entry.slotIndex ?? 0,
+            x: entry.slotX ?? 50,
+            y: entry.slotY ?? 50,
+            playerId: player.isRegistered ? player.id : null,
+            guestPlayerId: player.isGuest ? player.id : null,
+          );
+        }).toList(growable: false),
+      );
+    } else {
+      // Legacy fallback: auto-assign players to generated formation.
+      final generated = FormationEngine.generateFormationSlots(
+        playerCount: count,
+        formationCode: code,
+      );
+      final assigned = LineupUtils.assignPlayersToGeneratedSlots(
+        slots: generated,
+        starters: lineupPlayers,
+      );
+      slots.assignAll(assigned.slots);
+    }
+
     members.assignAll(
       [...snapshot.starters, ...snapshot.bench].map((entry) {
         final player = _playerFromSnapshotEntry(entry);
@@ -468,6 +494,14 @@ class TeamLineupEditorController extends GetxController {
         );
       }),
     );
+  }
+
+  SlotRole _parseSlotRole(String? raw) {
+    if (raw == null) return SlotRole.mid;
+    for (final role in SlotRole.values) {
+      if (role.name == raw) return role;
+    }
+    return SlotRole.mid;
   }
 
   TeamLineupEditorMember _memberFromMembership(
@@ -508,6 +542,27 @@ class TeamLineupEditorController extends GetxController {
       preferredPosition: entry.position,
       isRegistered: !entry.isGuest,
     );
+  }
+
+  /// Builds [SlotAssignment] list from the current pitch slots, mapping each
+  /// occupied slot to the corresponding membership ID.
+  List<SlotAssignment> _buildSlotAssignments() {
+    final assignments = <SlotAssignment>[];
+    for (final slot in slots) {
+      final occupantKey = slot.occupantKey;
+      if (occupantKey == null) continue;
+      // occupantKey is the membership ID (registered player) or guest player ID.
+      assignments.add(SlotAssignment(
+        membershipId: occupantKey,
+        slotId: slot.id,
+        slotRole: slot.role.name,
+        lineIndex: slot.lineIndex,
+        slotIndex: slot.slotIndex,
+        slotX: slot.x,
+        slotY: slot.y,
+      ));
+    }
+    return assignments;
   }
 
   String _readableError(Object error) {

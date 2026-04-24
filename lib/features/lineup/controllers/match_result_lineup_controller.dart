@@ -138,6 +138,16 @@ class MatchResultLineupController extends GetxController {
         formationCode: getDefaultFormation(count),
       );
     }
+
+    // If snapshot carries saved slot assignments, render exact positions.
+    final hasSavedSlots = snapshot.starters.any(
+      (entry) => entry.hasSlotAssignment,
+    );
+    if (hasSavedSlots) {
+      return _slotsFromSavedAssignment(snapshot);
+    }
+
+    // Legacy fallback: auto-assign players to generated formation slots.
     final count = playerCountForSnapshot(snapshot);
     final formation = formationForSnapshot(snapshot);
     final generated = FormationEngine.generateFormationSlots(
@@ -149,6 +159,32 @@ class MatchResultLineupController extends GetxController {
       slots: generated,
       starters: starters,
     ).slots;
+  }
+
+  /// Builds [FormationSlot] instances from the exact positions saved inside
+  /// each [MatchLineupEntry] of the snapshot.
+  List<FormationSlot> _slotsFromSavedAssignment(MatchLineupSnapshot snapshot) {
+    return snapshot.starters.map((entry) {
+      final player = _lineupPlayerFromEntry(entry);
+      return FormationSlot(
+        id: entry.slotId!,
+        role: _parseSlotRole(entry.slotRole),
+        lineIndex: entry.lineIndex ?? 0,
+        slotIndex: entry.slotIndex ?? 0,
+        x: entry.slotX ?? 0.5,
+        y: entry.slotY ?? 0.5,
+        playerId: player.isRegistered ? player.id : null,
+        guestPlayerId: player.isGuest ? player.id : null,
+      );
+    }).toList(growable: false);
+  }
+
+  SlotRole _parseSlotRole(String? raw) {
+    if (raw == null) return SlotRole.mid;
+    for (final role in SlotRole.values) {
+      if (role.name == raw) return role;
+    }
+    return SlotRole.mid;
   }
 
   List<LineupPlayer> benchForSnapshot(MatchLineupSnapshot? snapshot) {

@@ -5,6 +5,7 @@ import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/constants/feature_flags.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../core/widgets/rank_tier_badge.dart';
 import '../../../core/widgets/loading_shimmer.dart';
@@ -244,22 +245,23 @@ class _HomeTab extends StatelessWidget {
                       Row(
                         children: [
                           _actionCard(
-                            '⚽', 'ابحث عن\nمباراة', AppColors.primary,
-                            () => Get.toNamed(AppRoutes.findMatch),
+                            '⚽', 'المباريات', AppColors.primary,
+                            () => onNavigateToTab(1),
                           ),
                           const SizedBox(width: AppDimensions.md),
                           _actionCard(
-                            '🏆', 'أنشئ\nدورة', AppColors.secondary,
-                            () => Get.toNamed(AppRoutes.tournamentList),
+                            '🏆', 'البطولات', AppColors.secondary,
+                            () => onNavigateToTab(2),
                           ),
                           const SizedBox(width: AppDimensions.md),
                           _actionCard(
-                            '👥', 'أنشئ\nفريق', AppColors.accent,
-                            () => Get.toNamed(AppRoutes.myTeams),
+                            '👥', 'فرقي', AppColors.accent,
+                            () => onNavigateToTab(3),
                           ),
                         ],
                       ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.1),
                       const SizedBox(height: AppDimensions.md),
+                      if (FeatureFlags.fantasyUiEnabled) ...[
                       Row(
                         children: [
                           _actionCard(
@@ -290,6 +292,7 @@ class _HomeTab extends StatelessWidget {
                           ),
                         ],
                       ).animate().fadeIn(delay: 560.ms).slideY(begin: 0.1),
+                      ],
                     ],
                   ),
                 ),

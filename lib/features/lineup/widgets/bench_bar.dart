@@ -9,21 +9,25 @@ class BenchBar extends StatelessWidget {
   final List<LineupPlayer> players;
   final ValueChanged<LineupPlayer>? onPlayerTap;
   final VoidCallback? onAddGuest;
+  final ValueChanged<LineupPlayer>? onPlayerDroppedOnBench;
   final String title;
   final bool compact;
+  final bool draggable;
 
   const BenchBar({
     super.key,
     required this.players,
     this.onPlayerTap,
     this.onAddGuest,
+    this.onPlayerDroppedOnBench,
     this.title = 'البدلاء',
     this.compact = false,
+    this.draggable = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    Widget content = Container(
       padding: const EdgeInsets.all(AppDimensions.md),
       decoration: BoxDecoration(
         color: const Color(0xFF101A28).withValues(alpha: 0.92),
@@ -86,26 +90,68 @@ class BenchBar extends StatelessWidget {
             )
           else
             SizedBox(
-              height: compact ? 74 : 86,
+              height: compact ? 80 : 95,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: players.length,
                 separatorBuilder: (context, index) => const SizedBox(width: 10),
                 itemBuilder: (context, index) {
                   final player = players[index];
-                  return _BenchPlayerCard(
+                  Widget card = _BenchPlayerCard(
                     player: player,
                     compact: compact,
                     onTap: onPlayerTap == null
                         ? null
                         : () => onPlayerTap!(player),
                   );
+                  if (draggable) {
+                    card = Draggable<LineupPlayer>(
+                      data: player,
+                      feedback: Material(
+                        color: Colors.transparent,
+                        child: SizedBox(
+                          width: compact ? 82 : 96,
+                          child: Opacity(opacity: 0.85, child: card),
+                        ),
+                      ),
+                      childWhenDragging: Opacity(opacity: 0.3, child: card),
+                      child: card,
+                    );
+                  }
+                  return card;
                 },
               ),
             ),
         ],
       ),
     );
+
+    // Wrap entire bench area in DragTarget so players can be dropped back.
+    if (onPlayerDroppedOnBench != null) {
+      final targetChild = content;
+      content = DragTarget<LineupPlayer>(
+        onAcceptWithDetails: (details) {
+          onPlayerDroppedOnBench!(details.data);
+        },
+        builder: (context, candidateData, rejectedData) {
+          if (candidateData.isNotEmpty) {
+            return Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+                border: Border.all(
+                  color: AppColors.warning.withValues(alpha: 0.6),
+                  width: 2,
+                ),
+              ),
+              child: targetChild,
+            );
+          }
+          return targetChild;
+        },
+      );
+    }
+
+    return content;
   }
 }
 
@@ -171,6 +217,7 @@ class _BenchPlayerCard extends StatelessWidget {
               style: AppTextStyles.labelSmall.copyWith(
                 color: AppColors.textPrimary,
                 fontWeight: FontWeight.w700,
+                fontSize: compact ? 10 : 11,
                 letterSpacing: 0,
               ),
               maxLines: 1,

@@ -1,3 +1,4 @@
+import '../../core/enums/lineup_requirement.dart';
 import '../../core/enums/match_status.dart';
 import '../../core/enums/tournament_ops_enums.dart';
 
@@ -34,6 +35,7 @@ class Match {
   final DateTime? publishedAt;
   final String? venueId;
   final FixtureStatus fixtureStatus;
+  final LineupRequirement lineupRequirement;
   final DateTime createdAt;
   final DateTime? startedAt;
   final DateTime? completedAt;
@@ -70,6 +72,7 @@ class Match {
     this.publishedAt,
     this.venueId,
     this.fixtureStatus = FixtureStatus.draft,
+    this.lineupRequirement = LineupRequirement.none,
     required this.createdAt,
     this.startedAt,
     this.completedAt,
@@ -132,6 +135,7 @@ class Match {
     DateTime? publishedAt,
     String? venueId,
     FixtureStatus? fixtureStatus,
+    LineupRequirement? lineupRequirement,
     DateTime? createdAt,
     DateTime? startedAt,
     DateTime? completedAt,
@@ -168,6 +172,7 @@ class Match {
       publishedAt: publishedAt ?? this.publishedAt,
       venueId: venueId ?? this.venueId,
       fixtureStatus: fixtureStatus ?? this.fixtureStatus,
+      lineupRequirement: lineupRequirement ?? this.lineupRequirement,
       createdAt: createdAt ?? this.createdAt,
       startedAt: startedAt ?? this.startedAt,
       completedAt: completedAt ?? this.completedAt,

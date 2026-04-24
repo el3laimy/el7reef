@@ -7,6 +7,7 @@ import '../../../data/repositories/match_invitation_repository_impl.dart';
 import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
 import '../../../data/repositories/friend_repository_impl.dart';
 import '../../../data/repositories/player_repository_impl.dart';
+import '../../../core/services/match_start_service.dart';
 import '../../social/controllers/friend_controller.dart';
 
 class MatchLobbyBinding extends Bindings {
@@ -27,6 +28,12 @@ class MatchLobbyBinding extends Bindings {
     }
     if (!Get.isRegistered<MatchLineupSnapshotRepositoryImpl>()) {
       Get.lazyPut(() => MatchLineupSnapshotRepositoryImpl());
+    }
+    if (!Get.isRegistered<MatchStartService>()) {
+      Get.lazyPut(() => MatchStartService(
+        matchRepo: Get.find<MatchRepository>(),
+        snapshotRepo: Get.find<MatchLineupSnapshotRepositoryImpl>(),
+      ));
     }
     if (!Get.isRegistered<FriendRepositoryImpl>()) {
       Get.put(FriendRepositoryImpl());

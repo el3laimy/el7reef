@@ -1,0 +1,142 @@
+import '../../core/enums/lineup_requirement.dart';
+import '../../core/enums/match_status.dart';
+import '../../domain/entities/match.dart';
+import '../../domain/entities/match_lineup_snapshot.dart';
+import '../../domain/repositories/match_repository.dart';
+import '../../data/repositories/match_lineup_snapshot_repository_impl.dart';
+
+/// Readiness assessment for starting a match.
+class MatchStartReadiness {
+  final bool canStart;
+  final List<String> blockedReasons;
+
+  const MatchStartReadiness({
+    required this.canStart,
+    this.blockedReasons = const [],
+  });
+}
+
+/// Validates pre-conditions and transitions a match to [MatchStatus.live].
+///
+/// Centralizes all start-match logic so that neither [MatchLobbyController] nor
+/// any other caller can bypass lineup / check-in requirements.
+class MatchStartService {
+  final MatchRepository _matchRepo;
+  final MatchLineupSnapshotRepositoryImpl _snapshotRepo;
+
+  MatchStartService({
+    required MatchRepository matchRepo,
+    required MatchLineupSnapshotRepositoryImpl snapshotRepo,
+  }) : _matchRepo = matchRepo,
+       _snapshotRepo = snapshotRepo;
+
+  /// Returns a readiness assessment without mutating state.  Use this from the
+  /// UI to show why the start button is disabled.
+  Future<MatchStartReadiness> getStartReadiness({
+    required String matchId,
+    required String actorId,
+  }) async {
+    final match = await _matchRepo.getMatch(matchId);
+    if (match == null) {
+      return const MatchStartReadiness(
+        canStart: false,
+        blockedReasons: ['المباراة غير موجودة.'],
+      );
+    }
+    final reasons = await _collectBlockedReasons(
+      match: match,
+      actorId: actorId,
+    );
+    return MatchStartReadiness(
+      canStart: reasons.isEmpty,
+      blockedReasons: reasons,
+    );
+  }
+
+  /// Validates and starts the match.  Throws if any pre-condition fails.
+  Future<Match> startMatch({
+    required String matchId,
+    required String actorId,
+  }) async {
+    final match = await _matchRepo.getMatch(matchId);
+    if (match == null) {
+      throw Exception('المباراة غير موجودة.');
+    }
+    final reasons = await _collectBlockedReasons(
+      match: match,
+      actorId: actorId,
+    );
+    if (reasons.isNotEmpty) {
+      throw Exception(reasons.first);
+    }
+
+    final now = DateTime.now();
+    final updated = match.copyWith(
+      status: MatchStatus.live,
+      startedAt: now,
+    );
+    await _matchRepo.updateMatch(updated);
+    return updated;
+  }
+
+  Future<List<String>> _collectBlockedReasons({
+    required Match match,
+    required String actorId,
+  }) async {
+    final reasons = <String>[];
+
+    // 1. Actor must be the organizer.
+    if (match.organizerId != actorId) {
+      reasons.add('فقط منشئ المباراة يمكنه بدء المباراة.');
+    }
+
+    // 2. Match must be in a startable status.
+    if (match.status != MatchStatus.open &&
+        match.status != MatchStatus.full) {
+      reasons.add('حالة المباراة لا تسمح ببدء الآن.');
+    }
+
+    // 3. Match must not be frozen.
+    if (match.isFrozen) {
+      reasons.add('المباراة مجمّدة.');
+    }
+
+    // 4. Lineup requirements.
+    final requirement = match.lineupRequirement;
+    if (requirement == LineupRequirement.required) {
+      final snapshots = await _snapshotRepo.getMatchSnapshots(match.id);
+      final hasTeamALineup = _hasLineupForSide(
+        snapshots: snapshots,
+        teamId: match.teamAId,
+      );
+      final hasTeamBLineup = _hasLineupForSide(
+        snapshots: snapshots,
+        teamId: match.teamBId,
+      );
+      if (!hasTeamALineup) {
+        reasons.add('تشكيلة الفريق الأول غير مقفولة.');
+      }
+      if (!hasTeamBLineup) {
+        reasons.add('تشكيلة الفريق الثاني غير مقفولة.');
+      }
+    }
+
+    // 5. Both sides must have players (at minimum).
+    if (match.teamAPlayerIds.isEmpty && match.teamAId == null) {
+      reasons.add('الفريق الأول ليس له لاعبين.');
+    }
+    if (match.teamBPlayerIds.isEmpty && match.teamBId == null) {
+      reasons.add('الفريق الثاني ليس له لاعبين.');
+    }
+
+    return reasons;
+  }
+
+  bool _hasLineupForSide({
+    required List<MatchLineupSnapshot> snapshots,
+    required String? teamId,
+  }) {
+    if (teamId == null) return false;
+    return snapshots.any((snapshot) => snapshot.teamId == teamId);
+  }
+}

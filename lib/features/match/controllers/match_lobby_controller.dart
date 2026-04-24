@@ -10,8 +10,8 @@ import '../../../data/repositories/player_repository_impl.dart';
 import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
 import '../../../services/auth_service.dart';
 import '../../../core/enums/match_status.dart';
+import '../../../core/services/match_start_service.dart';
 import '../../../core/lineup/formation_library.dart';
-import '../../../core/enums/user_role.dart';
 import '../../../core/utils/app_logger.dart';
 
 /// Controller لشاشة لوبي المباراة
@@ -27,15 +27,18 @@ class MatchLobbyController extends GetxController {
   final _authService = Get.find<AuthService>();
   final _playerRepo = Get.find<PlayerRepositoryImpl>();
   final _snapshotRepo = Get.find<MatchLineupSnapshotRepositoryImpl>();
+  final _matchStartService = Get.find<MatchStartService>();
 
   // ── State ──
   final Rx<Match?> match = Rx<Match?>(null);
   final RxList<Player> teamAPlayers = <Player>[].obs;
   final RxList<Player> teamBPlayers = <Player>[].obs;
   final RxList<MatchInvitation> sentInvitations = <MatchInvitation>[].obs;
-  final RxMap<String, Offset> playerPositions = <String, Offset>{}.obs;
   final RxBool isLoading = true.obs;
   final RxBool hasLockedSnapshots = false.obs;
+  final Rx<MatchStartReadiness> startReadiness = Rx<MatchStartReadiness>(
+    const MatchStartReadiness(canStart: false),
+  );
 
   String get inviteLink => 'el7reef://match/join/$matchId';
   String? get currentUserId => _authService.currentUserId;
@@ -70,6 +73,13 @@ class MatchLobbyController extends GetxController {
         _loadInvitations(),
         _loadSnapshotState(),
       ]);
+      // Load start readiness for UI disabled-reasons display.
+      if (currentUserId != null) {
+        startReadiness.value = await _matchStartService.getStartReadiness(
+          matchId: matchId,
+          actorId: currentUserId!,
+        );
+      }
     } catch (e) {
       AppLogger.error('MatchLobbyController._loadMatch', e);
       Get.snackbar('خطأ', 'فشل تحميل بيانات المباراة');
@@ -115,10 +125,11 @@ class MatchLobbyController extends GetxController {
     final m = match.value;
     if (m == null) return;
     try {
-      await _matchRepo.updateMatch(
-        m.copyWith(status: MatchStatus.live, startedAt: DateTime.now()),
+      final started = await _matchStartService.startMatch(
+        matchId: matchId,
+        actorId: currentUserId!,
       );
-      match.value = m.copyWith(status: MatchStatus.live);
+      match.value = started;
       Get.snackbar(
         'بدأت المباراة ⚽',
         'تم بدء المباراة!',
@@ -126,7 +137,7 @@ class MatchLobbyController extends GetxController {
       );
     } catch (e) {
       AppLogger.error('MatchLobbyController.startMatch', e);
-      Get.snackbar('خطأ', 'فشل بدء المباراة');
+      Get.snackbar('خطأ', e.toString());
     }
   }
 
@@ -213,53 +224,9 @@ class MatchLobbyController extends GetxController {
     }
   }
 
-  /// إضافة لاعب ضيف (Guest)
-  Future<bool> addGuestPlayer(String name, String side) async {
-    try {
-      final trimmed = name.trim();
-      if (trimmed.isEmpty) {
-        Get.snackbar('خطأ', 'اسم اللاعب الضيف مطلوب.');
-        return false;
-      }
-      final guestId = const Uuid().v4();
-      final guestPlayer = Player(
-        id: guestId,
-        name: trimmed,
-        isGuest: true,
-        role: UserRole.player,
-        createdAt: DateTime.now(),
-        lastActiveAt: DateTime.now(),
-      );
-
-      // Save to players collection
-      await _playerRepo.createPlayer(guestPlayer);
-
-      // Add to match
-      await _matchRepo.addPlayerToMatch(
-        matchId: matchId,
-        playerId: guestId,
-        side: side,
-      );
-
-      if (side == 'A') {
-        teamAPlayers.add(guestPlayer);
-      } else {
-        teamBPlayers.add(guestPlayer);
-      }
-
-      Get.snackbar(
-        'تم',
-        'تم إضافة اللاعب الضيف $trimmed بنجاح',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      await _refreshMatch();
-      return true;
-    } catch (e) {
-      AppLogger.error('MatchLobbyController.addGuestPlayer', e);
-      Get.snackbar('خطأ', 'فشل إضافة اللاعب الضيف');
-      return false;
-    }
-  }
+  // Guest players should be added through TeamLineupEditor using the
+  // GuestPlayer + TeamMembership flow.  The old addGuestPlayer() method
+  // that created Player(isGuest: true) has been removed (Phase 4).
 
   /// إزالة لاعب من فريق
   Future<void> removePlayer(String playerId, String side) async {
@@ -339,15 +306,5 @@ class MatchLobbyController extends GetxController {
     final m = await _matchRepo.getMatch(matchId);
     if (m != null) match.value = m;
     await _loadSnapshotState();
-  }
-
-  /// تحديث موقع اللاعب في خطة اللعب
-  void updatePlayerPosition(String playerId, Offset position) {
-    playerPositions[playerId] = position;
-  }
-
-  /// إعادة تعيين خطة اللعب
-  void resetFormation() {
-    playerPositions.clear();
   }
 }

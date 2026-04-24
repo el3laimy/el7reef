@@ -77,15 +77,23 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
                         _showPlayerActions(context, player),
                     onPlayerLongPress: (slot, player) =>
                         _showPlayerActions(context, player),
+                    onPlayerDrop: controller.canEdit
+                        ? (slot, player) =>
+                            controller.assignPlayerToSlot(player, slot)
+                        : null,
                   ),
                   const SizedBox(height: AppDimensions.md),
                   BenchBar(
                     players: controller.benchPlayers,
+                    draggable: controller.canEdit,
                     onPlayerTap: controller.canEdit
                         ? (player) => _assignBenchPlayer(context, player)
                         : null,
                     onAddGuest: controller.canEdit
                         ? () => _showGuestDialog(context)
+                        : null,
+                    onPlayerDroppedOnBench: controller.canEdit
+                        ? (player) => controller.movePlayerToBench(player)
                         : null,
                   ),
                   const SizedBox(height: AppDimensions.md),

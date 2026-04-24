@@ -6,6 +6,7 @@ import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/enums/match_status.dart';
 import '../../../core/lineup/formation_library.dart';
+import '../../../core/services/match_start_service.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../core/widgets/qr_code_widget.dart';
 import '../../../domain/entities/player.dart';
@@ -13,7 +14,7 @@ import '../controllers/match_lobby_controller.dart';
 import '../widgets/invite_friends_sheet.dart';
 import '../widgets/match_formation_section.dart';
 
-/// شاشة لوبي المباراة — إدارة اللاعبين + QR + بدء المباراة
+/// شاشة لوبي المباراة — مركز العمليات الشامل (Match Dashboard)
 class MatchLobbyScreen extends GetView<MatchLobbyController> {
   const MatchLobbyScreen({super.key});
 
@@ -53,6 +54,7 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
             }
 
             final isOpen = match.status == MatchStatus.open;
+            final readiness = controller.startReadiness.value;
 
             return RefreshIndicator(
               onRefresh: controller.refresh,
@@ -118,6 +120,15 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                       ).animate().fadeIn(duration: 400.ms),
                     ),
                   ),
+
+                  // ── Readiness Stepper ──
+                  if (isOpen && controller.isOrganizer)
+                    SliverToBoxAdapter(
+                      child: _ReadinessStepper(readiness: readiness)
+                          .animate()
+                          .fadeIn(delay: 150.ms)
+                          .slideY(begin: 0.05),
+                    ),
 
                   // ── QR Code + رابط الدعوة ──
                   if (isOpen)
@@ -192,9 +203,9 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                     child: SizedBox(height: AppDimensions.lg),
                   ),
 
-                  // ── فريق A ──
+                  // ── فريق A (Collapsible) ──
                   SliverToBoxAdapter(
-                    child: _TeamSection(
+                    child: _CollapsibleTeamSection(
                       title: '🔵 فريق A',
                       players: controller.teamAPlayers,
                       side: 'A',
@@ -218,9 +229,9 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                     child: SizedBox(height: AppDimensions.md),
                   ),
 
-                  // ── فريق B ──
+                  // ── فريق B (Collapsible) ──
                   SliverToBoxAdapter(
-                    child: _TeamSection(
+                    child: _CollapsibleTeamSection(
                       title: '🔴 فريق B',
                       players: controller.teamBPlayers,
                       side: 'B',
@@ -255,7 +266,7 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                     child: SizedBox(height: AppDimensions.xl),
                   ),
 
-                  // ── أزرار الإجراءات ──
+                  // ── Sticky Start Action ──
                   if (controller.isOrganizer)
                     SliverToBoxAdapter(
                       child: Padding(
@@ -268,12 +279,22 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
-                                  onPressed: controller.startMatch,
+                                  onPressed: readiness.canStart
+                                      ? controller.startMatch
+                                      : null,
                                   icon: const Icon(Icons.play_arrow_rounded),
-                                  label: const Text('ابدأ المباراة ⚽'),
+                                  label: Text(
+                                    readiness.canStart
+                                        ? 'ابدأ المباراة ⚽'
+                                        : 'غير جاهز للبدء',
+                                  ),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.success,
-                                    foregroundColor: Colors.white,
+                                    backgroundColor: readiness.canStart
+                                        ? AppColors.success
+                                        : AppColors.surfaceBorder,
+                                    foregroundColor: readiness.canStart
+                                        ? Colors.white
+                                        : AppColors.textMuted,
                                     padding: const EdgeInsets.symmetric(
                                       vertical: AppDimensions.md,
                                     ),
@@ -352,6 +373,82 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
   }
 }
 
+/// ── Readiness Stepper ──
+/// Shows why the match can't start yet, or confirms it's ready.
+class _ReadinessStepper extends StatelessWidget {
+  final MatchStartReadiness readiness;
+
+  const _ReadinessStepper({required this.readiness});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimensions.pagePadding,
+      ),
+      child: GlassmorphicContainer(
+        padding: const EdgeInsets.all(AppDimensions.md),
+        borderRadius: AppDimensions.radiusLg,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  readiness.canStart
+                      ? Icons.check_circle_rounded
+                      : Icons.info_outline_rounded,
+                  color: readiness.canStart
+                      ? AppColors.success
+                      : AppColors.warning,
+                  size: 20,
+                ),
+                const SizedBox(width: AppDimensions.sm),
+                Text(
+                  readiness.canStart ? 'جاهز للبدء ✅' : 'متطلبات البدء',
+                  style: AppTextStyles.titleMedium.copyWith(
+                    color: readiness.canStart
+                        ? AppColors.success
+                        : AppColors.warning,
+                  ),
+                ),
+              ],
+            ),
+            if (!readiness.canStart) ...[
+              const SizedBox(height: AppDimensions.sm),
+              ...readiness.blockedReasons.map(
+                (reason) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.block_rounded,
+                        size: 14,
+                        color: AppColors.error,
+                      ),
+                      const SizedBox(width: AppDimensions.xs),
+                      Expanded(
+                        child: Text(
+                          reason,
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// ── Settings Sheet ──
 class _MatchSettingsSheet extends StatelessWidget {
   final MatchLobbyController controller;
 
@@ -450,8 +547,8 @@ class _MatchSettingsSheet extends StatelessWidget {
   }
 }
 
-/// ── قسم الفريق ──
-class _TeamSection extends StatelessWidget {
+/// ── Collapsible Team Section ──
+class _CollapsibleTeamSection extends StatefulWidget {
   final String title;
   final RxList<Player> players;
   final String side;
@@ -460,7 +557,7 @@ class _TeamSection extends StatelessWidget {
   final void Function(String playerId) onRemove;
   final VoidCallback onInvite;
 
-  const _TeamSection({
+  const _CollapsibleTeamSection({
     required this.title,
     required this.players,
     required this.side,
@@ -469,6 +566,14 @@ class _TeamSection extends StatelessWidget {
     required this.onRemove,
     required this.onInvite,
   });
+
+  @override
+  State<_CollapsibleTeamSection> createState() =>
+      _CollapsibleTeamSectionState();
+}
+
+class _CollapsibleTeamSectionState extends State<_CollapsibleTeamSection> {
+  bool _expanded = true;
 
   @override
   Widget build(BuildContext context) {
@@ -482,65 +587,88 @@ class _TeamSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Text(title, style: AppTextStyles.titleLarge),
-                const Spacer(),
-                if (isOpen)
-                  TextButton.icon(
-                    onPressed: onInvite,
-                    icon: const Icon(Icons.person_add_alt_1, size: 18),
-                    label: const Text('دعوة'),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
+              child: Row(
+                children: [
+                  Text(widget.title, style: AppTextStyles.titleLarge),
+                  const Spacer(),
+                  if (widget.isOpen)
+                    TextButton.icon(
+                      onPressed: widget.onInvite,
+                      icon: const Icon(Icons.person_add_alt_1, size: 18),
+                      label: const Text('دعوة'),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
                     ),
-                  ),
-                const SizedBox(width: AppDimensions.sm),
-                Obx(
-                  () => Text(
-                    '${players.length} لاعب',
-                    style: AppTextStyles.labelMedium.copyWith(
-                      color: AppColors.textMuted,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppDimensions.sm),
-            Obx(() {
-              if (players.isEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: AppDimensions.md,
-                  ),
-                  child: Center(
-                    child: Text(
-                      'لا يوجد لاعبين بعد',
-                      style: AppTextStyles.bodySmall.copyWith(
+                  const SizedBox(width: AppDimensions.sm),
+                  Obx(
+                    () => Text(
+                      '${widget.players.length} لاعب',
+                      style: AppTextStyles.labelMedium.copyWith(
                         color: AppColors.textMuted,
                       ),
                     ),
                   ),
-                );
-              }
-              return Column(
-                children: players
-                    .map(
-                      (player) => _PlayerTile(
-                        player: player,
-                        canRemove: isOrganizer && isOpen,
-                        onRemove: () => onRemove(player.id),
-                      ),
-                    )
-                    .toList(),
-              );
-            }),
+                  const SizedBox(width: 4),
+                  AnimatedRotation(
+                    turns: _expanded ? 0 : -0.25,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(
+                      Icons.expand_more_rounded,
+                      color: AppColors.textMuted,
+                      size: 20,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            AnimatedCrossFade(
+              firstChild: _buildPlayerList(),
+              secondChild: const SizedBox.shrink(),
+              crossFadeState: _expanded
+                  ? CrossFadeState.showFirst
+                  : CrossFadeState.showSecond,
+              duration: const Duration(milliseconds: 250),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildPlayerList() {
+    return Obx(() {
+      if (widget.players.isEmpty) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppDimensions.md),
+          child: Center(
+            child: Text(
+              'لا يوجد لاعبين بعد',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textMuted,
+              ),
+            ),
+          ),
+        );
+      }
+      return Column(
+        children: [
+          const SizedBox(height: AppDimensions.sm),
+          ...widget.players.map(
+            (player) => _PlayerTile(
+              player: player,
+              canRemove: widget.isOrganizer && widget.isOpen,
+              onRemove: () => widget.onRemove(player.id),
+            ),
+          ),
+        ],
+      );
+    });
   }
 }
 

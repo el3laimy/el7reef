@@ -10,6 +10,7 @@ import '../../core/enums/team_membership_role.dart';
 import '../../core/enums/team_membership_status.dart';
 import '../../core/enums/tournament_registration_status.dart';
 import '../../core/lineup/formation_library.dart';
+import '../../core/lineup/lineup_types.dart';
 import '../../data/models/guest_player_model.dart';
 import '../../data/models/guest_team_model.dart';
 import '../../data/models/match_attendance_model.dart';
@@ -632,6 +633,7 @@ class MatchdayService {
     String? formationCode,
     String? formationLabel,
     String? notes,
+    List<SlotAssignment> slotAssignments = const [],
     DateTime? now,
   }) async {
     final effectiveNow = now ?? DateTime.now();
@@ -689,14 +691,22 @@ class MatchdayService {
           ).toEntity();
           _ensureMatchAvailableForPreKickoff(match);
 
+          final decoratedStarters = _decorateEntriesWithSlotAssignments(
+            entries: validation.starters,
+            slotAssignments: slotAssignments,
+          );
+          final decoratedBench = _decorateEntriesWithSlotAssignments(
+            entries: validation.bench,
+            slotAssignments: slotAssignments,
+          );
           final snapshot = MatchLineupSnapshot(
             id: snapshotId,
             matchId: matchId,
             teamId: teamId,
             tournamentRegistrationId: context.registration?.id,
             checkInId: validation.checkIn.id,
-            starters: validation.starters,
-            bench: validation.bench,
+            starters: decoratedStarters,
+            bench: decoratedBench,
             lockedBy: actorId,
             lockedAt: effectiveNow,
             playerCount: validation.requiredStarterCount,
@@ -738,6 +748,7 @@ class MatchdayService {
     String? formationCode,
     String? formationLabel,
     String? notes,
+    List<SlotAssignment> slotAssignments = const [],
     DateTime? now,
   }) async {
     final effectiveNow = now ?? DateTime.now();
@@ -798,14 +809,24 @@ class MatchdayService {
           ).toEntity();
           _ensureMatchAvailableForPreKickoff(match);
 
+          final decoratedStarters = _decorateEntriesWithSlotAssignments(
+            entries: validation.starters,
+            slotAssignments: slotAssignments,
+            useGuestPlayerIdAsKey: true,
+          );
+          final decoratedBench = _decorateEntriesWithSlotAssignments(
+            entries: validation.bench,
+            slotAssignments: slotAssignments,
+            useGuestPlayerIdAsKey: true,
+          );
           final snapshot = MatchLineupSnapshot(
             id: snapshotId,
             matchId: matchId,
             guestTeamId: guestTeamId,
             tournamentRegistrationId: context.registration?.id,
             checkInId: validation.checkIn.id,
-            starters: validation.starters,
-            bench: validation.bench,
+            starters: decoratedStarters,
+            bench: decoratedBench,
             lockedBy: actorId,
             lockedAt: effectiveNow,
             playerCount: validation.requiredStarterCount,
@@ -1573,6 +1594,39 @@ class MatchdayService {
       }
     }
     return entries;
+  }
+
+  /// Decorates pre-built [MatchLineupEntry] instances with pitch-position data
+  /// from [slotAssignments].  The lookup key is [teamMembershipId] by default,
+  /// or [guestPlayerId] when [useGuestPlayerIdAsKey] is true.
+  List<MatchLineupEntry> _decorateEntriesWithSlotAssignments({
+    required List<MatchLineupEntry> entries,
+    required List<SlotAssignment> slotAssignments,
+    bool useGuestPlayerIdAsKey = false,
+  }) {
+    if (slotAssignments.isEmpty) {
+      return entries;
+    }
+    final assignmentMap = <String, SlotAssignment>{
+      for (final assignment in slotAssignments)
+        assignment.membershipId: assignment,
+    };
+    return entries.map((entry) {
+      final lookupKey = useGuestPlayerIdAsKey
+          ? entry.guestPlayerId
+          : entry.teamMembershipId;
+      if (lookupKey == null) return entry;
+      final assignment = assignmentMap[lookupKey];
+      if (assignment == null) return entry;
+      return entry.copyWith(
+        slotId: assignment.slotId,
+        slotRole: assignment.slotRole,
+        lineIndex: assignment.lineIndex,
+        slotIndex: assignment.slotIndex,
+        slotX: assignment.slotX,
+        slotY: assignment.slotY,
+      );
+    }).toList(growable: false);
   }
 
   List<MatchLineupEntry> _buildGuestEntries({

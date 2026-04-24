@@ -52,7 +52,11 @@ class InviteFriendsSheet extends StatelessWidget {
                 style: AppTextStyles.headlineMedium,
               ),
               TextButton.icon(
-                onPressed: () => _showAddGuestDialog(context),
+                onPressed: () => Get.snackbar(
+                  'إضافة ضيف',
+                  'استخدم محرر التشكيلة لإضافة لاعبين ضيوف.',
+                  snackPosition: SnackPosition.BOTTOM,
+                ),
                 icon: const Icon(Icons.person_add_alt),
                 label: const Text('إضافة ضيف'),
               ),
@@ -125,35 +129,4 @@ class InviteFriendsSheet extends StatelessWidget {
     );
   }
 
-  void _showAddGuestDialog(BuildContext context) {
-    final nameController = TextEditingController();
-
-    Get.dialog(
-      AlertDialog(
-        title: const Text('إضافة لاعب ضيف'),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(
-            labelText: 'اسم اللاعب',
-            hintText: 'أدخل اسم اللاعب الضيف',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('إلغاء'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (nameController.text.trim().isNotEmpty) {
-                Get.back(); // close dialog
-                lobbyController.addGuestPlayer(nameController.text.trim(), side);
-              }
-            },
-            child: const Text('إضافة'),
-          ),
-        ],
-      ),
-    );
-  }
 }

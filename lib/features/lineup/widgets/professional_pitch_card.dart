@@ -11,6 +11,8 @@ import 'lineup_player_node.dart';
 typedef FormationSlotCallback = void Function(FormationSlot slot);
 typedef FormationPlayerSlotCallback =
     void Function(FormationSlot slot, LineupPlayer player);
+typedef FormationSlotDropCallback =
+    void Function(FormationSlot slot, LineupPlayer droppedPlayer);
 
 class ProfessionalPitchCard extends StatelessWidget {
   final List<FormationSlot> slots;
@@ -23,6 +25,7 @@ class ProfessionalPitchCard extends StatelessWidget {
   final FormationSlotCallback? onEmptySlotTap;
   final FormationPlayerSlotCallback? onPlayerTap;
   final FormationPlayerSlotCallback? onPlayerLongPress;
+  final FormationSlotDropCallback? onPlayerDrop;
 
   const ProfessionalPitchCard({
     super.key,
@@ -36,6 +39,7 @@ class ProfessionalPitchCard extends StatelessWidget {
     this.onEmptySlotTap,
     this.onPlayerTap,
     this.onPlayerLongPress,
+    this.onPlayerDrop,
   });
 
   @override
@@ -117,26 +121,72 @@ class ProfessionalPitchCard extends StatelessWidget {
                     : playersByKey[slot.occupantKey];
                 final left = (slot.x / 100) * width - nodeWidth / 2;
                 final top = (slot.y / 100) * height - nodeHeight / 2;
+                final clampedLeft = left
+                    .clamp(4.0, math.max(4.0, width - nodeWidth - 4))
+                    .toDouble();
+                final clampedTop = top
+                    .clamp(12.0, math.max(12.0, height - nodeHeight - 8))
+                    .toDouble();
+
+                Widget nodeWidget = LineupPlayerNode(
+                  player: player,
+                  role: slot.role,
+                  compact: compact,
+                  presentationMode: presentationMode,
+                  onTap: player == null
+                      ? (editorMode ? () => onEmptySlotTap?.call(slot) : null)
+                      : () => onPlayerTap?.call(slot, player),
+                  onLongPress: player == null
+                      ? null
+                      : () => onPlayerLongPress?.call(slot, player),
+                );
+
+                // Wrap occupied slot in Draggable for drag-out.
+                if (editorMode && player != null) {
+                  nodeWidget = Draggable<LineupPlayer>(
+                    data: player,
+                    feedback: Material(
+                      color: Colors.transparent,
+                      child: SizedBox(
+                        width: nodeWidth,
+                        child: Opacity(opacity: 0.85, child: nodeWidget),
+                      ),
+                    ),
+                    childWhenDragging: Opacity(opacity: 0.3, child: nodeWidget),
+                    child: nodeWidget,
+                  );
+                }
+
+                // Wrap in DragTarget for drop-in.
+                if (editorMode && onPlayerDrop != null) {
+                  final targetChild = nodeWidget;
+                  nodeWidget = DragTarget<LineupPlayer>(
+                    onAcceptWithDetails: (details) {
+                      onPlayerDrop!(slot, details.data);
+                    },
+                    builder: (context, candidateData, rejectedData) {
+                      if (candidateData.isNotEmpty) {
+                        return Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.primaryLight,
+                              width: 2,
+                            ),
+                          ),
+                          child: targetChild,
+                        );
+                      }
+                      return targetChild;
+                    },
+                  );
+                }
+
                 return Positioned(
-                  left: left
-                      .clamp(4.0, math.max(4.0, width - nodeWidth - 4))
-                      .toDouble(),
-                  top: top
-                      .clamp(12.0, math.max(12.0, height - nodeHeight - 8))
-                      .toDouble(),
+                  left: clampedLeft,
+                  top: clampedTop,
                   width: nodeWidth,
-                  child: LineupPlayerNode(
-                    player: player,
-                    role: slot.role,
-                    compact: compact,
-                    presentationMode: presentationMode,
-                    onTap: player == null
-                        ? (editorMode ? () => onEmptySlotTap?.call(slot) : null)
-                        : () => onPlayerTap?.call(slot, player),
-                    onLongPress: player == null
-                        ? null
-                        : () => onPlayerLongPress?.call(slot, player),
-                  ),
+                  child: nodeWidget,
                 );
               }),
             ],

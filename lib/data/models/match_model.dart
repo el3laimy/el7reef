@@ -1,3 +1,4 @@
+import '../../core/enums/lineup_requirement.dart';
 import '../../core/enums/match_status.dart';
 import '../../core/enums/tournament_ops_enums.dart';
 import '../../core/lineup/formation_library.dart';
@@ -37,6 +38,7 @@ class MatchModel {
   final DateTime? publishedAt;
   final String? venueId;
   final String fixtureStatus;
+  final String lineupRequirement;
   final DateTime createdAt;
   final DateTime? startedAt;
   final DateTime? completedAt;
@@ -73,6 +75,7 @@ class MatchModel {
     this.publishedAt,
     this.venueId,
     this.fixtureStatus = 'draft',
+    this.lineupRequirement = 'none',
     required this.createdAt,
     this.startedAt,
     this.completedAt,
@@ -136,6 +139,8 @@ class MatchModel {
       venueId: json['venueId'] as String?,
       fixtureStatus:
           json['fixtureStatus'] as String? ?? FixtureStatus.draft.name,
+      lineupRequirement:
+          json['lineupRequirement'] as String? ?? 'none',
       createdAt: json['createdAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(
               (json['createdAt'] as num).toInt(),
@@ -185,6 +190,7 @@ class MatchModel {
     'publishedAt': publishedAt?.millisecondsSinceEpoch,
     'venueId': venueId,
     'fixtureStatus': fixtureStatus,
+    'lineupRequirement': lineupRequirement,
     'createdAt': createdAt.millisecondsSinceEpoch,
     'startedAt': startedAt?.millisecondsSinceEpoch,
     'completedAt': completedAt?.millisecondsSinceEpoch,
@@ -230,6 +236,10 @@ class MatchModel {
       (value) => value.name == fixtureStatus,
       orElse: () => FixtureStatus.draft,
     ),
+    lineupRequirement: LineupRequirement.values.firstWhere(
+      (value) => value.name == lineupRequirement,
+      orElse: () => LineupRequirement.none,
+    ),
     createdAt: createdAt,
     startedAt: startedAt,
     completedAt: completedAt,
@@ -267,6 +277,7 @@ class MatchModel {
     publishedAt: m.publishedAt,
     venueId: m.venueId,
     fixtureStatus: m.fixtureStatus.name,
+    lineupRequirement: m.lineupRequirement.name,
     createdAt: m.createdAt,
     startedAt: m.startedAt,
     completedAt: m.completedAt,
