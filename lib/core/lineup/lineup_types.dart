@@ -141,6 +141,7 @@ class FormationSlot {
 class LineupPlayer {
   final String id;
   final String name;
+  final String? username;
   final String? photoUrl;
   final int? number;
   final String? preferredPosition;
@@ -151,6 +152,7 @@ class LineupPlayer {
   const LineupPlayer({
     required this.id,
     required this.name,
+    this.username,
     this.photoUrl,
     this.number,
     this.preferredPosition,

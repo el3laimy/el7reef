@@ -7,9 +7,12 @@ import '../../core/enums/tournament_ops_enums.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/player.dart';
 import '../../domain/entities/player_match_stats.dart';
+import '../../domain/entities/tournament.dart';
+import '../../data/models/tournament_model.dart';
 import 'official_match_roster_service.dart';
 import 'rating_engine.dart';
 import 'tournament_lifecycle_service.dart';
+import 'tournament_permission_service.dart';
 
 class MatchSettlementResult {
   final MatchStatus status;
@@ -29,10 +32,12 @@ class MatchSettlementService {
   final FirebaseFirestore _firestore;
   final TournamentLifecycleService _tournamentLifecycleService;
   final OfficialMatchRosterService _officialRosterService;
+  final TournamentPermissionService _tournamentPermissionService;
 
   MatchSettlementService({
     FirebaseFirestore? firestore,
     TournamentLifecycleService? tournamentLifecycleService,
+    TournamentPermissionService? tournamentPermissionService,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _tournamentLifecycleService =
            tournamentLifecycleService ??
@@ -41,15 +46,19 @@ class MatchSettlementService {
            ),
        _officialRosterService = OfficialMatchRosterService(
          firestore: firestore ?? FirebaseFirestore.instance,
-       );
+       ),
+       _tournamentPermissionService =
+           tournamentPermissionService ?? TournamentPermissionService();
 
   Future<MatchSettlementResult> submitScore({
     required String matchId,
+    required String actorId,
     required int scoreA,
     required int scoreB,
     String? mvpPlayerId,
     List<PlayerMatchStats> detailedStats = const [],
   }) async {
+    _assertActor(actorId);
     final officialRoster = await _officialRosterService.loadRegisteredRoster(
       matchId: matchId,
     );
@@ -83,13 +92,12 @@ class MatchSettlementService {
         matchSnapshot.id,
       ).toEntity();
 
-      if (_isSettled(matchSnapshot)) {
-        return const MatchSettlementResult(
-          status: MatchStatus.settled,
-          ratingsApplied: true,
-          alreadySettled: true,
-        );
-      }
+      _assertCanSubmitScore(rawMatch);
+      await _assertCanManageScore(
+        transaction: transaction,
+        match: rawMatch,
+        actorId: actorId,
+      );
 
       final isAnomaly = RatingEngine.isAnomalousResult(
         scoreA: scoreA,
@@ -139,7 +147,11 @@ class MatchSettlementService {
     });
   }
 
-  Future<MatchSettlementResult> approveScore({required String matchId}) async {
+  Future<MatchSettlementResult> approveScore({
+    required String matchId,
+    required String actorId,
+  }) async {
+    _assertActor(actorId);
     final officialRoster = await _officialRosterService.loadRegisteredRoster(
       matchId: matchId,
     );
@@ -153,6 +165,18 @@ class MatchSettlementService {
         throw StateError('المباراة غير موجودة');
       }
 
+      final match = MatchModel.fromJson(
+        matchSnapshot.data()!,
+        matchSnapshot.id,
+      ).toEntity();
+      tournamentMatch = match;
+
+      await _assertCanManageScore(
+        transaction: transaction,
+        match: match,
+        actorId: actorId,
+      );
+
       if (_isSettled(matchSnapshot)) {
         return const MatchSettlementResult(
           status: MatchStatus.settled,
@@ -161,11 +185,7 @@ class MatchSettlementService {
         );
       }
 
-      final match = MatchModel.fromJson(
-        matchSnapshot.data()!,
-        matchSnapshot.id,
-      ).toEntity();
-      tournamentMatch = match;
+      _assertCanApproveScore(match);
 
       if (match.scoreTeamA == null || match.scoreTeamB == null) {
         throw StateError('لا يمكن اعتماد مباراة بدون نتيجة');
@@ -395,6 +415,66 @@ class MatchSettlementService {
     }
     final trimmed = value.trim();
     return trimmed.isEmpty ? null : trimmed;
+  }
+
+  void _assertActor(String actorId) {
+    if (actorId.trim().isEmpty) {
+      throw StateError('يجب تسجيل الدخول أولاً.');
+    }
+  }
+
+  void _assertCanSubmitScore(Match match) {
+    if (match.isFrozen || match.status == MatchStatus.frozen) {
+      throw StateError('لا يمكن تسجيل نتيجة مباراة مجمّدة.');
+    }
+    if (match.status != MatchStatus.live) {
+      throw StateError('يمكن تسجيل النتيجة فقط أثناء المباراة الجارية.');
+    }
+  }
+
+  void _assertCanApproveScore(Match match) {
+    if (match.isFrozen || match.status == MatchStatus.frozen) {
+      throw StateError('لا يمكن اعتماد نتيجة مباراة مجمّدة.');
+    }
+    if (match.status != MatchStatus.completed &&
+        match.status != MatchStatus.pendingReview) {
+      throw StateError('لا يمكن اعتماد نتيجة قبل تسجيلها.');
+    }
+  }
+
+  Future<void> _assertCanManageScore({
+    required Transaction transaction,
+    required Match match,
+    required String actorId,
+  }) async {
+    final tournamentId = match.tournamentId;
+    if (tournamentId == null || tournamentId.isEmpty) {
+      if (match.organizerId != actorId) {
+        throw StateError('فقط منظم المباراة يمكنه إدارة النتيجة.');
+      }
+      return;
+    }
+
+    final tournament = await _loadTournamentForTransaction(
+      transaction: transaction,
+      tournamentId: tournamentId,
+    );
+    if (!_tournamentPermissionService.canEditResults(tournament, actorId)) {
+      throw StateError('لا تملك صلاحية إدارة نتائج هذه البطولة.');
+    }
+  }
+
+  Future<Tournament> _loadTournamentForTransaction({
+    required Transaction transaction,
+    required String tournamentId,
+  }) async {
+    final snapshot = await transaction.get(
+      _firestore.collection(FirebasePaths.tournaments).doc(tournamentId),
+    );
+    if (!snapshot.exists || snapshot.data() == null) {
+      throw StateError('البطولة المرتبطة بالمباراة غير موجودة.');
+    }
+    return TournamentModel.fromJson(snapshot.data()!, snapshot.id).toEntity();
   }
 
   bool _isSettled(DocumentSnapshot<Map<String, dynamic>> matchSnapshot) {

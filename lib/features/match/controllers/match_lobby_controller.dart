@@ -124,10 +124,15 @@ class MatchLobbyController extends GetxController {
   Future<void> startMatch() async {
     final m = match.value;
     if (m == null) return;
+    final actorId = currentUserId;
+    if (actorId == null || actorId.isEmpty) {
+      Get.snackbar('غير مسموح', 'يجب تسجيل الدخول أولاً.');
+      return;
+    }
     try {
       final started = await _matchStartService.startMatch(
         matchId: matchId,
-        actorId: currentUserId!,
+        actorId: actorId,
       );
       match.value = started;
       Get.snackbar(
@@ -137,7 +142,7 @@ class MatchLobbyController extends GetxController {
       );
     } catch (e) {
       AppLogger.error('MatchLobbyController.startMatch', e);
-      Get.snackbar('خطأ', e.toString());
+      Get.snackbar('خطأ', _readableError(e));
     }
   }
 
@@ -306,5 +311,16 @@ class MatchLobbyController extends GetxController {
     final m = await _matchRepo.getMatch(matchId);
     if (m != null) match.value = m;
     await _loadSnapshotState();
+  }
+
+  String _readableError(Object error) {
+    final raw = error.toString();
+    if (raw.startsWith('Exception: ')) {
+      return raw.substring('Exception: '.length);
+    }
+    if (raw.startsWith('Bad state: ')) {
+      return raw.substring('Bad state: '.length);
+    }
+    return raw;
   }
 }

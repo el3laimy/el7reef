@@ -71,10 +71,7 @@ class MatchStartService {
     }
 
     final now = DateTime.now();
-    final updated = match.copyWith(
-      status: MatchStatus.live,
-      startedAt: now,
-    );
+    final updated = match.copyWith(status: MatchStatus.live, startedAt: now);
     await _matchRepo.updateMatch(updated);
     return updated;
   }
@@ -90,18 +87,23 @@ class MatchStartService {
       reasons.add('فقط منشئ المباراة يمكنه بدء المباراة.');
     }
 
-    // 2. Match must be in a startable status.
-    if (match.status != MatchStatus.open &&
-        match.status != MatchStatus.full) {
+    // 2. Tournament fixtures must use the tournament fixture service because
+    // it validates published status, check-ins, lineups, and participant sides.
+    if (match.tournamentId != null && match.tournamentId!.isNotEmpty) {
+      reasons.add('مباريات البطولة تبدأ من إدارة البطولة/الفيكستشر فقط.');
+    }
+
+    // 3. Match must be in a startable status.
+    if (match.status != MatchStatus.open && match.status != MatchStatus.full) {
       reasons.add('حالة المباراة لا تسمح ببدء الآن.');
     }
 
-    // 3. Match must not be frozen.
+    // 4. Match must not be frozen.
     if (match.isFrozen) {
       reasons.add('المباراة مجمّدة.');
     }
 
-    // 4. Lineup requirements.
+    // 5. Lineup requirements.
     final requirement = match.lineupRequirement;
     if (requirement == LineupRequirement.required) {
       final snapshots = await _snapshotRepo.getMatchSnapshots(match.id);
@@ -121,7 +123,7 @@ class MatchStartService {
       }
     }
 
-    // 5. Both sides must have players (at minimum).
+    // 6. Both sides must have players (at minimum).
     if (match.teamAPlayerIds.isEmpty && match.teamAId == null) {
       reasons.add('الفريق الأول ليس له لاعبين.');
     }

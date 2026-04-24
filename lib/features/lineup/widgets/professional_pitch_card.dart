@@ -6,6 +6,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/lineup/lineup_types.dart';
+import 'lineup_player_display.dart';
 import 'lineup_player_node.dart';
 
 typedef FormationSlotCallback = void Function(FormationSlot slot);
@@ -160,6 +161,7 @@ class ProfessionalPitchCard extends StatelessWidget {
                 // Wrap in DragTarget for drop-in.
                 if (editorMode && onPlayerDrop != null) {
                   final targetChild = nodeWidget;
+                  final targetColor = lineupRoleColor(slot.role);
                   nodeWidget = DragTarget<LineupPlayer>(
                     onAcceptWithDetails: (details) {
                       onPlayerDrop!(slot, details.data);
@@ -169,10 +171,14 @@ class ProfessionalPitchCard extends StatelessWidget {
                         return Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: AppColors.primaryLight,
-                              width: 2,
-                            ),
+                            border: Border.all(color: targetColor, width: 2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: targetColor.withValues(alpha: 0.35),
+                                blurRadius: 14,
+                                spreadRadius: 1,
+                              ),
+                            ],
                           ),
                           child: targetChild,
                         );

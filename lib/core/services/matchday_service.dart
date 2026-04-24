@@ -1611,22 +1611,24 @@ class MatchdayService {
       for (final assignment in slotAssignments)
         assignment.membershipId: assignment,
     };
-    return entries.map((entry) {
-      final lookupKey = useGuestPlayerIdAsKey
-          ? entry.guestPlayerId
-          : entry.teamMembershipId;
-      if (lookupKey == null) return entry;
-      final assignment = assignmentMap[lookupKey];
-      if (assignment == null) return entry;
-      return entry.copyWith(
-        slotId: assignment.slotId,
-        slotRole: assignment.slotRole,
-        lineIndex: assignment.lineIndex,
-        slotIndex: assignment.slotIndex,
-        slotX: assignment.slotX,
-        slotY: assignment.slotY,
-      );
-    }).toList(growable: false);
+    return entries
+        .map((entry) {
+          final lookupKey = useGuestPlayerIdAsKey
+              ? entry.guestPlayerId
+              : entry.teamMembershipId;
+          if (lookupKey == null) return entry;
+          final assignment = assignmentMap[lookupKey];
+          if (assignment == null) return entry;
+          return entry.copyWith(
+            slotId: assignment.slotId,
+            slotRole: assignment.slotRole,
+            lineIndex: assignment.lineIndex,
+            slotIndex: assignment.slotIndex,
+            slotX: assignment.slotX,
+            slotY: assignment.slotY,
+          );
+        })
+        .toList(growable: false);
   }
 
   List<MatchLineupEntry> _buildGuestEntries({

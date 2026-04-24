@@ -255,6 +255,49 @@ class TeamLineupEditorController extends GetxController {
     );
   }
 
+  void dropPlayerOnSlot(LineupPlayer draggedPlayer, FormationSlot targetSlot) {
+    if (!canEdit) return;
+    final currentSlots = slots.toList(growable: false);
+    final draggedKey = draggedPlayer.key;
+    final sourceIndex = currentSlots.indexWhere(
+      (slot) => slot.occupantKey == draggedKey,
+    );
+    final targetIndex = currentSlots.indexWhere(
+      (slot) => slot.id == targetSlot.id,
+    );
+    if (targetIndex == -1 || sourceIndex == targetIndex) {
+      return;
+    }
+
+    final updatedSlots = currentSlots.toList(growable: true);
+    final oldTargetSlot = updatedSlots[targetIndex];
+
+    if (sourceIndex == -1) {
+      updatedSlots[targetIndex] = oldTargetSlot.assignPlayer(draggedPlayer);
+      _assignUniqueSlots(updatedSlots);
+      return;
+    }
+
+    final oldSourceSlot = updatedSlots[sourceIndex];
+    if (oldTargetSlot.isEmpty) {
+      updatedSlots[sourceIndex] = oldSourceSlot.clearPlayer();
+      updatedSlots[targetIndex] = oldTargetSlot.assignPlayer(draggedPlayer);
+      _assignUniqueSlots(updatedSlots);
+      return;
+    }
+
+    final targetPlayerId = oldTargetSlot.playerId;
+    final targetGuestPlayerId = oldTargetSlot.guestPlayerId;
+    final targetIsCaptain = oldTargetSlot.isCaptain;
+    updatedSlots[targetIndex] = oldTargetSlot.assignPlayer(draggedPlayer);
+    updatedSlots[sourceIndex] = oldSourceSlot.copyWith(
+      playerId: targetPlayerId,
+      guestPlayerId: targetGuestPlayerId,
+      isCaptain: targetIsCaptain,
+    );
+    _assignUniqueSlots(updatedSlots);
+  }
+
   void movePlayerToBench(LineupPlayer player) {
     if (!canEdit) return;
     slots.assignAll(
@@ -448,19 +491,21 @@ class TeamLineupEditorController extends GetxController {
     );
     if (hasSavedSlots) {
       slots.assignAll(
-        snapshot.starters.map((entry) {
-          final player = _playerFromSnapshotEntry(entry);
-          return FormationSlot(
-            id: entry.slotId!,
-            role: _parseSlotRole(entry.slotRole),
-            lineIndex: entry.lineIndex ?? 0,
-            slotIndex: entry.slotIndex ?? 0,
-            x: entry.slotX ?? 50,
-            y: entry.slotY ?? 50,
-            playerId: player.isRegistered ? player.id : null,
-            guestPlayerId: player.isGuest ? player.id : null,
-          );
-        }).toList(growable: false),
+        snapshot.starters
+            .map((entry) {
+              final player = _playerFromSnapshotEntry(entry);
+              return FormationSlot(
+                id: entry.slotId!,
+                role: _parseSlotRole(entry.slotRole),
+                lineIndex: entry.lineIndex ?? 0,
+                slotIndex: entry.slotIndex ?? 0,
+                x: entry.slotX ?? 50,
+                y: entry.slotY ?? 50,
+                playerId: player.isRegistered ? player.id : null,
+                guestPlayerId: player.isGuest ? player.id : null,
+              );
+            })
+            .toList(growable: false),
       );
     } else {
       // Legacy fallback: auto-assign players to generated formation.
@@ -516,6 +561,7 @@ class TeamLineupEditorController extends GetxController {
         player: LineupPlayer(
           id: membership.id,
           name: player?.name ?? 'لاعب مسجل',
+          username: player?.username,
           photoUrl: player?.photoThumbUrl ?? player?.photoUrl,
           preferredPosition: player?.position,
           isRegistered: true,
@@ -549,20 +595,44 @@ class TeamLineupEditorController extends GetxController {
   List<SlotAssignment> _buildSlotAssignments() {
     final assignments = <SlotAssignment>[];
     for (final slot in slots) {
-      final occupantKey = slot.occupantKey;
-      if (occupantKey == null) continue;
-      // occupantKey is the membership ID (registered player) or guest player ID.
-      assignments.add(SlotAssignment(
-        membershipId: occupantKey,
-        slotId: slot.id,
-        slotRole: slot.role.name,
-        lineIndex: slot.lineIndex,
-        slotIndex: slot.slotIndex,
-        slotX: slot.x,
-        slotY: slot.y,
-      ));
+      if (slot.isEmpty) continue;
+      final membershipId = slot.playerId ?? slot.guestPlayerId;
+      if (membershipId == null) continue;
+      assert(!membershipId.startsWith('player:'));
+      assert(!membershipId.startsWith('guest:'));
+      assignments.add(
+        SlotAssignment(
+          membershipId: membershipId,
+          slotId: slot.id,
+          slotRole: slot.role.name,
+          lineIndex: slot.lineIndex,
+          slotIndex: slot.slotIndex,
+          slotX: slot.x,
+          slotY: slot.y,
+        ),
+      );
     }
     return assignments;
+  }
+
+  void _assignUniqueSlots(List<FormationSlot> updatedSlots) {
+    assert(_hasUniqueOccupants(updatedSlots));
+    if (!_hasUniqueOccupants(updatedSlots)) {
+      return;
+    }
+    slots.assignAll(updatedSlots);
+  }
+
+  bool _hasUniqueOccupants(List<FormationSlot> value) {
+    final seen = <String>{};
+    for (final slot in value) {
+      final key = slot.occupantKey;
+      if (key == null) continue;
+      if (!seen.add(key)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   String _readableError(Object error) {

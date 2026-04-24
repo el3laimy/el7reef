@@ -8,6 +8,7 @@ import '../../../core/enums/team_membership_status.dart';
 import '../../../core/enums/tournament_registration_status.dart';
 import '../../../core/services/matchday_service.dart';
 import '../../../core/services/tournament_permission_service.dart';
+import '../../../app/routes/app_routes.dart';
 import '../../../data/repositories/guest_player_repository_impl.dart';
 import '../../../data/repositories/guest_team_repository_impl.dart';
 import '../../../data/repositories/match_attendance_repository_impl.dart';
@@ -535,7 +536,10 @@ class MatchdayController extends GetxController {
 
     if (side.isRegisteredTeam) {
       Get.toNamed(
-        '/match/$matchId/lineup/${side.teamId!}',
+        AppRoutes.teamLineupEditorForMatch(
+          matchId: matchId,
+          teamId: side.teamId!,
+        ),
       );
     } else {
       _showSnack(

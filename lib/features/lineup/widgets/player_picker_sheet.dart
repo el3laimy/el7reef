@@ -4,6 +4,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/lineup/lineup_types.dart';
+import 'lineup_player_display.dart';
 
 class PlayerPickerSheet extends StatefulWidget {
   final String title;
@@ -31,9 +32,11 @@ class _PlayerPickerSheetState extends State<PlayerPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final filtered = widget.players
-        .where(
-          (player) => player.name.toLowerCase().contains(query.toLowerCase()),
-        )
+        .where((player) {
+          final normalizedQuery = query.toLowerCase();
+          return player.name.toLowerCase().contains(normalizedQuery) ||
+              lineupDisplayName(player).toLowerCase().contains(normalizedQuery);
+        })
         .toList(growable: false);
 
     return Directionality(
@@ -133,6 +136,9 @@ class _PickerPlayerTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final roleColor = player.isGuest
+        ? AppColors.warning
+        : lineupPlayerRoleColor(player);
     return ListTile(
       onTap: onTap,
       tileColor: Colors.white.withValues(alpha: 0.05),
@@ -141,24 +147,18 @@ class _PickerPlayerTile extends StatelessWidget {
         side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
       ),
       leading: CircleAvatar(
-        backgroundColor: player.isGuest
-            ? AppColors.warning.withValues(alpha: 0.18)
-            : AppColors.primary.withValues(alpha: 0.16),
+        backgroundColor: roleColor.withValues(alpha: 0.18),
         backgroundImage: (player.photoUrl ?? '').isEmpty
             ? null
             : NetworkImage(player.photoUrl!),
         child: (player.photoUrl ?? '').isEmpty
             ? Text(
-                player.name.trim().isEmpty ? '?' : player.name.characters.first,
-                style: AppTextStyles.titleMedium.copyWith(
-                  color: player.isGuest
-                      ? AppColors.warning
-                      : AppColors.primaryLight,
-                ),
+                lineupInitialsForPlayer(player),
+                style: AppTextStyles.titleMedium.copyWith(color: roleColor),
               )
             : null,
       ),
-      title: Text(player.name, style: AppTextStyles.titleMedium),
+      title: Text(lineupDisplayName(player), style: AppTextStyles.titleMedium),
       subtitle: Text(
         [
           player.isGuest ? 'ضيف' : 'مسجل',

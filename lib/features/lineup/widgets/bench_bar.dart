@@ -4,6 +4,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/lineup/lineup_types.dart';
+import 'lineup_player_display.dart';
 
 class BenchBar extends StatelessWidget {
   final List<LineupPlayer> players;
@@ -169,6 +170,9 @@ class _BenchPlayerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = compact ? 34.0 : 40.0;
+    final roleColor = player.isGuest
+        ? AppColors.warning
+        : lineupPlayerRoleColor(player);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
@@ -178,11 +182,7 @@ class _BenchPlayerCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFF07111F).withValues(alpha: 0.88),
           borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-          border: Border.all(
-            color: player.isGuest
-                ? AppColors.warning.withValues(alpha: 0.5)
-                : AppColors.accentLight.withValues(alpha: 0.35),
-          ),
+          border: Border.all(color: roleColor.withValues(alpha: 0.5)),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -192,14 +192,8 @@ class _BenchPlayerCard extends StatelessWidget {
               height: size,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: player.isGuest
-                    ? AppColors.warning.withValues(alpha: 0.18)
-                    : AppColors.primary.withValues(alpha: 0.14),
-                border: Border.all(
-                  color: player.isGuest
-                      ? AppColors.warning
-                      : AppColors.primaryLight,
-                ),
+                color: roleColor.withValues(alpha: 0.16),
+                border: Border.all(color: roleColor),
               ),
               clipBehavior: Clip.antiAlias,
               child: (player.photoUrl ?? '').isNotEmpty
@@ -213,7 +207,7 @@ class _BenchPlayerCard extends StatelessWidget {
             ),
             const SizedBox(height: 5),
             Text(
-              player.name,
+              lineupDisplayName(player),
               style: AppTextStyles.labelSmall.copyWith(
                 color: AppColors.textPrimary,
                 fontWeight: FontWeight.w700,
@@ -227,7 +221,7 @@ class _BenchPlayerCard extends StatelessWidget {
             Text(
               player.isGuest ? 'ضيف' : (player.preferredPosition ?? 'لاعب'),
               style: AppTextStyles.labelSmall.copyWith(
-                color: player.isGuest ? AppColors.warning : AppColors.textMuted,
+                color: player.isGuest ? AppColors.warning : roleColor,
                 fontSize: 8.5,
                 letterSpacing: 0,
               ),
@@ -248,10 +242,9 @@ class _Initial extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = player.name.trim();
     return Center(
       child: Text(
-        name.isEmpty ? '?' : name.characters.first,
+        lineupInitialsForPlayer(player),
         style: AppTextStyles.titleMedium.copyWith(
           color: player.isGuest ? AppColors.warning : AppColors.primaryLight,
           fontWeight: FontWeight.w900,

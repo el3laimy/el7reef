@@ -49,7 +49,11 @@ class MatchdayHeader extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.emoji_events_rounded, size: 14, color: AppColors.secondary),
+                  const Icon(
+                    Icons.emoji_events_rounded,
+                    size: 14,
+                    color: AppColors.secondary,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     tournament.name,
@@ -64,7 +68,9 @@ class MatchdayHeader extends StatelessWidget {
           else
             Text(
               'مباراة ودية',
-              style: AppTextStyles.labelSmall.copyWith(color: AppColors.textMuted),
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.textMuted,
+              ),
             ),
 
           const SizedBox(height: AppDimensions.md),
@@ -91,7 +97,10 @@ class MatchdayHeader extends StatelessWidget {
 
               // Score
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(12),
@@ -149,9 +158,8 @@ class MatchdayHeader extends StatelessWidget {
             ],
           ),
 
-          // Record Score Button for Live/Completed
-          if (match != null &&
-              (match.status == MatchStatus.live || match.status == MatchStatus.completed)) ...[
+          // Record Score Button for Live matches only.
+          if (match != null && match.status == MatchStatus.live) ...[
             const SizedBox(height: AppDimensions.md),
             SizedBox(
               width: double.infinity,
@@ -218,13 +226,21 @@ class _TeamBadge extends StatelessWidget {
           colors: [color, color.withValues(alpha: 0.6)],
         ),
         boxShadow: [
-          BoxShadow(color: color.withValues(alpha: 0.3), blurRadius: 10, spreadRadius: 1),
+          BoxShadow(
+            color: color.withValues(alpha: 0.3),
+            blurRadius: 10,
+            spreadRadius: 1,
+          ),
         ],
       ),
       child: Center(
         child: Text(
           label,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white),
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
         ),
       ),
     );
@@ -235,7 +251,11 @@ class _HeaderChip extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-  const _HeaderChip({required this.icon, required this.label, required this.color});
+  const _HeaderChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -266,7 +286,11 @@ class MatchdayQuickStats extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final presentCount = controller.attendanceDrafts.values
-        .where((s) => s == MatchAttendanceStatus.present || s == MatchAttendanceStatus.late)
+        .where(
+          (s) =>
+              s == MatchAttendanceStatus.present ||
+              s == MatchAttendanceStatus.late,
+        )
         .length;
     final absentCount = controller.attendanceDrafts.values
         .where((s) => s == MatchAttendanceStatus.absent)
@@ -285,35 +309,68 @@ class MatchdayQuickStats extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _StatItem(value: '$presentCount', label: 'حاضر', color: AppColors.success),
+          _StatItem(
+            value: '$presentCount',
+            label: 'حاضر',
+            color: AppColors.success,
+          ),
           _divider(),
-          _StatItem(value: '$absentCount', label: 'غائب', color: AppColors.error),
+          _StatItem(
+            value: '$absentCount',
+            label: 'غائب',
+            color: AppColors.error,
+          ),
           _divider(),
-          _StatItem(value: '$starterCount', label: 'أساسي', color: AppColors.accent),
+          _StatItem(
+            value: '$starterCount',
+            label: 'أساسي',
+            color: AppColors.accent,
+          ),
           _divider(),
-          _StatItem(value: '$subCount', label: 'تبديل', color: AppColors.warning),
+          _StatItem(
+            value: '$subCount',
+            label: 'تبديل',
+            color: AppColors.warning,
+          ),
         ],
       ),
     );
   }
 
-  Widget _divider() => Container(width: 1, height: 30, color: AppColors.surfaceBorder);
+  Widget _divider() =>
+      Container(width: 1, height: 30, color: AppColors.surfaceBorder);
 }
 
 class _StatItem extends StatelessWidget {
   final String value;
   final String label;
   final Color color;
-  const _StatItem({required this.value, required this.label, required this.color});
+  const _StatItem({
+    required this.value,
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Column(
         children: [
-          Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(label, style: AppTextStyles.labelSmall.copyWith(color: AppColors.textMuted)),
+          Text(
+            label,
+            style: AppTextStyles.labelSmall.copyWith(
+              color: AppColors.textMuted,
+            ),
+          ),
         ],
       ),
     );
@@ -341,7 +398,11 @@ class MatchdayProgressStepper extends StatelessWidget {
         children: [
           _StepDot(done: hasCheckIn, active: !hasCheckIn, label: 'الحضور'),
           Expanded(child: _StepLine(done: hasCheckIn)),
-          _StepDot(done: hasSnapshot, active: hasCheckIn && !hasSnapshot, label: 'التشكيل'),
+          _StepDot(
+            done: hasSnapshot,
+            active: hasCheckIn && !hasSnapshot,
+            label: 'التشكيل',
+          ),
           Expanded(child: _StepLine(done: hasSnapshot)),
           _StepDot(done: false, active: hasSnapshot, label: 'التبديلات'),
         ],
@@ -354,11 +415,19 @@ class _StepDot extends StatelessWidget {
   final bool done;
   final bool active;
   final String label;
-  const _StepDot({required this.done, required this.active, required this.label});
+  const _StepDot({
+    required this.done,
+    required this.active,
+    required this.label,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final color = done ? AppColors.success : active ? AppColors.accent : AppColors.textMuted;
+    final color = done
+        ? AppColors.success
+        : active
+        ? AppColors.accent
+        : AppColors.textMuted;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -374,12 +443,26 @@ class _StepDot extends StatelessWidget {
             child: done
                 ? const Icon(Icons.check, size: 16, color: Colors.white)
                 : active
-                    ? Container(width: 8, height: 8, decoration: BoxDecoration(shape: BoxShape.circle, color: color))
-                    : null,
+                ? Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: color,
+                    ),
+                  )
+                : null,
           ),
         ),
         const SizedBox(height: 4),
-        Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
       ],
     );
   }

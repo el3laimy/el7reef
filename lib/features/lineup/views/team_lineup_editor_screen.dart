@@ -9,6 +9,7 @@ import '../controllers/team_lineup_editor_controller.dart';
 import '../widgets/bench_bar.dart';
 import '../widgets/formation_control_bar.dart';
 import '../widgets/lineup_bottom_action_bar.dart';
+import '../widgets/lineup_player_display.dart';
 import '../widgets/player_picker_sheet.dart';
 import '../widgets/professional_pitch_card.dart';
 
@@ -79,7 +80,7 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
                         _showPlayerActions(context, player),
                     onPlayerDrop: controller.canEdit
                         ? (slot, player) =>
-                            controller.assignPlayerToSlot(player, slot)
+                              controller.dropPlayerOnSlot(player, slot)
                         : null,
                   ),
                   const SizedBox(height: AppDimensions.md),
@@ -149,7 +150,7 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'اختر مركز ${player.name}',
+                'اختر مركز ${lineupDisplayName(player)}',
                 style: AppTextStyles.headlineSmall,
               ),
               const SizedBox(height: AppDimensions.md),

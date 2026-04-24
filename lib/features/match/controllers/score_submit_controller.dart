@@ -7,6 +7,7 @@ import '../../../data/repositories/match_repository_impl.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/entities/player.dart';
 import '../../../domain/entities/player_match_stats.dart';
+import '../../../services/auth_service.dart';
 import 'match_controller.dart';
 
 class ScoreSubmitController extends GetxController {
@@ -15,6 +16,7 @@ class ScoreSubmitController extends GetxController {
   final MatchSettlementService _settlementService = MatchSettlementService();
   final OfficialMatchRosterService _officialRosterService =
       OfficialMatchRosterService();
+  final AuthService _authService = Get.find<AuthService>();
 
   ScoreSubmitController({required this.matchId});
 
@@ -99,6 +101,16 @@ class ScoreSubmitController extends GetxController {
   Future<void> submit() async {
     final currentMatch = match.value;
     if (currentMatch == null) return;
+    final actorId = _authService.currentUserId;
+    if (actorId == null || actorId.isEmpty) {
+      errorMessage.value = 'يجب تسجيل الدخول أولاً لتسجيل النتيجة.';
+      Get.snackbar(
+        'غير مسموح',
+        errorMessage.value,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
 
     final scoreA = totalTeamAGoals;
     final scoreB = totalTeamBGoals;
@@ -127,6 +139,7 @@ class ScoreSubmitController extends GetxController {
       isLoading.value = true;
       final result = await _settlementService.submitScore(
         matchId: currentMatch.id,
+        actorId: actorId,
         scoreA: scoreA,
         scoreB: scoreB,
         mvpPlayerId: selectedMvpId.value.isEmpty ? null : selectedMvpId.value,
@@ -154,7 +167,7 @@ class ScoreSubmitController extends GetxController {
 
       Get.back();
     } catch (error) {
-      errorMessage.value = 'فشل حفظ النتيجة: $error';
+      errorMessage.value = 'فشل حفظ النتيجة: ${_readableError(error)}';
       Get.snackbar(
         'خطأ',
         errorMessage.value,
@@ -163,6 +176,17 @@ class ScoreSubmitController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  String _readableError(Object error) {
+    final raw = error.toString();
+    if (raw.startsWith('Exception: ')) {
+      return raw.substring('Exception: '.length);
+    }
+    if (raw.startsWith('Bad state: ')) {
+      return raw.substring('Bad state: '.length);
+    }
+    return raw;
   }
 
   PlayerMatchStats _buildDetailedStats({

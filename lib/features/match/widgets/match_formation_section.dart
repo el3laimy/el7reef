@@ -103,10 +103,7 @@ class MatchFormationSection extends StatelessWidget {
               presentationMode: true,
             ),
             const SizedBox(height: AppDimensions.md),
-            BenchBar(
-              players: bench,
-              compact: true,
-            ),
+            BenchBar(players: bench, compact: true),
           ],
         ),
       );
@@ -117,10 +114,10 @@ class MatchFormationSection extends StatelessWidget {
     return LineupPlayer(
       id: player.id,
       name: player.name,
+      username: player.username,
       photoUrl: player.photoThumbUrl ?? player.photoUrl,
       preferredPosition: player.position,
       isRegistered: !player.isGuest,
     );
   }
-
 }

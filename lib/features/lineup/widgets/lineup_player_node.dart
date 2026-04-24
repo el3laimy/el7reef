@@ -4,6 +4,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/lineup/lineup_types.dart';
+import 'lineup_player_display.dart';
 
 class LineupPlayerNode extends StatelessWidget {
   final LineupPlayer? player;
@@ -35,17 +36,12 @@ class LineupPlayerNode extends StatelessWidget {
   Widget build(BuildContext context) {
     final avatarSize = compact ? 34.0 : 42.0;
     final nodeWidth = compact ? 64.0 : 76.0;
-    final borderColor = isEmpty
-        ? AppColors.primary.withValues(alpha: 0.6)
-        : role == SlotRole.gk
-        ? AppColors.secondary
-        : player!.isGuest
-        ? AppColors.warning
-        : AppColors.accentLight;
+    final borderColor = lineupRoleColor(role);
+    final label = isEmpty ? 'إضافة لاعب' : lineupDisplayName(player!);
 
     return Semantics(
       button: onTap != null,
-      label: isEmpty ? 'إضافة لاعب' : player!.name,
+      label: label,
       child: GestureDetector(
         onTap: onTap,
         onLongPress: onLongPress,
@@ -74,10 +70,8 @@ class LineupPlayerNode extends StatelessWidget {
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                   colors: [
-                                    AppColors.primary.withValues(alpha: 0.28),
-                                    AppColors.primaryDark.withValues(
-                                      alpha: 0.2,
-                                    ),
+                                    borderColor.withValues(alpha: 0.28),
+                                    borderColor.withValues(alpha: 0.12),
                                   ],
                                 )
                               : LinearGradient(
@@ -109,10 +103,14 @@ class LineupPlayerNode extends StatelessWidget {
                         child: isEmpty
                             ? Icon(
                                 Icons.add_rounded,
-                                color: AppColors.primaryLight,
+                                color: borderColor,
                                 size: compact ? 24 : 28,
                               )
-                            : _AvatarContent(player: player!, size: avatarSize),
+                            : _AvatarContent(
+                                player: player!,
+                                size: avatarSize,
+                                roleColor: borderColor,
+                              ),
                       ),
                       if (!isEmpty && player!.number != null)
                         PositionedDirectional(
@@ -170,7 +168,7 @@ class LineupPlayerNode extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          isEmpty ? 'إضافة لاعب' : _shortName(player!.name),
+                          label,
                           style: AppTextStyles.labelSmall.copyWith(
                             color: AppColors.textPrimary,
                             fontSize: compact ? 9 : 10,
@@ -206,22 +204,18 @@ class LineupPlayerNode extends StatelessWidget {
       ),
     );
   }
-
-  String _shortName(String value) {
-    final parts = value
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty);
-    final first = parts.isEmpty ? value.trim() : parts.first;
-    return first.isEmpty ? 'لاعب' : first;
-  }
 }
 
 class _AvatarContent extends StatelessWidget {
   final LineupPlayer player;
   final double size;
+  final Color roleColor;
 
-  const _AvatarContent({required this.player, required this.size});
+  const _AvatarContent({
+    required this.player,
+    required this.size,
+    required this.roleColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -231,18 +225,23 @@ class _AvatarContent extends StatelessWidget {
         url,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) =>
-            _Initials(player: player, size: size),
+            _Initials(player: player, size: size, roleColor: roleColor),
       );
     }
-    return _Initials(player: player, size: size);
+    return _Initials(player: player, size: size, roleColor: roleColor);
   }
 }
 
 class _Initials extends StatelessWidget {
   final LineupPlayer player;
   final double size;
+  final Color roleColor;
 
-  const _Initials({required this.player, required this.size});
+  const _Initials({
+    required this.player,
+    required this.size,
+    required this.roleColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -251,14 +250,15 @@ class _Initials extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: player.isGuest
-              ? const [Color(0xFFFACC15), Color(0xFF92400E)]
-              : const [Color(0xFF1EA247), Color(0xFF0B4F2A)],
+          colors: [
+            roleColor.withValues(alpha: 0.95),
+            roleColor.withValues(alpha: 0.45),
+          ],
         ),
       ),
       child: Center(
         child: Text(
-          _initials(player.name),
+          lineupInitialsForPlayer(player),
           style: AppTextStyles.titleMedium.copyWith(
             color: Colors.white,
             fontSize: size * 0.34,
@@ -268,22 +268,6 @@ class _Initials extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _initials(String name) {
-    final parts = name
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty)
-        .toList();
-    if (parts.isEmpty) {
-      return '?';
-    }
-    if (parts.length == 1) {
-      return parts.first.characters.first.toUpperCase();
-    }
-    return '${parts.first.characters.first}${parts.last.characters.first}'
-        .toUpperCase();
   }
 }
 

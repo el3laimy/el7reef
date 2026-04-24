@@ -3,7 +3,9 @@ import 'package:uuid/uuid.dart';
 import '../../../core/enums/match_status.dart';
 import '../../../core/lineup/formation_library.dart';
 import '../../../core/services/match_settlement_service.dart';
+import '../../../core/services/match_start_service.dart';
 import '../../../core/utils/app_logger.dart';
+import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
 import '../../../data/repositories/match_repository_impl.dart';
 import '../../../domain/entities/match.dart';
 import '../../../services/auth_service.dart';
@@ -13,6 +15,10 @@ class MatchController extends GetxController {
   final AuthService _authService = Get.find<AuthService>();
   final MatchRepositoryImpl _matchRepo = MatchRepositoryImpl();
   final MatchSettlementService _settlementService = MatchSettlementService();
+  late final MatchStartService _matchStartService = MatchStartService(
+    matchRepo: _matchRepo,
+    snapshotRepo: MatchLineupSnapshotRepositoryImpl(),
+  );
 
   /// المستخدم الحالي — للتحقق من صلاحيات المنظم في الـ Views
   AuthService get authService => _authService;
@@ -161,9 +167,17 @@ class MatchController extends GetxController {
 
   /// اعتماد النتيجة من المنظم
   Future<void> approveScore(String matchId) async {
+    final actorId = _authService.currentUserId;
+    if (actorId == null || actorId.isEmpty) {
+      Get.snackbar('غير مسموح', 'يجب تسجيل الدخول أولاً.');
+      return;
+    }
     try {
       isLoading.value = true;
-      final result = await _settlementService.approveScore(matchId: matchId);
+      final result = await _settlementService.approveScore(
+        matchId: matchId,
+        actorId: actorId,
+      );
       await loadLiveMatches();
       await loadMyMatches();
 
@@ -182,7 +196,7 @@ class MatchController extends GetxController {
       }
     } catch (e) {
       AppLogger.error('MatchController.approveScore', e);
-      Get.snackbar('خطأ', 'فشل اعتماد النتيجة');
+      Get.snackbar('خطأ', _readableError(e));
     } finally {
       isLoading.value = false;
     }
@@ -207,12 +221,13 @@ class MatchController extends GetxController {
 
   /// بدء المباراة (open → live)
   Future<void> startMatch(String matchId) async {
+    final actorId = _authService.currentUserId;
+    if (actorId == null || actorId.isEmpty) {
+      Get.snackbar('غير مسموح', 'يجب تسجيل الدخول أولاً.');
+      return;
+    }
     try {
-      await _matchRepo.updateMatch(
-        (await _matchRepo.getMatch(
-          matchId,
-        ))!.copyWith(status: MatchStatus.live, startedAt: DateTime.now()),
-      );
+      await _matchStartService.startMatch(matchId: matchId, actorId: actorId);
       await loadLiveMatches();
       Get.snackbar(
         'بدأت المباراة ⚽',
@@ -221,8 +236,19 @@ class MatchController extends GetxController {
       );
     } catch (e) {
       AppLogger.error('MatchController.startMatch', e);
-      Get.snackbar('خطأ', 'فشل بدء المباراة');
+      Get.snackbar('خطأ', _readableError(e));
     }
+  }
+
+  String _readableError(Object error) {
+    final raw = error.toString();
+    if (raw.startsWith('Exception: ')) {
+      return raw.substring('Exception: '.length);
+    }
+    if (raw.startsWith('Bad state: ')) {
+      return raw.substring('Bad state: '.length);
+    }
+    return raw;
   }
 
   /// إضافة لاعب لمباراة
