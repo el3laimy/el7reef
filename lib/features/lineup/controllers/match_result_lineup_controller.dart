@@ -139,11 +139,8 @@ class MatchResultLineupController extends GetxController {
       );
     }
 
-    // If snapshot carries saved slot assignments, render exact positions.
-    final hasSavedSlots = snapshot.starters.any(
-      (entry) => entry.hasSlotAssignment,
-    );
-    if (hasSavedSlots) {
+    // Exact saved rendering is only safe when every starter has complete data.
+    if (_hasCompleteSavedAssignments(snapshot)) {
       return _slotsFromSavedAssignment(snapshot);
     }
 
@@ -164,27 +161,47 @@ class MatchResultLineupController extends GetxController {
   /// Builds [FormationSlot] instances from the exact positions saved inside
   /// each [MatchLineupEntry] of the snapshot.
   List<FormationSlot> _slotsFromSavedAssignment(MatchLineupSnapshot snapshot) {
-    return snapshot.starters.map((entry) {
-      final player = _lineupPlayerFromEntry(entry);
-      return FormationSlot(
-        id: entry.slotId!,
-        role: _parseSlotRole(entry.slotRole),
-        lineIndex: entry.lineIndex ?? 0,
-        slotIndex: entry.slotIndex ?? 0,
-        x: entry.slotX ?? 0.5,
-        y: entry.slotY ?? 0.5,
-        playerId: player.isRegistered ? player.id : null,
-        guestPlayerId: player.isGuest ? player.id : null,
-      );
-    }).toList(growable: false);
+    return snapshot.starters
+        .map((entry) {
+          final player = _lineupPlayerFromEntry(entry);
+          return FormationSlot(
+            id: entry.slotId!,
+            role: _parseSlotRole(entry.slotRole)!,
+            lineIndex: entry.lineIndex!,
+            slotIndex: entry.slotIndex!,
+            x: entry.slotX ?? 50,
+            y: entry.slotY ?? 50,
+            playerId: player.isRegistered ? player.id : null,
+            guestPlayerId: player.isGuest ? player.id : null,
+          );
+        })
+        .toList(growable: false);
   }
 
-  SlotRole _parseSlotRole(String? raw) {
-    if (raw == null) return SlotRole.mid;
+  bool _hasCompleteSavedAssignments(MatchLineupSnapshot snapshot) {
+    if (snapshot.starters.isEmpty) {
+      return false;
+    }
+    return snapshot.starters.every(_hasCompleteSavedAssignment);
+  }
+
+  bool _hasCompleteSavedAssignment(MatchLineupEntry entry) {
+    final slotId = entry.slotId;
+    return slotId != null &&
+        slotId.trim().isNotEmpty &&
+        _parseSlotRole(entry.slotRole) != null &&
+        entry.lineIndex != null &&
+        entry.slotIndex != null &&
+        entry.slotX != null &&
+        entry.slotY != null;
+  }
+
+  SlotRole? _parseSlotRole(String? raw) {
+    if (raw == null) return null;
     for (final role in SlotRole.values) {
       if (role.name == raw) return role;
     }
-    return SlotRole.mid;
+    return null;
   }
 
   List<LineupPlayer> benchForSnapshot(MatchLineupSnapshot? snapshot) {

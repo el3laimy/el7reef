@@ -1890,13 +1890,9 @@ class _FixtureOperationsCard extends StatelessWidget {
                   label: const Text('Start Match'),
                 ),
                 OutlinedButton.icon(
-                  onPressed: fixture.status == MatchStatus.open
-                      ? null
-                      : () => Get.toNamed(
-                          AppRoutes.scoreApprovalForMatch(fixture.id),
-                        ),
-                  icon: const Icon(Icons.rule_folder_outlined),
-                  label: const Text('Score Review'),
+                  onPressed: _scoreActionForMatch(controller, fixture),
+                  icon: Icon(_scoreActionIcon(fixture)),
+                  label: Text(_scoreActionLabel(fixture)),
                 ),
                 FilledButton.icon(
                   onPressed: onSchedule,
@@ -2107,13 +2103,9 @@ class _KnockoutFinalSummaryCard extends StatelessWidget {
                     label: const Text('Matchday'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: match!.status == MatchStatus.open
-                        ? null
-                        : () => Get.toNamed(
-                            AppRoutes.scoreApprovalForMatch(match!.id),
-                          ),
-                    icon: const Icon(Icons.rule_folder_outlined),
-                    label: const Text('Score Review'),
+                    onPressed: _scoreActionForMatch(controller, match!),
+                    icon: Icon(_scoreActionIcon(match!)),
+                    label: Text(_scoreActionLabel(match!)),
                   ),
                 ],
               ),
@@ -2221,13 +2213,9 @@ class _KnockoutTieCard extends StatelessWidget {
                     label: const Text('Matchday'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: match!.status == MatchStatus.open
-                        ? null
-                        : () => Get.toNamed(
-                            AppRoutes.scoreApprovalForMatch(match!.id),
-                          ),
-                    icon: const Icon(Icons.rule_folder_outlined),
-                    label: const Text('Score Review'),
+                    onPressed: _scoreActionForMatch(controller, match!),
+                    icon: Icon(_scoreActionIcon(match!)),
+                    label: Text(_scoreActionLabel(match!)),
                   ),
                 ],
               ),
@@ -2243,6 +2231,39 @@ String _fixtureStatusLabelText(FixtureStatus status) => switch (status) {
   FixtureStatus.draft => 'Draft',
   FixtureStatus.published => 'Published',
   FixtureStatus.completed => 'Completed',
+};
+
+VoidCallback? _scoreActionForMatch(
+  TournamentOperationsController controller,
+  Match match,
+) {
+  if (controller.isActing.value) {
+    return null;
+  }
+  return switch (match.status) {
+    MatchStatus.live => () => Get.toNamed(
+      AppRoutes.scoreApprovalForMatch(match.id),
+    ),
+    MatchStatus.completed ||
+    MatchStatus.pendingReview => () => controller.approveFixtureScore(match.id),
+    MatchStatus.settled => null,
+    _ => null,
+  };
+}
+
+String _scoreActionLabel(Match match) => switch (match.status) {
+  MatchStatus.live => 'Submit Score',
+  MatchStatus.completed => 'Approve Score',
+  MatchStatus.pendingReview => 'Review & Approve',
+  MatchStatus.settled => 'Approved',
+  _ => 'Score Review',
+};
+
+IconData _scoreActionIcon(Match match) => switch (match.status) {
+  MatchStatus.live => Icons.edit_note,
+  MatchStatus.completed || MatchStatus.pendingReview => Icons.verified_outlined,
+  MatchStatus.settled => Icons.check_circle_outline,
+  _ => Icons.rule_folder_outlined,
 };
 
 String _tournamentStageLabel(TournamentStageType? stage) => switch (stage) {

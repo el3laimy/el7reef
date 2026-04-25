@@ -69,14 +69,12 @@ class MatchSettlementService {
         !eligiblePlayerIds.contains(normalizedMvpId)) {
       throw StateError('لا يمكن اختيار MVP خارج roster الرسمية للمباراة.');
     }
-    final invalidStats = detailedStats.where(
-      (stats) =>
-          eligiblePlayerIds.isNotEmpty &&
-          !eligiblePlayerIds.contains(stats.playerId),
-    );
-    if (invalidStats.isNotEmpty) {
-      throw StateError('توجد إحصائيات مرتبطة بلاعب خارج roster الرسمية.');
-    }
+    final effectiveMvpId = eligiblePlayerIds.contains(normalizedMvpId)
+        ? normalizedMvpId
+        : null;
+    final officialDetailedStats = detailedStats
+        .where((stats) => eligiblePlayerIds.contains(stats.playerId))
+        .toList(growable: false);
 
     return _firestore.runTransaction((transaction) async {
       final matchRef = _firestore
@@ -111,7 +109,7 @@ class MatchSettlementService {
       final updatedMatch = rawMatch.copyWith(
         scoreTeamA: scoreA,
         scoreTeamB: scoreB,
-        mvpPlayerId: normalizedMvpId,
+        mvpPlayerId: effectiveMvpId,
         completedAt: submittedAt,
         isAnomaly: isAnomaly,
         status: isAnomaly ? MatchStatus.pendingReview : MatchStatus.completed,
@@ -120,7 +118,7 @@ class MatchSettlementService {
       transaction.update(matchRef, {
         'scoreTeamA': scoreA,
         'scoreTeamB': scoreB,
-        'mvpPlayerId': normalizedMvpId,
+        'mvpPlayerId': effectiveMvpId,
         'completedAt': submittedAt.millisecondsSinceEpoch,
         'isAnomaly': isAnomaly,
         'status': updatedMatch.status.name,
@@ -129,7 +127,7 @@ class MatchSettlementService {
       _writeDetailedStats(
         transaction: transaction,
         matchId: matchId,
-        detailedStats: detailedStats,
+        detailedStats: officialDetailedStats,
       );
       await _ensureFanVotingSession(
         transaction: transaction,
@@ -200,65 +198,73 @@ class MatchSettlementService {
         transaction: transaction,
         fanVotingRef: fanVotingRef,
         fanVotingSnapshot: fanVotingSnapshot,
+        eligiblePlayerIds: officialRoster.allPlayerIds.toSet(),
       );
       final teamAPlayers = officialRoster.teamAPlayers;
       final teamBPlayers = officialRoster.teamBPlayers;
+      final canApplyRatingDeltas =
+          teamAPlayers.isNotEmpty && teamBPlayers.isNotEmpty;
 
       final avgA = _avgRating(teamAPlayers);
       final avgB = _avgRating(teamBPlayers);
       final winner = match.winner;
       final settledAt = DateTime.now();
 
-      for (final player in teamAPlayers) {
-        final delta = RatingEngine.calculateMatchDelta(
-          player: player,
-          match: match.copyWith(isAnomaly: false),
-          isWinner: winner == 'A',
-          isDraw: winner == 'draw',
-          isMvp: match.mvpPlayerId == player.id,
-          difficultyMultiplier: RatingEngine.computeDifficultyMultiplier(
-            myTeamAvgRating: avgA,
-            opponentAvgRating: avgB,
-          ),
-          recentEncounterCount: 0,
-          isFanMvp: fanWinnerId == player.id,
-        );
-        if (delta.isBlocked) continue;
-        _updatePlayerAggregate(
-          transaction: transaction,
-          player: player,
-          isWin: winner == 'A',
-          isDraw: winner == 'draw',
-          isMvp: match.mvpPlayerId == player.id,
-          ratingDelta: delta.delta,
-          settledAt: settledAt,
-        );
-      }
+      // V1 rates registered players only. If either side has no registered
+      // eligible players, skip rating deltas rather than treating guests as
+      // Player documents or calculating a one-sided official rating result.
+      if (canApplyRatingDeltas) {
+        for (final player in teamAPlayers) {
+          final delta = RatingEngine.calculateMatchDelta(
+            player: player,
+            match: match.copyWith(isAnomaly: false),
+            isWinner: winner == 'A',
+            isDraw: winner == 'draw',
+            isMvp: match.mvpPlayerId == player.id,
+            difficultyMultiplier: RatingEngine.computeDifficultyMultiplier(
+              myTeamAvgRating: avgA,
+              opponentAvgRating: avgB,
+            ),
+            recentEncounterCount: 0,
+            isFanMvp: fanWinnerId == player.id,
+          );
+          if (delta.isBlocked) continue;
+          _updatePlayerAggregate(
+            transaction: transaction,
+            player: player,
+            isWin: winner == 'A',
+            isDraw: winner == 'draw',
+            isMvp: match.mvpPlayerId == player.id,
+            ratingDelta: delta.delta,
+            settledAt: settledAt,
+          );
+        }
 
-      for (final player in teamBPlayers) {
-        final delta = RatingEngine.calculateMatchDelta(
-          player: player,
-          match: match.copyWith(isAnomaly: false),
-          isWinner: winner == 'B',
-          isDraw: winner == 'draw',
-          isMvp: match.mvpPlayerId == player.id,
-          difficultyMultiplier: RatingEngine.computeDifficultyMultiplier(
-            myTeamAvgRating: avgB,
-            opponentAvgRating: avgA,
-          ),
-          recentEncounterCount: 0,
-          isFanMvp: fanWinnerId == player.id,
-        );
-        if (delta.isBlocked) continue;
-        _updatePlayerAggregate(
-          transaction: transaction,
-          player: player,
-          isWin: winner == 'B',
-          isDraw: winner == 'draw',
-          isMvp: match.mvpPlayerId == player.id,
-          ratingDelta: delta.delta,
-          settledAt: settledAt,
-        );
+        for (final player in teamBPlayers) {
+          final delta = RatingEngine.calculateMatchDelta(
+            player: player,
+            match: match.copyWith(isAnomaly: false),
+            isWinner: winner == 'B',
+            isDraw: winner == 'draw',
+            isMvp: match.mvpPlayerId == player.id,
+            difficultyMultiplier: RatingEngine.computeDifficultyMultiplier(
+              myTeamAvgRating: avgB,
+              opponentAvgRating: avgA,
+            ),
+            recentEncounterCount: 0,
+            isFanMvp: fanWinnerId == player.id,
+          );
+          if (delta.isBlocked) continue;
+          _updatePlayerAggregate(
+            transaction: transaction,
+            player: player,
+            isWin: winner == 'B',
+            isDraw: winner == 'draw',
+            isMvp: match.mvpPlayerId == player.id,
+            ratingDelta: delta.delta,
+            settledAt: settledAt,
+          );
+        }
       }
 
       transaction.update(matchRef, {
@@ -268,9 +274,9 @@ class MatchSettlementService {
       });
       tournamentMatch = match.copyWith(status: MatchStatus.settled);
 
-      return const MatchSettlementResult(
+      return MatchSettlementResult(
         status: MatchStatus.settled,
-        ratingsApplied: true,
+        ratingsApplied: canApplyRatingDeltas,
       );
     });
     await _refreshTournamentProgress(match: tournamentMatch);
@@ -286,6 +292,9 @@ class MatchSettlementService {
     required List<String> eligiblePlayerIds,
   }) async {
     if (sessionExists) {
+      return;
+    }
+    if (eligiblePlayerIds.isEmpty) {
       return;
     }
 
@@ -357,6 +366,7 @@ class MatchSettlementService {
     required Transaction transaction,
     required DocumentReference<Map<String, dynamic>> fanVotingRef,
     required DocumentSnapshot<Map<String, dynamic>> fanVotingSnapshot,
+    required Set<String> eligiblePlayerIds,
   }) {
     if (!fanVotingSnapshot.exists || fanVotingSnapshot.data() == null) {
       return null;
@@ -372,16 +382,11 @@ class MatchSettlementService {
       (data['playerVotes'] as Map<String, dynamic>? ?? const {}).map(
         (key, value) => MapEntry(key, (value as num).toInt()),
       ),
-    );
+    )..removeWhere((playerId, _) => !eligiblePlayerIds.contains(playerId));
     if (playerVotes.isEmpty) {
-      return null;
-    }
-
-    final closesAtMs = (data['closesAt'] as num?)?.toInt();
-    final isClosed =
-        closesAtMs != null &&
-        DateTime.now().isAfter(DateTime.fromMillisecondsSinceEpoch(closesAtMs));
-    if (!isClosed) {
+      transaction.update(fanVotingRef, {
+        'closesAt': DateTime.now().millisecondsSinceEpoch,
+      });
       return null;
     }
 
@@ -395,7 +400,10 @@ class MatchSettlementService {
     });
 
     if (winnerId != null) {
-      transaction.update(fanVotingRef, {'winnerPlayerId': winnerId});
+      transaction.update(fanVotingRef, {
+        'closesAt': DateTime.now().millisecondsSinceEpoch,
+        'winnerPlayerId': winnerId,
+      });
     }
 
     return winnerId;

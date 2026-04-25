@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../domain/entities/match.dart';
+import '../../shareables/controllers/match_result_share_controller.dart';
+import '../../shareables/models/match_result_share_data.dart';
+import '../../shareables/services/share_card_capture_service.dart';
+import '../../shareables/widgets/match_result_share_card.dart';
 import '../controllers/match_result_lineup_controller.dart';
 import '../widgets/bench_bar.dart';
 import '../widgets/professional_match_header.dart';
@@ -12,6 +16,10 @@ import '../widgets/professional_pitch_card.dart';
 
 class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
   const MatchResultLineupScreen({super.key});
+
+  static final GlobalKey _shareBoundaryKey = GlobalKey();
+  static const _shareBuilder = MatchResultShareController();
+  static const _captureService = ShareCardCaptureService();
 
   @override
   Widget build(BuildContext context) {
@@ -21,10 +29,12 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
         appBar: AppBar(
           title: const Text('تشكيلة المباراة'),
           actions: [
-            IconButton(
-              onPressed: _shareResult,
-              icon: const Icon(Icons.share_rounded),
-              tooltip: 'مشاركة',
+            Obx(
+              () => IconButton(
+                onPressed: _hasShareableScore ? _shareResult : null,
+                icon: const Icon(Icons.share_rounded),
+                tooltip: 'مشاركة النتيجة',
+              ),
             ),
           ],
         ),
@@ -67,7 +77,7 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
                         ? 'مباراة بطولة'
                         : 'مباراة الحريف',
                     location: match?.location,
-                    onShare: _shareResult,
+                    onShare: _hasShareableScore ? _shareResult : null,
                   ),
                   const SizedBox(height: AppDimensions.lg),
                   _SnapshotWarning(
@@ -128,16 +138,85 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
     );
   }
 
-  void _shareResult() {
-    // TODO(lineup-share): capture this screen as a branded image/card and
-    // share the generated image instead of text-only sharing.
+  bool get _hasShareableScore {
     final match = controller.match.value;
-    final home = controller.homeSide.label;
-    final away = controller.awaySide.label;
-    final score = match == null
-        ? ''
-        : ' ${match.scoreTeamA ?? 0}-${match.scoreTeamB ?? 0} ';
-    Share.share('تشكيلة مباراة $home$score$away على الحريف');
+    return match?.scoreTeamA != null && match?.scoreTeamB != null;
+  }
+
+  Future<void> _shareResult() async {
+    final match = controller.match.value;
+    if (match == null || match.scoreTeamA == null || match.scoreTeamB == null) {
+      Get.snackbar('تعذر المشاركة', 'لا توجد نتيجة لمشاركتها بعد.');
+      return;
+    }
+
+    final shareData = _buildShareData(match);
+    final overlay = Overlay.of(Get.context!);
+    final entry = OverlayEntry(
+      builder: (_) => Positioned(
+        left: 0,
+        top: 0,
+        child: IgnorePointer(
+          child: Opacity(
+            opacity: 0.01,
+            child: RepaintBoundary(
+              key: _shareBoundaryKey,
+              child: MatchResultShareCard(data: shareData, exportMode: true),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      await _precacheShareLogos(shareData);
+      overlay.insert(entry);
+      await WidgetsBinding.instance.endOfFrame;
+      await _captureService.captureAndShare(
+        boundaryKey: _shareBoundaryKey,
+        fileName: 'el7reef_match_${match.id}',
+        text: 'نتيجة المباراة على الحريف',
+        pixelRatio: 3,
+      );
+    } catch (error) {
+      Get.snackbar('تعذر المشاركة', _readableShareError(error));
+    } finally {
+      entry.remove();
+    }
+  }
+
+  MatchResultShareData _buildShareData(Match match) {
+    final home = controller.homeSide;
+    final away = controller.awaySide;
+    return _shareBuilder.build(
+      match: match,
+      teamA: home,
+      teamB: away,
+      teamAFormation: controller.formationForSnapshot(home.snapshot),
+      teamBFormation: controller.formationForSnapshot(away.snapshot),
+    );
+  }
+
+  Future<void> _precacheShareLogos(MatchResultShareData shareData) async {
+    final context = Get.context;
+    if (context == null) return;
+    for (final logoUrl in [shareData.teamALogoUrl, shareData.teamBLogoUrl]) {
+      final url = logoUrl?.trim();
+      if (url == null || url.isEmpty) continue;
+      try {
+        await precacheImage(NetworkImage(url), context);
+      } catch (_) {
+        // Fallback initials are rendered if the logo cannot be loaded in time.
+      }
+    }
+  }
+
+  String _readableShareError(Object error) {
+    final raw = error.toString();
+    if (raw.startsWith('Exception: ')) {
+      return raw.substring('Exception: '.length);
+    }
+    return raw;
   }
 }
 

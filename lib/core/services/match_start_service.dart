@@ -103,8 +103,22 @@ class MatchStartService {
       reasons.add('المباراة مجمّدة.');
     }
 
-    // 5. Lineup requirements.
     final requirement = match.lineupRequirement;
+    final isFriendlyMatch =
+        match.tournamentId == null || match.tournamentId!.isEmpty;
+
+    // 5. Friendly matches without required lineups only need one player per side.
+    if (isFriendlyMatch && requirement != LineupRequirement.required) {
+      if (match.teamAPlayerIds.isEmpty) {
+        reasons.add('الفريق الأول يحتاج لاعبًا واحدًا على الأقل.');
+      }
+      if (match.teamBPlayerIds.isEmpty) {
+        reasons.add('الفريق الثاني يحتاج لاعبًا واحدًا على الأقل.');
+      }
+      return reasons;
+    }
+
+    // 6. Lineup requirements.
     if (requirement == LineupRequirement.required) {
       final snapshots = await _snapshotRepo.getMatchSnapshots(match.id);
       final hasTeamALineup = _hasLineupForSide(
@@ -123,7 +137,7 @@ class MatchStartService {
       }
     }
 
-    // 6. Both sides must have players (at minimum).
+    // 7. Both sides must have players (at minimum).
     if (match.teamAPlayerIds.isEmpty && match.teamAId == null) {
       reasons.add('الفريق الأول ليس له لاعبين.');
     }

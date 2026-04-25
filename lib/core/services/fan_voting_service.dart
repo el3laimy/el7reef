@@ -26,6 +26,9 @@ class FanVotingService {
     final roster = await _officialRosterService.loadRegisteredRoster(
       matchId: matchId,
     );
+    if (roster.allPlayerIds.isEmpty) {
+      return;
+    }
     await _firestore.runTransaction((transaction) async {
       final sessionRef = _sessionsRef.doc(matchId);
       final existingSession = await transaction.get(sessionRef);
@@ -86,7 +89,7 @@ class FanVotingService {
         sessionSnapshot.data() as Map<String, dynamic>,
         sessionSnapshot.id,
       ).toEntity();
-      var eligiblePlayerIds = session.eligiblePlayerIds;
+      final eligiblePlayerIds = session.eligiblePlayerIds;
 
       // 2. التحقق من توقيت الجلسة (ضمان عدم التلاعب)
       if (session.isClosed) {
@@ -104,18 +107,10 @@ class FanVotingService {
       }
 
       if (eligiblePlayerIds.isEmpty) {
-        final matchSnapshot = await transaction.get(
-          _firestore.collection(FirebasePaths.matches).doc(matchId),
+        throw Exception(
+          'لا يوجد لاعبون مسجلون مؤهلون للتصويت في هذه المباراة.',
         );
-        if (matchSnapshot.exists && matchSnapshot.data() != null) {
-          final matchData = matchSnapshot.data() as Map<String, dynamic>;
-          eligiblePlayerIds = <String>[
-            ...List<String>.from(matchData['teamAPlayerIds'] ?? const []),
-            ...List<String>.from(matchData['teamBPlayerIds'] ?? const []),
-          ];
-        }
       }
-
       if (!eligiblePlayerIds.contains(targetPlayerId)) {
         throw Exception('اللاعب المختار ليس ضمن roster الرسمية لهذه المباراة.');
       }
@@ -168,7 +163,11 @@ class FanVotingService {
     final session = await getSession(matchId);
     if (session == null) return;
 
-    if (session.playerVotes.isEmpty) {
+    final eligiblePlayerIds = session.eligiblePlayerIds.toSet();
+    final playerVotes = Map<String, int>.from(session.playerVotes)
+      ..removeWhere((playerId, _) => !eligiblePlayerIds.contains(playerId));
+
+    if (eligiblePlayerIds.isEmpty || playerVotes.isEmpty) {
       await _sessionsRef.doc(matchId).update({
         'closesAt': DateTime.now().millisecondsSinceEpoch,
       });
@@ -179,7 +178,7 @@ class FanVotingService {
     String? winnerId;
     int maxVotes = -1;
 
-    session.playerVotes.forEach((playerId, votes) {
+    playerVotes.forEach((playerId, votes) {
       if (votes > maxVotes) {
         maxVotes = votes;
         winnerId = playerId;

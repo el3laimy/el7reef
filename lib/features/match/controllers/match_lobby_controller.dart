@@ -7,12 +7,14 @@ import '../../../domain/entities/player.dart';
 import '../../../domain/repositories/match_repository.dart';
 import '../../../domain/repositories/match_invitation_repository.dart';
 import '../../../data/repositories/player_repository_impl.dart';
+import '../../../data/repositories/team_repository_impl.dart';
 import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
 import '../../../services/auth_service.dart';
 import '../../../core/enums/match_status.dart';
 import '../../../core/services/match_start_service.dart';
 import '../../../core/lineup/formation_library.dart';
 import '../../../core/utils/app_logger.dart';
+import '../models/friendly_match_side_view.dart';
 
 /// Controller لشاشة لوبي المباراة
 class MatchLobbyController extends GetxController {
@@ -26,11 +28,13 @@ class MatchLobbyController extends GetxController {
 
   final _authService = Get.find<AuthService>();
   final _playerRepo = Get.find<PlayerRepositoryImpl>();
+  final _teamRepo = Get.find<TeamRepositoryImpl>();
   final _snapshotRepo = Get.find<MatchLineupSnapshotRepositoryImpl>();
   final _matchStartService = Get.find<MatchStartService>();
 
   // ── State ──
   final Rx<Match?> match = Rx<Match?>(null);
+  final RxList<FriendlyMatchSideView> sideViews = <FriendlyMatchSideView>[].obs;
   final RxList<Player> teamAPlayers = <Player>[].obs;
   final RxList<Player> teamBPlayers = <Player>[].obs;
   final RxList<MatchInvitation> sentInvitations = <MatchInvitation>[].obs;
@@ -43,6 +47,16 @@ class MatchLobbyController extends GetxController {
   String get inviteLink => 'el7reef://match/join/$matchId';
   String? get currentUserId => _authService.currentUserId;
   bool get isOrganizer => match.value?.organizerId == currentUserId;
+  bool get isFriendlyMatchHost {
+    final m = match.value;
+    final uid = currentUserId;
+    return m != null &&
+        m.tournamentId == null &&
+        uid != null &&
+        uid.isNotEmpty &&
+        m.organizerId == uid;
+  }
+
   int get effectiveTeamSize => normalizeMatchTeamSize(match.value?.teamSize);
   bool get canChangeTeamSize {
     final m = match.value;
@@ -69,6 +83,7 @@ class MatchLobbyController extends GetxController {
       }
       match.value = m;
       await Future.wait([
+        _loadSideViews(m),
         _loadPlayers(m),
         _loadInvitations(),
         _loadSnapshotState(),
@@ -118,6 +133,20 @@ class MatchLobbyController extends GetxController {
       final player = await _playerRepo.getPlayer(id);
       if (player != null) teamBPlayers.add(player);
     }
+  }
+
+  Future<void> _loadSideViews(Match m) async {
+    final teamIds = <String>[
+      if (m.teamAId != null && m.teamAId!.isNotEmpty) m.teamAId!,
+      if (m.teamBId != null && m.teamBId!.isNotEmpty) m.teamBId!,
+    ];
+    final teams = await _teamRepo.getTeamsByIds(teamIds);
+    sideViews.assignAll(
+      FriendlyMatchSideView.fromMatch(
+        match: m,
+        teamsById: {for (final team in teams) team.id: team},
+      ),
+    );
   }
 
   /// بدء المباراة (open → live)
@@ -208,23 +237,75 @@ class MatchLobbyController extends GetxController {
 
   /// إضافة لاعب لفريق
   Future<void> addPlayer(String playerId, String side) async {
+    await addRegisteredPlayerToSide(playerId: playerId, sideKey: side);
+  }
+
+  Future<void> addRegisteredPlayerToSide({
+    required String playerId,
+    required String sideKey,
+  }) async {
+    final m = match.value;
+    final normalizedSide = sideKey.trim().toUpperCase();
+    if (m == null) return;
+    if (playerId.trim().isEmpty) {
+      Get.snackbar('بيانات ناقصة', 'اختر لاعبًا مسجلًا أولاً.');
+      return;
+    }
+    if (m.tournamentId != null) {
+      Get.snackbar('غير متاح', 'إدارة أطراف البطولة تتم من مسار البطولة.');
+      return;
+    }
+    if (!isOrganizer) {
+      Get.snackbar('غير مسموح', 'منظم المباراة فقط يمكنه تعديل الأطراف.');
+      return;
+    }
+    if (normalizedSide != 'A' && normalizedSide != 'B') {
+      Get.snackbar('خطأ', 'طرف المباراة غير صحيح.');
+      return;
+    }
+    if (m.status != MatchStatus.open && m.status != MatchStatus.full) {
+      Get.snackbar('غير متاح', 'لا يمكن تعديل اللاعبين بعد بدء المباراة.');
+      return;
+    }
+    final targetPlayers = normalizedSide == 'A'
+        ? m.teamAPlayerIds
+        : m.teamBPlayerIds;
+    final oppositePlayers = normalizedSide == 'A'
+        ? m.teamBPlayerIds
+        : m.teamAPlayerIds;
+    if (targetPlayers.contains(playerId)) {
+      Get.snackbar('موجود بالفعل', 'هذا اللاعب موجود بالفعل في هذا الفريق.');
+      return;
+    }
+    if (oppositePlayers.contains(playerId)) {
+      Get.snackbar('موجود بالفعل', 'هذا اللاعب موجود بالفعل في الفريق الآخر.');
+      return;
+    }
+
     try {
-      await _matchRepo.addPlayerToMatch(
-        matchId: matchId,
-        playerId: playerId,
-        side: side,
-      );
-      final player = await _playerRepo.getPlayer(playerId);
-      if (player != null) {
-        if (side == 'A') {
-          teamAPlayers.add(player);
-        } else {
-          teamBPlayers.add(player);
-        }
+      final updated = normalizedSide == 'A'
+          ? m.copyWith(teamAPlayerIds: [...m.teamAPlayerIds, playerId])
+          : m.copyWith(teamBPlayerIds: [...m.teamBPlayerIds, playerId]);
+      await _matchRepo.updateMatch(updated);
+      match.value = updated;
+      await Future.wait([
+        _loadPlayers(updated),
+        _loadSideViews(updated),
+        _loadSnapshotState(),
+      ]);
+      if (currentUserId != null) {
+        startReadiness.value = await _matchStartService.getStartReadiness(
+          matchId: matchId,
+          actorId: currentUserId!,
+        );
       }
-      await _refreshMatch();
+      Get.snackbar(
+        'تمت الإضافة',
+        'تمت إضافة اللاعب إلى فريق $normalizedSide.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     } catch (e) {
-      AppLogger.error('MatchLobbyController.addPlayer', e);
+      AppLogger.error('MatchLobbyController.addRegisteredPlayerToSide', e);
       Get.snackbar('خطأ', 'فشل إضافة اللاعب');
     }
   }
@@ -309,7 +390,16 @@ class MatchLobbyController extends GetxController {
 
   Future<void> _refreshMatch() async {
     final m = await _matchRepo.getMatch(matchId);
-    if (m != null) match.value = m;
+    if (m != null) {
+      match.value = m;
+      await _loadSideViews(m);
+      if (currentUserId != null) {
+        startReadiness.value = await _matchStartService.getStartReadiness(
+          matchId: matchId,
+          actorId: currentUserId!,
+        );
+      }
+    }
     await _loadSnapshotState();
   }
 

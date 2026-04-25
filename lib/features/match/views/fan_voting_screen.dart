@@ -24,7 +24,10 @@ class FanVotingScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: AppColors.textPrimary,
+          ),
           onPressed: () => Get.back(),
         ),
       ),
@@ -32,7 +35,9 @@ class FanVotingScreen extends StatelessWidget {
         decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
         child: Obx(() {
           if (controller.isLoading.value && controller.players.isEmpty) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+            return const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            );
           }
 
           if (controller.errorMessage.value.isNotEmpty) {
@@ -44,23 +49,42 @@ class FanVotingScreen extends StatelessWidget {
             );
           }
 
-          if (controller.hasVoted.value || controller.successMessage.value.isNotEmpty) {
+          if (controller.hasVoted.value ||
+              controller.successMessage.value.isNotEmpty) {
             return _buildMessage(
               icon: Icons.how_to_vote,
               color: AppColors.success,
               title: 'شكراً لمشاركتك!',
-              message: controller.successMessage.value.isNotEmpty 
-                  ? controller.successMessage.value 
+              message: controller.successMessage.value.isNotEmpty
+                  ? controller.successMessage.value
                   : 'لقد قمت بالتصويت مسبقاً لرجل المباراة في هذا اللقاء.',
             );
           }
 
           if (controller.session.value?.isClosed ?? true) {
-             return _buildMessage(
+            return _buildMessage(
               icon: Icons.timer_off_outlined,
               color: AppColors.warning,
               title: 'انتهى التصويت',
               message: 'تم إغلاق نافذة التصويت الجماهيري لهذه المباراة.',
+            );
+          }
+
+          if (controller.session.value?.isOpen == false) {
+            return _buildMessage(
+              icon: Icons.lock_clock_outlined,
+              color: AppColors.warning,
+              title: 'التصويت غير متاح',
+              message: 'التصويت لم يفتح بعد لهذه المباراة.',
+            );
+          }
+
+          if (controller.players.isEmpty) {
+            return _buildMessage(
+              icon: Icons.group_off_outlined,
+              color: AppColors.warning,
+              title: 'التصويت غير متاح',
+              message: 'لا يوجد لاعبون مسجلون مؤهلون للتصويت في هذه المباراة.',
             );
           }
 
@@ -71,13 +95,16 @@ class FanVotingScreen extends StatelessWidget {
                 const SizedBox(height: AppDimensions.md),
                 Expanded(
                   child: GridView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: AppDimensions.sm,
-                      mainAxisSpacing: AppDimensions.sm,
-                      childAspectRatio: 0.85,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimensions.pagePadding,
                     ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: AppDimensions.sm,
+                          mainAxisSpacing: AppDimensions.sm,
+                          childAspectRatio: 0.85,
+                        ),
                     itemCount: controller.players.length,
                     itemBuilder: (context, index) {
                       final p = controller.players[index];
@@ -106,12 +133,18 @@ class FanVotingScreen extends StatelessWidget {
           Text('الوقت المتبقي لغلق التصويت', style: AppTextStyles.labelLarge),
           const SizedBox(height: AppDimensions.xs),
           Text(
-            controller.timeRemaining.value,
-            style: AppTextStyles.displayLarge.copyWith(
-              color: AppColors.primary,
-              letterSpacing: 2,
-            ),
-          ).animate(onPlay: (c) => c.repeat(reverse: true)).scaleXY(begin: 1, end: 1.02, duration: const Duration(seconds: 1)),
+                controller.timeRemaining.value,
+                style: AppTextStyles.displayLarge.copyWith(
+                  color: AppColors.primary,
+                  letterSpacing: 2,
+                ),
+              )
+              .animate(onPlay: (c) => c.repeat(reverse: true))
+              .scaleXY(
+                begin: 1,
+                end: 1.02,
+                duration: const Duration(seconds: 1),
+              ),
         ],
       ),
     );
@@ -129,7 +162,9 @@ class FanVotingScreen extends StatelessWidget {
             backgroundColor: AppColors.surfaceBorder,
             child: Text(
               player.name.substring(0, 1).toUpperCase(),
-              style: AppTextStyles.headlineMedium.copyWith(color: AppColors.primary),
+              style: AppTextStyles.headlineMedium.copyWith(
+                color: AppColors.primary,
+              ),
             ),
           ),
           const SizedBox(height: AppDimensions.sm),
@@ -153,11 +188,16 @@ class FanVotingScreen extends StatelessWidget {
     );
   }
 
-  void _confirmVote(BuildContext context, Player player, FanVotingController controller) {
+  void _confirmVote(
+    BuildContext context,
+    Player player,
+    FanVotingController controller,
+  ) {
     Get.defaultDialog(
       title: 'تأكيد التصويت',
       titleStyle: AppTextStyles.headlineMedium,
-      middleText: 'هل أنت متأكد من منح صوتك لـ ${player.name}؟ هذا الإجراء لا يمكن التراجع عنه.',
+      middleText:
+          'هل أنت متأكد من منح صوتك لـ ${player.name}؟ هذا الإجراء لا يمكن التراجع عنه.',
       middleTextStyle: AppTextStyles.bodyMedium,
       backgroundColor: AppColors.surface,
       radius: AppDimensions.radiusMd,
@@ -173,7 +213,12 @@ class FanVotingScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMessage({required IconData icon, required Color color, required String title, required String message}) {
+  Widget _buildMessage({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String message,
+  }) {
     return Center(
       child: GlassmorphicContainer(
         margin: const EdgeInsets.all(AppDimensions.pagePadding),
@@ -182,20 +227,23 @@ class FanVotingScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 64, color: color).animate().scale(delay: const Duration(milliseconds: 200)),
+            Icon(
+              icon,
+              size: 64,
+              color: color,
+            ).animate().scale(delay: const Duration(milliseconds: 200)),
             const SizedBox(height: AppDimensions.md),
             Text(title, style: AppTextStyles.headlineMedium),
             const SizedBox(height: AppDimensions.sm),
             Text(
               message,
-              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textMuted),
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textMuted,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppDimensions.lg),
-            El7reefButton(
-              text: 'العودة للمباراة',
-              onPressed: () => Get.back(),
-            ),
+            El7reefButton(text: 'العودة للمباراة', onPressed: () => Get.back()),
           ],
         ),
       ),

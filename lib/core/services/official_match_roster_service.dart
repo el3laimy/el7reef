@@ -23,10 +23,8 @@ class OfficialMatchRegisteredRoster {
     required this.teamBPlayers,
   });
 
-  List<String> get allPlayerIds => <String>[
-    ...teamAPlayerIds,
-    ...teamBPlayerIds,
-  ];
+  List<String> get allPlayerIds =>
+      <String>{...teamAPlayerIds, ...teamBPlayerIds}.toList(growable: false);
 }
 
 class OfficialMatchRosterService {
@@ -119,11 +117,10 @@ class OfficialMatchRosterService {
       return _normalizeIds(fallbackIds);
     }
 
-    final projectedIds = _projectRegisteredPlayerIds(snapshot);
-    if (projectedIds.isNotEmpty) {
-      return projectedIds;
-    }
-    return _normalizeIds(fallbackIds);
+    // V1 official rating/stat/fan-voting roster is registered-player only.
+    // Guest-only lineup snapshots intentionally project to an empty eligible
+    // roster; guest players remain display-only until they are claimed later.
+    return _projectRegisteredPlayerIds(snapshot);
   }
 
   MatchLineupSnapshot? _findSnapshotForSide({
@@ -144,8 +141,8 @@ class OfficialMatchRosterService {
 
   List<String> _projectRegisteredPlayerIds(MatchLineupSnapshot snapshot) {
     final ids = <String>[];
-    for (final entry in <dynamic>[...snapshot.starters, ...snapshot.bench]) {
-      final playerId = entry.playerId as String?;
+    for (final entry in [...snapshot.starters, ...snapshot.bench]) {
+      final playerId = entry.playerId;
       if (playerId == null ||
           playerId.trim().isEmpty ||
           ids.contains(playerId)) {

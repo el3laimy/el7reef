@@ -51,29 +51,25 @@ class InviteFriendsSheet extends StatelessWidget {
                 'ادعُ أصدقاءك لفريق $side',
                 style: AppTextStyles.headlineMedium,
               ),
-              TextButton.icon(
-                onPressed: () => Get.snackbar(
-                  'إضافة ضيف',
-                  'استخدم محرر التشكيلة لإضافة لاعبين ضيوف.',
-                  snackPosition: SnackPosition.BOTTOM,
-                ),
-                icon: const Icon(Icons.person_add_alt),
-                label: const Text('إضافة ضيف'),
-              ),
             ],
           ),
           const SizedBox(height: AppDimensions.md),
           Expanded(
             child: Obx(() {
-              if (friendController.isLoading.value && friendController.friends.isEmpty) {
-                return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+              if (friendController.isLoading.value &&
+                  friendController.friends.isEmpty) {
+                return const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                );
               }
 
               if (friendController.friends.isEmpty) {
                 return Center(
                   child: Text(
                     'لا يوجد لديك أصدقاء بعد',
-                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textMuted),
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textMuted,
+                    ),
                   ),
                 );
               }
@@ -82,18 +78,26 @@ class InviteFriendsSheet extends StatelessWidget {
                 itemCount: friendController.friends.length,
                 itemBuilder: (context, index) {
                   final friendship = friendController.friends[index];
-                  final friendId = friendship.getOtherUserId(friendController.currentUserId!);
-                  final friendProfile = friendController.friendProfiles[friendId];
+                  final friendId = friendship.getOtherUserId(
+                    friendController.currentUserId!,
+                  );
+                  final friendProfile =
+                      friendController.friendProfiles[friendId];
 
                   if (friendProfile == null) return const SizedBox.shrink();
 
                   // Check if already in the match
-                  final isAlreadyInMatch = lobbyController.teamAPlayers.any((p) => p.id == friendId) ||
-                                           lobbyController.teamBPlayers.any((p) => p.id == friendId);
+                  final isAlreadyInMatch =
+                      lobbyController.teamAPlayers.any(
+                        (p) => p.id == friendId,
+                      ) ||
+                      lobbyController.teamBPlayers.any((p) => p.id == friendId);
 
                   // Check if already invited
                   final isInvited = lobbyController.sentInvitations.any(
-                    (inv) => inv.receiverId == friendId && inv.status == InvitationStatus.pending
+                    (inv) =>
+                        inv.receiverId == friendId &&
+                        inv.status == InvitationStatus.pending,
                   );
 
                   return ListTile(
@@ -107,18 +111,34 @@ class InviteFriendsSheet extends StatelessWidget {
                           ? const Icon(Icons.person, color: AppColors.primary)
                           : null,
                     ),
-                    title: Text(friendProfile.name, style: AppTextStyles.titleMedium),
-                    subtitle: Text('@${friendProfile.username ?? 'user'}', style: AppTextStyles.labelSmall),
+                    title: Text(
+                      friendProfile.name,
+                      style: AppTextStyles.titleMedium,
+                    ),
+                    subtitle: Text(
+                      '@${friendProfile.username ?? 'user'}',
+                      style: AppTextStyles.labelSmall,
+                    ),
                     trailing: isAlreadyInMatch
-                        ? Text('موجود', style: AppTextStyles.labelMedium.copyWith(color: AppColors.success))
+                        ? Text(
+                            'موجود',
+                            style: AppTextStyles.labelMedium.copyWith(
+                              color: AppColors.success,
+                            ),
+                          )
                         : isInvited
-                            ? Text('مدعو', style: AppTextStyles.labelMedium.copyWith(color: AppColors.textMuted))
-                            : TextButton(
-                                onPressed: () {
-                                  lobbyController.inviteFriend(friendId, side);
-                                },
-                                child: const Text('دعوة'),
-                              ),
+                        ? Text(
+                            'مدعو',
+                            style: AppTextStyles.labelMedium.copyWith(
+                              color: AppColors.textMuted,
+                            ),
+                          )
+                        : TextButton(
+                            onPressed: () {
+                              lobbyController.inviteFriend(friendId, side);
+                            },
+                            child: const Text('دعوة'),
+                          ),
                   );
                 },
               );
@@ -128,5 +148,4 @@ class InviteFriendsSheet extends StatelessWidget {
       ),
     );
   }
-
 }

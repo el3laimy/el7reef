@@ -57,9 +57,25 @@ class FanVotingController extends GetxController {
       }
       match.value = loadedMatch;
 
-      session.value = await _votingService.getSession(matchId);
-      if (session.value == null) {
+      final loadedSession = await _votingService.getSession(matchId);
+      session.value = loadedSession;
+      if (loadedSession == null) {
+        final roster = await _officialRosterService.loadRegisteredRoster(
+          matchId: loadedMatch.id,
+          match: loadedMatch,
+        );
+        if (roster.allPlayerIds.isEmpty) {
+          errorMessage.value =
+              'لا يوجد لاعبون مسجلون مؤهلون للتصويت في هذه المباراة.';
+          return;
+        }
         errorMessage.value = 'لا توجد جلسة تصويت مفتوحة لهذه المباراة.';
+        return;
+      }
+
+      if (loadedSession.eligiblePlayerIds.isEmpty) {
+        errorMessage.value =
+            'لا يوجد لاعبون مسجلون مؤهلون للتصويت في هذه المباراة.';
         return;
       }
 
@@ -71,13 +87,9 @@ class FanVotingController extends GetxController {
         );
       }
 
-      final playerIds = session.value!.eligiblePlayerIds.isNotEmpty
-          ? session.value!.eligiblePlayerIds
-          : (await _officialRosterService.loadRegisteredRoster(
-              matchId: loadedMatch.id,
-              match: loadedMatch,
-            )).allPlayerIds;
-      players.value = await _playerRepo.getPlayersByIds(playerIds);
+      players.value = await _playerRepo.getPlayersByIds(
+        loadedSession.eligiblePlayerIds,
+      );
       _startTimer();
     } catch (error) {
       errorMessage.value = 'حدث خطأ أثناء تحميل بيانات التصويت: $error';
@@ -121,6 +133,19 @@ class FanVotingController extends GetxController {
   }
 
   Future<void> submitVote(String targetPlayerId) async {
+    final currentSession = session.value;
+    if (currentSession == null ||
+        currentSession.isClosed ||
+        !currentSession.isOpen) {
+      errorMessage.value = 'التصويت غير متاح حالياً لهذه المباراة.';
+      return;
+    }
+    if (players.isEmpty ||
+        !players.any((player) => player.id == targetPlayerId)) {
+      errorMessage.value = 'اللاعب المختار ليس ضمن المرشحين للتصويت.';
+      return;
+    }
+
     if (hasVoted.value) {
       Get.snackbar(
         'تصويت مسجل',

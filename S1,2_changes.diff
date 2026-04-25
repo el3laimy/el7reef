@@ -1,0 +1,1414 @@
+diff --git a/lib/core/services/fan_voting_service.dart b/lib/core/services/fan_voting_service.dart
+index 5e8c58b..0018f95 100644
+--- a/lib/core/services/fan_voting_service.dart
++++ b/lib/core/services/fan_voting_service.dart
+@@ -26,6 +26,9 @@ class FanVotingService {
+     final roster = await _officialRosterService.loadRegisteredRoster(
+       matchId: matchId,
+     );
++    if (roster.allPlayerIds.isEmpty) {
++      return;
++    }
+     await _firestore.runTransaction((transaction) async {
+       final sessionRef = _sessionsRef.doc(matchId);
+       final existingSession = await transaction.get(sessionRef);
+@@ -86,7 +89,7 @@ class FanVotingService {
+         sessionSnapshot.data() as Map<String, dynamic>,
+         sessionSnapshot.id,
+       ).toEntity();
+-      var eligiblePlayerIds = session.eligiblePlayerIds;
++      final eligiblePlayerIds = session.eligiblePlayerIds;
+ 
+       // 2. التحقق من توقيت الجلسة (ضمان عدم التلاعب)
+       if (session.isClosed) {
+@@ -104,18 +107,10 @@ class FanVotingService {
+       }
+ 
+       if (eligiblePlayerIds.isEmpty) {
+-        final matchSnapshot = await transaction.get(
+-          _firestore.collection(FirebasePaths.matches).doc(matchId),
++        throw Exception(
++          'لا يوجد لاعبون مسجلون مؤهلون للتصويت في هذه المباراة.',
+         );
+-        if (matchSnapshot.exists && matchSnapshot.data() != null) {
+-          final matchData = matchSnapshot.data() as Map<String, dynamic>;
+-          eligiblePlayerIds = <String>[
+-            ...List<String>.from(matchData['teamAPlayerIds'] ?? const []),
+-            ...List<String>.from(matchData['teamBPlayerIds'] ?? const []),
+-          ];
+-        }
+       }
+-
+       if (!eligiblePlayerIds.contains(targetPlayerId)) {
+         throw Exception('اللاعب المختار ليس ضمن roster الرسمية لهذه المباراة.');
+       }
+@@ -168,7 +163,11 @@ class FanVotingService {
+     final session = await getSession(matchId);
+     if (session == null) return;
+ 
+-    if (session.playerVotes.isEmpty) {
++    final eligiblePlayerIds = session.eligiblePlayerIds.toSet();
++    final playerVotes = Map<String, int>.from(session.playerVotes)
++      ..removeWhere((playerId, _) => !eligiblePlayerIds.contains(playerId));
++
++    if (eligiblePlayerIds.isEmpty || playerVotes.isEmpty) {
+       await _sessionsRef.doc(matchId).update({
+         'closesAt': DateTime.now().millisecondsSinceEpoch,
+       });
+@@ -179,7 +178,7 @@ class FanVotingService {
+     String? winnerId;
+     int maxVotes = -1;
+ 
+-    session.playerVotes.forEach((playerId, votes) {
++    playerVotes.forEach((playerId, votes) {
+       if (votes > maxVotes) {
+         maxVotes = votes;
+         winnerId = playerId;
+diff --git a/lib/core/services/match_settlement_service.dart b/lib/core/services/match_settlement_service.dart
+index 0785bfb..2278404 100644
+--- a/lib/core/services/match_settlement_service.dart
++++ b/lib/core/services/match_settlement_service.dart
+@@ -69,14 +69,12 @@ class MatchSettlementService {
+         !eligiblePlayerIds.contains(normalizedMvpId)) {
+       throw StateError('لا يمكن اختيار MVP خارج roster الرسمية للمباراة.');
+     }
+-    final invalidStats = detailedStats.where(
+-      (stats) =>
+-          eligiblePlayerIds.isNotEmpty &&
+-          !eligiblePlayerIds.contains(stats.playerId),
+-    );
+-    if (invalidStats.isNotEmpty) {
+-      throw StateError('توجد إحصائيات مرتبطة بلاعب خارج roster الرسمية.');
+-    }
++    final effectiveMvpId = eligiblePlayerIds.contains(normalizedMvpId)
++        ? normalizedMvpId
++        : null;
++    final officialDetailedStats = detailedStats
++        .where((stats) => eligiblePlayerIds.contains(stats.playerId))
++        .toList(growable: false);
+ 
+     return _firestore.runTransaction((transaction) async {
+       final matchRef = _firestore
+@@ -111,7 +109,7 @@ class MatchSettlementService {
+       final updatedMatch = rawMatch.copyWith(
+         scoreTeamA: scoreA,
+         scoreTeamB: scoreB,
+-        mvpPlayerId: normalizedMvpId,
++        mvpPlayerId: effectiveMvpId,
+         completedAt: submittedAt,
+         isAnomaly: isAnomaly,
+         status: isAnomaly ? MatchStatus.pendingReview : MatchStatus.completed,
+@@ -120,7 +118,7 @@ class MatchSettlementService {
+       transaction.update(matchRef, {
+         'scoreTeamA': scoreA,
+         'scoreTeamB': scoreB,
+-        'mvpPlayerId': normalizedMvpId,
++        'mvpPlayerId': effectiveMvpId,
+         'completedAt': submittedAt.millisecondsSinceEpoch,
+         'isAnomaly': isAnomaly,
+         'status': updatedMatch.status.name,
+@@ -129,7 +127,7 @@ class MatchSettlementService {
+       _writeDetailedStats(
+         transaction: transaction,
+         matchId: matchId,
+-        detailedStats: detailedStats,
++        detailedStats: officialDetailedStats,
+       );
+       await _ensureFanVotingSession(
+         transaction: transaction,
+@@ -200,65 +198,73 @@ class MatchSettlementService {
+         transaction: transaction,
+         fanVotingRef: fanVotingRef,
+         fanVotingSnapshot: fanVotingSnapshot,
++        eligiblePlayerIds: officialRoster.allPlayerIds.toSet(),
+       );
+       final teamAPlayers = officialRoster.teamAPlayers;
+       final teamBPlayers = officialRoster.teamBPlayers;
++      final canApplyRatingDeltas =
++          teamAPlayers.isNotEmpty && teamBPlayers.isNotEmpty;
+ 
+       final avgA = _avgRating(teamAPlayers);
+       final avgB = _avgRating(teamBPlayers);
+       final winner = match.winner;
+       final settledAt = DateTime.now();
+ 
+-      for (final player in teamAPlayers) {
+-        final delta = RatingEngine.calculateMatchDelta(
+-          player: player,
+-          match: match.copyWith(isAnomaly: false),
+-          isWinner: winner == 'A',
+-          isDraw: winner == 'draw',
+-          isMvp: match.mvpPlayerId == player.id,
+-          difficultyMultiplier: RatingEngine.computeDifficultyMultiplier(
+-            myTeamAvgRating: avgA,
+-            opponentAvgRating: avgB,
+-          ),
+-          recentEncounterCount: 0,
+-          isFanMvp: fanWinnerId == player.id,
+-        );
+-        if (delta.isBlocked) continue;
+-        _updatePlayerAggregate(
+-          transaction: transaction,
+-          player: player,
+-          isWin: winner == 'A',
+-          isDraw: winner == 'draw',
+-          isMvp: match.mvpPlayerId == player.id,
+-          ratingDelta: delta.delta,
+-          settledAt: settledAt,
+-        );
+-      }
+-
+-      for (final player in teamBPlayers) {
+-        final delta = RatingEngine.calculateMatchDelta(
+-          player: player,
+-          match: match.copyWith(isAnomaly: false),
+-          isWinner: winner == 'B',
+-          isDraw: winner == 'draw',
+-          isMvp: match.mvpPlayerId == player.id,
+-          difficultyMultiplier: RatingEngine.computeDifficultyMultiplier(
+-            myTeamAvgRating: avgB,
+-            opponentAvgRating: avgA,
+-          ),
+-          recentEncounterCount: 0,
+-          isFanMvp: fanWinnerId == player.id,
+-        );
+-        if (delta.isBlocked) continue;
+-        _updatePlayerAggregate(
+-          transaction: transaction,
+-          player: player,
+-          isWin: winner == 'B',
+-          isDraw: winner == 'draw',
+-          isMvp: match.mvpPlayerId == player.id,
+-          ratingDelta: delta.delta,
+-          settledAt: settledAt,
+-        );
++      // V1 rates registered players only. If either side has no registered
++      // eligible players, skip rating deltas rather than treating guests as
++      // Player documents or calculating a one-sided official rating result.
++      if (canApplyRatingDeltas) {
++        for (final player in teamAPlayers) {
++          final delta = RatingEngine.calculateMatchDelta(
++            player: player,
++            match: match.copyWith(isAnomaly: false),
++            isWinner: winner == 'A',
++            isDraw: winner == 'draw',
++            isMvp: match.mvpPlayerId == player.id,
++            difficultyMultiplier: RatingEngine.computeDifficultyMultiplier(
++              myTeamAvgRating: avgA,
++              opponentAvgRating: avgB,
++            ),
++            recentEncounterCount: 0,
++            isFanMvp: fanWinnerId == player.id,
++          );
++          if (delta.isBlocked) continue;
++          _updatePlayerAggregate(
++            transaction: transaction,
++            player: player,
++            isWin: winner == 'A',
++            isDraw: winner == 'draw',
++            isMvp: match.mvpPlayerId == player.id,
++            ratingDelta: delta.delta,
++            settledAt: settledAt,
++          );
++        }
++
++        for (final player in teamBPlayers) {
++          final delta = RatingEngine.calculateMatchDelta(
++            player: player,
++            match: match.copyWith(isAnomaly: false),
++            isWinner: winner == 'B',
++            isDraw: winner == 'draw',
++            isMvp: match.mvpPlayerId == player.id,
++            difficultyMultiplier: RatingEngine.computeDifficultyMultiplier(
++              myTeamAvgRating: avgB,
++              opponentAvgRating: avgA,
++            ),
++            recentEncounterCount: 0,
++            isFanMvp: fanWinnerId == player.id,
++          );
++          if (delta.isBlocked) continue;
++          _updatePlayerAggregate(
++            transaction: transaction,
++            player: player,
++            isWin: winner == 'B',
++            isDraw: winner == 'draw',
++            isMvp: match.mvpPlayerId == player.id,
++            ratingDelta: delta.delta,
++            settledAt: settledAt,
++          );
++        }
+       }
+ 
+       transaction.update(matchRef, {
+@@ -268,9 +274,9 @@ class MatchSettlementService {
+       });
+       tournamentMatch = match.copyWith(status: MatchStatus.settled);
+ 
+-      return const MatchSettlementResult(
++      return MatchSettlementResult(
+         status: MatchStatus.settled,
+-        ratingsApplied: true,
++        ratingsApplied: canApplyRatingDeltas,
+       );
+     });
+     await _refreshTournamentProgress(match: tournamentMatch);
+@@ -288,6 +294,9 @@ class MatchSettlementService {
+     if (sessionExists) {
+       return;
+     }
++    if (eligiblePlayerIds.isEmpty) {
++      return;
++    }
+ 
+     transaction.set(sessionRef, {
+       'matchId': match.id,
+@@ -357,6 +366,7 @@ class MatchSettlementService {
+     required Transaction transaction,
+     required DocumentReference<Map<String, dynamic>> fanVotingRef,
+     required DocumentSnapshot<Map<String, dynamic>> fanVotingSnapshot,
++    required Set<String> eligiblePlayerIds,
+   }) {
+     if (!fanVotingSnapshot.exists || fanVotingSnapshot.data() == null) {
+       return null;
+@@ -372,16 +382,11 @@ class MatchSettlementService {
+       (data['playerVotes'] as Map<String, dynamic>? ?? const {}).map(
+         (key, value) => MapEntry(key, (value as num).toInt()),
+       ),
+-    );
++    )..removeWhere((playerId, _) => !eligiblePlayerIds.contains(playerId));
+     if (playerVotes.isEmpty) {
+-      return null;
+-    }
+-
+-    final closesAtMs = (data['closesAt'] as num?)?.toInt();
+-    final isClosed =
+-        closesAtMs != null &&
+-        DateTime.now().isAfter(DateTime.fromMillisecondsSinceEpoch(closesAtMs));
+-    if (!isClosed) {
++      transaction.update(fanVotingRef, {
++        'closesAt': DateTime.now().millisecondsSinceEpoch,
++      });
+       return null;
+     }
+ 
+@@ -395,7 +400,10 @@ class MatchSettlementService {
+     });
+ 
+     if (winnerId != null) {
+-      transaction.update(fanVotingRef, {'winnerPlayerId': winnerId});
++      transaction.update(fanVotingRef, {
++        'closesAt': DateTime.now().millisecondsSinceEpoch,
++        'winnerPlayerId': winnerId,
++      });
+     }
+ 
+     return winnerId;
+diff --git a/lib/core/services/matchday_service.dart b/lib/core/services/matchday_service.dart
+index 0e9f2c9..5c52a6e 100644
+--- a/lib/core/services/matchday_service.dart
++++ b/lib/core/services/matchday_service.dart
+@@ -690,15 +690,15 @@ class MatchdayService {
+             matchSnapshot.id,
+           ).toEntity();
+           _ensureMatchAvailableForPreKickoff(match);
++          _assertSlotAssignmentsBelongToStarters(
++            starters: validation.starters,
++            slotAssignments: slotAssignments,
++          );
+ 
+           final decoratedStarters = _decorateEntriesWithSlotAssignments(
+             entries: validation.starters,
+             slotAssignments: slotAssignments,
+           );
+-          final decoratedBench = _decorateEntriesWithSlotAssignments(
+-            entries: validation.bench,
+-            slotAssignments: slotAssignments,
+-          );
+           final snapshot = MatchLineupSnapshot(
+             id: snapshotId,
+             matchId: matchId,
+@@ -706,7 +706,7 @@ class MatchdayService {
+             tournamentRegistrationId: context.registration?.id,
+             checkInId: validation.checkIn.id,
+             starters: decoratedStarters,
+-            bench: decoratedBench,
++            bench: validation.bench,
+             lockedBy: actorId,
+             lockedAt: effectiveNow,
+             playerCount: validation.requiredStarterCount,
+@@ -808,14 +808,14 @@ class MatchdayService {
+             matchSnapshot.id,
+           ).toEntity();
+           _ensureMatchAvailableForPreKickoff(match);
+-
+-          final decoratedStarters = _decorateEntriesWithSlotAssignments(
+-            entries: validation.starters,
++          _assertSlotAssignmentsBelongToStarters(
++            starters: validation.starters,
+             slotAssignments: slotAssignments,
+             useGuestPlayerIdAsKey: true,
+           );
+-          final decoratedBench = _decorateEntriesWithSlotAssignments(
+-            entries: validation.bench,
++
++          final decoratedStarters = _decorateEntriesWithSlotAssignments(
++            entries: validation.starters,
+             slotAssignments: slotAssignments,
+             useGuestPlayerIdAsKey: true,
+           );
+@@ -826,7 +826,7 @@ class MatchdayService {
+             tournamentRegistrationId: context.registration?.id,
+             checkInId: validation.checkIn.id,
+             starters: decoratedStarters,
+-            bench: decoratedBench,
++            bench: validation.bench,
+             lockedBy: actorId,
+             lockedAt: effectiveNow,
+             playerCount: validation.requiredStarterCount,
+@@ -858,6 +858,67 @@ class MatchdayService {
+     );
+   }
+ 
++  Future<void> unlockLineup({
++    required String matchId,
++    required String snapshotId,
++    required String actorId,
++  }) async {
++    if (actorId.trim().isEmpty) {
++      throw Exception('يجب تسجيل الدخول أولاً.');
++    }
++
++    await _firestore.runTransaction((transaction) async {
++      final matchRef = _matchesRef.doc(matchId);
++      final snapshotRef = _snapshotsRef.doc(snapshotId);
++      final matchSnapshot = await transaction.get(matchRef);
++      final lineupSnapshot = await transaction.get(snapshotRef);
++
++      if (!matchSnapshot.exists || matchSnapshot.data() == null) {
++        throw Exception('المباراة المطلوبة غير موجودة.');
++      }
++      if (!lineupSnapshot.exists || lineupSnapshot.data() == null) {
++        throw Exception('التشكيلة المقفولة غير موجودة.');
++      }
++
++      final match = MatchModel.fromJson(
++        matchSnapshot.data()!,
++        matchSnapshot.id,
++      ).toEntity();
++      final snapshot = MatchLineupSnapshotModel.fromJson(
++        lineupSnapshot.data()!,
++        lineupSnapshot.id,
++      ).toEntity();
++
++      if (snapshot.matchId != match.id) {
++        throw Exception('التشكيلة لا تخص هذه المباراة.');
++      }
++      _ensureMatchAvailableForPreKickoff(match);
++
++      final tournament = await _loadTournamentForTransaction(
++        transaction: transaction,
++        tournamentId: match.tournamentId,
++      );
++      _ensureCanUnlockLineup(
++        match: match,
++        tournament: tournament,
++        actorId: actorId,
++      );
++
++      transaction.delete(snapshotRef);
++      final updates = <String, Object?>{};
++      if (snapshot.teamId != null) {
++        updates['lineupSnapshotIds.${snapshot.teamId}'] = FieldValue.delete();
++      }
++      if (snapshot.guestTeamId != null) {
++        updates['guestLineupSnapshotIds.${snapshot.guestTeamId}'] =
++            FieldValue.delete();
++      }
++      if (updates.isNotEmpty) {
++        transaction.update(matchRef, updates);
++      }
++    });
++  }
++
+   Future<MatchdaySubstitutionResult> recordRegisteredTeamSubstitution({
+     required String matchId,
+     required String teamId,
+@@ -1069,6 +1130,37 @@ class MatchdayService {
+     return TournamentModel.fromJson(snapshot.data()!, snapshot.id).toEntity();
+   }
+ 
++  Future<Tournament?> _loadTournamentForTransaction({
++    required Transaction transaction,
++    required String? tournamentId,
++  }) async {
++    if (tournamentId == null || tournamentId.isEmpty) {
++      return null;
++    }
++    final snapshot = await transaction.get(_tournamentsRef.doc(tournamentId));
++    if (!snapshot.exists || snapshot.data() == null) {
++      throw Exception('الدورة المرتبطة بالمباراة غير موجودة.');
++    }
++    return TournamentModel.fromJson(snapshot.data()!, snapshot.id).toEntity();
++  }
++
++  void _ensureCanUnlockLineup({
++    required Match match,
++    required Tournament? tournament,
++    required String actorId,
++  }) {
++    if (tournament != null) {
++      if (!_tournamentPermissionService.canManageTeams(tournament, actorId)) {
++        throw Exception('فقط منظم أو مشرف البطولة يمكنه فك قفل التشكيلة.');
++      }
++      return;
++    }
++
++    if (match.organizerId != actorId) {
++      throw Exception('فقط منظم المباراة يمكنه فك قفل التشكيلة.');
++    }
++  }
++
+   Future<TournamentRegistration?> _loadApprovedRegistrationForTeam({
+     required String? tournamentId,
+     required String teamId,
+@@ -1631,6 +1723,30 @@ class MatchdayService {
+         .toList(growable: false);
+   }
+ 
++  void _assertSlotAssignmentsBelongToStarters({
++    required List<MatchLineupEntry> starters,
++    required List<SlotAssignment> slotAssignments,
++    bool useGuestPlayerIdAsKey = false,
++  }) {
++    if (slotAssignments.isEmpty) return;
++
++    final starterIds = starters
++        .map(
++          (entry) => useGuestPlayerIdAsKey
++              ? entry.guestPlayerId
++              : entry.teamMembershipId,
++        )
++        .whereType<String>()
++        .toSet();
++    final invalidIds = slotAssignments
++        .map((assignment) => assignment.membershipId)
++        .where((membershipId) => !starterIds.contains(membershipId))
++        .toSet();
++    if (invalidIds.isNotEmpty) {
++      throw Exception('توجد slot assignment للاعب غير أساسي في التشكيلة.');
++    }
++  }
++
+   List<MatchLineupEntry> _buildGuestEntries({
+     required List<String> selectedIds,
+     required Map<String, MatchAttendance> attendanceMap,
+diff --git a/lib/core/services/official_match_roster_service.dart b/lib/core/services/official_match_roster_service.dart
+index 04f2b43..0813932 100644
+--- a/lib/core/services/official_match_roster_service.dart
++++ b/lib/core/services/official_match_roster_service.dart
+@@ -23,10 +23,8 @@ class OfficialMatchRegisteredRoster {
+     required this.teamBPlayers,
+   });
+ 
+-  List<String> get allPlayerIds => <String>[
+-    ...teamAPlayerIds,
+-    ...teamBPlayerIds,
+-  ];
++  List<String> get allPlayerIds =>
++      <String>{...teamAPlayerIds, ...teamBPlayerIds}.toList(growable: false);
+ }
+ 
+ class OfficialMatchRosterService {
+@@ -119,11 +117,10 @@ class OfficialMatchRosterService {
+       return _normalizeIds(fallbackIds);
+     }
+ 
+-    final projectedIds = _projectRegisteredPlayerIds(snapshot);
+-    if (projectedIds.isNotEmpty) {
+-      return projectedIds;
+-    }
+-    return _normalizeIds(fallbackIds);
++    // V1 official rating/stat/fan-voting roster is registered-player only.
++    // Guest-only lineup snapshots intentionally project to an empty eligible
++    // roster; guest players remain display-only until they are claimed later.
++    return _projectRegisteredPlayerIds(snapshot);
+   }
+ 
+   MatchLineupSnapshot? _findSnapshotForSide({
+@@ -144,8 +141,8 @@ class OfficialMatchRosterService {
+ 
+   List<String> _projectRegisteredPlayerIds(MatchLineupSnapshot snapshot) {
+     final ids = <String>[];
+-    for (final entry in <dynamic>[...snapshot.starters, ...snapshot.bench]) {
+-      final playerId = entry.playerId as String?;
++    for (final entry in [...snapshot.starters, ...snapshot.bench]) {
++      final playerId = entry.playerId;
+       if (playerId == null ||
+           playerId.trim().isEmpty ||
+           ids.contains(playerId)) {
+diff --git a/lib/core/services/tournament_fixture_service.dart b/lib/core/services/tournament_fixture_service.dart
+index 85ac722..f3b34bb 100644
+--- a/lib/core/services/tournament_fixture_service.dart
++++ b/lib/core/services/tournament_fixture_service.dart
+@@ -20,25 +20,29 @@ import '../../domain/entities/tournament_participant.dart';
+ import 'group_stage_builder.dart';
+ import 'tournament_audit_emitter.dart';
+ import 'tournament_participant_service.dart';
++import 'tournament_permission_service.dart';
+ 
+ class TournamentFixtureService {
+   final FirebaseFirestore _firestore;
+   final TournamentParticipantService _participantService;
+   final GroupStageBuilder _groupStageBuilder;
+   final TournamentAuditEmitter _auditEmitter;
++  final TournamentPermissionService _permissionService;
+ 
+   TournamentFixtureService({
+     FirebaseFirestore? firestore,
+     TournamentParticipantService? participantService,
+     GroupStageBuilder? groupStageBuilder,
+     TournamentAuditEmitter? auditEmitter,
++    TournamentPermissionService? permissionService,
+   }) : _firestore = firestore ?? FirebaseFirestore.instance,
+        _participantService =
+            participantService ??
+            TournamentParticipantService(firestore: firestore),
+        _groupStageBuilder = groupStageBuilder ?? const GroupStageBuilder(),
+        _auditEmitter =
+-           auditEmitter ?? TournamentAuditEmitter(firestore: firestore);
++           auditEmitter ?? TournamentAuditEmitter(firestore: firestore),
++       _permissionService = permissionService ?? TournamentPermissionService();
+ 
+   CollectionReference<Map<String, dynamic>> get _tournamentsRef =>
+       _firestore.collection(FirebasePaths.tournaments);
+@@ -100,12 +104,19 @@ class TournamentFixtureService {
+     required String actorId,
+     DateTime? now,
+   }) async {
++    if (actorId.trim().isEmpty) {
++      throw Exception('يجب تسجيل الدخول أولاً.');
++    }
+     final effectiveNow = now ?? DateTime.now();
+     final match = await _loadMatch(matchId);
+     final tournamentId = match.tournamentId;
+     if (tournamentId == null || tournamentId.isEmpty) {
+       throw Exception('لا يمكن بدء مباراة ليست جزءًا من بطولة.');
+     }
++    final tournament = await _loadTournament(tournamentId);
++    if (!_permissionService.canManageTeams(tournament, actorId)) {
++      throw Exception('لا تملك صلاحية بدء مباريات هذه البطولة.');
++    }
+     if (match.isFrozen || match.status == MatchStatus.frozen) {
+       throw Exception('لا يمكن بدء مباراة مجمدة.');
+     }
+@@ -126,7 +137,6 @@ class TournamentFixtureService {
+       throw Exception('يجب نشر fixture قبل بدء المباراة.');
+     }
+ 
+-    final tournament = await _loadTournament(tournamentId);
+     final homeSide = await _loadStartSide(
+       match: match,
+       participantId: match.teamAParticipantId,
+diff --git a/lib/features/lineup/controllers/match_result_lineup_controller.dart b/lib/features/lineup/controllers/match_result_lineup_controller.dart
+index 50d8040..89bae9b 100644
+--- a/lib/features/lineup/controllers/match_result_lineup_controller.dart
++++ b/lib/features/lineup/controllers/match_result_lineup_controller.dart
+@@ -139,11 +139,8 @@ class MatchResultLineupController extends GetxController {
+       );
+     }
+ 
+-    // If snapshot carries saved slot assignments, render exact positions.
+-    final hasSavedSlots = snapshot.starters.any(
+-      (entry) => entry.hasSlotAssignment,
+-    );
+-    if (hasSavedSlots) {
++    // Exact saved rendering is only safe when every starter has complete data.
++    if (_hasCompleteSavedAssignments(snapshot)) {
+       return _slotsFromSavedAssignment(snapshot);
+     }
+ 
+@@ -164,27 +161,47 @@ class MatchResultLineupController extends GetxController {
+   /// Builds [FormationSlot] instances from the exact positions saved inside
+   /// each [MatchLineupEntry] of the snapshot.
+   List<FormationSlot> _slotsFromSavedAssignment(MatchLineupSnapshot snapshot) {
+-    return snapshot.starters.map((entry) {
+-      final player = _lineupPlayerFromEntry(entry);
+-      return FormationSlot(
+-        id: entry.slotId!,
+-        role: _parseSlotRole(entry.slotRole),
+-        lineIndex: entry.lineIndex ?? 0,
+-        slotIndex: entry.slotIndex ?? 0,
+-        x: entry.slotX ?? 0.5,
+-        y: entry.slotY ?? 0.5,
+-        playerId: player.isRegistered ? player.id : null,
+-        guestPlayerId: player.isGuest ? player.id : null,
+-      );
+-    }).toList(growable: false);
++    return snapshot.starters
++        .map((entry) {
++          final player = _lineupPlayerFromEntry(entry);
++          return FormationSlot(
++            id: entry.slotId!,
++            role: _parseSlotRole(entry.slotRole)!,
++            lineIndex: entry.lineIndex!,
++            slotIndex: entry.slotIndex!,
++            x: entry.slotX ?? 50,
++            y: entry.slotY ?? 50,
++            playerId: player.isRegistered ? player.id : null,
++            guestPlayerId: player.isGuest ? player.id : null,
++          );
++        })
++        .toList(growable: false);
++  }
++
++  bool _hasCompleteSavedAssignments(MatchLineupSnapshot snapshot) {
++    if (snapshot.starters.isEmpty) {
++      return false;
++    }
++    return snapshot.starters.every(_hasCompleteSavedAssignment);
++  }
++
++  bool _hasCompleteSavedAssignment(MatchLineupEntry entry) {
++    final slotId = entry.slotId;
++    return slotId != null &&
++        slotId.trim().isNotEmpty &&
++        _parseSlotRole(entry.slotRole) != null &&
++        entry.lineIndex != null &&
++        entry.slotIndex != null &&
++        entry.slotX != null &&
++        entry.slotY != null;
+   }
+ 
+-  SlotRole _parseSlotRole(String? raw) {
+-    if (raw == null) return SlotRole.mid;
++  SlotRole? _parseSlotRole(String? raw) {
++    if (raw == null) return null;
+     for (final role in SlotRole.values) {
+       if (role.name == raw) return role;
+     }
+-    return SlotRole.mid;
++    return null;
+   }
+ 
+   List<LineupPlayer> benchForSnapshot(MatchLineupSnapshot? snapshot) {
+diff --git a/lib/features/lineup/views/match_result_lineup_screen.dart b/lib/features/lineup/views/match_result_lineup_screen.dart
+index 2cb5ab9..a2be0ec 100644
+--- a/lib/features/lineup/views/match_result_lineup_screen.dart
++++ b/lib/features/lineup/views/match_result_lineup_screen.dart
+@@ -1,10 +1,14 @@
+ import 'package:flutter/material.dart';
+ import 'package:get/get.dart';
+-import 'package:share_plus/share_plus.dart';
+ 
+ import '../../../app/theme/app_colors.dart';
+ import '../../../app/theme/app_dimensions.dart';
+ import '../../../app/theme/app_text_styles.dart';
++import '../../../domain/entities/match.dart';
++import '../../shareables/controllers/match_result_share_controller.dart';
++import '../../shareables/models/match_result_share_data.dart';
++import '../../shareables/services/share_card_capture_service.dart';
++import '../../shareables/widgets/match_result_share_card.dart';
+ import '../controllers/match_result_lineup_controller.dart';
+ import '../widgets/bench_bar.dart';
+ import '../widgets/professional_match_header.dart';
+@@ -13,6 +17,10 @@ import '../widgets/professional_pitch_card.dart';
+ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
+   const MatchResultLineupScreen({super.key});
+ 
++  static final GlobalKey _shareBoundaryKey = GlobalKey();
++  static const _shareBuilder = MatchResultShareController();
++  static const _captureService = ShareCardCaptureService();
++
+   @override
+   Widget build(BuildContext context) {
+     return Directionality(
+@@ -21,10 +29,12 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
+         appBar: AppBar(
+           title: const Text('تشكيلة المباراة'),
+           actions: [
+-            IconButton(
+-              onPressed: _shareResult,
+-              icon: const Icon(Icons.share_rounded),
+-              tooltip: 'مشاركة',
++            Obx(
++              () => IconButton(
++                onPressed: _hasShareableScore ? _shareResult : null,
++                icon: const Icon(Icons.share_rounded),
++                tooltip: 'مشاركة النتيجة',
++              ),
+             ),
+           ],
+         ),
+@@ -67,7 +77,7 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
+                         ? 'مباراة بطولة'
+                         : 'مباراة الحريف',
+                     location: match?.location,
+-                    onShare: _shareResult,
++                    onShare: _hasShareableScore ? _shareResult : null,
+                   ),
+                   const SizedBox(height: AppDimensions.lg),
+                   _SnapshotWarning(
+@@ -128,16 +138,85 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
+     );
+   }
+ 
+-  void _shareResult() {
+-    // TODO(lineup-share): capture this screen as a branded image/card and
+-    // share the generated image instead of text-only sharing.
++  bool get _hasShareableScore {
++    final match = controller.match.value;
++    return match?.scoreTeamA != null && match?.scoreTeamB != null;
++  }
++
++  Future<void> _shareResult() async {
+     final match = controller.match.value;
+-    final home = controller.homeSide.label;
+-    final away = controller.awaySide.label;
+-    final score = match == null
+-        ? ''
+-        : ' ${match.scoreTeamA ?? 0}-${match.scoreTeamB ?? 0} ';
+-    Share.share('تشكيلة مباراة $home$score$away على الحريف');
++    if (match == null || match.scoreTeamA == null || match.scoreTeamB == null) {
++      Get.snackbar('تعذر المشاركة', 'لا توجد نتيجة لمشاركتها بعد.');
++      return;
++    }
++
++    final shareData = _buildShareData(match);
++    final overlay = Overlay.of(Get.context!);
++    final entry = OverlayEntry(
++      builder: (_) => Positioned(
++        left: 0,
++        top: 0,
++        child: IgnorePointer(
++          child: Opacity(
++            opacity: 0.01,
++            child: RepaintBoundary(
++              key: _shareBoundaryKey,
++              child: MatchResultShareCard(data: shareData, exportMode: true),
++            ),
++          ),
++        ),
++      ),
++    );
++
++    try {
++      await _precacheShareLogos(shareData);
++      overlay.insert(entry);
++      await WidgetsBinding.instance.endOfFrame;
++      await _captureService.captureAndShare(
++        boundaryKey: _shareBoundaryKey,
++        fileName: 'el7reef_match_${match.id}',
++        text: 'نتيجة المباراة على الحريف',
++        pixelRatio: 3,
++      );
++    } catch (error) {
++      Get.snackbar('تعذر المشاركة', _readableShareError(error));
++    } finally {
++      entry.remove();
++    }
++  }
++
++  MatchResultShareData _buildShareData(Match match) {
++    final home = controller.homeSide;
++    final away = controller.awaySide;
++    return _shareBuilder.build(
++      match: match,
++      teamA: home,
++      teamB: away,
++      teamAFormation: controller.formationForSnapshot(home.snapshot),
++      teamBFormation: controller.formationForSnapshot(away.snapshot),
++    );
++  }
++
++  Future<void> _precacheShareLogos(MatchResultShareData shareData) async {
++    final context = Get.context;
++    if (context == null) return;
++    for (final logoUrl in [shareData.teamALogoUrl, shareData.teamBLogoUrl]) {
++      final url = logoUrl?.trim();
++      if (url == null || url.isEmpty) continue;
++      try {
++        await precacheImage(NetworkImage(url), context);
++      } catch (_) {
++        // Fallback initials are rendered if the logo cannot be loaded in time.
++      }
++    }
++  }
++
++  String _readableShareError(Object error) {
++    final raw = error.toString();
++    if (raw.startsWith('Exception: ')) {
++      return raw.substring('Exception: '.length);
++    }
++    return raw;
+   }
+ }
+ 
+diff --git a/lib/features/match/controllers/fan_voting_controller.dart b/lib/features/match/controllers/fan_voting_controller.dart
+index 1c26e1c..5754764 100644
+--- a/lib/features/match/controllers/fan_voting_controller.dart
++++ b/lib/features/match/controllers/fan_voting_controller.dart
+@@ -57,12 +57,28 @@ class FanVotingController extends GetxController {
+       }
+       match.value = loadedMatch;
+ 
+-      session.value = await _votingService.getSession(matchId);
+-      if (session.value == null) {
++      final loadedSession = await _votingService.getSession(matchId);
++      session.value = loadedSession;
++      if (loadedSession == null) {
++        final roster = await _officialRosterService.loadRegisteredRoster(
++          matchId: loadedMatch.id,
++          match: loadedMatch,
++        );
++        if (roster.allPlayerIds.isEmpty) {
++          errorMessage.value =
++              'لا يوجد لاعبون مسجلون مؤهلون للتصويت في هذه المباراة.';
++          return;
++        }
+         errorMessage.value = 'لا توجد جلسة تصويت مفتوحة لهذه المباراة.';
+         return;
+       }
+ 
++      if (loadedSession.eligiblePlayerIds.isEmpty) {
++        errorMessage.value =
++            'لا يوجد لاعبون مسجلون مؤهلون للتصويت في هذه المباراة.';
++        return;
++      }
++
+       final currentUserId = _authService.currentUserId;
+       if (currentUserId != null) {
+         hasVoted.value = await _votingService.hasUserVoted(
+@@ -71,13 +87,9 @@ class FanVotingController extends GetxController {
+         );
+       }
+ 
+-      final playerIds = session.value!.eligiblePlayerIds.isNotEmpty
+-          ? session.value!.eligiblePlayerIds
+-          : (await _officialRosterService.loadRegisteredRoster(
+-              matchId: loadedMatch.id,
+-              match: loadedMatch,
+-            )).allPlayerIds;
+-      players.value = await _playerRepo.getPlayersByIds(playerIds);
++      players.value = await _playerRepo.getPlayersByIds(
++        loadedSession.eligiblePlayerIds,
++      );
+       _startTimer();
+     } catch (error) {
+       errorMessage.value = 'حدث خطأ أثناء تحميل بيانات التصويت: $error';
+@@ -121,6 +133,19 @@ class FanVotingController extends GetxController {
+   }
+ 
+   Future<void> submitVote(String targetPlayerId) async {
++    final currentSession = session.value;
++    if (currentSession == null ||
++        currentSession.isClosed ||
++        !currentSession.isOpen) {
++      errorMessage.value = 'التصويت غير متاح حالياً لهذه المباراة.';
++      return;
++    }
++    if (players.isEmpty ||
++        !players.any((player) => player.id == targetPlayerId)) {
++      errorMessage.value = 'اللاعب المختار ليس ضمن المرشحين للتصويت.';
++      return;
++    }
++
+     if (hasVoted.value) {
+       Get.snackbar(
+         'تصويت مسجل',
+diff --git a/lib/features/match/controllers/matchday_controller.dart b/lib/features/match/controllers/matchday_controller.dart
+index 2914ff5..f9cb4ec 100644
+--- a/lib/features/match/controllers/matchday_controller.dart
++++ b/lib/features/match/controllers/matchday_controller.dart
+@@ -502,22 +502,46 @@ class MatchdayController extends GetxController {
+   }
+ 
+   /// Whether the current lineup can be unlocked for re-editing.
+-  /// Allowed only when lineup is locked, match is not completed/settled, and
+-  /// not frozen.
+-  bool get canUnlockLineup =>
+-      isLineupLocked &&
+-      match.value?.status != MatchStatus.completed &&
+-      match.value?.status != MatchStatus.settled &&
+-      match.value?.isFrozen != true;
++  bool get canUnlockLineup {
++    final currentMatch = match.value;
++    final snapshot = activeSnapshot.value;
++    final actorId = currentUserId;
++    if (currentMatch == null ||
++        snapshot == null ||
++        actorId == null ||
++        actorId.isEmpty) {
++      return false;
++    }
++    if (!_isPreKickoffUnlockStatus(currentMatch)) {
++      return false;
++    }
++    final currentTournament = tournament.value;
++    if (currentTournament != null) {
++      return _tournamentPermissionService.canManageTeams(
++        currentTournament,
++        actorId,
++      );
++    }
++    return currentMatch.organizerId == actorId;
++  }
+ 
+   /// Deletes the active snapshot so the lineup can be re-edited.
+   Future<void> unlockLineup() async {
+     final snapshot = activeSnapshot.value;
+     if (snapshot == null) return;
++    final actorId = currentUserId;
++    if (actorId == null || actorId.isEmpty) {
++      _showSnack('غير مسموح', 'يجب تسجيل الدخول أولاً.');
++      return;
++    }
+ 
+     try {
+       isSubmitting.value = true;
+-      await _snapshotRepository.deleteSnapshot(snapshot.id);
++      await _matchdayService.unlockLineup(
++        matchId: matchId,
++        snapshotId: snapshot.id,
++        actorId: actorId,
++      );
+       activeSnapshot.value = null;
+       _showSnack('تم فك القفل', 'يمكنك تعديل التشكيلة من جديد.');
+       await _loadSelectedSideState();
+@@ -528,6 +552,17 @@ class MatchdayController extends GetxController {
+     }
+   }
+ 
++  bool _isPreKickoffUnlockStatus(Match currentMatch) {
++    if (currentMatch.isFrozen || currentMatch.status == MatchStatus.frozen) {
++      return false;
++    }
++    return currentMatch.status != MatchStatus.live &&
++        currentMatch.status != MatchStatus.completed &&
++        currentMatch.status != MatchStatus.pendingReview &&
++        currentMatch.status != MatchStatus.ratingWindow &&
++        currentMatch.status != MatchStatus.settled;
++  }
++
+   /// Navigates to TeamLineupEditorScreen for the currently selected
+   /// registered team. Guest teams use the in-place matchday editor.
+   void openLineupEditor() {
+@@ -1047,6 +1082,9 @@ class MatchdayController extends GetxController {
+     if (raw.startsWith('Exception: ')) {
+       return raw.substring('Exception: '.length);
+     }
++    if (raw.startsWith('Bad state: ')) {
++      return raw.substring('Bad state: '.length);
++    }
+     return raw;
+   }
+ 
+diff --git a/lib/features/match/views/fan_voting_screen.dart b/lib/features/match/views/fan_voting_screen.dart
+index fc4438a..ec8aa75 100644
+--- a/lib/features/match/views/fan_voting_screen.dart
++++ b/lib/features/match/views/fan_voting_screen.dart
+@@ -24,7 +24,10 @@ class FanVotingScreen extends StatelessWidget {
+         backgroundColor: Colors.transparent,
+         elevation: 0,
+         leading: IconButton(
+-          icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary),
++          icon: const Icon(
++            Icons.arrow_back_ios_new,
++            color: AppColors.textPrimary,
++          ),
+           onPressed: () => Get.back(),
+         ),
+       ),
+@@ -32,7 +35,9 @@ class FanVotingScreen extends StatelessWidget {
+         decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+         child: Obx(() {
+           if (controller.isLoading.value && controller.players.isEmpty) {
+-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
++            return const Center(
++              child: CircularProgressIndicator(color: AppColors.primary),
++            );
+           }
+ 
+           if (controller.errorMessage.value.isNotEmpty) {
+@@ -44,19 +49,20 @@ class FanVotingScreen extends StatelessWidget {
+             );
+           }
+ 
+-          if (controller.hasVoted.value || controller.successMessage.value.isNotEmpty) {
++          if (controller.hasVoted.value ||
++              controller.successMessage.value.isNotEmpty) {
+             return _buildMessage(
+               icon: Icons.how_to_vote,
+               color: AppColors.success,
+               title: 'شكراً لمشاركتك!',
+-              message: controller.successMessage.value.isNotEmpty 
+-                  ? controller.successMessage.value 
++              message: controller.successMessage.value.isNotEmpty
++                  ? controller.successMessage.value
+                   : 'لقد قمت بالتصويت مسبقاً لرجل المباراة في هذا اللقاء.',
+             );
+           }
+ 
+           if (controller.session.value?.isClosed ?? true) {
+-             return _buildMessage(
++            return _buildMessage(
+               icon: Icons.timer_off_outlined,
+               color: AppColors.warning,
+               title: 'انتهى التصويت',
+@@ -64,6 +70,24 @@ class FanVotingScreen extends StatelessWidget {
+             );
+           }
+ 
++          if (controller.session.value?.isOpen == false) {
++            return _buildMessage(
++              icon: Icons.lock_clock_outlined,
++              color: AppColors.warning,
++              title: 'التصويت غير متاح',
++              message: 'التصويت لم يفتح بعد لهذه المباراة.',
++            );
++          }
++
++          if (controller.players.isEmpty) {
++            return _buildMessage(
++              icon: Icons.group_off_outlined,
++              color: AppColors.warning,
++              title: 'التصويت غير متاح',
++              message: 'لا يوجد لاعبون مسجلون مؤهلون للتصويت في هذه المباراة.',
++            );
++          }
++
+           return SafeArea(
+             child: Column(
+               children: [
+@@ -71,13 +95,16 @@ class FanVotingScreen extends StatelessWidget {
+                 const SizedBox(height: AppDimensions.md),
+                 Expanded(
+                   child: GridView.builder(
+-                    padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
+-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+-                      crossAxisCount: 2,
+-                      crossAxisSpacing: AppDimensions.sm,
+-                      mainAxisSpacing: AppDimensions.sm,
+-                      childAspectRatio: 0.85,
++                    padding: const EdgeInsets.symmetric(
++                      horizontal: AppDimensions.pagePadding,
+                     ),
++                    gridDelegate:
++                        const SliverGridDelegateWithFixedCrossAxisCount(
++                          crossAxisCount: 2,
++                          crossAxisSpacing: AppDimensions.sm,
++                          mainAxisSpacing: AppDimensions.sm,
++                          childAspectRatio: 0.85,
++                        ),
+                     itemCount: controller.players.length,
+                     itemBuilder: (context, index) {
+                       final p = controller.players[index];
+@@ -106,12 +133,18 @@ class FanVotingScreen extends StatelessWidget {
+           Text('الوقت المتبقي لغلق التصويت', style: AppTextStyles.labelLarge),
+           const SizedBox(height: AppDimensions.xs),
+           Text(
+-            controller.timeRemaining.value,
+-            style: AppTextStyles.displayLarge.copyWith(
+-              color: AppColors.primary,
+-              letterSpacing: 2,
+-            ),
+-          ).animate(onPlay: (c) => c.repeat(reverse: true)).scaleXY(begin: 1, end: 1.02, duration: const Duration(seconds: 1)),
++                controller.timeRemaining.value,
++                style: AppTextStyles.displayLarge.copyWith(
++                  color: AppColors.primary,
++                  letterSpacing: 2,
++                ),
++              )
++              .animate(onPlay: (c) => c.repeat(reverse: true))
++              .scaleXY(
++                begin: 1,
++                end: 1.02,
++                duration: const Duration(seconds: 1),
++              ),
+         ],
+       ),
+     );
+@@ -129,7 +162,9 @@ class FanVotingScreen extends StatelessWidget {
+             backgroundColor: AppColors.surfaceBorder,
+             child: Text(
+               player.name.substring(0, 1).toUpperCase(),
+-              style: AppTextStyles.headlineMedium.copyWith(color: AppColors.primary),
++              style: AppTextStyles.headlineMedium.copyWith(
++                color: AppColors.primary,
++              ),
+             ),
+           ),
+           const SizedBox(height: AppDimensions.sm),
+@@ -153,11 +188,16 @@ class FanVotingScreen extends StatelessWidget {
+     );
+   }
+ 
+-  void _confirmVote(BuildContext context, Player player, FanVotingController controller) {
++  void _confirmVote(
++    BuildContext context,
++    Player player,
++    FanVotingController controller,
++  ) {
+     Get.defaultDialog(
+       title: 'تأكيد التصويت',
+       titleStyle: AppTextStyles.headlineMedium,
+-      middleText: 'هل أنت متأكد من منح صوتك لـ ${player.name}؟ هذا الإجراء لا يمكن التراجع عنه.',
++      middleText:
++          'هل أنت متأكد من منح صوتك لـ ${player.name}؟ هذا الإجراء لا يمكن التراجع عنه.',
+       middleTextStyle: AppTextStyles.bodyMedium,
+       backgroundColor: AppColors.surface,
+       radius: AppDimensions.radiusMd,
+@@ -173,7 +213,12 @@ class FanVotingScreen extends StatelessWidget {
+     );
+   }
+ 
+-  Widget _buildMessage({required IconData icon, required Color color, required String title, required String message}) {
++  Widget _buildMessage({
++    required IconData icon,
++    required Color color,
++    required String title,
++    required String message,
++  }) {
+     return Center(
+       child: GlassmorphicContainer(
+         margin: const EdgeInsets.all(AppDimensions.pagePadding),
+@@ -182,20 +227,23 @@ class FanVotingScreen extends StatelessWidget {
+         child: Column(
+           mainAxisSize: MainAxisSize.min,
+           children: [
+-            Icon(icon, size: 64, color: color).animate().scale(delay: const Duration(milliseconds: 200)),
++            Icon(
++              icon,
++              size: 64,
++              color: color,
++            ).animate().scale(delay: const Duration(milliseconds: 200)),
+             const SizedBox(height: AppDimensions.md),
+             Text(title, style: AppTextStyles.headlineMedium),
+             const SizedBox(height: AppDimensions.sm),
+             Text(
+               message,
+-              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textMuted),
++              style: AppTextStyles.bodyMedium.copyWith(
++                color: AppColors.textMuted,
++              ),
+               textAlign: TextAlign.center,
+             ),
+             const SizedBox(height: AppDimensions.lg),
+-            El7reefButton(
+-              text: 'العودة للمباراة',
+-              onPressed: () => Get.back(),
+-            ),
++            El7reefButton(text: 'العودة للمباراة', onPressed: () => Get.back()),
+           ],
+         ),
+       ),
+diff --git a/lib/features/tournament/controllers/tournament_operations_controller.dart b/lib/features/tournament/controllers/tournament_operations_controller.dart
+index d9b57a7..cebee2b 100644
+--- a/lib/features/tournament/controllers/tournament_operations_controller.dart
++++ b/lib/features/tournament/controllers/tournament_operations_controller.dart
+@@ -3,6 +3,7 @@ import 'package:get/get.dart';
+ import '../../../core/enums/match_status.dart';
+ import '../../../core/enums/tournament_enums.dart';
+ import '../../../core/enums/tournament_ops_enums.dart';
++import '../../../core/services/match_settlement_service.dart';
+ import '../../../core/services/tournament_fixture_service.dart';
+ import '../../../core/services/tournament_lifecycle_service.dart';
+ import '../../../core/services/tournament_ops_migration_service.dart';
+@@ -22,6 +23,7 @@ import '../../../domain/repositories/match_repository.dart';
+ import '../../../domain/repositories/team_repository.dart';
+ import '../../../domain/repositories/tournament_group_repository.dart';
+ import '../../../domain/repositories/tournament_repository.dart';
++import '../../../services/auth_service.dart';
+ 
+ class TournamentOperationsController extends GetxController {
+   static const Duration _participantSearchCacheTtl = Duration(seconds: 30);
+@@ -38,6 +40,8 @@ class TournamentOperationsController extends GetxController {
+   final TournamentOpsMigrationService _migrationService;
+   final TournamentLifecycleService _lifecycleService;
+   final TournamentFixtureService _fixtureService;
++  final AuthService _authService;
++  final MatchSettlementService _settlementService;
+ 
+   TournamentOperationsController({
+     required TournamentRepository tournamentRepository,
+@@ -52,6 +56,8 @@ class TournamentOperationsController extends GetxController {
+     required TournamentOpsMigrationService migrationService,
+     required TournamentLifecycleService lifecycleService,
+     required TournamentFixtureService fixtureService,
++    AuthService? authService,
++    MatchSettlementService? settlementService,
+   }) : _tournamentRepository = tournamentRepository,
+        _groupRepository = groupRepository,
+        _matchRepository = matchRepository,
+@@ -63,7 +69,9 @@ class TournamentOperationsController extends GetxController {
+        _participantService = participantService,
+        _migrationService = migrationService,
+        _lifecycleService = lifecycleService,
+-       _fixtureService = fixtureService;
++       _fixtureService = fixtureService,
++       _authService = authService ?? Get.find<AuthService>(),
++       _settlementService = settlementService ?? MatchSettlementService();
+ 
+   final tournament = Rxn<Tournament>();
+   final participants = <TournamentParticipant>[].obs;
+@@ -863,18 +871,37 @@ class TournamentOperationsController extends GetxController {
+   }
+ 
+   Future<void> startFixture(String fixtureId) async {
++    final actorId = _currentActorId();
++    if (actorId == null) return;
+     await _runAction(
+       message: 'تم بدء المباراة وأصبحت جارية الآن.',
+-      action: () => _fixtureService.startMatch(
+-        matchId: fixtureId,
+-        actorId: tournament.value?.organizerId ?? 'system',
+-      ),
++      action: () =>
++          _fixtureService.startMatch(matchId: fixtureId, actorId: actorId),
+       onSuccess: (updatedFixture) async {
+         _upsertFixture(updatedFixture);
+       },
+     );
+   }
+ 
++  Future<void> approveFixtureScore(String fixtureId) async {
++    final actorId = _currentActorId();
++    if (actorId == null) return;
++    await _runAction(
++      message: 'تم اعتماد نتيجة المباراة وتحديث البطولة.',
++      action: () =>
++          _settlementService.approveScore(matchId: fixtureId, actorId: actorId),
++    );
++  }
++
++  String? _currentActorId() {
++    final actorId = _authService.currentUserId;
++    if (actorId == null || actorId.isEmpty) {
++      _showSnackbar('غير مسموح', 'يجب تسجيل الدخول أولاً.');
++      return null;
++    }
++    return actorId;
++  }
++
+   Future<void> _runAction<T>({
+     required String message,
+     required Future<T> Function() action,
+diff --git a/lib/features/tournament/views/tournament_operations_screens.dart b/lib/features/tournament/views/tournament_operations_screens.dart
+index 263a52a..9132b08 100644
+--- a/lib/features/tournament/views/tournament_operations_screens.dart
++++ b/lib/features/tournament/views/tournament_operations_screens.dart
+@@ -1890,13 +1890,9 @@ class _FixtureOperationsCard extends StatelessWidget {
+                   label: const Text('Start Match'),
+                 ),
+                 OutlinedButton.icon(
+-                  onPressed: fixture.status == MatchStatus.open
+-                      ? null
+-                      : () => Get.toNamed(
+-                          AppRoutes.scoreApprovalForMatch(fixture.id),
+-                        ),
+-                  icon: const Icon(Icons.rule_folder_outlined),
+-                  label: const Text('Score Review'),
++                  onPressed: _scoreActionForMatch(controller, fixture),
++                  icon: Icon(_scoreActionIcon(fixture)),
++                  label: Text(_scoreActionLabel(fixture)),
+                 ),
+                 FilledButton.icon(
+                   onPressed: onSchedule,
+@@ -2107,13 +2103,9 @@ class _KnockoutFinalSummaryCard extends StatelessWidget {
+                     label: const Text('Matchday'),
+                   ),
+                   OutlinedButton.icon(
+-                    onPressed: match!.status == MatchStatus.open
+-                        ? null
+-                        : () => Get.toNamed(
+-                            AppRoutes.scoreApprovalForMatch(match!.id),
+-                          ),
+-                    icon: const Icon(Icons.rule_folder_outlined),
+-                    label: const Text('Score Review'),
++                    onPressed: _scoreActionForMatch(controller, match!),
++                    icon: Icon(_scoreActionIcon(match!)),
++                    label: Text(_scoreActionLabel(match!)),
+                   ),
+                 ],
+               ),
+@@ -2221,13 +2213,9 @@ class _KnockoutTieCard extends StatelessWidget {
+                     label: const Text('Matchday'),
+                   ),
+                   OutlinedButton.icon(
+-                    onPressed: match!.status == MatchStatus.open
+-                        ? null
+-                        : () => Get.toNamed(
+-                            AppRoutes.scoreApprovalForMatch(match!.id),
+-                          ),
+-                    icon: const Icon(Icons.rule_folder_outlined),
+-                    label: const Text('Score Review'),
++                    onPressed: _scoreActionForMatch(controller, match!),
++                    icon: Icon(_scoreActionIcon(match!)),
++                    label: Text(_scoreActionLabel(match!)),
+                   ),
+                 ],
+               ),
+@@ -2245,6 +2233,39 @@ String _fixtureStatusLabelText(FixtureStatus status) => switch (status) {
+   FixtureStatus.completed => 'Completed',
+ };
+ 
++VoidCallback? _scoreActionForMatch(
++  TournamentOperationsController controller,
++  Match match,
++) {
++  if (controller.isActing.value) {
++    return null;
++  }
++  return switch (match.status) {
++    MatchStatus.live => () => Get.toNamed(
++      AppRoutes.scoreApprovalForMatch(match.id),
++    ),
++    MatchStatus.completed ||
++    MatchStatus.pendingReview => () => controller.approveFixtureScore(match.id),
++    MatchStatus.settled => null,
++    _ => null,
++  };
++}
++
++String _scoreActionLabel(Match match) => switch (match.status) {
++  MatchStatus.live => 'Submit Score',
++  MatchStatus.completed => 'Approve Score',
++  MatchStatus.pendingReview => 'Review & Approve',
++  MatchStatus.settled => 'Approved',
++  _ => 'Score Review',
++};
++
++IconData _scoreActionIcon(Match match) => switch (match.status) {
++  MatchStatus.live => Icons.edit_note,
++  MatchStatus.completed || MatchStatus.pendingReview => Icons.verified_outlined,
++  MatchStatus.settled => Icons.check_circle_outline,
++  _ => Icons.rule_folder_outlined,
++};
++
+ String _tournamentStageLabel(TournamentStageType? stage) => switch (stage) {
+   TournamentStageType.groupStage => 'المجموعات',
+   TournamentStageType.knockoutStage => 'الإقصاء',
+diff --git a/pubspec.lock b/pubspec.lock
+index f238b09..eaa9814 100644
+--- a/pubspec.lock
++++ b/pubspec.lock
+@@ -1017,7 +1017,7 @@ packages:
+     source: hosted
+     version: "1.1.0"
+   path_provider:
+-    dependency: transitive
++    dependency: "direct main"
+     description:
+       name: path_provider
+       sha256: "50c5dd5b6e1aaf6fb3a78b33f6aa3afca52bf903a8a5298f53101fdaee55bbcd"
+diff --git a/pubspec.yaml b/pubspec.yaml
+index ff8fa97..df3ebe6 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -41,6 +41,7 @@ dependencies:
+   intl: ^0.20.2
+   uuid: ^4.5.1
+   share_plus: ^10.1.4
++  path_provider: ^2.1.5
+   image_picker: ^1.1.2
+   connectivity_plus: ^6.1.4
+ 

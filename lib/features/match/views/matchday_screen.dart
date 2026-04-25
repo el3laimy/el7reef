@@ -689,7 +689,14 @@ class _NoManagedSideCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final message = controller.isLoggedIn
+    final isFriendlyHostWithoutFormalSides =
+        controller.isFriendlyMatchHost && !controller.hasFormalMatchdaySides;
+    final title = isFriendlyHostWithoutFormalSides
+        ? 'هذه المباراة لا تحتوي على فرق رسمية'
+        : 'لا يوجد طرف متاح حاليًا';
+    final message = isFriendlyHostWithoutFormalSides
+        ? 'يمكنك إدارة الدعوات وبدء هذه المباراة من اللوبي كمنظم للمباراة.'
+        : controller.isLoggedIn
         ? 'لا توجد أطراف تملك صلاحية إدارتها في هذه المباراة من حسابك الحالي.'
         : 'سجّل الدخول أولًا حتى تظهر لك أطراف المباراة التي يمكنك إدارتها.';
     return GlassmorphicContainer(
@@ -700,7 +707,7 @@ class _NoManagedSideCard extends StatelessWidget {
           const Icon(Icons.sports_soccer_outlined, size: 42),
           const SizedBox(height: AppDimensions.sm),
           Text(
-            'لا يوجد طرف متاح حاليًا',
+            title,
             style: AppTextStyles.titleLarge,
             textAlign: TextAlign.center,
           ),

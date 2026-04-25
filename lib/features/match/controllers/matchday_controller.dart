@@ -193,6 +193,23 @@ class MatchdayController extends GetxController {
 
   String? get currentUserId => _authSession.currentUserId;
   bool get isLoggedIn => currentUserId != null && currentUserId!.isNotEmpty;
+  bool get isFriendlyMatchHost {
+    final currentMatch = match.value;
+    final actorId = currentUserId;
+    return currentMatch != null &&
+        currentMatch.tournamentId == null &&
+        actorId != null &&
+        actorId.isNotEmpty &&
+        currentMatch.organizerId == actorId;
+  }
+
+  bool get hasFormalMatchdaySides {
+    final currentMatch = match.value;
+    if (currentMatch == null) return false;
+    return currentMatch.teamAId != null ||
+        currentMatch.teamBId != null ||
+        currentMatch.tournamentId != null;
+  }
 
   MatchdayManagedSide? get selectedSide {
     for (final side in managedSides) {
@@ -502,22 +519,46 @@ class MatchdayController extends GetxController {
   }
 
   /// Whether the current lineup can be unlocked for re-editing.
-  /// Allowed only when lineup is locked, match is not completed/settled, and
-  /// not frozen.
-  bool get canUnlockLineup =>
-      isLineupLocked &&
-      match.value?.status != MatchStatus.completed &&
-      match.value?.status != MatchStatus.settled &&
-      match.value?.isFrozen != true;
+  bool get canUnlockLineup {
+    final currentMatch = match.value;
+    final snapshot = activeSnapshot.value;
+    final actorId = currentUserId;
+    if (currentMatch == null ||
+        snapshot == null ||
+        actorId == null ||
+        actorId.isEmpty) {
+      return false;
+    }
+    if (!_isPreKickoffUnlockStatus(currentMatch)) {
+      return false;
+    }
+    final currentTournament = tournament.value;
+    if (currentTournament != null) {
+      return _tournamentPermissionService.canManageTeams(
+        currentTournament,
+        actorId,
+      );
+    }
+    return currentMatch.organizerId == actorId;
+  }
 
   /// Deletes the active snapshot so the lineup can be re-edited.
   Future<void> unlockLineup() async {
     final snapshot = activeSnapshot.value;
     if (snapshot == null) return;
+    final actorId = currentUserId;
+    if (actorId == null || actorId.isEmpty) {
+      _showSnack('غير مسموح', 'يجب تسجيل الدخول أولاً.');
+      return;
+    }
 
     try {
       isSubmitting.value = true;
-      await _snapshotRepository.deleteSnapshot(snapshot.id);
+      await _matchdayService.unlockLineup(
+        matchId: matchId,
+        snapshotId: snapshot.id,
+        actorId: actorId,
+      );
       activeSnapshot.value = null;
       _showSnack('تم فك القفل', 'يمكنك تعديل التشكيلة من جديد.');
       await _loadSelectedSideState();
@@ -526,6 +567,17 @@ class MatchdayController extends GetxController {
     } finally {
       isSubmitting.value = false;
     }
+  }
+
+  bool _isPreKickoffUnlockStatus(Match currentMatch) {
+    if (currentMatch.isFrozen || currentMatch.status == MatchStatus.frozen) {
+      return false;
+    }
+    return currentMatch.status != MatchStatus.live &&
+        currentMatch.status != MatchStatus.completed &&
+        currentMatch.status != MatchStatus.pendingReview &&
+        currentMatch.status != MatchStatus.ratingWindow &&
+        currentMatch.status != MatchStatus.settled;
   }
 
   /// Navigates to TeamLineupEditorScreen for the currently selected
@@ -991,11 +1043,8 @@ class MatchdayController extends GetxController {
     required Tournament? tournament,
     required String actorId,
   }) {
-    if (match.organizerId == actorId) {
-      return true;
-    }
     if (tournament == null) {
-      return false;
+      return match.organizerId == actorId;
     }
     if (tournament.organizerId == actorId) {
       return true;
@@ -1046,6 +1095,9 @@ class MatchdayController extends GetxController {
     final raw = error.toString();
     if (raw.startsWith('Exception: ')) {
       return raw.substring('Exception: '.length);
+    }
+    if (raw.startsWith('Bad state: ')) {
+      return raw.substring('Bad state: '.length);
     }
     return raw;
   }

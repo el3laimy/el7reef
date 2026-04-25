@@ -690,13 +690,13 @@ class MatchdayService {
             matchSnapshot.id,
           ).toEntity();
           _ensureMatchAvailableForPreKickoff(match);
+          _assertSlotAssignmentsBelongToStarters(
+            starters: validation.starters,
+            slotAssignments: slotAssignments,
+          );
 
           final decoratedStarters = _decorateEntriesWithSlotAssignments(
             entries: validation.starters,
-            slotAssignments: slotAssignments,
-          );
-          final decoratedBench = _decorateEntriesWithSlotAssignments(
-            entries: validation.bench,
             slotAssignments: slotAssignments,
           );
           final snapshot = MatchLineupSnapshot(
@@ -706,7 +706,7 @@ class MatchdayService {
             tournamentRegistrationId: context.registration?.id,
             checkInId: validation.checkIn.id,
             starters: decoratedStarters,
-            bench: decoratedBench,
+            bench: validation.bench,
             lockedBy: actorId,
             lockedAt: effectiveNow,
             playerCount: validation.requiredStarterCount,
@@ -808,14 +808,14 @@ class MatchdayService {
             matchSnapshot.id,
           ).toEntity();
           _ensureMatchAvailableForPreKickoff(match);
-
-          final decoratedStarters = _decorateEntriesWithSlotAssignments(
-            entries: validation.starters,
+          _assertSlotAssignmentsBelongToStarters(
+            starters: validation.starters,
             slotAssignments: slotAssignments,
             useGuestPlayerIdAsKey: true,
           );
-          final decoratedBench = _decorateEntriesWithSlotAssignments(
-            entries: validation.bench,
+
+          final decoratedStarters = _decorateEntriesWithSlotAssignments(
+            entries: validation.starters,
             slotAssignments: slotAssignments,
             useGuestPlayerIdAsKey: true,
           );
@@ -826,7 +826,7 @@ class MatchdayService {
             tournamentRegistrationId: context.registration?.id,
             checkInId: validation.checkIn.id,
             starters: decoratedStarters,
-            bench: decoratedBench,
+            bench: validation.bench,
             lockedBy: actorId,
             lockedAt: effectiveNow,
             playerCount: validation.requiredStarterCount,
@@ -856,6 +856,67 @@ class MatchdayService {
       snapshot: transactionResult.snapshot,
       validation: validation,
     );
+  }
+
+  Future<void> unlockLineup({
+    required String matchId,
+    required String snapshotId,
+    required String actorId,
+  }) async {
+    if (actorId.trim().isEmpty) {
+      throw Exception('يجب تسجيل الدخول أولاً.');
+    }
+
+    await _firestore.runTransaction((transaction) async {
+      final matchRef = _matchesRef.doc(matchId);
+      final snapshotRef = _snapshotsRef.doc(snapshotId);
+      final matchSnapshot = await transaction.get(matchRef);
+      final lineupSnapshot = await transaction.get(snapshotRef);
+
+      if (!matchSnapshot.exists || matchSnapshot.data() == null) {
+        throw Exception('المباراة المطلوبة غير موجودة.');
+      }
+      if (!lineupSnapshot.exists || lineupSnapshot.data() == null) {
+        throw Exception('التشكيلة المقفولة غير موجودة.');
+      }
+
+      final match = MatchModel.fromJson(
+        matchSnapshot.data()!,
+        matchSnapshot.id,
+      ).toEntity();
+      final snapshot = MatchLineupSnapshotModel.fromJson(
+        lineupSnapshot.data()!,
+        lineupSnapshot.id,
+      ).toEntity();
+
+      if (snapshot.matchId != match.id) {
+        throw Exception('التشكيلة لا تخص هذه المباراة.');
+      }
+      _ensureMatchAvailableForPreKickoff(match);
+
+      final tournament = await _loadTournamentForTransaction(
+        transaction: transaction,
+        tournamentId: match.tournamentId,
+      );
+      _ensureCanUnlockLineup(
+        match: match,
+        tournament: tournament,
+        actorId: actorId,
+      );
+
+      transaction.delete(snapshotRef);
+      final updates = <String, Object?>{};
+      if (snapshot.teamId != null) {
+        updates['lineupSnapshotIds.${snapshot.teamId}'] = FieldValue.delete();
+      }
+      if (snapshot.guestTeamId != null) {
+        updates['guestLineupSnapshotIds.${snapshot.guestTeamId}'] =
+            FieldValue.delete();
+      }
+      if (updates.isNotEmpty) {
+        transaction.update(matchRef, updates);
+      }
+    });
   }
 
   Future<MatchdaySubstitutionResult> recordRegisteredTeamSubstitution({
@@ -1069,6 +1130,37 @@ class MatchdayService {
     return TournamentModel.fromJson(snapshot.data()!, snapshot.id).toEntity();
   }
 
+  Future<Tournament?> _loadTournamentForTransaction({
+    required Transaction transaction,
+    required String? tournamentId,
+  }) async {
+    if (tournamentId == null || tournamentId.isEmpty) {
+      return null;
+    }
+    final snapshot = await transaction.get(_tournamentsRef.doc(tournamentId));
+    if (!snapshot.exists || snapshot.data() == null) {
+      throw Exception('الدورة المرتبطة بالمباراة غير موجودة.');
+    }
+    return TournamentModel.fromJson(snapshot.data()!, snapshot.id).toEntity();
+  }
+
+  void _ensureCanUnlockLineup({
+    required Match match,
+    required Tournament? tournament,
+    required String actorId,
+  }) {
+    if (tournament != null) {
+      if (!_tournamentPermissionService.canManageTeams(tournament, actorId)) {
+        throw Exception('فقط منظم أو مشرف البطولة يمكنه فك قفل التشكيلة.');
+      }
+      return;
+    }
+
+    if (match.organizerId != actorId) {
+      throw Exception('فقط منظم المباراة يمكنه فك قفل التشكيلة.');
+    }
+  }
+
   Future<TournamentRegistration?> _loadApprovedRegistrationForTeam({
     required String? tournamentId,
     required String teamId,
@@ -1128,11 +1220,11 @@ class MatchdayService {
     required Tournament? tournament,
     required String actorId,
   }) {
-    if (match.organizerId == actorId) {
-      return true;
-    }
     if (tournament == null) {
-      return false;
+      return match.organizerId == actorId;
+    }
+    if (tournament.organizerId == actorId) {
+      return true;
     }
     if (!tournament.assistants.any(
       (assistant) => assistant.userId == actorId,
@@ -1629,6 +1721,30 @@ class MatchdayService {
           );
         })
         .toList(growable: false);
+  }
+
+  void _assertSlotAssignmentsBelongToStarters({
+    required List<MatchLineupEntry> starters,
+    required List<SlotAssignment> slotAssignments,
+    bool useGuestPlayerIdAsKey = false,
+  }) {
+    if (slotAssignments.isEmpty) return;
+
+    final starterIds = starters
+        .map(
+          (entry) => useGuestPlayerIdAsKey
+              ? entry.guestPlayerId
+              : entry.teamMembershipId,
+        )
+        .whereType<String>()
+        .toSet();
+    final invalidIds = slotAssignments
+        .map((assignment) => assignment.membershipId)
+        .where((membershipId) => !starterIds.contains(membershipId))
+        .toSet();
+    if (invalidIds.isNotEmpty) {
+      throw Exception('توجد slot assignment للاعب غير أساسي في التشكيلة.');
+    }
   }
 
   List<MatchLineupEntry> _buildGuestEntries({

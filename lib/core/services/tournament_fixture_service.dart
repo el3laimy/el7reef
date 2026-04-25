@@ -20,25 +20,29 @@ import '../../domain/entities/tournament_participant.dart';
 import 'group_stage_builder.dart';
 import 'tournament_audit_emitter.dart';
 import 'tournament_participant_service.dart';
+import 'tournament_permission_service.dart';
 
 class TournamentFixtureService {
   final FirebaseFirestore _firestore;
   final TournamentParticipantService _participantService;
   final GroupStageBuilder _groupStageBuilder;
   final TournamentAuditEmitter _auditEmitter;
+  final TournamentPermissionService _permissionService;
 
   TournamentFixtureService({
     FirebaseFirestore? firestore,
     TournamentParticipantService? participantService,
     GroupStageBuilder? groupStageBuilder,
     TournamentAuditEmitter? auditEmitter,
+    TournamentPermissionService? permissionService,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _participantService =
            participantService ??
            TournamentParticipantService(firestore: firestore),
        _groupStageBuilder = groupStageBuilder ?? const GroupStageBuilder(),
        _auditEmitter =
-           auditEmitter ?? TournamentAuditEmitter(firestore: firestore);
+           auditEmitter ?? TournamentAuditEmitter(firestore: firestore),
+       _permissionService = permissionService ?? TournamentPermissionService();
 
   CollectionReference<Map<String, dynamic>> get _tournamentsRef =>
       _firestore.collection(FirebasePaths.tournaments);
@@ -100,11 +104,18 @@ class TournamentFixtureService {
     required String actorId,
     DateTime? now,
   }) async {
+    if (actorId.trim().isEmpty) {
+      throw Exception('يجب تسجيل الدخول أولاً.');
+    }
     final effectiveNow = now ?? DateTime.now();
     final match = await _loadMatch(matchId);
     final tournamentId = match.tournamentId;
     if (tournamentId == null || tournamentId.isEmpty) {
       throw Exception('لا يمكن بدء مباراة ليست جزءًا من بطولة.');
+    }
+    final tournament = await _loadTournament(tournamentId);
+    if (!_permissionService.canManageTeams(tournament, actorId)) {
+      throw Exception('لا تملك صلاحية بدء مباريات هذه البطولة.');
     }
     if (match.isFrozen || match.status == MatchStatus.frozen) {
       throw Exception('لا يمكن بدء مباراة مجمدة.');
@@ -126,7 +137,6 @@ class TournamentFixtureService {
       throw Exception('يجب نشر fixture قبل بدء المباراة.');
     }
 
-    final tournament = await _loadTournament(tournamentId);
     final homeSide = await _loadStartSide(
       match: match,
       participantId: match.teamAParticipantId,

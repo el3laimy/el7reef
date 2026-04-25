@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../../core/enums/match_status.dart';
 import '../../../core/enums/tournament_enums.dart';
 import '../../../core/enums/tournament_ops_enums.dart';
+import '../../../core/services/match_settlement_service.dart';
 import '../../../core/services/tournament_fixture_service.dart';
 import '../../../core/services/tournament_lifecycle_service.dart';
 import '../../../core/services/tournament_ops_migration_service.dart';
@@ -22,6 +23,7 @@ import '../../../domain/repositories/match_repository.dart';
 import '../../../domain/repositories/team_repository.dart';
 import '../../../domain/repositories/tournament_group_repository.dart';
 import '../../../domain/repositories/tournament_repository.dart';
+import '../../../services/auth_service.dart';
 
 class TournamentOperationsController extends GetxController {
   static const Duration _participantSearchCacheTtl = Duration(seconds: 30);
@@ -38,6 +40,8 @@ class TournamentOperationsController extends GetxController {
   final TournamentOpsMigrationService _migrationService;
   final TournamentLifecycleService _lifecycleService;
   final TournamentFixtureService _fixtureService;
+  final AuthService _authService;
+  final MatchSettlementService _settlementService;
 
   TournamentOperationsController({
     required TournamentRepository tournamentRepository,
@@ -52,6 +56,8 @@ class TournamentOperationsController extends GetxController {
     required TournamentOpsMigrationService migrationService,
     required TournamentLifecycleService lifecycleService,
     required TournamentFixtureService fixtureService,
+    AuthService? authService,
+    MatchSettlementService? settlementService,
   }) : _tournamentRepository = tournamentRepository,
        _groupRepository = groupRepository,
        _matchRepository = matchRepository,
@@ -63,7 +69,9 @@ class TournamentOperationsController extends GetxController {
        _participantService = participantService,
        _migrationService = migrationService,
        _lifecycleService = lifecycleService,
-       _fixtureService = fixtureService;
+       _fixtureService = fixtureService,
+       _authService = authService ?? Get.find<AuthService>(),
+       _settlementService = settlementService ?? MatchSettlementService();
 
   final tournament = Rxn<Tournament>();
   final participants = <TournamentParticipant>[].obs;
@@ -863,16 +871,35 @@ class TournamentOperationsController extends GetxController {
   }
 
   Future<void> startFixture(String fixtureId) async {
+    final actorId = _currentActorId();
+    if (actorId == null) return;
     await _runAction(
       message: 'تم بدء المباراة وأصبحت جارية الآن.',
-      action: () => _fixtureService.startMatch(
-        matchId: fixtureId,
-        actorId: tournament.value?.organizerId ?? 'system',
-      ),
+      action: () =>
+          _fixtureService.startMatch(matchId: fixtureId, actorId: actorId),
       onSuccess: (updatedFixture) async {
         _upsertFixture(updatedFixture);
       },
     );
+  }
+
+  Future<void> approveFixtureScore(String fixtureId) async {
+    final actorId = _currentActorId();
+    if (actorId == null) return;
+    await _runAction(
+      message: 'تم اعتماد نتيجة المباراة وتحديث البطولة.',
+      action: () =>
+          _settlementService.approveScore(matchId: fixtureId, actorId: actorId),
+    );
+  }
+
+  String? _currentActorId() {
+    final actorId = _authService.currentUserId;
+    if (actorId == null || actorId.isEmpty) {
+      _showSnackbar('غير مسموح', 'يجب تسجيل الدخول أولاً.');
+      return null;
+    }
+    return actorId;
   }
 
   Future<void> _runAction<T>({
