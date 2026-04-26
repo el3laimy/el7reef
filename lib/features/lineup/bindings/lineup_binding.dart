@@ -9,12 +9,16 @@ import '../../../data/repositories/match_attendance_repository_impl.dart';
 import '../../../data/repositories/match_check_in_repository_impl.dart';
 import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
 import '../../../data/repositories/match_repository_impl.dart';
+import '../../../data/repositories/match_side_player_repository_impl.dart';
+import '../../../data/repositories/match_side_repository_impl.dart';
 import '../../../data/repositories/player_repository_impl.dart';
 import '../../../data/repositories/team_membership_repository_impl.dart';
 import '../../../data/repositories/team_repository_impl.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
 import '../../../services/auth_service.dart';
+import '../../shareables/controllers/lineup_share_controller.dart';
 import '../controllers/match_result_lineup_controller.dart';
+import '../controllers/match_side_lineup_editor_controller.dart';
 import '../controllers/team_lineup_editor_controller.dart';
 
 class TeamLineupEditorBinding extends Bindings {
@@ -38,6 +42,23 @@ class TeamLineupEditorBinding extends Bindings {
   }
 }
 
+class MatchSideLineupEditorBinding extends Bindings {
+  @override
+  void dependencies() {
+    _putSharedLineupDependencies();
+    Get.lazyPut<MatchSideLineupEditorController>(
+      () => MatchSideLineupEditorController(
+        authSession: _authSession(),
+        matchRepository: Get.find<MatchRepositoryImpl>(),
+        matchSideRepository: Get.find<MatchSideRepositoryImpl>(),
+        matchSidePlayerRepository: Get.find<MatchSidePlayerRepositoryImpl>(),
+        snapshotRepository: Get.find<MatchLineupSnapshotRepositoryImpl>(),
+        matchdayService: Get.find<MatchdayService>(),
+      ),
+    );
+  }
+}
+
 class MatchResultLineupBinding extends Bindings {
   @override
   void dependencies() {
@@ -47,6 +68,8 @@ class MatchResultLineupBinding extends Bindings {
         matchRepository: Get.find<MatchRepositoryImpl>(),
         teamRepository: Get.find<TeamRepositoryImpl>(),
         snapshotRepository: Get.find<MatchLineupSnapshotRepositoryImpl>(),
+        matchSideRepository: Get.find<MatchSideRepositoryImpl>(),
+        matchSidePlayerRepository: Get.find<MatchSidePlayerRepositoryImpl>(),
       ),
     );
   }
@@ -78,6 +101,14 @@ void _putSharedLineupDependencies() {
       () => MatchLineupSnapshotRepositoryImpl(),
     );
   }
+  if (!Get.isRegistered<MatchSideRepositoryImpl>()) {
+    Get.lazyPut<MatchSideRepositoryImpl>(() => MatchSideRepositoryImpl());
+  }
+  if (!Get.isRegistered<MatchSidePlayerRepositoryImpl>()) {
+    Get.lazyPut<MatchSidePlayerRepositoryImpl>(
+      () => MatchSidePlayerRepositoryImpl(),
+    );
+  }
   if (!Get.isRegistered<MatchCheckInRepositoryImpl>()) {
     Get.lazyPut<MatchCheckInRepositoryImpl>(() => MatchCheckInRepositoryImpl());
   }
@@ -95,6 +126,15 @@ void _putSharedLineupDependencies() {
         teamRepository: Get.find<TeamRepositoryImpl>(),
         membershipRepository: Get.find<TeamMembershipRepositoryImpl>(),
         guestPlayerRepository: Get.find<GuestPlayerRepositoryImpl>(),
+      ),
+    );
+  }
+  if (!Get.isRegistered<LineupShareController>()) {
+    Get.lazyPut<LineupShareController>(
+      () => LineupShareController(
+        snapshotRepository: Get.find<MatchLineupSnapshotRepositoryImpl>(),
+        teamRepository: Get.find<TeamRepositoryImpl>(),
+        matchSideRepository: Get.find<MatchSideRepositoryImpl>(),
       ),
     );
   }

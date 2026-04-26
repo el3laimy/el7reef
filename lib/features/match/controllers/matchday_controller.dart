@@ -15,6 +15,7 @@ import '../../../data/repositories/match_attendance_repository_impl.dart';
 import '../../../data/repositories/match_check_in_repository_impl.dart';
 import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
 import '../../../data/repositories/match_repository_impl.dart';
+import '../../../data/repositories/match_side_repository_impl.dart';
 import '../../../data/repositories/match_substitution_repository_impl.dart';
 import '../../../data/repositories/player_repository_impl.dart';
 import '../../../data/repositories/team_membership_repository_impl.dart';
@@ -26,11 +27,13 @@ import '../../../domain/entities/match.dart';
 import '../../../domain/entities/match_attendance.dart';
 import '../../../domain/entities/match_check_in.dart';
 import '../../../domain/entities/match_lineup_snapshot.dart';
+import '../../../domain/entities/match_side.dart';
 import '../../../domain/entities/match_substitution.dart';
 import '../../../domain/entities/player.dart';
 import '../../../domain/entities/team.dart';
 import '../../../domain/entities/team_membership.dart';
 import '../../../domain/entities/tournament.dart';
+import '../models/friendly_match_side_view.dart';
 
 enum MatchdayManagedSideKind { registeredTeam, guestTeam }
 
@@ -129,6 +132,7 @@ class MatchdayController extends GetxController {
   final MatchCheckInRepositoryImpl _checkInRepository;
   final MatchAttendanceRepositoryImpl _attendanceRepository;
   final MatchLineupSnapshotRepositoryImpl _snapshotRepository;
+  final MatchSideRepositoryImpl _matchSideRepository;
   final MatchSubstitutionRepositoryImpl _substitutionRepository;
   final TournamentPermissionService _tournamentPermissionService;
 
@@ -147,6 +151,7 @@ class MatchdayController extends GetxController {
     required MatchCheckInRepositoryImpl checkInRepository,
     required MatchAttendanceRepositoryImpl attendanceRepository,
     required MatchLineupSnapshotRepositoryImpl snapshotRepository,
+    required MatchSideRepositoryImpl matchSideRepository,
     required MatchSubstitutionRepositoryImpl substitutionRepository,
     required TournamentPermissionService tournamentPermissionService,
   }) : _authSession = authSession,
@@ -162,6 +167,7 @@ class MatchdayController extends GetxController {
        _checkInRepository = checkInRepository,
        _attendanceRepository = attendanceRepository,
        _snapshotRepository = snapshotRepository,
+       _matchSideRepository = matchSideRepository,
        _substitutionRepository = substitutionRepository,
        _tournamentPermissionService = tournamentPermissionService;
 
@@ -171,6 +177,8 @@ class MatchdayController extends GetxController {
 
   final Rx<Match?> match = Rx<Match?>(null);
   final Rx<Tournament?> tournament = Rx<Tournament?>(null);
+  final RxString sideADisplayName = 'فريق A'.obs;
+  final RxString sideBDisplayName = 'فريق B'.obs;
   final RxList<MatchdayManagedSide> managedSides = <MatchdayManagedSide>[].obs;
   final RxString selectedSideKey = ''.obs;
 
@@ -284,6 +292,7 @@ class MatchdayController extends GetxController {
 
       match.value = loadedMatch;
       tournament.value = loadedTournament;
+      await _loadFriendlySideDisplayNames(loadedMatch);
 
       final sides = await _discoverManagedSides(
         match: loadedMatch,
@@ -307,6 +316,39 @@ class MatchdayController extends GetxController {
       errorMessage.value = _formatError(error);
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> _loadFriendlySideDisplayNames(Match loadedMatch) async {
+    sideADisplayName.value = 'فريق A';
+    sideBDisplayName.value = 'فريق B';
+    if (loadedMatch.tournamentId != null) {
+      return;
+    }
+
+    final teamIds = <String>[
+      if (loadedMatch.teamAId != null && loadedMatch.teamAId!.isNotEmpty)
+        loadedMatch.teamAId!,
+      if (loadedMatch.teamBId != null && loadedMatch.teamBId!.isNotEmpty)
+        loadedMatch.teamBId!,
+    ];
+    final results = await Future.wait<dynamic>([
+      _teamRepository.getTeamsByIds(teamIds),
+      _matchSideRepository.getMatchSides(loadedMatch.id),
+    ]);
+    final teams = results[0] as List<Team>;
+    final sides = results[1] as List<MatchSide>;
+    final sideViews = FriendlyMatchSideView.fromMatch(
+      match: loadedMatch,
+      teamsById: {for (final team in teams) team.id: team},
+      sides: sides,
+    );
+    for (final side in sideViews) {
+      if (side.sideKey == 'A') {
+        sideADisplayName.value = side.displayName;
+      } else if (side.sideKey == 'B') {
+        sideBDisplayName.value = side.displayName;
+      }
     }
   }
 
@@ -577,7 +619,8 @@ class MatchdayController extends GetxController {
         currentMatch.status != MatchStatus.completed &&
         currentMatch.status != MatchStatus.pendingReview &&
         currentMatch.status != MatchStatus.ratingWindow &&
-        currentMatch.status != MatchStatus.settled;
+        currentMatch.status != MatchStatus.settled &&
+        currentMatch.status != MatchStatus.cancelled;
   }
 
   /// Navigates to TeamLineupEditorScreen for the currently selected

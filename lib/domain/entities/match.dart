@@ -39,6 +39,9 @@ class Match {
   final DateTime createdAt;
   final DateTime? startedAt;
   final DateTime? completedAt;
+  final DateTime? cancelledAt;
+  final String? cancelledBy;
+  final String? cancelReason;
 
   const Match({
     required this.id,
@@ -76,6 +79,9 @@ class Match {
     required this.createdAt,
     this.startedAt,
     this.completedAt,
+    this.cancelledAt,
+    this.cancelledBy,
+    this.cancelReason,
   });
 
   /// هل انتهت وعندنا نتيجة؟
@@ -139,6 +145,9 @@ class Match {
     DateTime? createdAt,
     DateTime? startedAt,
     DateTime? completedAt,
+    DateTime? cancelledAt,
+    String? cancelledBy,
+    String? cancelReason,
   }) {
     return Match(
       id: id ?? this.id,
@@ -176,6 +185,9 @@ class Match {
       createdAt: createdAt ?? this.createdAt,
       startedAt: startedAt ?? this.startedAt,
       completedAt: completedAt ?? this.completedAt,
+      cancelledAt: cancelledAt ?? this.cancelledAt,
+      cancelledBy: cancelledBy ?? this.cancelledBy,
+      cancelReason: cancelReason ?? this.cancelReason,
     );
   }
 }

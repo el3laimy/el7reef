@@ -64,6 +64,7 @@ class FormationSlot {
   final double y;
   final String? playerId;
   final String? guestPlayerId;
+  final String? matchSidePlayerId;
   final bool isCaptain;
   final bool isLocked;
 
@@ -76,14 +77,19 @@ class FormationSlot {
     required this.y,
     this.playerId,
     this.guestPlayerId,
+    this.matchSidePlayerId,
     this.isCaptain = false,
     this.isLocked = false,
   }) : assert(
-         playerId == null || guestPlayerId == null,
-         'A lineup slot can hold either a registered player or a guest.',
+         (playerId == null ? 0 : 1) +
+                 (guestPlayerId == null ? 0 : 1) +
+                 (matchSidePlayerId == null ? 0 : 1) <=
+             1,
+         'A lineup slot can hold only one occupant.',
        );
 
-  bool get isEmpty => playerId == null && guestPlayerId == null;
+  bool get isEmpty =>
+      playerId == null && guestPlayerId == null && matchSidePlayerId == null;
 
   String? get occupantKey {
     if (playerId != null) {
@@ -91,6 +97,9 @@ class FormationSlot {
     }
     if (guestPlayerId != null) {
       return LineupPlayer.guestKey(guestPlayerId!);
+    }
+    if (matchSidePlayerId != null) {
+      return LineupPlayer.matchSidePlayerKey(matchSidePlayerId!);
     }
     return null;
   }
@@ -104,6 +113,7 @@ class FormationSlot {
     double? y,
     Object? playerId = _unset,
     Object? guestPlayerId = _unset,
+    Object? matchSidePlayerId = _unset,
     bool? isCaptain,
     bool? isLocked,
   }) {
@@ -120,19 +130,28 @@ class FormationSlot {
       guestPlayerId: identical(guestPlayerId, _unset)
           ? this.guestPlayerId
           : guestPlayerId as String?,
+      matchSidePlayerId: identical(matchSidePlayerId, _unset)
+          ? this.matchSidePlayerId
+          : matchSidePlayerId as String?,
       isCaptain: isCaptain ?? this.isCaptain,
       isLocked: isLocked ?? this.isLocked,
     );
   }
 
   FormationSlot clearPlayer() {
-    return copyWith(playerId: null, guestPlayerId: null, isCaptain: false);
+    return copyWith(
+      playerId: null,
+      guestPlayerId: null,
+      matchSidePlayerId: null,
+      isCaptain: false,
+    );
   }
 
   FormationSlot assignPlayer(LineupPlayer player) {
     return copyWith(
       playerId: player.isRegistered ? player.id : null,
-      guestPlayerId: player.isRegistered ? null : player.id,
+      guestPlayerId: player.isGuest ? player.id : null,
+      matchSidePlayerId: player.isTemporary ? player.id : null,
       isCaptain: player.isCaptain,
     );
   }
@@ -146,6 +165,7 @@ class LineupPlayer {
   final int? number;
   final String? preferredPosition;
   final bool isRegistered;
+  final bool isTemporary;
   final LineupInviteStatus? inviteStatus;
   final bool isCaptain;
 
@@ -157,16 +177,25 @@ class LineupPlayer {
     this.number,
     this.preferredPosition,
     required this.isRegistered,
+    this.isTemporary = false,
     this.inviteStatus,
     this.isCaptain = false,
-  });
+  }) : assert(
+         !(isRegistered && isTemporary),
+         'A lineup player cannot be both registered and temporary.',
+       );
 
-  bool get isGuest => !isRegistered;
+  bool get isGuest => !isRegistered && !isTemporary;
 
-  String get key => isRegistered ? registeredKey(id) : guestKey(id);
+  String get key {
+    if (isRegistered) return registeredKey(id);
+    if (isTemporary) return matchSidePlayerKey(id);
+    return guestKey(id);
+  }
 
   static String registeredKey(String id) => 'player:$id';
   static String guestKey(String id) => 'guest:$id';
+  static String matchSidePlayerKey(String id) => 'sidePlayer:$id';
 }
 
 class LineupGuestPlayer {

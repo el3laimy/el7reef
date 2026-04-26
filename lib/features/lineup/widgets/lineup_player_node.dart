@@ -132,12 +132,12 @@ class LineupPlayerNode extends StatelessWidget {
                             background: AppColors.secondary,
                           ),
                         ),
-                      if (!isEmpty && player!.isGuest)
-                        const PositionedDirectional(
+                      if (!isEmpty && (player!.isGuest || player!.isTemporary))
+                        PositionedDirectional(
                           bottom: -3,
                           end: -9,
                           child: _MiniBadge(
-                            label: 'ضيف',
+                            label: player!.isTemporary ? 'مؤقت' : 'ضيف',
                             color: Color(0xFF07111F),
                             background: AppColors.warning,
                           ),

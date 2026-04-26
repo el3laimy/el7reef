@@ -39,6 +39,8 @@ class MatchResultShareController {
       scoreB: scoreB,
       statusLabel: _statusLabel(match.status),
       winnerSide: match.winner,
+      // Do not infer tournament names from match flags; only show a real
+      // loaded name passed by the caller.
       tournamentName: _normalizeOptional(tournamentName),
       mvpName: mvpName,
       playedAt: match.completedAt ?? match.startedAt ?? match.scheduledAt,
@@ -50,7 +52,7 @@ class MatchResultShareController {
     if (location != null && location.isNotEmpty) {
       return location;
     }
-    return match.isOrganized ? 'مباراة بطولة' : 'مباراة ودية';
+    return 'نتيجة المباراة';
   }
 
   String _statusLabel(MatchStatus status) => switch (status) {

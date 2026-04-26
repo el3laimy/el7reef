@@ -1,12 +1,14 @@
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/enums/match_status.dart';
+import '../../../core/services/match_cancellation_service.dart';
 import '../../../core/lineup/formation_library.dart';
 import '../../../core/services/match_settlement_service.dart';
 import '../../../core/services/match_start_service.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
 import '../../../data/repositories/match_repository_impl.dart';
+import '../../../data/repositories/match_side_player_repository_impl.dart';
 import '../../../domain/entities/match.dart';
 import '../../../services/auth_service.dart';
 
@@ -14,10 +16,13 @@ import '../../../services/auth_service.dart';
 class MatchController extends GetxController {
   final AuthService _authService = Get.find<AuthService>();
   final MatchRepositoryImpl _matchRepo = MatchRepositoryImpl();
+  final MatchCancellationService _cancellationService =
+      MatchCancellationService();
   final MatchSettlementService _settlementService = MatchSettlementService();
   late final MatchStartService _matchStartService = MatchStartService(
     matchRepo: _matchRepo,
     snapshotRepo: MatchLineupSnapshotRepositoryImpl(),
+    sidePlayerRepo: MatchSidePlayerRepositoryImpl(),
   );
 
   /// المستخدم الحالي — للتحقق من صلاحيات المنظم في الـ Views
@@ -203,9 +208,18 @@ class MatchController extends GetxController {
   }
 
   /// إلغاء مباراة (soft-delete)
-  Future<void> cancelMatch(String matchId) async {
+  Future<void> cancelMatch(String matchId, {String? reason}) async {
+    final actorId = _authService.currentUserId;
+    if (actorId == null || actorId.isEmpty) {
+      Get.snackbar('غير مسموح', 'يجب تسجيل الدخول أولاً.');
+      return;
+    }
     try {
-      await _matchRepo.cancelMatch(matchId);
+      await _cancellationService.cancelFriendlyMatch(
+        matchId: matchId,
+        actorId: actorId,
+        reason: reason,
+      );
       liveMatches.removeWhere((m) => m.id == matchId);
       myMatches.removeWhere((m) => m.id == matchId);
       Get.snackbar(
@@ -215,7 +229,7 @@ class MatchController extends GetxController {
       );
     } catch (e) {
       AppLogger.error('MatchController.cancelMatch', e);
-      Get.snackbar('خطأ', 'فشل إلغاء المباراة');
+      Get.snackbar('خطأ', _readableError(e));
     }
   }
 

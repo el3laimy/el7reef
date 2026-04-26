@@ -10,6 +10,7 @@ import '../../../data/repositories/match_attendance_repository_impl.dart';
 import '../../../data/repositories/match_check_in_repository_impl.dart';
 import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
 import '../../../data/repositories/match_repository_impl.dart';
+import '../../../data/repositories/match_side_repository_impl.dart';
 import '../../../data/repositories/match_substitution_repository_impl.dart';
 import '../../../data/repositories/player_repository_impl.dart';
 import '../../../data/repositories/team_membership_repository_impl.dart';
@@ -70,6 +71,9 @@ class MatchdayBinding extends Bindings {
         () => MatchLineupSnapshotRepositoryImpl(),
       );
     }
+    if (!Get.isRegistered<MatchSideRepositoryImpl>()) {
+      Get.lazyPut<MatchSideRepositoryImpl>(() => MatchSideRepositoryImpl());
+    }
     if (!Get.isRegistered<MatchSubstitutionRepositoryImpl>()) {
       Get.lazyPut<MatchSubstitutionRepositoryImpl>(
         () => MatchSubstitutionRepositoryImpl(),
@@ -87,8 +91,8 @@ class MatchdayBinding extends Bindings {
     final authSession = Get.isRegistered<AuthSession>()
         ? Get.find<AuthSession>()
         : Get.isRegistered<AuthService>()
-            ? AuthServiceSession(Get.find<AuthService>())
-            : const _AnonymousAuthSession();
+        ? AuthServiceSession(Get.find<AuthService>())
+        : const _AnonymousAuthSession();
 
     Get.lazyPut<MatchdayController>(
       () => MatchdayController(
@@ -97,7 +101,8 @@ class MatchdayBinding extends Bindings {
         matchdayService: Get.find<MatchdayService>(),
         matchRepository: Get.find<MatchRepositoryImpl>(),
         tournamentRepository: Get.find<TournamentRepositoryImpl>(),
-        registrationRepository: Get.find<TournamentRegistrationRepositoryImpl>(),
+        registrationRepository:
+            Get.find<TournamentRegistrationRepositoryImpl>(),
         teamRepository: Get.find<TeamRepositoryImpl>(),
         guestTeamRepository: Get.find<GuestTeamRepositoryImpl>(),
         membershipRepository: Get.find<TeamMembershipRepositoryImpl>(),
@@ -106,6 +111,7 @@ class MatchdayBinding extends Bindings {
         checkInRepository: Get.find<MatchCheckInRepositoryImpl>(),
         attendanceRepository: Get.find<MatchAttendanceRepositoryImpl>(),
         snapshotRepository: Get.find<MatchLineupSnapshotRepositoryImpl>(),
+        matchSideRepository: Get.find<MatchSideRepositoryImpl>(),
         substitutionRepository: Get.find<MatchSubstitutionRepositoryImpl>(),
         tournamentPermissionService: Get.find<TournamentPermissionService>(),
       ),

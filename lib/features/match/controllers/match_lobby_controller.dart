@@ -3,14 +3,19 @@ import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/entities/match_invitation.dart';
+import '../../../domain/entities/match_side.dart';
+import '../../../domain/entities/match_side_player.dart';
 import '../../../domain/entities/player.dart';
 import '../../../domain/repositories/match_repository.dart';
 import '../../../domain/repositories/match_invitation_repository.dart';
 import '../../../data/repositories/player_repository_impl.dart';
 import '../../../data/repositories/team_repository_impl.dart';
+import '../../../data/repositories/match_side_player_repository_impl.dart';
+import '../../../data/repositories/match_side_repository_impl.dart';
 import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
 import '../../../services/auth_service.dart';
 import '../../../core/enums/match_status.dart';
+import '../../../core/services/match_cancellation_service.dart';
 import '../../../core/services/match_start_service.dart';
 import '../../../core/lineup/formation_library.dart';
 import '../../../core/utils/app_logger.dart';
@@ -29,8 +34,11 @@ class MatchLobbyController extends GetxController {
   final _authService = Get.find<AuthService>();
   final _playerRepo = Get.find<PlayerRepositoryImpl>();
   final _teamRepo = Get.find<TeamRepositoryImpl>();
+  final _sideRepo = Get.find<MatchSideRepositoryImpl>();
+  final _sidePlayerRepo = Get.find<MatchSidePlayerRepositoryImpl>();
   final _snapshotRepo = Get.find<MatchLineupSnapshotRepositoryImpl>();
   final _matchStartService = Get.find<MatchStartService>();
+  final _matchCancellationService = Get.find<MatchCancellationService>();
 
   // ── State ──
   final Rx<Match?> match = Rx<Match?>(null);
@@ -65,6 +73,15 @@ class MatchLobbyController extends GetxController {
         m.status == MatchStatus.open &&
         isOrganizer &&
         !hasLockedSnapshots.value;
+  }
+
+  bool get canCancelMatch {
+    final m = match.value;
+    return m != null &&
+        m.tournamentId == null &&
+        isOrganizer &&
+        !m.isFrozen &&
+        (m.status == MatchStatus.open || m.status == MatchStatus.full);
   }
 
   @override
@@ -141,10 +158,31 @@ class MatchLobbyController extends GetxController {
       if (m.teamBId != null && m.teamBId!.isNotEmpty) m.teamBId!,
     ];
     final teams = await _teamRepo.getTeamsByIds(teamIds);
+    final teamsById = {for (final team in teams) team.id: team};
+    final actorId = currentUserId;
+    if (m.tournamentId == null &&
+        actorId != null &&
+        actorId.isNotEmpty &&
+        m.organizerId == actorId) {
+      await _sideRepo.ensureFriendlySides(
+        match: m,
+        actorId: actorId,
+        teamADisplayName: teamsById[m.teamAId]?.name ?? 'فريق A',
+        teamBDisplayName: teamsById[m.teamBId]?.name ?? 'فريق B',
+      );
+    }
+    final results = await Future.wait<dynamic>([
+      _sideRepo.getMatchSides(m.id),
+      _sidePlayerRepo.getMatchPlayers(m.id),
+    ]);
+    final sides = results[0] as List<MatchSide>;
+    final sidePlayers = results[1] as List<MatchSidePlayer>;
     sideViews.assignAll(
       FriendlyMatchSideView.fromMatch(
         match: m,
-        teamsById: {for (final team in teams) team.id: team},
+        teamsById: teamsById,
+        sides: sides,
+        sidePlayers: sidePlayers,
       ),
     );
   }
@@ -220,18 +258,28 @@ class MatchLobbyController extends GetxController {
   }
 
   /// إلغاء المباراة
-  Future<void> cancelMatch() async {
+  Future<void> cancelMatch({String? reason}) async {
+    final actorId = currentUserId;
+    if (actorId == null || actorId.isEmpty) {
+      Get.snackbar('غير مسموح', 'يجب تسجيل الدخول أولاً.');
+      return;
+    }
     try {
-      await _matchRepo.cancelMatch(matchId);
-      Get.back();
+      final cancelled = await _matchCancellationService.cancelFriendlyMatch(
+        matchId: matchId,
+        actorId: actorId,
+        reason: reason,
+      );
+      match.value = cancelled;
       Get.snackbar(
         'تم الإلغاء ❌',
         'تم إلغاء المباراة',
         snackPosition: SnackPosition.BOTTOM,
       );
+      Get.back();
     } catch (e) {
       AppLogger.error('MatchLobbyController.cancelMatch', e);
-      Get.snackbar('خطأ', 'فشل إلغاء المباراة');
+      Get.snackbar('خطأ', _readableError(e));
     }
   }
 
@@ -307,6 +355,139 @@ class MatchLobbyController extends GetxController {
     } catch (e) {
       AppLogger.error('MatchLobbyController.addRegisteredPlayerToSide', e);
       Get.snackbar('خطأ', 'فشل إضافة اللاعب');
+    }
+  }
+
+  Future<void> renameTemporarySide({
+    required String sideKey,
+    required String displayName,
+  }) async {
+    final m = match.value;
+    final actorId = currentUserId;
+    final normalizedSide = sideKey.trim().toUpperCase();
+    final trimmedName = displayName.trim();
+    if (m == null) return;
+    if (actorId == null || actorId.isEmpty) {
+      Get.snackbar('غير مسموح', 'يجب تسجيل الدخول أولاً.');
+      return;
+    }
+    if (m.tournamentId != null) {
+      Get.snackbar('غير متاح', 'تسمية الأطراف المؤقتة متاحة للوديات فقط.');
+      return;
+    }
+    if (!isOrganizer) {
+      Get.snackbar('غير مسموح', 'منظم المباراة فقط يمكنه تسمية الأطراف.');
+      return;
+    }
+    if (normalizedSide != 'A' && normalizedSide != 'B') {
+      Get.snackbar('خطأ', 'طرف المباراة غير صحيح.');
+      return;
+    }
+    final officialTeamId = normalizedSide == 'A' ? m.teamAId : m.teamBId;
+    if (officialTeamId != null && officialTeamId.trim().isNotEmpty) {
+      Get.snackbar('غير متاح', 'اسم الفريق الرسمي يأتي من بيانات الفريق.');
+      return;
+    }
+    if (trimmedName.isEmpty) {
+      Get.snackbar('بيانات ناقصة', 'اكتب اسم الفريق المؤقت أولاً.');
+      return;
+    }
+
+    try {
+      await _sideRepo.upsertSide(
+        match: m,
+        sideKey: normalizedSide,
+        displayName: trimmedName,
+        actorId: actorId,
+      );
+      await _loadSideViews(m);
+      Get.snackbar(
+        'تم تحديث الاسم',
+        'تم حفظ اسم فريق $normalizedSide.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (e) {
+      AppLogger.error('MatchLobbyController.renameTemporarySide', e);
+      Get.snackbar('خطأ', 'فشل حفظ اسم الفريق المؤقت');
+    }
+  }
+
+  Future<void> addTemporaryPlayerToSide({
+    required String sideKey,
+    required String displayName,
+    String? position,
+    int? shirtNumber,
+  }) async {
+    final m = match.value;
+    final actorId = currentUserId;
+    final normalizedSide = sideKey.trim().toUpperCase();
+    final trimmedName = displayName.trim();
+    if (m == null) return;
+    if (actorId == null || actorId.isEmpty) {
+      Get.snackbar('غير مسموح', 'يجب تسجيل الدخول أولاً.');
+      return;
+    }
+    if (m.tournamentId != null) {
+      Get.snackbar('غير متاح', 'اللاعبون المؤقتون متاحون للوديات فقط.');
+      return;
+    }
+    if (!isOrganizer) {
+      Get.snackbar('غير مسموح', 'منظم المباراة فقط يمكنه تعديل الأطراف.');
+      return;
+    }
+    if (normalizedSide != 'A' && normalizedSide != 'B') {
+      Get.snackbar('خطأ', 'طرف المباراة غير صحيح.');
+      return;
+    }
+    if (m.status != MatchStatus.open && m.status != MatchStatus.full) {
+      Get.snackbar('غير متاح', 'لا يمكن تعديل اللاعبين بعد بدء المباراة.');
+      return;
+    }
+    if (trimmedName.isEmpty) {
+      Get.snackbar('بيانات ناقصة', 'اكتب اسم اللاعب المؤقت أولاً.');
+      return;
+    }
+
+    final sideView = _sideViewFor(normalizedSide);
+    final duplicateName =
+        sideView?.temporaryPlayers.any(
+          (player) => player.displayName.trim() == trimmedName,
+        ) ??
+        false;
+    if (duplicateName) {
+      Get.snackbar('موجود بالفعل', 'هذا الاسم موجود بالفعل في نفس الفريق.');
+      return;
+    }
+
+    try {
+      final side = await _sideRepo.upsertSide(
+        match: m,
+        sideKey: normalizedSide,
+        displayName: sideView?.displayName ?? 'فريق $normalizedSide',
+        actorId: actorId,
+      );
+      await _sidePlayerRepo.addTemporaryPlayer(
+        matchId: m.id,
+        sideKey: normalizedSide,
+        sideId: side.id,
+        displayName: trimmedName,
+        addedBy: actorId,
+        position: position,
+        shirtNumber: shirtNumber,
+      );
+      await _loadSideViews(m);
+      startReadiness.value = await _matchStartService.getStartReadiness(
+        matchId: matchId,
+        actorId: actorId,
+      );
+      Get.snackbar(
+        'تمت الإضافة',
+        'تمت إضافة $trimmedName إلى فريق $normalizedSide.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (e) {
+      AppLogger.error('MatchLobbyController.addTemporaryPlayerToSide', e);
+      Get.snackbar('خطأ', 'فشل إضافة اللاعب المؤقت');
     }
   }
 
@@ -412,5 +593,12 @@ class MatchLobbyController extends GetxController {
       return raw.substring('Bad state: '.length);
     }
     return raw;
+  }
+
+  FriendlyMatchSideView? _sideViewFor(String sideKey) {
+    for (final side in sideViews) {
+      if (side.sideKey == sideKey) return side;
+    }
+    return null;
   }
 }

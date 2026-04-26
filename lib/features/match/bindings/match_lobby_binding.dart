@@ -8,6 +8,9 @@ import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
 import '../../../data/repositories/friend_repository_impl.dart';
 import '../../../data/repositories/player_repository_impl.dart';
 import '../../../data/repositories/team_repository_impl.dart';
+import '../../../data/repositories/match_side_player_repository_impl.dart';
+import '../../../data/repositories/match_side_repository_impl.dart';
+import '../../../core/services/match_cancellation_service.dart';
 import '../../../core/services/match_start_service.dart';
 import '../../social/controllers/friend_controller.dart';
 
@@ -30,6 +33,12 @@ class MatchLobbyBinding extends Bindings {
     if (!Get.isRegistered<TeamRepositoryImpl>()) {
       Get.lazyPut(() => TeamRepositoryImpl());
     }
+    if (!Get.isRegistered<MatchSideRepositoryImpl>()) {
+      Get.lazyPut(() => MatchSideRepositoryImpl());
+    }
+    if (!Get.isRegistered<MatchSidePlayerRepositoryImpl>()) {
+      Get.lazyPut(() => MatchSidePlayerRepositoryImpl());
+    }
     if (!Get.isRegistered<MatchLineupSnapshotRepositoryImpl>()) {
       Get.lazyPut(() => MatchLineupSnapshotRepositoryImpl());
     }
@@ -38,8 +47,12 @@ class MatchLobbyBinding extends Bindings {
         () => MatchStartService(
           matchRepo: Get.find<MatchRepository>(),
           snapshotRepo: Get.find<MatchLineupSnapshotRepositoryImpl>(),
+          sidePlayerRepo: Get.find<MatchSidePlayerRepositoryImpl>(),
         ),
       );
+    }
+    if (!Get.isRegistered<MatchCancellationService>()) {
+      Get.lazyPut(() => MatchCancellationService());
     }
     if (!Get.isRegistered<FriendRepositoryImpl>()) {
       Get.put(FriendRepositoryImpl());

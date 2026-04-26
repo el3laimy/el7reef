@@ -3,6 +3,7 @@ import '../../core/enums/match_status.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_lineup_snapshot.dart';
 import '../../domain/repositories/match_repository.dart';
+import '../../data/repositories/match_side_player_repository_impl.dart';
 import '../../data/repositories/match_lineup_snapshot_repository_impl.dart';
 
 /// Readiness assessment for starting a match.
@@ -23,12 +24,15 @@ class MatchStartReadiness {
 class MatchStartService {
   final MatchRepository _matchRepo;
   final MatchLineupSnapshotRepositoryImpl _snapshotRepo;
+  final MatchSidePlayerRepositoryImpl? _sidePlayerRepo;
 
   MatchStartService({
     required MatchRepository matchRepo,
     required MatchLineupSnapshotRepositoryImpl snapshotRepo,
+    MatchSidePlayerRepositoryImpl? sidePlayerRepo,
   }) : _matchRepo = matchRepo,
-       _snapshotRepo = snapshotRepo;
+       _snapshotRepo = snapshotRepo,
+       _sidePlayerRepo = sidePlayerRepo;
 
   /// Returns a readiness assessment without mutating state.  Use this from the
   /// UI to show why the start button is disabled.
@@ -94,7 +98,10 @@ class MatchStartService {
     }
 
     // 3. Match must be in a startable status.
-    if (match.status != MatchStatus.open && match.status != MatchStatus.full) {
+    if (match.status == MatchStatus.cancelled) {
+      reasons.add('لا يمكن بدء مباراة ملغاة.');
+    } else if (match.status != MatchStatus.open &&
+        match.status != MatchStatus.full) {
       reasons.add('حالة المباراة لا تسمح ببدء الآن.');
     }
 
@@ -109,10 +116,15 @@ class MatchStartService {
 
     // 5. Friendly matches without required lineups only need one player per side.
     if (isFriendlyMatch && requirement != LineupRequirement.required) {
-      if (match.teamAPlayerIds.isEmpty) {
+      final temporarySideCounts = await _loadTemporarySideCounts(match.id);
+      final teamACount =
+          match.teamAPlayerIds.length + (temporarySideCounts['A'] ?? 0);
+      final teamBCount =
+          match.teamBPlayerIds.length + (temporarySideCounts['B'] ?? 0);
+      if (teamACount < 1) {
         reasons.add('الفريق الأول يحتاج لاعبًا واحدًا على الأقل.');
       }
-      if (match.teamBPlayerIds.isEmpty) {
+      if (teamBCount < 1) {
         reasons.add('الفريق الثاني يحتاج لاعبًا واحدًا على الأقل.');
       }
       return reasons;
@@ -124,10 +136,14 @@ class MatchStartService {
       final hasTeamALineup = _hasLineupForSide(
         snapshots: snapshots,
         teamId: match.teamAId,
+        matchId: match.id,
+        sideKey: 'A',
       );
       final hasTeamBLineup = _hasLineupForSide(
         snapshots: snapshots,
         teamId: match.teamBId,
+        matchId: match.id,
+        sideKey: 'B',
       );
       if (!hasTeamALineup) {
         reasons.add('تشكيلة الفريق الأول غير مقفولة.');
@@ -138,21 +154,42 @@ class MatchStartService {
     }
 
     // 7. Both sides must have players (at minimum).
-    if (match.teamAPlayerIds.isEmpty && match.teamAId == null) {
+    final temporarySideCounts = await _loadTemporarySideCounts(match.id);
+    final teamACount =
+        match.teamAPlayerIds.length + (temporarySideCounts['A'] ?? 0);
+    final teamBCount =
+        match.teamBPlayerIds.length + (temporarySideCounts['B'] ?? 0);
+    if (teamACount < 1 && match.teamAId == null) {
       reasons.add('الفريق الأول ليس له لاعبين.');
     }
-    if (match.teamBPlayerIds.isEmpty && match.teamBId == null) {
+    if (teamBCount < 1 && match.teamBId == null) {
       reasons.add('الفريق الثاني ليس له لاعبين.');
     }
 
     return reasons;
   }
 
+  Future<Map<String, int>> _loadTemporarySideCounts(String matchId) async {
+    final repo = _sidePlayerRepo;
+    if (repo == null) return const {};
+    final players = await repo.getTemporaryPlayersForMatch(matchId);
+    final counts = <String, int>{};
+    for (final player in players) {
+      counts[player.sideKey] = (counts[player.sideKey] ?? 0) + 1;
+    }
+    return counts;
+  }
+
   bool _hasLineupForSide({
     required List<MatchLineupSnapshot> snapshots,
     required String? teamId,
+    required String matchId,
+    required String sideKey,
   }) {
-    if (teamId == null) return false;
-    return snapshots.any((snapshot) => snapshot.teamId == teamId);
+    if (teamId != null) {
+      return snapshots.any((snapshot) => snapshot.teamId == teamId);
+    }
+    final matchSideId = '${matchId}_${sideKey.trim().toUpperCase()}';
+    return snapshots.any((snapshot) => snapshot.matchSideId == matchSideId);
   }
 }

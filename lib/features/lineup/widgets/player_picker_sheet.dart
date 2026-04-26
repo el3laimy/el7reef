@@ -136,7 +136,7 @@ class _PickerPlayerTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final roleColor = player.isGuest
+    final roleColor = (player.isGuest || player.isTemporary)
         ? AppColors.warning
         : lineupPlayerRoleColor(player);
     return ListTile(
@@ -161,7 +161,11 @@ class _PickerPlayerTile extends StatelessWidget {
       title: Text(lineupDisplayName(player), style: AppTextStyles.titleMedium),
       subtitle: Text(
         [
-          player.isGuest ? 'ضيف' : 'مسجل',
+          player.isTemporary
+              ? 'مؤقت'
+              : player.isGuest
+              ? 'ضيف'
+              : 'مسجل',
           player.preferredPosition,
           player.number == null ? null : '#${player.number}',
         ].whereType<String>().where((value) => value.isNotEmpty).join(' • '),

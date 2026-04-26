@@ -28,6 +28,7 @@ import '../../features/match/bindings/fan_voting_binding.dart';
 import '../../features/match/bindings/match_lobby_binding.dart';
 import '../../features/lineup/bindings/lineup_binding.dart';
 import '../../features/lineup/views/match_result_lineup_screen.dart';
+import '../../features/lineup/views/match_side_lineup_editor_screen.dart';
 import '../../features/lineup/views/team_lineup_editor_screen.dart';
 import '../../features/tournament/views/tournament_list_screen.dart';
 import '../../features/tournament/views/tournament_detail_screen.dart';
@@ -181,6 +182,14 @@ class AppPages {
       name: AppRoutes.teamLineupEditor,
       page: () => const TeamLineupEditorScreen(),
       binding: TeamLineupEditorBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    // ── Friendly temporary-side editable lineup ──
+    GetPage(
+      name: AppRoutes.matchSideLineupEditor,
+      page: () => const MatchSideLineupEditorScreen(),
+      binding: MatchSideLineupEditorBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 

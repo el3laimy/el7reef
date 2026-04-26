@@ -6,6 +6,8 @@ class MatchLineupSnapshot {
   final String matchId;
   final String? teamId;
   final String? guestTeamId;
+  final String? matchSideId;
+  final String? sideKey;
   final String? tournamentRegistrationId;
   final String? checkInId;
   final List<MatchLineupEntry> starters;
@@ -22,6 +24,8 @@ class MatchLineupSnapshot {
     required this.matchId,
     this.teamId,
     this.guestTeamId,
+    this.matchSideId,
+    this.sideKey,
     this.tournamentRegistrationId,
     this.checkInId,
     required this.starters,
@@ -33,15 +37,19 @@ class MatchLineupSnapshot {
     this.formationLabel,
     this.notes,
   }) : assert(
-         (teamId != null) != (guestTeamId != null),
-         'Exactly one of teamId or guestTeamId must be set.',
+         (teamId == null ? 0 : 1) +
+                 (guestTeamId == null ? 0 : 1) +
+                 (matchSideId == null ? 0 : 1) ==
+             1,
+         'Exactly one of teamId, guestTeamId, or matchSideId must be set.',
        );
 
   bool get isGuestTeam => guestTeamId != null;
   bool get isRegisteredTeam => teamId != null;
+  bool get isMatchSide => matchSideId != null;
   int get guestCount =>
       [...starters, ...bench].where((entry) => entry.isGuest).length;
-  String get participantId => teamId ?? guestTeamId!;
+  String get participantId => teamId ?? guestTeamId ?? matchSideId!;
 
   String get summaryLabel {
     final effectiveFormation = formationCode?.trim().isNotEmpty == true

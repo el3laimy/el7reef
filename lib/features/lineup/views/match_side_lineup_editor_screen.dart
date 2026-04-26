@@ -9,7 +9,7 @@ import '../../shareables/controllers/lineup_share_controller.dart';
 import '../../shareables/models/lineup_share_data.dart';
 import '../../shareables/services/share_card_capture_service.dart';
 import '../../shareables/widgets/lineup_share_card.dart';
-import '../controllers/team_lineup_editor_controller.dart';
+import '../controllers/match_side_lineup_editor_controller.dart';
 import '../widgets/bench_bar.dart';
 import '../widgets/formation_control_bar.dart';
 import '../widgets/lineup_bottom_action_bar.dart';
@@ -17,8 +17,9 @@ import '../widgets/lineup_player_display.dart';
 import '../widgets/player_picker_sheet.dart';
 import '../widgets/professional_pitch_card.dart';
 
-class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
-  const TeamLineupEditorScreen({super.key});
+class MatchSideLineupEditorScreen
+    extends GetView<MatchSideLineupEditorController> {
+  const MatchSideLineupEditorScreen({super.key});
 
   static final GlobalKey _lineupShareBoundaryKey = GlobalKey();
   static const _captureService = ShareCardCaptureService();
@@ -29,7 +30,7 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('تشكيلة الفريق'),
+          title: const Text('تشكيلة الطرف المؤقت'),
           actions: [
             IconButton(
               onPressed: () => _shareLineup(context),
@@ -66,7 +67,7 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
               child: ListView(
                 padding: const EdgeInsets.all(AppDimensions.pagePadding),
                 children: [
-                  _TeamLineupHeader(controller: controller),
+                  _MatchSideLineupHeader(controller: controller),
                   const SizedBox(height: AppDimensions.md),
                   if (controller.isConfirmed)
                     _ConfirmedNotice(controller: controller)
@@ -83,7 +84,7 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
                     playersByKey: controller.playersByKey,
                     formationCode: controller.formationCode.value,
                     playerCount: controller.playerCount.value,
-                    teamName: controller.teamName,
+                    teamName: controller.sideName,
                     editorMode: controller.canEdit,
                     onEmptySlotTap: (slot) => _showPlayerPicker(context, slot),
                     onPlayerTap: (slot, player) =>
@@ -98,12 +99,10 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
                   const SizedBox(height: AppDimensions.md),
                   BenchBar(
                     players: controller.benchPlayers,
+                    title: 'لاعبو الطرف',
                     draggable: controller.canEdit,
                     onPlayerTap: controller.canEdit
                         ? (player) => _assignBenchPlayer(context, player)
-                        : null,
-                    onAddGuest: controller.canEdit
-                        ? () => _showGuestDialog(context)
                         : null,
                     onPlayerDroppedOnBench: controller.canEdit
                         ? (player) => controller.movePlayerToBench(player)
@@ -137,7 +136,6 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
           controller.assignPlayerToSlot(player, slot);
           Get.back();
         },
-        onAddGuest: () => _showGuestDialog(context),
       ),
       isScrollControlled: true,
     );
@@ -220,10 +218,6 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
     );
   }
 
-  void _showGuestDialog(BuildContext context) {
-    Get.dialog(_TeamLineupGuestDialog(controller: controller));
-  }
-
   Future<void> _shareLineup(BuildContext context) async {
     final snapshot = controller.confirmedSnapshot.value;
     if (snapshot == null) {
@@ -233,12 +227,11 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
 
     final shareData = Get.find<LineupShareController>().buildFromSnapshot(
       snapshot: snapshot,
-      teamName: controller.teamName,
-      logoUrl: controller.teamLogoUrl,
-      lineupOwnerType: LineupShareOwnerType.officialTeam,
-      lineupTypeLabel: 'فريق رسمي',
-      matchLabel: _matchLabel(),
-      accentColor: AppColors.primary,
+      teamName: controller.sideName,
+      lineupOwnerType: LineupShareOwnerType.temporarySide,
+      lineupTypeLabel: 'فريق مؤقت',
+      matchLabel: 'مباراة ودية',
+      accentColor: AppColors.success,
     );
 
     await _captureAndShareLineup(context, shareData);
@@ -267,7 +260,6 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
 
     var inserted = false;
     try {
-      await _precacheLineupLogo(context, shareData);
       overlay.insert(entry);
       inserted = true;
       await WidgetsBinding.instance.endOfFrame;
@@ -284,149 +276,60 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
     }
   }
 
-  Future<void> _precacheLineupLogo(
-    BuildContext context,
-    LineupShareData shareData,
-  ) async {
-    final url = shareData.logoUrl?.trim();
-    if (url == null || url.isEmpty) return;
-    try {
-      await precacheImage(NetworkImage(url), context);
-    } catch (_) {
-      // Initials fallback remains available if the logo cannot be loaded.
-    }
-  }
-
-  String _matchLabel() {
-    final match = controller.match.value;
-    if (match == null) return '';
-    return match.tournamentId == null ? 'مباراة ودية' : '';
-  }
-
   String _readableShareError(Object error) {
     final raw = error.toString();
     return raw.startsWith('Exception: ') ? raw.substring(11) : raw;
   }
 }
 
-class _TeamLineupGuestDialog extends StatefulWidget {
-  final TeamLineupEditorController controller;
+class _MatchSideLineupHeader extends StatelessWidget {
+  final MatchSideLineupEditorController controller;
 
-  const _TeamLineupGuestDialog({required this.controller});
-
-  @override
-  State<_TeamLineupGuestDialog> createState() => _TeamLineupGuestDialogState();
-}
-
-class _TeamLineupGuestDialogState extends State<_TeamLineupGuestDialog> {
-  final _nameController = TextEditingController();
-  final _numberController = TextEditingController();
-  var _isSubmitting = false;
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _numberController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (_isSubmitting) return;
-    setState(() => _isSubmitting = true);
-    final saved = await widget.controller.addGuestPlayer(
-      _nameController.text,
-      number: int.tryParse(_numberController.text.trim()),
-    );
-    if (!mounted) return;
-    setState(() => _isSubmitting = false);
-    if (saved) {
-      Get.back();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('إضافة لاعب ضيف'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _nameController,
-            decoration: const InputDecoration(labelText: 'اسم اللاعب'),
-            textInputAction: TextInputAction.next,
-            autofocus: true,
-          ),
-          const SizedBox(height: AppDimensions.sm),
-          TextField(
-            controller: _numberController,
-            decoration: const InputDecoration(labelText: 'رقم القميص اختياري'),
-            keyboardType: TextInputType.number,
-            onSubmitted: (_) => _submit(),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: _isSubmitting ? null : () => Get.back(),
-          child: const Text('إلغاء'),
-        ),
-        FilledButton(
-          onPressed: _isSubmitting ? null : _submit,
-          child: _isSubmitting
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('إضافة'),
-        ),
-      ],
-    );
-  }
-}
-
-class _TeamLineupHeader extends StatelessWidget {
-  final TeamLineupEditorController controller;
-
-  const _TeamLineupHeader({required this.controller});
+  const _MatchSideLineupHeader({required this.controller});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(AppDimensions.lg),
       decoration: BoxDecoration(
-        color: const Color(0xFF101A28),
-        borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.22)),
+        color: const Color(0xFF101A28).withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: AppColors.primary.withValues(alpha: 0.18),
-            backgroundImage: (controller.teamLogoUrl ?? '').isEmpty
-                ? null
-                : NetworkImage(controller.teamLogoUrl!),
-            child: (controller.teamLogoUrl ?? '').isEmpty
-                ? Text(
-                    controller.teamName.characters.first,
-                    style: AppTextStyles.headlineSmall.copyWith(
-                      color: AppColors.primaryLight,
-                    ),
-                  )
-                : null,
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.primary.withValues(alpha: 0.14),
+              border: Border.all(color: AppColors.primaryLight),
+            ),
+            child: const Icon(
+              Icons.groups_2_rounded,
+              color: AppColors.primaryLight,
+            ),
           ),
           const SizedBox(width: AppDimensions.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(controller.teamName, style: AppTextStyles.headlineSmall),
-                const SizedBox(height: 2),
                 Text(
-                  '${controller.playerCount.value}v${controller.playerCount.value} • ${controller.formationCode.value}',
-                  style: AppTextStyles.bodySmall,
+                  controller.sideName,
+                  style: AppTextStyles.titleLarge.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'مباراة ودية • فريق مؤقت',
+                  style: AppTextStyles.labelMedium.copyWith(
+                    color: AppColors.primaryLight,
+                  ),
                 ),
               ],
             ),
@@ -438,27 +341,30 @@ class _TeamLineupHeader extends StatelessWidget {
 }
 
 class _ConfirmedNotice extends StatelessWidget {
-  final TeamLineupEditorController controller;
+  final MatchSideLineupEditorController controller;
 
   const _ConfirmedNotice({required this.controller});
 
   @override
   Widget build(BuildContext context) {
+    final snapshot = controller.confirmedSnapshot.value;
     return Container(
       padding: const EdgeInsets.all(AppDimensions.md),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        color: AppColors.success.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.38)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.verified_rounded, color: AppColors.primaryLight),
+          const Icon(Icons.lock_rounded, color: AppColors.success),
           const SizedBox(width: AppDimensions.sm),
           Expanded(
             child: Text(
-              'تم حفظ نسخة المباراة. أي تغيير لاحق في الفريق لن يغير هذه المباراة.',
-              style: AppTextStyles.bodySmall.copyWith(
+              snapshot == null
+                  ? 'تم تثبيت التشكيلة.'
+                  : 'تم تثبيت التشكيلة: ${snapshot.summaryLabel}',
+              style: AppTextStyles.bodyMedium.copyWith(
                 color: AppColors.textPrimary,
               ),
             ),
@@ -483,7 +389,17 @@ class _EditorErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(message, textAlign: TextAlign.center),
+            const Icon(
+              Icons.error_outline_rounded,
+              color: AppColors.error,
+              size: 40,
+            ),
+            const SizedBox(height: AppDimensions.md),
+            Text(
+              message,
+              style: AppTextStyles.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: AppDimensions.md),
             FilledButton.icon(
               onPressed: onRetry,

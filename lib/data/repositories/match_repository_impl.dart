@@ -93,8 +93,9 @@ class MatchRepositoryImpl implements MatchRepository {
       all.add(MatchModel.fromJson(doc.data(), doc.id).toEntity());
     }
 
-    final sorted = all.toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final sorted =
+        all.where((match) => match.status != MatchStatus.cancelled).toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return sorted.take(limit).toList();
   }
 

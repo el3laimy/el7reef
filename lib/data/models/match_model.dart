@@ -42,6 +42,9 @@ class MatchModel {
   final DateTime createdAt;
   final DateTime? startedAt;
   final DateTime? completedAt;
+  final DateTime? cancelledAt;
+  final String? cancelledBy;
+  final String? cancelReason;
 
   const MatchModel({
     required this.id,
@@ -79,6 +82,9 @@ class MatchModel {
     required this.createdAt,
     this.startedAt,
     this.completedAt,
+    this.cancelledAt,
+    this.cancelledBy,
+    this.cancelReason,
   });
 
   factory MatchModel.fromJson(Map<String, dynamic> json, String docId) {
@@ -139,8 +145,7 @@ class MatchModel {
       venueId: json['venueId'] as String?,
       fixtureStatus:
           json['fixtureStatus'] as String? ?? FixtureStatus.draft.name,
-      lineupRequirement:
-          json['lineupRequirement'] as String? ?? 'none',
+      lineupRequirement: json['lineupRequirement'] as String? ?? 'none',
       createdAt: json['createdAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(
               (json['createdAt'] as num).toInt(),
@@ -156,6 +161,13 @@ class MatchModel {
               (json['completedAt'] as num).toInt(),
             )
           : null,
+      cancelledAt: json['cancelledAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(
+              (json['cancelledAt'] as num).toInt(),
+            )
+          : null,
+      cancelledBy: json['cancelledBy'] as String?,
+      cancelReason: json['cancelReason'] as String?,
     );
   }
 
@@ -194,6 +206,9 @@ class MatchModel {
     'createdAt': createdAt.millisecondsSinceEpoch,
     'startedAt': startedAt?.millisecondsSinceEpoch,
     'completedAt': completedAt?.millisecondsSinceEpoch,
+    'cancelledAt': cancelledAt?.millisecondsSinceEpoch,
+    'cancelledBy': cancelledBy,
+    'cancelReason': cancelReason,
   };
 
   Match toEntity() => Match(
@@ -243,6 +258,9 @@ class MatchModel {
     createdAt: createdAt,
     startedAt: startedAt,
     completedAt: completedAt,
+    cancelledAt: cancelledAt,
+    cancelledBy: cancelledBy,
+    cancelReason: cancelReason,
   );
 
   factory MatchModel.fromEntity(Match m) => MatchModel(
@@ -281,6 +299,9 @@ class MatchModel {
     createdAt: m.createdAt,
     startedAt: m.startedAt,
     completedAt: m.completedAt,
+    cancelledAt: m.cancelledAt,
+    cancelledBy: m.cancelledBy,
+    cancelReason: m.cancelReason,
   );
 
   static MatchStatus _parseStatus(String v) => MatchStatus.values.firstWhere(

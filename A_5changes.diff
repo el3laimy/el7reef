@@ -1,0 +1,3244 @@
+diff --git a/lib/app/routes/app_pages.dart b/lib/app/routes/app_pages.dart
+index 6fab134..63546be 100644
+--- a/lib/app/routes/app_pages.dart
++++ b/lib/app/routes/app_pages.dart
+@@ -28,6 +28,7 @@ import '../../features/match/bindings/fan_voting_binding.dart';
+ import '../../features/match/bindings/match_lobby_binding.dart';
+ import '../../features/lineup/bindings/lineup_binding.dart';
+ import '../../features/lineup/views/match_result_lineup_screen.dart';
++import '../../features/lineup/views/match_side_lineup_editor_screen.dart';
+ import '../../features/lineup/views/team_lineup_editor_screen.dart';
+ import '../../features/tournament/views/tournament_list_screen.dart';
+ import '../../features/tournament/views/tournament_detail_screen.dart';
+@@ -184,6 +185,14 @@ class AppPages {
+       transition: Transition.rightToLeftWithFade,
+     ),
+ 
++    // ── Friendly temporary-side editable lineup ──
++    GetPage(
++      name: AppRoutes.matchSideLineupEditor,
++      page: () => const MatchSideLineupEditorScreen(),
++      binding: MatchSideLineupEditorBinding(),
++      transition: Transition.rightToLeftWithFade,
++    ),
++
+     // ── Match result lineup presentation from saved snapshots ──
+     GetPage(
+       name: AppRoutes.matchResultLineup,
+diff --git a/lib/app/routes/app_routes.dart b/lib/app/routes/app_routes.dart
+index b6c4a99..5ef1e54 100644
+--- a/lib/app/routes/app_routes.dart
++++ b/lib/app/routes/app_routes.dart
+@@ -16,6 +16,8 @@ abstract class AppRoutes {
+   static const String matchDetails = '/match/details/:id';
+   static const String teamLineupEditor =
+       '/match/:matchId/lineup/editor/:teamId';
++  static const String matchSideLineupEditor =
++      '/match/:matchId/lineup/side/:sideKey';
+   static const String matchResultLineup = '/match/:matchId/lineup/result';
+   static const String rating = '/rating/:matchId';
+   static const String mvpVote = '/rating/mvp/:matchId';
+@@ -89,6 +91,10 @@ abstract class AppRoutes {
+     required String matchId,
+     required String teamId,
+   }) => '/match/$matchId/lineup/editor/$teamId';
++  static String matchSideLineupEditorForMatch({
++    required String matchId,
++    required String sideKey,
++  }) => '/match/$matchId/lineup/side/${sideKey.trim().toUpperCase()}';
+   static String matchResultLineupById(String matchId) =>
+       '/match/$matchId/lineup/result';
+   static String mvpVoteForMatch(String matchId) => '/rating/mvp/$matchId';
+diff --git a/lib/core/constants/firebase_paths.dart b/lib/core/constants/firebase_paths.dart
+index ca49eeb..7bdbb3e 100644
+--- a/lib/core/constants/firebase_paths.dart
++++ b/lib/core/constants/firebase_paths.dart
+@@ -8,6 +8,8 @@ abstract class FirebasePaths {
+   static const String teamFormationTemplates = 'teamFormationTemplates';
+   static const String teamRosterSnapshots = 'teamRosterSnapshots';
+   static const String matches = 'matches';
++  static const String matchSides = 'matchSides';
++  static const String matchSidePlayers = 'matchSidePlayers';
+   static const String matchCheckIns = 'matchCheckIns';
+   static const String matchAttendances = 'matchAttendances';
+   static const String matchLineupSnapshots = 'matchLineupSnapshots';
+@@ -33,7 +35,7 @@ abstract class FirebasePaths {
+   static const String friendRequests = 'friendRequests';
+   static const String matchInvitations = 'matchInvitations';
+   static const String challenges = 'challenges';
+-  static const String userVotes = 'userVotes';       // Fan voting
++  static const String userVotes = 'userVotes'; // Fan voting
+   static const String fanVotingSessions = 'fanVotingSessions';
+   static const String fantasySlots = 'fantasySlots';
+   static const String transferRecords = 'transferRecords';
+diff --git a/lib/core/lineup/lineup_types.dart b/lib/core/lineup/lineup_types.dart
+index 6ec3c3b..9407fab 100644
+--- a/lib/core/lineup/lineup_types.dart
++++ b/lib/core/lineup/lineup_types.dart
+@@ -64,6 +64,7 @@ class FormationSlot {
+   final double y;
+   final String? playerId;
+   final String? guestPlayerId;
++  final String? matchSidePlayerId;
+   final bool isCaptain;
+   final bool isLocked;
+ 
+@@ -76,14 +77,19 @@ class FormationSlot {
+     required this.y,
+     this.playerId,
+     this.guestPlayerId,
++    this.matchSidePlayerId,
+     this.isCaptain = false,
+     this.isLocked = false,
+   }) : assert(
+-         playerId == null || guestPlayerId == null,
+-         'A lineup slot can hold either a registered player or a guest.',
++         (playerId == null ? 0 : 1) +
++                 (guestPlayerId == null ? 0 : 1) +
++                 (matchSidePlayerId == null ? 0 : 1) <=
++             1,
++         'A lineup slot can hold only one occupant.',
+        );
+ 
+-  bool get isEmpty => playerId == null && guestPlayerId == null;
++  bool get isEmpty =>
++      playerId == null && guestPlayerId == null && matchSidePlayerId == null;
+ 
+   String? get occupantKey {
+     if (playerId != null) {
+@@ -92,6 +98,9 @@ class FormationSlot {
+     if (guestPlayerId != null) {
+       return LineupPlayer.guestKey(guestPlayerId!);
+     }
++    if (matchSidePlayerId != null) {
++      return LineupPlayer.matchSidePlayerKey(matchSidePlayerId!);
++    }
+     return null;
+   }
+ 
+@@ -104,6 +113,7 @@ class FormationSlot {
+     double? y,
+     Object? playerId = _unset,
+     Object? guestPlayerId = _unset,
++    Object? matchSidePlayerId = _unset,
+     bool? isCaptain,
+     bool? isLocked,
+   }) {
+@@ -120,19 +130,28 @@ class FormationSlot {
+       guestPlayerId: identical(guestPlayerId, _unset)
+           ? this.guestPlayerId
+           : guestPlayerId as String?,
++      matchSidePlayerId: identical(matchSidePlayerId, _unset)
++          ? this.matchSidePlayerId
++          : matchSidePlayerId as String?,
+       isCaptain: isCaptain ?? this.isCaptain,
+       isLocked: isLocked ?? this.isLocked,
+     );
+   }
+ 
+   FormationSlot clearPlayer() {
+-    return copyWith(playerId: null, guestPlayerId: null, isCaptain: false);
++    return copyWith(
++      playerId: null,
++      guestPlayerId: null,
++      matchSidePlayerId: null,
++      isCaptain: false,
++    );
+   }
+ 
+   FormationSlot assignPlayer(LineupPlayer player) {
+     return copyWith(
+       playerId: player.isRegistered ? player.id : null,
+-      guestPlayerId: player.isRegistered ? null : player.id,
++      guestPlayerId: player.isGuest ? player.id : null,
++      matchSidePlayerId: player.isTemporary ? player.id : null,
+       isCaptain: player.isCaptain,
+     );
+   }
+@@ -146,6 +165,7 @@ class LineupPlayer {
+   final int? number;
+   final String? preferredPosition;
+   final bool isRegistered;
++  final bool isTemporary;
+   final LineupInviteStatus? inviteStatus;
+   final bool isCaptain;
+ 
+@@ -157,16 +177,25 @@ class LineupPlayer {
+     this.number,
+     this.preferredPosition,
+     required this.isRegistered,
++    this.isTemporary = false,
+     this.inviteStatus,
+     this.isCaptain = false,
+-  });
++  }) : assert(
++         !(isRegistered && isTemporary),
++         'A lineup player cannot be both registered and temporary.',
++       );
+ 
+-  bool get isGuest => !isRegistered;
++  bool get isGuest => !isRegistered && !isTemporary;
+ 
+-  String get key => isRegistered ? registeredKey(id) : guestKey(id);
++  String get key {
++    if (isRegistered) return registeredKey(id);
++    if (isTemporary) return matchSidePlayerKey(id);
++    return guestKey(id);
++  }
+ 
+   static String registeredKey(String id) => 'player:$id';
+   static String guestKey(String id) => 'guest:$id';
++  static String matchSidePlayerKey(String id) => 'sidePlayer:$id';
+ }
+ 
+ class LineupGuestPlayer {
+diff --git a/lib/core/services/match_start_service.dart b/lib/core/services/match_start_service.dart
+index cf6b1c8..d9d69d1 100644
+--- a/lib/core/services/match_start_service.dart
++++ b/lib/core/services/match_start_service.dart
+@@ -3,6 +3,7 @@ import '../../core/enums/match_status.dart';
+ import '../../domain/entities/match.dart';
+ import '../../domain/entities/match_lineup_snapshot.dart';
+ import '../../domain/repositories/match_repository.dart';
++import '../../data/repositories/match_side_player_repository_impl.dart';
+ import '../../data/repositories/match_lineup_snapshot_repository_impl.dart';
+ 
+ /// Readiness assessment for starting a match.
+@@ -23,12 +24,15 @@ class MatchStartReadiness {
+ class MatchStartService {
+   final MatchRepository _matchRepo;
+   final MatchLineupSnapshotRepositoryImpl _snapshotRepo;
++  final MatchSidePlayerRepositoryImpl? _sidePlayerRepo;
+ 
+   MatchStartService({
+     required MatchRepository matchRepo,
+     required MatchLineupSnapshotRepositoryImpl snapshotRepo,
++    MatchSidePlayerRepositoryImpl? sidePlayerRepo,
+   }) : _matchRepo = matchRepo,
+-       _snapshotRepo = snapshotRepo;
++       _snapshotRepo = snapshotRepo,
++       _sidePlayerRepo = sidePlayerRepo;
+ 
+   /// Returns a readiness assessment without mutating state.  Use this from the
+   /// UI to show why the start button is disabled.
+@@ -94,7 +98,10 @@ class MatchStartService {
+     }
+ 
+     // 3. Match must be in a startable status.
+-    if (match.status != MatchStatus.open && match.status != MatchStatus.full) {
++    if (match.status == MatchStatus.cancelled) {
++      reasons.add('لا يمكن بدء مباراة ملغاة.');
++    } else if (match.status != MatchStatus.open &&
++        match.status != MatchStatus.full) {
+       reasons.add('حالة المباراة لا تسمح ببدء الآن.');
+     }
+ 
+@@ -109,10 +116,15 @@ class MatchStartService {
+ 
+     // 5. Friendly matches without required lineups only need one player per side.
+     if (isFriendlyMatch && requirement != LineupRequirement.required) {
+-      if (match.teamAPlayerIds.isEmpty) {
++      final temporarySideCounts = await _loadTemporarySideCounts(match.id);
++      final teamACount =
++          match.teamAPlayerIds.length + (temporarySideCounts['A'] ?? 0);
++      final teamBCount =
++          match.teamBPlayerIds.length + (temporarySideCounts['B'] ?? 0);
++      if (teamACount < 1) {
+         reasons.add('الفريق الأول يحتاج لاعبًا واحدًا على الأقل.');
+       }
+-      if (match.teamBPlayerIds.isEmpty) {
++      if (teamBCount < 1) {
+         reasons.add('الفريق الثاني يحتاج لاعبًا واحدًا على الأقل.');
+       }
+       return reasons;
+@@ -124,10 +136,14 @@ class MatchStartService {
+       final hasTeamALineup = _hasLineupForSide(
+         snapshots: snapshots,
+         teamId: match.teamAId,
++        matchId: match.id,
++        sideKey: 'A',
+       );
+       final hasTeamBLineup = _hasLineupForSide(
+         snapshots: snapshots,
+         teamId: match.teamBId,
++        matchId: match.id,
++        sideKey: 'B',
+       );
+       if (!hasTeamALineup) {
+         reasons.add('تشكيلة الفريق الأول غير مقفولة.');
+@@ -138,21 +154,42 @@ class MatchStartService {
+     }
+ 
+     // 7. Both sides must have players (at minimum).
+-    if (match.teamAPlayerIds.isEmpty && match.teamAId == null) {
++    final temporarySideCounts = await _loadTemporarySideCounts(match.id);
++    final teamACount =
++        match.teamAPlayerIds.length + (temporarySideCounts['A'] ?? 0);
++    final teamBCount =
++        match.teamBPlayerIds.length + (temporarySideCounts['B'] ?? 0);
++    if (teamACount < 1 && match.teamAId == null) {
+       reasons.add('الفريق الأول ليس له لاعبين.');
+     }
+-    if (match.teamBPlayerIds.isEmpty && match.teamBId == null) {
++    if (teamBCount < 1 && match.teamBId == null) {
+       reasons.add('الفريق الثاني ليس له لاعبين.');
+     }
+ 
+     return reasons;
+   }
+ 
++  Future<Map<String, int>> _loadTemporarySideCounts(String matchId) async {
++    final repo = _sidePlayerRepo;
++    if (repo == null) return const {};
++    final players = await repo.getTemporaryPlayersForMatch(matchId);
++    final counts = <String, int>{};
++    for (final player in players) {
++      counts[player.sideKey] = (counts[player.sideKey] ?? 0) + 1;
++    }
++    return counts;
++  }
++
+   bool _hasLineupForSide({
+     required List<MatchLineupSnapshot> snapshots,
+     required String? teamId,
++    required String matchId,
++    required String sideKey,
+   }) {
+-    if (teamId == null) return false;
+-    return snapshots.any((snapshot) => snapshot.teamId == teamId);
++    if (teamId != null) {
++      return snapshots.any((snapshot) => snapshot.teamId == teamId);
++    }
++    final matchSideId = '${matchId}_${sideKey.trim().toUpperCase()}';
++    return snapshots.any((snapshot) => snapshot.matchSideId == matchSideId);
+   }
+ }
+diff --git a/lib/core/services/matchday_service.dart b/lib/core/services/matchday_service.dart
+index 65ed516..3a5b7ad 100644
+--- a/lib/core/services/matchday_service.dart
++++ b/lib/core/services/matchday_service.dart
+@@ -17,6 +17,8 @@ import '../../data/models/match_attendance_model.dart';
+ import '../../data/models/match_check_in_model.dart';
+ import '../../data/models/match_lineup_snapshot_model.dart';
+ import '../../data/models/match_model.dart';
++import '../../data/models/match_side_model.dart';
++import '../../data/models/match_side_player_model.dart';
+ import '../../data/models/match_substitution_model.dart';
+ import '../../data/models/player_model.dart';
+ import '../../data/models/team_membership_model.dart';
+@@ -30,6 +32,8 @@ import '../../domain/entities/match_attendance.dart';
+ import '../../domain/entities/match_check_in.dart';
+ import '../../domain/entities/match_lineup_entry.dart';
+ import '../../domain/entities/match_lineup_snapshot.dart';
++import '../../domain/entities/match_side.dart';
++import '../../domain/entities/match_side_player.dart';
+ import '../../domain/entities/match_substitution.dart';
+ import '../../domain/entities/player.dart';
+ import '../../domain/entities/team.dart';
+@@ -147,6 +151,12 @@ class MatchdayService {
+   CollectionReference<Map<String, dynamic>> get _snapshotsRef =>
+       _firestore.collection(FirebasePaths.matchLineupSnapshots);
+ 
++  CollectionReference<Map<String, dynamic>> get _matchSidesRef =>
++      _firestore.collection(FirebasePaths.matchSides);
++
++  CollectionReference<Map<String, dynamic>> get _matchSidePlayersRef =>
++      _firestore.collection(FirebasePaths.matchSidePlayers);
++
+   CollectionReference<Map<String, dynamic>> get _substitutionsRef =>
+       _firestore.collection(FirebasePaths.matchSubstitutions);
+ 
+@@ -858,6 +868,134 @@ class MatchdayService {
+     );
+   }
+ 
++  Future<MatchLineupSnapshot> lockMatchSideLineup({
++    required String matchId,
++    required String matchSideId,
++    required String sideKey,
++    required String actorId,
++    required List<String> starterMatchSidePlayerIds,
++    List<String> benchMatchSidePlayerIds = const [],
++    String? formationCode,
++    String? formationLabel,
++    String? notes,
++    List<SlotAssignment> slotAssignments = const [],
++    DateTime? now,
++  }) async {
++    final effectiveNow = now ?? DateTime.now();
++    final normalizedSide = _normalizeSideKey(sideKey);
++    if (actorId.trim().isEmpty) {
++      throw Exception('يجب تسجيل الدخول أولاً.');
++    }
++
++    final match = await _requireMatch(matchId);
++    _ensureMatchAvailableForPreKickoff(match);
++    if (match.tournamentId != null && match.tournamentId!.isNotEmpty) {
++      throw Exception('تشكيلات الأطراف المؤقتة متاحة للمباريات الودية فقط.');
++    }
++
++    final side = await _requireMatchSide(
++      matchId: matchId,
++      matchSideId: matchSideId,
++      sideKey: normalizedSide,
++    );
++    _ensureCanManageMatchSideLineup(match: match, side: side, actorId: actorId);
++    if (!side.isTemporary) {
++      throw Exception('استخدم محرر الفريق الرسمي لهذا الطرف.');
++    }
++
++    _ensureUniqueLineupSelection(
++      starters: starterMatchSidePlayerIds,
++      bench: benchMatchSidePlayerIds,
++    );
++    final requiredStarterCount = normalizeMatchTeamSize(match.teamSize);
++    _assertStarterCount(
++      requiredStarterCount: requiredStarterCount,
++      selectedStarters: starterMatchSidePlayerIds.length,
++      allowIncompleteLineup: true,
++    );
++
++    final sidePlayers = await _loadMatchSidePlayers(matchId, normalizedSide);
++    final sidePlayerMap = {for (final player in sidePlayers) player.id: player};
++    final selectedIds = <String>{
++      ...starterMatchSidePlayerIds,
++      ...benchMatchSidePlayerIds,
++    };
++    final missingPlayerId = selectedIds.firstWhere(
++      (playerId) => !sidePlayerMap.containsKey(playerId),
++      orElse: () => '',
++    );
++    if (missingPlayerId.isNotEmpty) {
++      throw Exception('يوجد لاعب مؤقت لا ينتمي لهذا الطرف.');
++    }
++
++    final starters = _buildMatchSideEntries(
++      selectedIds: starterMatchSidePlayerIds,
++      sidePlayerMap: sidePlayerMap,
++    );
++    final bench = _buildMatchSideEntries(
++      selectedIds: benchMatchSidePlayerIds,
++      sidePlayerMap: sidePlayerMap,
++    );
++    _assertSlotAssignmentsBelongToStarters(
++      starters: starters,
++      slotAssignments: slotAssignments,
++      useMatchSidePlayerIdAsKey: true,
++    );
++
++    final snapshotId = _matchSideSnapshotId(
++      matchId: matchId,
++      matchSideId: matchSideId,
++    );
++    final snapshotRef = _snapshotsRef.doc(snapshotId);
++    final decoratedStarters = _decorateEntriesWithSlotAssignments(
++      entries: starters,
++      slotAssignments: slotAssignments,
++      useMatchSidePlayerIdAsKey: true,
++    );
++    final snapshot = MatchLineupSnapshot(
++      id: snapshotId,
++      matchId: matchId,
++      matchSideId: matchSideId,
++      sideKey: normalizedSide,
++      starters: decoratedStarters,
++      bench: bench,
++      lockedBy: actorId,
++      lockedAt: effectiveNow,
++      playerCount: requiredStarterCount,
++      formationCode: _normalizeOptionalText(formationCode),
++      formationLabel: _normalizeOptionalText(formationLabel),
++      notes: _normalizeOptionalText(notes),
++    );
++
++    return _firestore.runTransaction<MatchLineupSnapshot>((transaction) async {
++      final existingSnapshot = await transaction.get(snapshotRef);
++      if (existingSnapshot.exists && existingSnapshot.data() != null) {
++        return MatchLineupSnapshotModel.fromJson(
++          existingSnapshot.data()!,
++          existingSnapshot.id,
++        ).toEntity();
++      }
++
++      final matchSnapshot = await transaction.get(_matchesRef.doc(matchId));
++      if (!matchSnapshot.exists || matchSnapshot.data() == null) {
++        throw Exception('المباراة المطلوبة غير موجودة.');
++      }
++      final transactionMatch = MatchModel.fromJson(
++        matchSnapshot.data()!,
++        matchSnapshot.id,
++      ).toEntity();
++      _ensureMatchAvailableForPreKickoff(transactionMatch);
++      transaction.set(
++        snapshotRef,
++        MatchLineupSnapshotModel.fromEntity(snapshot).toJson(),
++      );
++      transaction.update(_matchesRef.doc(matchId), {
++        'matchSideLineupSnapshotIds.$matchSideId': snapshotId,
++      });
++      return snapshot;
++    });
++  }
++
+   Future<void> unlockLineup({
+     required String matchId,
+     required String snapshotId,
+@@ -913,6 +1051,10 @@ class MatchdayService {
+         updates['guestLineupSnapshotIds.${snapshot.guestTeamId}'] =
+             FieldValue.delete();
+       }
++      if (snapshot.matchSideId != null) {
++        updates['matchSideLineupSnapshotIds.${snapshot.matchSideId}'] =
++            FieldValue.delete();
++      }
+       if (updates.isNotEmpty) {
+         transaction.update(matchRef, updates);
+       }
+@@ -1095,6 +1237,54 @@ class MatchdayService {
+     );
+   }
+ 
++  Future<MatchSide> _requireMatchSide({
++    required String matchId,
++    required String matchSideId,
++    required String sideKey,
++  }) async {
++    final snapshot = await _matchSidesRef.doc(matchSideId).get();
++    if (!snapshot.exists || snapshot.data() == null) {
++      throw Exception('طرف المباراة المؤقت غير موجود.');
++    }
++    final side = MatchSideModel.fromJson(
++      snapshot.data()!,
++      snapshot.id,
++    ).toEntity();
++    if (side.matchId != matchId || _normalizeSideKey(side.sideKey) != sideKey) {
++      throw Exception('طرف المباراة لا يخص هذه المباراة.');
++    }
++    return side;
++  }
++
++  Future<List<MatchSidePlayer>> _loadMatchSidePlayers(
++    String matchId,
++    String sideKey,
++  ) async {
++    final snapshot = await _matchSidePlayersRef
++        .where('matchId', isEqualTo: matchId)
++        .get();
++    final normalizedSide = _normalizeSideKey(sideKey);
++    return snapshot.docs
++        .map(
++          (doc) => MatchSidePlayerModel.fromJson(doc.data(), doc.id).toEntity(),
++        )
++        .where((player) => _normalizeSideKey(player.sideKey) == normalizedSide)
++        .toList(growable: false);
++  }
++
++  void _ensureCanManageMatchSideLineup({
++    required Match match,
++    required MatchSide side,
++    required String actorId,
++  }) {
++    if (match.organizerId == actorId ||
++        side.captainUserId == actorId ||
++        side.managedByUserIds.contains(actorId)) {
++      return;
++    }
++    throw Exception('لا تملك صلاحية تعديل تشكيلة هذا الطرف.');
++  }
++
+   Future<Match> _requireMatch(String matchId) async {
+     final snapshot = await _matchesRef.doc(matchId).get();
+     if (!snapshot.exists || snapshot.data() == null) {
+@@ -1278,7 +1468,8 @@ class MatchdayService {
+         match.status == MatchStatus.completed ||
+         match.status == MatchStatus.pendingReview ||
+         match.status == MatchStatus.ratingWindow ||
+-        match.status == MatchStatus.settled) {
++        match.status == MatchStatus.settled ||
++        match.status == MatchStatus.cancelled) {
+       throw Exception(
+         'لا يمكن تنفيذ check-in أو lineup lock بعد انطلاق المباراة.',
+       );
+@@ -1293,7 +1484,8 @@ class MatchdayService {
+     if (match.status == MatchStatus.completed ||
+         match.status == MatchStatus.pendingReview ||
+         match.status == MatchStatus.ratingWindow ||
+-        match.status == MatchStatus.settled) {
++        match.status == MatchStatus.settled ||
++        match.status == MatchStatus.cancelled) {
+       throw Exception('لا يمكن تسجيل تبديلات بعد انتهاء المباراة.');
+     }
+   }
+@@ -1690,11 +1882,13 @@ class MatchdayService {
+ 
+   /// Decorates pre-built [MatchLineupEntry] instances with pitch-position data
+   /// from [slotAssignments].  The lookup key is [teamMembershipId] by default,
+-  /// or [guestPlayerId] when [useGuestPlayerIdAsKey] is true.
++  /// [guestPlayerId] for guest teams, or [matchSidePlayerId] for temporary
++  /// friendly sides.
+   List<MatchLineupEntry> _decorateEntriesWithSlotAssignments({
+     required List<MatchLineupEntry> entries,
+     required List<SlotAssignment> slotAssignments,
+     bool useGuestPlayerIdAsKey = false,
++    bool useMatchSidePlayerIdAsKey = false,
+   }) {
+     if (slotAssignments.isEmpty) {
+       return entries;
+@@ -1707,6 +1901,8 @@ class MatchdayService {
+         .map((entry) {
+           final lookupKey = useGuestPlayerIdAsKey
+               ? entry.guestPlayerId
++              : useMatchSidePlayerIdAsKey
++              ? entry.matchSidePlayerId
+               : entry.teamMembershipId;
+           if (lookupKey == null) return entry;
+           final assignment = assignmentMap[lookupKey];
+@@ -1727,6 +1923,7 @@ class MatchdayService {
+     required List<MatchLineupEntry> starters,
+     required List<SlotAssignment> slotAssignments,
+     bool useGuestPlayerIdAsKey = false,
++    bool useMatchSidePlayerIdAsKey = false,
+   }) {
+     if (slotAssignments.isEmpty) return;
+ 
+@@ -1734,6 +1931,8 @@ class MatchdayService {
+         .map(
+           (entry) => useGuestPlayerIdAsKey
+               ? entry.guestPlayerId
++              : useMatchSidePlayerIdAsKey
++              ? entry.matchSidePlayerId
+               : entry.teamMembershipId,
+         )
+         .whereType<String>()
+@@ -1775,6 +1974,32 @@ class MatchdayService {
+     return entries;
+   }
+ 
++  List<MatchLineupEntry> _buildMatchSideEntries({
++    required List<String> selectedIds,
++    required Map<String, MatchSidePlayer> sidePlayerMap,
++  }) {
++    final entries = <MatchLineupEntry>[];
++    for (final matchSidePlayerId in selectedIds) {
++      final sidePlayer = sidePlayerMap[matchSidePlayerId];
++      if (sidePlayer == null) {
++        throw Exception('يوجد لاعب مؤقت غير موجود داخل طرف المباراة.');
++      }
++      entries.add(
++        MatchLineupEntry(
++          attendanceId: 'matchSidePlayer::$matchSidePlayerId',
++          matchSidePlayerId: matchSidePlayerId,
++          role: TeamMembershipRole.player,
++          availability: TeamMemberAvailability.available,
++          attendanceStatus: MatchAttendanceStatus.present,
++          displayName: sidePlayer.displayName,
++          position: sidePlayer.position,
++          ratingEligible: sidePlayer.ratingEligible && sidePlayer.isRegistered,
++        ),
++      );
++    }
++    return entries;
++  }
++
+   Map<String, Map<String, dynamic>> _buildLockAttendanceUpdates({
+     required List<MatchAttendance> attendances,
+     required Set<String> starterAttendanceIds,
+@@ -1969,6 +2194,21 @@ class MatchdayService {
+     return 'match::$matchId::guest::$guestTeamId::lineup';
+   }
+ 
++  String _matchSideSnapshotId({
++    required String matchId,
++    required String matchSideId,
++  }) {
++    return 'match::$matchId::side::$matchSideId::lineup';
++  }
++
++  String _normalizeSideKey(String sideKey) {
++    final normalized = sideKey.trim().toUpperCase();
++    if (normalized != 'A' && normalized != 'B') {
++      throw Exception('طرف المباراة غير صحيح.');
++    }
++    return normalized;
++  }
++
+   String? _normalizeOptionalText(String? value) {
+     if (value == null) {
+       return null;
+diff --git a/lib/data/models/match_lineup_entry_model.dart b/lib/data/models/match_lineup_entry_model.dart
+index 1de7273..d532a03 100644
+--- a/lib/data/models/match_lineup_entry_model.dart
++++ b/lib/data/models/match_lineup_entry_model.dart
+@@ -8,12 +8,14 @@ class MatchLineupEntryModel {
+   final String? teamMembershipId;
+   final String? playerId;
+   final String? guestPlayerId;
++  final String? matchSidePlayerId;
+   final String? claimedFromGuestPlayerId;
+   final TeamMembershipRole role;
+   final TeamMemberAvailability availability;
+   final MatchAttendanceStatus attendanceStatus;
+   final String displayName;
+   final String? position;
++  final bool ratingEligible;
+ 
+   // ── Slot assignment (nullable for backward compatibility) ──
+   final String? slotId;
+@@ -28,12 +30,14 @@ class MatchLineupEntryModel {
+     this.teamMembershipId,
+     this.playerId,
+     this.guestPlayerId,
++    this.matchSidePlayerId,
+     this.claimedFromGuestPlayerId,
+     required this.role,
+     required this.availability,
+     required this.attendanceStatus,
+     required this.displayName,
+     this.position,
++    this.ratingEligible = true,
+     this.slotId,
+     this.slotRole,
+     this.lineIndex,
+@@ -48,26 +52,31 @@ class MatchLineupEntryModel {
+       teamMembershipId: json['teamMembershipId'] as String?,
+       playerId: json['playerId'] as String?,
+       guestPlayerId: json['guestPlayerId'] as String?,
++      matchSidePlayerId: json['matchSidePlayerId'] as String?,
+       claimedFromGuestPlayerId: json['claimedFromGuestPlayerId'] as String?,
+       role: TeamMembershipRole.values.firstWhere(
+-        (value) => value.name ==
++        (value) =>
++            value.name ==
+             (json['role'] as String? ?? TeamMembershipRole.player.name),
+         orElse: () => TeamMembershipRole.player,
+       ),
+       availability: TeamMemberAvailability.values.firstWhere(
+-        (value) => value.name ==
++        (value) =>
++            value.name ==
+             (json['availability'] as String? ??
+                 TeamMemberAvailability.available.name),
+         orElse: () => TeamMemberAvailability.available,
+       ),
+       attendanceStatus: MatchAttendanceStatus.values.firstWhere(
+-        (value) => value.name ==
++        (value) =>
++            value.name ==
+             (json['attendanceStatus'] as String? ??
+                 MatchAttendanceStatus.pending.name),
+         orElse: () => MatchAttendanceStatus.pending,
+       ),
+       displayName: json['displayName'] as String? ?? '',
+       position: json['position'] as String?,
++      ratingEligible: json['ratingEligible'] as bool? ?? true,
+       slotId: json['slotId'] as String?,
+       slotRole: json['slotRole'] as String?,
+       lineIndex: (json['lineIndex'] as num?)?.toInt(),
+@@ -83,12 +92,14 @@ class MatchLineupEntryModel {
+       'teamMembershipId': teamMembershipId,
+       'playerId': playerId,
+       'guestPlayerId': guestPlayerId,
++      'matchSidePlayerId': matchSidePlayerId,
+       'claimedFromGuestPlayerId': claimedFromGuestPlayerId,
+       'role': role.name,
+       'availability': availability.name,
+       'attendanceStatus': attendanceStatus.name,
+       'displayName': displayName,
+       'position': position,
++      'ratingEligible': ratingEligible,
+       'slotId': slotId,
+       'slotRole': slotRole,
+       'lineIndex': lineIndex,
+@@ -104,12 +115,14 @@ class MatchLineupEntryModel {
+       teamMembershipId: teamMembershipId,
+       playerId: playerId,
+       guestPlayerId: guestPlayerId,
++      matchSidePlayerId: matchSidePlayerId,
+       claimedFromGuestPlayerId: claimedFromGuestPlayerId,
+       role: role,
+       availability: availability,
+       attendanceStatus: attendanceStatus,
+       displayName: displayName,
+       position: position,
++      ratingEligible: ratingEligible,
+       slotId: slotId,
+       slotRole: slotRole,
+       lineIndex: lineIndex,
+@@ -125,12 +138,14 @@ class MatchLineupEntryModel {
+       teamMembershipId: entry.teamMembershipId,
+       playerId: entry.playerId,
+       guestPlayerId: entry.guestPlayerId,
++      matchSidePlayerId: entry.matchSidePlayerId,
+       claimedFromGuestPlayerId: entry.claimedFromGuestPlayerId,
+       role: entry.role,
+       availability: entry.availability,
+       attendanceStatus: entry.attendanceStatus,
+       displayName: entry.displayName,
+       position: entry.position,
++      ratingEligible: entry.ratingEligible,
+       slotId: entry.slotId,
+       slotRole: entry.slotRole,
+       lineIndex: entry.lineIndex,
+diff --git a/lib/data/models/match_lineup_snapshot_model.dart b/lib/data/models/match_lineup_snapshot_model.dart
+index 1903fa6..59e9ab7 100644
+--- a/lib/data/models/match_lineup_snapshot_model.dart
++++ b/lib/data/models/match_lineup_snapshot_model.dart
+@@ -7,6 +7,8 @@ class MatchLineupSnapshotModel {
+   final String matchId;
+   final String? teamId;
+   final String? guestTeamId;
++  final String? matchSideId;
++  final String? sideKey;
+   final String? tournamentRegistrationId;
+   final String? checkInId;
+   final List<MatchLineupEntryModel> starters;
+@@ -23,6 +25,8 @@ class MatchLineupSnapshotModel {
+     required this.matchId,
+     this.teamId,
+     this.guestTeamId,
++    this.matchSideId,
++    this.sideKey,
+     this.tournamentRegistrationId,
+     this.checkInId,
+     required this.starters,
+@@ -44,6 +48,8 @@ class MatchLineupSnapshotModel {
+       matchId: json['matchId'] as String? ?? '',
+       teamId: json['teamId'] as String?,
+       guestTeamId: json['guestTeamId'] as String?,
++      matchSideId: json['matchSideId'] as String?,
++      sideKey: json['sideKey'] as String?,
+       tournamentRegistrationId: json['tournamentRegistrationId'] as String?,
+       checkInId: json['checkInId'] as String?,
+       starters: (json['starters'] as List<dynamic>? ?? const [])
+@@ -76,6 +82,8 @@ class MatchLineupSnapshotModel {
+       'matchId': matchId,
+       'teamId': teamId,
+       'guestTeamId': guestTeamId,
++      'matchSideId': matchSideId,
++      'sideKey': sideKey,
+       'tournamentRegistrationId': tournamentRegistrationId,
+       'checkInId': checkInId,
+       'starters': starters.map((entry) => entry.toJson()).toList(),
+@@ -97,6 +105,8 @@ class MatchLineupSnapshotModel {
+       matchId: matchId,
+       teamId: teamId,
+       guestTeamId: guestTeamId,
++      matchSideId: matchSideId,
++      sideKey: sideKey,
+       tournamentRegistrationId: tournamentRegistrationId,
+       checkInId: checkInId,
+       starters: starters
+@@ -118,6 +128,8 @@ class MatchLineupSnapshotModel {
+       matchId: snapshot.matchId,
+       teamId: snapshot.teamId,
+       guestTeamId: snapshot.guestTeamId,
++      matchSideId: snapshot.matchSideId,
++      sideKey: snapshot.sideKey,
+       tournamentRegistrationId: snapshot.tournamentRegistrationId,
+       checkInId: snapshot.checkInId,
+       starters: snapshot.starters
+diff --git a/lib/data/models/match_model.dart b/lib/data/models/match_model.dart
+index 1d8f41b..36b7c52 100644
+--- a/lib/data/models/match_model.dart
++++ b/lib/data/models/match_model.dart
+@@ -42,6 +42,9 @@ class MatchModel {
+   final DateTime createdAt;
+   final DateTime? startedAt;
+   final DateTime? completedAt;
++  final DateTime? cancelledAt;
++  final String? cancelledBy;
++  final String? cancelReason;
+ 
+   const MatchModel({
+     required this.id,
+@@ -79,6 +82,9 @@ class MatchModel {
+     required this.createdAt,
+     this.startedAt,
+     this.completedAt,
++    this.cancelledAt,
++    this.cancelledBy,
++    this.cancelReason,
+   });
+ 
+   factory MatchModel.fromJson(Map<String, dynamic> json, String docId) {
+@@ -139,8 +145,7 @@ class MatchModel {
+       venueId: json['venueId'] as String?,
+       fixtureStatus:
+           json['fixtureStatus'] as String? ?? FixtureStatus.draft.name,
+-      lineupRequirement:
+-          json['lineupRequirement'] as String? ?? 'none',
++      lineupRequirement: json['lineupRequirement'] as String? ?? 'none',
+       createdAt: json['createdAt'] != null
+           ? DateTime.fromMillisecondsSinceEpoch(
+               (json['createdAt'] as num).toInt(),
+@@ -156,6 +161,13 @@ class MatchModel {
+               (json['completedAt'] as num).toInt(),
+             )
+           : null,
++      cancelledAt: json['cancelledAt'] != null
++          ? DateTime.fromMillisecondsSinceEpoch(
++              (json['cancelledAt'] as num).toInt(),
++            )
++          : null,
++      cancelledBy: json['cancelledBy'] as String?,
++      cancelReason: json['cancelReason'] as String?,
+     );
+   }
+ 
+@@ -194,6 +206,9 @@ class MatchModel {
+     'createdAt': createdAt.millisecondsSinceEpoch,
+     'startedAt': startedAt?.millisecondsSinceEpoch,
+     'completedAt': completedAt?.millisecondsSinceEpoch,
++    'cancelledAt': cancelledAt?.millisecondsSinceEpoch,
++    'cancelledBy': cancelledBy,
++    'cancelReason': cancelReason,
+   };
+ 
+   Match toEntity() => Match(
+@@ -243,6 +258,9 @@ class MatchModel {
+     createdAt: createdAt,
+     startedAt: startedAt,
+     completedAt: completedAt,
++    cancelledAt: cancelledAt,
++    cancelledBy: cancelledBy,
++    cancelReason: cancelReason,
+   );
+ 
+   factory MatchModel.fromEntity(Match m) => MatchModel(
+@@ -281,6 +299,9 @@ class MatchModel {
+     createdAt: m.createdAt,
+     startedAt: m.startedAt,
+     completedAt: m.completedAt,
++    cancelledAt: m.cancelledAt,
++    cancelledBy: m.cancelledBy,
++    cancelReason: m.cancelReason,
+   );
+ 
+   static MatchStatus _parseStatus(String v) => MatchStatus.values.firstWhere(
+diff --git a/lib/data/repositories/match_lineup_snapshot_repository_impl.dart b/lib/data/repositories/match_lineup_snapshot_repository_impl.dart
+index 1dba7a2..0bbecb5 100644
+--- a/lib/data/repositories/match_lineup_snapshot_repository_impl.dart
++++ b/lib/data/repositories/match_lineup_snapshot_repository_impl.dart
+@@ -10,7 +10,7 @@ class MatchLineupSnapshotRepositoryImpl
+   final FirebaseFirestore _firestore;
+ 
+   MatchLineupSnapshotRepositoryImpl({FirebaseFirestore? firestore})
+-      : _firestore = firestore ?? FirebaseFirestore.instance;
++    : _firestore = firestore ?? FirebaseFirestore.instance;
+ 
+   CollectionReference<Map<String, dynamic>> get _snapshotsRef =>
+       _firestore.collection(FirebasePaths.matchLineupSnapshots);
+@@ -32,9 +32,14 @@ class MatchLineupSnapshotRepositoryImpl
+ 
+   @override
+   Future<List<MatchLineupSnapshot>> getMatchSnapshots(String matchId) async {
+-    final snapshot = await _snapshotsRef.where('matchId', isEqualTo: matchId).get();
++    final snapshot = await _snapshotsRef
++        .where('matchId', isEqualTo: matchId)
++        .get();
+     final lineups = snapshot.docs
+-        .map((doc) => MatchLineupSnapshotModel.fromJson(doc.data(), doc.id).toEntity())
++        .map(
++          (doc) =>
++              MatchLineupSnapshotModel.fromJson(doc.data(), doc.id).toEntity(),
++        )
+         .toList(growable: true);
+     lineups.sort((left, right) => left.lockedAt.compareTo(right.lockedAt));
+     return lineups;
+@@ -74,6 +79,23 @@ class MatchLineupSnapshotRepositoryImpl
+     return MatchLineupSnapshotModel.fromJson(doc.data(), doc.id).toEntity();
+   }
+ 
++  @override
++  Future<MatchLineupSnapshot?> getSnapshotByMatchSideId({
++    required String matchId,
++    required String matchSideId,
++  }) async {
++    final snapshot = await _snapshotsRef
++        .where('matchId', isEqualTo: matchId)
++        .where('matchSideId', isEqualTo: matchSideId)
++        .limit(1)
++        .get();
++    if (snapshot.docs.isEmpty) {
++      return null;
++    }
++    final doc = snapshot.docs.first;
++    return MatchLineupSnapshotModel.fromJson(doc.data(), doc.id).toEntity();
++  }
++
+   @override
+   Future<void> deleteSnapshot(String snapshotId) async {
+     await _snapshotsRef.doc(snapshotId).delete();
+diff --git a/lib/data/repositories/match_repository_impl.dart b/lib/data/repositories/match_repository_impl.dart
+index a0c8016..98ac97b 100644
+--- a/lib/data/repositories/match_repository_impl.dart
++++ b/lib/data/repositories/match_repository_impl.dart
+@@ -93,8 +93,9 @@ class MatchRepositoryImpl implements MatchRepository {
+       all.add(MatchModel.fromJson(doc.data(), doc.id).toEntity());
+     }
+ 
+-    final sorted = all.toList()
+-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
++    final sorted =
++        all.where((match) => match.status != MatchStatus.cancelled).toList()
++          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+     return sorted.take(limit).toList();
+   }
+ 
+diff --git a/lib/domain/entities/match.dart b/lib/domain/entities/match.dart
+index 778ddda..fe2b71e 100644
+--- a/lib/domain/entities/match.dart
++++ b/lib/domain/entities/match.dart
+@@ -39,6 +39,9 @@ class Match {
+   final DateTime createdAt;
+   final DateTime? startedAt;
+   final DateTime? completedAt;
++  final DateTime? cancelledAt;
++  final String? cancelledBy;
++  final String? cancelReason;
+ 
+   const Match({
+     required this.id,
+@@ -76,6 +79,9 @@ class Match {
+     required this.createdAt,
+     this.startedAt,
+     this.completedAt,
++    this.cancelledAt,
++    this.cancelledBy,
++    this.cancelReason,
+   });
+ 
+   /// هل انتهت وعندنا نتيجة؟
+@@ -139,6 +145,9 @@ class Match {
+     DateTime? createdAt,
+     DateTime? startedAt,
+     DateTime? completedAt,
++    DateTime? cancelledAt,
++    String? cancelledBy,
++    String? cancelReason,
+   }) {
+     return Match(
+       id: id ?? this.id,
+@@ -176,6 +185,9 @@ class Match {
+       createdAt: createdAt ?? this.createdAt,
+       startedAt: startedAt ?? this.startedAt,
+       completedAt: completedAt ?? this.completedAt,
++      cancelledAt: cancelledAt ?? this.cancelledAt,
++      cancelledBy: cancelledBy ?? this.cancelledBy,
++      cancelReason: cancelReason ?? this.cancelReason,
+     );
+   }
+ }
+diff --git a/lib/domain/entities/match_lineup_entry.dart b/lib/domain/entities/match_lineup_entry.dart
+index 275b4ea..0df691d 100644
+--- a/lib/domain/entities/match_lineup_entry.dart
++++ b/lib/domain/entities/match_lineup_entry.dart
+@@ -8,12 +8,14 @@ class MatchLineupEntry {
+   final String? teamMembershipId;
+   final String? playerId;
+   final String? guestPlayerId;
++  final String? matchSidePlayerId;
+   final String? claimedFromGuestPlayerId;
+   final TeamMembershipRole role;
+   final TeamMemberAvailability availability;
+   final MatchAttendanceStatus attendanceStatus;
+   final String displayName;
+   final String? position;
++  final bool ratingEligible;
+ 
+   // ── Slot assignment (nullable for backward compatibility) ──
+   final String? slotId;
+@@ -28,12 +30,14 @@ class MatchLineupEntry {
+     this.teamMembershipId,
+     this.playerId,
+     this.guestPlayerId,
++    this.matchSidePlayerId,
+     this.claimedFromGuestPlayerId,
+     required this.role,
+     required this.availability,
+     required this.attendanceStatus,
+     required this.displayName,
+     this.position,
++    this.ratingEligible = true,
+     this.slotId,
+     this.slotRole,
+     this.lineIndex,
+@@ -41,13 +45,17 @@ class MatchLineupEntry {
+     this.slotX,
+     this.slotY,
+   }) : assert(
+-          (playerId != null) != (guestPlayerId != null),
+-          'Exactly one of playerId or guestPlayerId must be set.',
+-        );
++         (playerId == null ? 0 : 1) +
++                 (guestPlayerId == null ? 0 : 1) +
++                 (matchSidePlayerId == null ? 0 : 1) ==
++             1,
++         'Exactly one of playerId, guestPlayerId, or matchSidePlayerId must be set.',
++       );
+ 
+   bool get isGuest => guestPlayerId != null;
++  bool get isTemporary => matchSidePlayerId != null;
+ 
+-  String get participantId => playerId ?? guestPlayerId!;
++  String get participantId => playerId ?? guestPlayerId ?? matchSidePlayerId!;
+ 
+   /// Whether this entry carries exact pitch-position data.
+   bool get hasSlotAssignment => slotId != null;
+@@ -57,12 +65,14 @@ class MatchLineupEntry {
+     Object? teamMembershipId = _unset,
+     Object? playerId = _unset,
+     Object? guestPlayerId = _unset,
++    Object? matchSidePlayerId = _unset,
+     Object? claimedFromGuestPlayerId = _unset,
+     TeamMembershipRole? role,
+     TeamMemberAvailability? availability,
+     MatchAttendanceStatus? attendanceStatus,
+     String? displayName,
+     Object? position = _unset,
++    bool? ratingEligible,
+     Object? slotId = _unset,
+     Object? slotRole = _unset,
+     Object? lineIndex = _unset,
+@@ -75,10 +85,15 @@ class MatchLineupEntry {
+       teamMembershipId: identical(teamMembershipId, _unset)
+           ? this.teamMembershipId
+           : teamMembershipId as String?,
+-      playerId: identical(playerId, _unset) ? this.playerId : playerId as String?,
++      playerId: identical(playerId, _unset)
++          ? this.playerId
++          : playerId as String?,
+       guestPlayerId: identical(guestPlayerId, _unset)
+           ? this.guestPlayerId
+           : guestPlayerId as String?,
++      matchSidePlayerId: identical(matchSidePlayerId, _unset)
++          ? this.matchSidePlayerId
++          : matchSidePlayerId as String?,
+       claimedFromGuestPlayerId: identical(claimedFromGuestPlayerId, _unset)
+           ? this.claimedFromGuestPlayerId
+           : claimedFromGuestPlayerId as String?,
+@@ -86,11 +101,20 @@ class MatchLineupEntry {
+       availability: availability ?? this.availability,
+       attendanceStatus: attendanceStatus ?? this.attendanceStatus,
+       displayName: displayName ?? this.displayName,
+-      position: identical(position, _unset) ? this.position : position as String?,
++      position: identical(position, _unset)
++          ? this.position
++          : position as String?,
++      ratingEligible: ratingEligible ?? this.ratingEligible,
+       slotId: identical(slotId, _unset) ? this.slotId : slotId as String?,
+-      slotRole: identical(slotRole, _unset) ? this.slotRole : slotRole as String?,
+-      lineIndex: identical(lineIndex, _unset) ? this.lineIndex : lineIndex as int?,
+-      slotIndex: identical(slotIndex, _unset) ? this.slotIndex : slotIndex as int?,
++      slotRole: identical(slotRole, _unset)
++          ? this.slotRole
++          : slotRole as String?,
++      lineIndex: identical(lineIndex, _unset)
++          ? this.lineIndex
++          : lineIndex as int?,
++      slotIndex: identical(slotIndex, _unset)
++          ? this.slotIndex
++          : slotIndex as int?,
+       slotX: identical(slotX, _unset) ? this.slotX : slotX as double?,
+       slotY: identical(slotY, _unset) ? this.slotY : slotY as double?,
+     );
+@@ -98,4 +122,3 @@ class MatchLineupEntry {
+ }
+ 
+ const Object _unset = Object();
+-
+diff --git a/lib/domain/entities/match_lineup_snapshot.dart b/lib/domain/entities/match_lineup_snapshot.dart
+index 83b1b1f..02967d2 100644
+--- a/lib/domain/entities/match_lineup_snapshot.dart
++++ b/lib/domain/entities/match_lineup_snapshot.dart
+@@ -6,6 +6,8 @@ class MatchLineupSnapshot {
+   final String matchId;
+   final String? teamId;
+   final String? guestTeamId;
++  final String? matchSideId;
++  final String? sideKey;
+   final String? tournamentRegistrationId;
+   final String? checkInId;
+   final List<MatchLineupEntry> starters;
+@@ -22,6 +24,8 @@ class MatchLineupSnapshot {
+     required this.matchId,
+     this.teamId,
+     this.guestTeamId,
++    this.matchSideId,
++    this.sideKey,
+     this.tournamentRegistrationId,
+     this.checkInId,
+     required this.starters,
+@@ -33,15 +37,19 @@ class MatchLineupSnapshot {
+     this.formationLabel,
+     this.notes,
+   }) : assert(
+-         (teamId != null) != (guestTeamId != null),
+-         'Exactly one of teamId or guestTeamId must be set.',
++         (teamId == null ? 0 : 1) +
++                 (guestTeamId == null ? 0 : 1) +
++                 (matchSideId == null ? 0 : 1) ==
++             1,
++         'Exactly one of teamId, guestTeamId, or matchSideId must be set.',
+        );
+ 
+   bool get isGuestTeam => guestTeamId != null;
+   bool get isRegisteredTeam => teamId != null;
++  bool get isMatchSide => matchSideId != null;
+   int get guestCount =>
+       [...starters, ...bench].where((entry) => entry.isGuest).length;
+-  String get participantId => teamId ?? guestTeamId!;
++  String get participantId => teamId ?? guestTeamId ?? matchSideId!;
+ 
+   String get summaryLabel {
+     final effectiveFormation = formationCode?.trim().isNotEmpty == true
+diff --git a/lib/domain/repositories/match_lineup_snapshot_repository.dart b/lib/domain/repositories/match_lineup_snapshot_repository.dart
+index 0601a13..96d526b 100644
+--- a/lib/domain/repositories/match_lineup_snapshot_repository.dart
++++ b/lib/domain/repositories/match_lineup_snapshot_repository.dart
+@@ -12,5 +12,9 @@ abstract class MatchLineupSnapshotRepository {
+     required String matchId,
+     required String guestTeamId,
+   });
++  Future<MatchLineupSnapshot?> getSnapshotByMatchSideId({
++    required String matchId,
++    required String matchSideId,
++  });
+   Future<void> deleteSnapshot(String snapshotId);
+ }
+diff --git a/lib/features/lineup/bindings/lineup_binding.dart b/lib/features/lineup/bindings/lineup_binding.dart
+index f1e2553..3886c08 100644
+--- a/lib/features/lineup/bindings/lineup_binding.dart
++++ b/lib/features/lineup/bindings/lineup_binding.dart
+@@ -9,12 +9,15 @@ import '../../../data/repositories/match_attendance_repository_impl.dart';
+ import '../../../data/repositories/match_check_in_repository_impl.dart';
+ import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
+ import '../../../data/repositories/match_repository_impl.dart';
++import '../../../data/repositories/match_side_player_repository_impl.dart';
++import '../../../data/repositories/match_side_repository_impl.dart';
+ import '../../../data/repositories/player_repository_impl.dart';
+ import '../../../data/repositories/team_membership_repository_impl.dart';
+ import '../../../data/repositories/team_repository_impl.dart';
+ import '../../../data/repositories/tournament_repository_impl.dart';
+ import '../../../services/auth_service.dart';
+ import '../controllers/match_result_lineup_controller.dart';
++import '../controllers/match_side_lineup_editor_controller.dart';
+ import '../controllers/team_lineup_editor_controller.dart';
+ 
+ class TeamLineupEditorBinding extends Bindings {
+@@ -38,6 +41,23 @@ class TeamLineupEditorBinding extends Bindings {
+   }
+ }
+ 
++class MatchSideLineupEditorBinding extends Bindings {
++  @override
++  void dependencies() {
++    _putSharedLineupDependencies();
++    Get.lazyPut<MatchSideLineupEditorController>(
++      () => MatchSideLineupEditorController(
++        authSession: _authSession(),
++        matchRepository: Get.find<MatchRepositoryImpl>(),
++        matchSideRepository: Get.find<MatchSideRepositoryImpl>(),
++        matchSidePlayerRepository: Get.find<MatchSidePlayerRepositoryImpl>(),
++        snapshotRepository: Get.find<MatchLineupSnapshotRepositoryImpl>(),
++        matchdayService: Get.find<MatchdayService>(),
++      ),
++    );
++  }
++}
++
+ class MatchResultLineupBinding extends Bindings {
+   @override
+   void dependencies() {
+@@ -47,6 +67,8 @@ class MatchResultLineupBinding extends Bindings {
+         matchRepository: Get.find<MatchRepositoryImpl>(),
+         teamRepository: Get.find<TeamRepositoryImpl>(),
+         snapshotRepository: Get.find<MatchLineupSnapshotRepositoryImpl>(),
++        matchSideRepository: Get.find<MatchSideRepositoryImpl>(),
++        matchSidePlayerRepository: Get.find<MatchSidePlayerRepositoryImpl>(),
+       ),
+     );
+   }
+@@ -78,6 +100,14 @@ void _putSharedLineupDependencies() {
+       () => MatchLineupSnapshotRepositoryImpl(),
+     );
+   }
++  if (!Get.isRegistered<MatchSideRepositoryImpl>()) {
++    Get.lazyPut<MatchSideRepositoryImpl>(() => MatchSideRepositoryImpl());
++  }
++  if (!Get.isRegistered<MatchSidePlayerRepositoryImpl>()) {
++    Get.lazyPut<MatchSidePlayerRepositoryImpl>(
++      () => MatchSidePlayerRepositoryImpl(),
++    );
++  }
+   if (!Get.isRegistered<MatchCheckInRepositoryImpl>()) {
+     Get.lazyPut<MatchCheckInRepositoryImpl>(() => MatchCheckInRepositoryImpl());
+   }
+diff --git a/lib/features/lineup/controllers/match_result_lineup_controller.dart b/lib/features/lineup/controllers/match_result_lineup_controller.dart
+index 89bae9b..1171536 100644
+--- a/lib/features/lineup/controllers/match_result_lineup_controller.dart
++++ b/lib/features/lineup/controllers/match_result_lineup_controller.dart
+@@ -6,11 +6,16 @@ import '../../../core/lineup/lineup_types.dart';
+ import '../../../core/lineup/lineup_utils.dart';
+ import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
+ import '../../../data/repositories/match_repository_impl.dart';
++import '../../../data/repositories/match_side_player_repository_impl.dart';
++import '../../../data/repositories/match_side_repository_impl.dart';
+ import '../../../data/repositories/team_repository_impl.dart';
+ import '../../../domain/entities/match.dart';
+ import '../../../domain/entities/match_lineup_entry.dart';
+ import '../../../domain/entities/match_lineup_snapshot.dart';
++import '../../../domain/entities/match_side.dart';
++import '../../../domain/entities/match_side_player.dart';
+ import '../../../domain/entities/team.dart';
++import '../../match/models/friendly_match_side_view.dart';
+ 
+ class ResultLineupSide {
+   final String label;
+@@ -24,19 +29,27 @@ class MatchResultLineupController extends GetxController {
+   final MatchRepositoryImpl _matchRepository;
+   final TeamRepositoryImpl _teamRepository;
+   final MatchLineupSnapshotRepositoryImpl _snapshotRepository;
++  final MatchSideRepositoryImpl _matchSideRepository;
++  final MatchSidePlayerRepositoryImpl _matchSidePlayerRepository;
+ 
+   MatchResultLineupController({
+     required MatchRepositoryImpl matchRepository,
+     required TeamRepositoryImpl teamRepository,
+     required MatchLineupSnapshotRepositoryImpl snapshotRepository,
++    required MatchSideRepositoryImpl matchSideRepository,
++    required MatchSidePlayerRepositoryImpl matchSidePlayerRepository,
+   }) : _matchRepository = matchRepository,
+        _teamRepository = teamRepository,
+-       _snapshotRepository = snapshotRepository;
++       _snapshotRepository = snapshotRepository,
++       _matchSideRepository = matchSideRepository,
++       _matchSidePlayerRepository = matchSidePlayerRepository;
+ 
+   final RxBool isLoading = true.obs;
+   final RxString errorMessage = ''.obs;
+   final Rx<Match?> match = Rx<Match?>(null);
+   final RxMap<String, Team> teams = <String, Team>{}.obs;
++  final RxList<MatchSide> matchSides = <MatchSide>[].obs;
++  final RxList<MatchSidePlayer> matchSidePlayers = <MatchSidePlayer>[].obs;
+   final RxList<MatchLineupSnapshot> snapshots = <MatchLineupSnapshot>[].obs;
+ 
+   String get matchId => Get.parameters['matchId'] ?? Get.parameters['id'] ?? '';
+@@ -45,10 +58,11 @@ class MatchResultLineupController extends GetxController {
+     final currentMatch = match.value;
+     final teamId = currentMatch?.teamAId;
+     final team = teamId == null ? null : teams[teamId];
++    final sideView = _friendlySideView('A');
+     return ResultLineupSide(
+-      label: team?.name ?? 'الفريق الأول',
++      label: sideView?.displayName ?? team?.name ?? 'الفريق الأول',
+       logoUrl: team?.logoUrl,
+-      snapshot: _snapshotForTeam(teamId),
++      snapshot: _snapshotForSide(sideKey: 'A', teamId: teamId),
+     );
+   }
+ 
+@@ -56,10 +70,11 @@ class MatchResultLineupController extends GetxController {
+     final currentMatch = match.value;
+     final teamId = currentMatch?.teamBId;
+     final team = teamId == null ? null : teams[teamId];
++    final sideView = _friendlySideView('B');
+     return ResultLineupSide(
+-      label: team?.name ?? 'الفريق الثاني',
++      label: sideView?.displayName ?? team?.name ?? 'الفريق الثاني',
+       logoUrl: team?.logoUrl,
+-      snapshot: _snapshotForTeam(teamId),
++      snapshot: _snapshotForSide(sideKey: 'B', teamId: teamId),
+     );
+   }
+ 
+@@ -89,10 +104,18 @@ class MatchResultLineupController extends GetxController {
+         if (loadedMatch.teamAId != null) loadedMatch.teamAId!,
+         if (loadedMatch.teamBId != null) loadedMatch.teamBId!,
+       ]);
++      final loadedSides = loadedMatch.tournamentId == null
++          ? await _matchSideRepository.getMatchSides(loadedMatch.id)
++          : <MatchSide>[];
++      final loadedSidePlayers = loadedMatch.tournamentId == null
++          ? await _matchSidePlayerRepository.getMatchPlayers(loadedMatch.id)
++          : <MatchSidePlayer>[];
+ 
+       match.value = loadedMatch;
+       snapshots.assignAll(loadedSnapshots);
+       teams.assignAll({for (final team in loadedTeams) team.id: team});
++      matchSides.assignAll(loadedSides);
++      matchSidePlayers.assignAll(loadedSidePlayers);
+     } catch (error) {
+       errorMessage.value = _readableError(error);
+     } finally {
+@@ -173,6 +196,7 @@ class MatchResultLineupController extends GetxController {
+             y: entry.slotY ?? 50,
+             playerId: player.isRegistered ? player.id : null,
+             guestPlayerId: player.isGuest ? player.id : null,
++            matchSidePlayerId: player.isTemporary ? player.id : null,
+           );
+         })
+         .toList(growable: false);
+@@ -211,12 +235,26 @@ class MatchResultLineupController extends GetxController {
+     return snapshot.bench.map(_lineupPlayerFromEntry).toList(growable: false);
+   }
+ 
+-  MatchLineupSnapshot? _snapshotForTeam(String? teamId) {
+-    if (teamId == null) {
+-      return null;
++  MatchLineupSnapshot? _snapshotForSide({
++    required String sideKey,
++    required String? teamId,
++  }) {
++    if (teamId != null) {
++      for (final snapshot in snapshots) {
++        if (snapshot.teamId == teamId) {
++          return snapshot;
++        }
++      }
+     }
++    final currentMatch = match.value;
++    final matchSideId = currentMatch == null
++        ? null
++        : '${currentMatch.id}_${sideKey.trim().toUpperCase()}';
++    if (matchSideId == null) return null;
+     for (final snapshot in snapshots) {
+-      if (snapshot.teamId == teamId) {
++      if (snapshot.matchSideId == matchSideId ||
++          snapshot.sideKey?.trim().toUpperCase() ==
++              sideKey.trim().toUpperCase()) {
+         return snapshot;
+       }
+     }
+@@ -228,10 +266,28 @@ class MatchResultLineupController extends GetxController {
+       id: entry.participantId,
+       name: entry.displayName,
+       preferredPosition: entry.position,
+-      isRegistered: !entry.isGuest,
++      isRegistered: entry.playerId != null,
++      isTemporary: entry.matchSidePlayerId != null,
+     );
+   }
+ 
++  FriendlyMatchSideView? _friendlySideView(String sideKey) {
++    final currentMatch = match.value;
++    if (currentMatch == null || currentMatch.tournamentId != null) {
++      return null;
++    }
++    final views = FriendlyMatchSideView.fromMatch(
++      match: currentMatch,
++      teamsById: teams,
++      sides: matchSides,
++      sidePlayers: matchSidePlayers,
++    );
++    for (final side in views) {
++      if (side.sideKey == sideKey) return side;
++    }
++    return null;
++  }
++
+   String _readableError(Object error) {
+     final raw = error.toString();
+     return raw.startsWith('Exception: ') ? raw.substring(11) : raw;
+diff --git a/lib/features/lineup/controllers/team_lineup_editor_controller.dart b/lib/features/lineup/controllers/team_lineup_editor_controller.dart
+index da6a02f..3e47c01 100644
+--- a/lib/features/lineup/controllers/team_lineup_editor_controller.dart
++++ b/lib/features/lineup/controllers/team_lineup_editor_controller.dart
+@@ -288,11 +288,13 @@ class TeamLineupEditorController extends GetxController {
+ 
+     final targetPlayerId = oldTargetSlot.playerId;
+     final targetGuestPlayerId = oldTargetSlot.guestPlayerId;
++    final targetMatchSidePlayerId = oldTargetSlot.matchSidePlayerId;
+     final targetIsCaptain = oldTargetSlot.isCaptain;
+     updatedSlots[targetIndex] = oldTargetSlot.assignPlayer(draggedPlayer);
+     updatedSlots[sourceIndex] = oldSourceSlot.copyWith(
+       playerId: targetPlayerId,
+       guestPlayerId: targetGuestPlayerId,
++      matchSidePlayerId: targetMatchSidePlayerId,
+       isCaptain: targetIsCaptain,
+     );
+     _assignUniqueSlots(updatedSlots);
+@@ -503,6 +505,7 @@ class TeamLineupEditorController extends GetxController {
+                 y: entry.slotY ?? 50,
+                 playerId: player.isRegistered ? player.id : null,
+                 guestPlayerId: player.isGuest ? player.id : null,
++                matchSidePlayerId: player.isTemporary ? player.id : null,
+               );
+             })
+             .toList(growable: false),
+@@ -586,7 +589,8 @@ class TeamLineupEditorController extends GetxController {
+       id: entry.teamMembershipId ?? entry.participantId,
+       name: entry.displayName,
+       preferredPosition: entry.position,
+-      isRegistered: !entry.isGuest,
++      isRegistered: entry.playerId != null,
++      isTemporary: entry.matchSidePlayerId != null,
+     );
+   }
+ 
+diff --git a/lib/features/lineup/widgets/bench_bar.dart b/lib/features/lineup/widgets/bench_bar.dart
+index 086dec4..dc2758f 100644
+--- a/lib/features/lineup/widgets/bench_bar.dart
++++ b/lib/features/lineup/widgets/bench_bar.dart
+@@ -170,7 +170,7 @@ class _BenchPlayerCard extends StatelessWidget {
+   @override
+   Widget build(BuildContext context) {
+     final size = compact ? 34.0 : 40.0;
+-    final roleColor = player.isGuest
++    final roleColor = (player.isGuest || player.isTemporary)
+         ? AppColors.warning
+         : lineupPlayerRoleColor(player);
+     return InkWell(
+@@ -219,9 +219,15 @@ class _BenchPlayerCard extends StatelessWidget {
+               textAlign: TextAlign.center,
+             ),
+             Text(
+-              player.isGuest ? 'ضيف' : (player.preferredPosition ?? 'لاعب'),
++              player.isTemporary
++                  ? 'مؤقت'
++                  : player.isGuest
++                  ? 'ضيف'
++                  : (player.preferredPosition ?? 'لاعب'),
+               style: AppTextStyles.labelSmall.copyWith(
+-                color: player.isGuest ? AppColors.warning : roleColor,
++                color: (player.isGuest || player.isTemporary)
++                    ? AppColors.warning
++                    : roleColor,
+                 fontSize: 8.5,
+                 letterSpacing: 0,
+               ),
+@@ -246,7 +252,9 @@ class _Initial extends StatelessWidget {
+       child: Text(
+         lineupInitialsForPlayer(player),
+         style: AppTextStyles.titleMedium.copyWith(
+-          color: player.isGuest ? AppColors.warning : AppColors.primaryLight,
++          color: (player.isGuest || player.isTemporary)
++              ? AppColors.warning
++              : AppColors.primaryLight,
+           fontWeight: FontWeight.w900,
+         ),
+       ),
+diff --git a/lib/features/lineup/widgets/lineup_player_node.dart b/lib/features/lineup/widgets/lineup_player_node.dart
+index 96ce6df..cebd74b 100644
+--- a/lib/features/lineup/widgets/lineup_player_node.dart
++++ b/lib/features/lineup/widgets/lineup_player_node.dart
+@@ -132,12 +132,12 @@ class LineupPlayerNode extends StatelessWidget {
+                             background: AppColors.secondary,
+                           ),
+                         ),
+-                      if (!isEmpty && player!.isGuest)
+-                        const PositionedDirectional(
++                      if (!isEmpty && (player!.isGuest || player!.isTemporary))
++                        PositionedDirectional(
+                           bottom: -3,
+                           end: -9,
+                           child: _MiniBadge(
+-                            label: 'ضيف',
++                            label: player!.isTemporary ? 'مؤقت' : 'ضيف',
+                             color: Color(0xFF07111F),
+                             background: AppColors.warning,
+                           ),
+diff --git a/lib/features/lineup/widgets/player_picker_sheet.dart b/lib/features/lineup/widgets/player_picker_sheet.dart
+index 0b21221..296f568 100644
+--- a/lib/features/lineup/widgets/player_picker_sheet.dart
++++ b/lib/features/lineup/widgets/player_picker_sheet.dart
+@@ -136,7 +136,7 @@ class _PickerPlayerTile extends StatelessWidget {
+ 
+   @override
+   Widget build(BuildContext context) {
+-    final roleColor = player.isGuest
++    final roleColor = (player.isGuest || player.isTemporary)
+         ? AppColors.warning
+         : lineupPlayerRoleColor(player);
+     return ListTile(
+@@ -161,7 +161,11 @@ class _PickerPlayerTile extends StatelessWidget {
+       title: Text(lineupDisplayName(player), style: AppTextStyles.titleMedium),
+       subtitle: Text(
+         [
+-          player.isGuest ? 'ضيف' : 'مسجل',
++          player.isTemporary
++              ? 'مؤقت'
++              : player.isGuest
++              ? 'ضيف'
++              : 'مسجل',
+           player.preferredPosition,
+           player.number == null ? null : '#${player.number}',
+         ].whereType<String>().where((value) => value.isNotEmpty).join(' • '),
+diff --git a/lib/features/match/bindings/match_lobby_binding.dart b/lib/features/match/bindings/match_lobby_binding.dart
+index 4699009..15a1c5f 100644
+--- a/lib/features/match/bindings/match_lobby_binding.dart
++++ b/lib/features/match/bindings/match_lobby_binding.dart
+@@ -8,6 +8,9 @@ import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
+ import '../../../data/repositories/friend_repository_impl.dart';
+ import '../../../data/repositories/player_repository_impl.dart';
+ import '../../../data/repositories/team_repository_impl.dart';
++import '../../../data/repositories/match_side_player_repository_impl.dart';
++import '../../../data/repositories/match_side_repository_impl.dart';
++import '../../../core/services/match_cancellation_service.dart';
+ import '../../../core/services/match_start_service.dart';
+ import '../../social/controllers/friend_controller.dart';
+ 
+@@ -30,6 +33,12 @@ class MatchLobbyBinding extends Bindings {
+     if (!Get.isRegistered<TeamRepositoryImpl>()) {
+       Get.lazyPut(() => TeamRepositoryImpl());
+     }
++    if (!Get.isRegistered<MatchSideRepositoryImpl>()) {
++      Get.lazyPut(() => MatchSideRepositoryImpl());
++    }
++    if (!Get.isRegistered<MatchSidePlayerRepositoryImpl>()) {
++      Get.lazyPut(() => MatchSidePlayerRepositoryImpl());
++    }
+     if (!Get.isRegistered<MatchLineupSnapshotRepositoryImpl>()) {
+       Get.lazyPut(() => MatchLineupSnapshotRepositoryImpl());
+     }
+@@ -38,9 +47,13 @@ class MatchLobbyBinding extends Bindings {
+         () => MatchStartService(
+           matchRepo: Get.find<MatchRepository>(),
+           snapshotRepo: Get.find<MatchLineupSnapshotRepositoryImpl>(),
++          sidePlayerRepo: Get.find<MatchSidePlayerRepositoryImpl>(),
+         ),
+       );
+     }
++    if (!Get.isRegistered<MatchCancellationService>()) {
++      Get.lazyPut(() => MatchCancellationService());
++    }
+     if (!Get.isRegistered<FriendRepositoryImpl>()) {
+       Get.put(FriendRepositoryImpl());
+     }
+diff --git a/lib/features/match/bindings/matchday_binding.dart b/lib/features/match/bindings/matchday_binding.dart
+index 45c6b44..389df0c 100644
+--- a/lib/features/match/bindings/matchday_binding.dart
++++ b/lib/features/match/bindings/matchday_binding.dart
+@@ -10,6 +10,7 @@ import '../../../data/repositories/match_attendance_repository_impl.dart';
+ import '../../../data/repositories/match_check_in_repository_impl.dart';
+ import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
+ import '../../../data/repositories/match_repository_impl.dart';
++import '../../../data/repositories/match_side_repository_impl.dart';
+ import '../../../data/repositories/match_substitution_repository_impl.dart';
+ import '../../../data/repositories/player_repository_impl.dart';
+ import '../../../data/repositories/team_membership_repository_impl.dart';
+@@ -70,6 +71,9 @@ class MatchdayBinding extends Bindings {
+         () => MatchLineupSnapshotRepositoryImpl(),
+       );
+     }
++    if (!Get.isRegistered<MatchSideRepositoryImpl>()) {
++      Get.lazyPut<MatchSideRepositoryImpl>(() => MatchSideRepositoryImpl());
++    }
+     if (!Get.isRegistered<MatchSubstitutionRepositoryImpl>()) {
+       Get.lazyPut<MatchSubstitutionRepositoryImpl>(
+         () => MatchSubstitutionRepositoryImpl(),
+@@ -87,8 +91,8 @@ class MatchdayBinding extends Bindings {
+     final authSession = Get.isRegistered<AuthSession>()
+         ? Get.find<AuthSession>()
+         : Get.isRegistered<AuthService>()
+-            ? AuthServiceSession(Get.find<AuthService>())
+-            : const _AnonymousAuthSession();
++        ? AuthServiceSession(Get.find<AuthService>())
++        : const _AnonymousAuthSession();
+ 
+     Get.lazyPut<MatchdayController>(
+       () => MatchdayController(
+@@ -97,7 +101,8 @@ class MatchdayBinding extends Bindings {
+         matchdayService: Get.find<MatchdayService>(),
+         matchRepository: Get.find<MatchRepositoryImpl>(),
+         tournamentRepository: Get.find<TournamentRepositoryImpl>(),
+-        registrationRepository: Get.find<TournamentRegistrationRepositoryImpl>(),
++        registrationRepository:
++            Get.find<TournamentRegistrationRepositoryImpl>(),
+         teamRepository: Get.find<TeamRepositoryImpl>(),
+         guestTeamRepository: Get.find<GuestTeamRepositoryImpl>(),
+         membershipRepository: Get.find<TeamMembershipRepositoryImpl>(),
+@@ -106,6 +111,7 @@ class MatchdayBinding extends Bindings {
+         checkInRepository: Get.find<MatchCheckInRepositoryImpl>(),
+         attendanceRepository: Get.find<MatchAttendanceRepositoryImpl>(),
+         snapshotRepository: Get.find<MatchLineupSnapshotRepositoryImpl>(),
++        matchSideRepository: Get.find<MatchSideRepositoryImpl>(),
+         substitutionRepository: Get.find<MatchSubstitutionRepositoryImpl>(),
+         tournamentPermissionService: Get.find<TournamentPermissionService>(),
+       ),
+diff --git a/lib/features/match/controllers/match_controller.dart b/lib/features/match/controllers/match_controller.dart
+index f796efc..52e7a36 100644
+--- a/lib/features/match/controllers/match_controller.dart
++++ b/lib/features/match/controllers/match_controller.dart
+@@ -1,12 +1,14 @@
+ import 'package:get/get.dart';
+ import 'package:uuid/uuid.dart';
+ import '../../../core/enums/match_status.dart';
++import '../../../core/services/match_cancellation_service.dart';
+ import '../../../core/lineup/formation_library.dart';
+ import '../../../core/services/match_settlement_service.dart';
+ import '../../../core/services/match_start_service.dart';
+ import '../../../core/utils/app_logger.dart';
+ import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
+ import '../../../data/repositories/match_repository_impl.dart';
++import '../../../data/repositories/match_side_player_repository_impl.dart';
+ import '../../../domain/entities/match.dart';
+ import '../../../services/auth_service.dart';
+ 
+@@ -14,10 +16,13 @@ import '../../../services/auth_service.dart';
+ class MatchController extends GetxController {
+   final AuthService _authService = Get.find<AuthService>();
+   final MatchRepositoryImpl _matchRepo = MatchRepositoryImpl();
++  final MatchCancellationService _cancellationService =
++      MatchCancellationService();
+   final MatchSettlementService _settlementService = MatchSettlementService();
+   late final MatchStartService _matchStartService = MatchStartService(
+     matchRepo: _matchRepo,
+     snapshotRepo: MatchLineupSnapshotRepositoryImpl(),
++    sidePlayerRepo: MatchSidePlayerRepositoryImpl(),
+   );
+ 
+   /// المستخدم الحالي — للتحقق من صلاحيات المنظم في الـ Views
+@@ -203,9 +208,18 @@ class MatchController extends GetxController {
+   }
+ 
+   /// إلغاء مباراة (soft-delete)
+-  Future<void> cancelMatch(String matchId) async {
++  Future<void> cancelMatch(String matchId, {String? reason}) async {
++    final actorId = _authService.currentUserId;
++    if (actorId == null || actorId.isEmpty) {
++      Get.snackbar('غير مسموح', 'يجب تسجيل الدخول أولاً.');
++      return;
++    }
+     try {
+-      await _matchRepo.cancelMatch(matchId);
++      await _cancellationService.cancelFriendlyMatch(
++        matchId: matchId,
++        actorId: actorId,
++        reason: reason,
++      );
+       liveMatches.removeWhere((m) => m.id == matchId);
+       myMatches.removeWhere((m) => m.id == matchId);
+       Get.snackbar(
+@@ -215,7 +229,7 @@ class MatchController extends GetxController {
+       );
+     } catch (e) {
+       AppLogger.error('MatchController.cancelMatch', e);
+-      Get.snackbar('خطأ', 'فشل إلغاء المباراة');
++      Get.snackbar('خطأ', _readableError(e));
+     }
+   }
+ 
+diff --git a/lib/features/match/controllers/match_lobby_controller.dart b/lib/features/match/controllers/match_lobby_controller.dart
+index c8b5feb..2ea468e 100644
+--- a/lib/features/match/controllers/match_lobby_controller.dart
++++ b/lib/features/match/controllers/match_lobby_controller.dart
+@@ -3,14 +3,19 @@ import 'package:flutter/services.dart';
+ import 'package:uuid/uuid.dart';
+ import '../../../domain/entities/match.dart';
+ import '../../../domain/entities/match_invitation.dart';
++import '../../../domain/entities/match_side.dart';
++import '../../../domain/entities/match_side_player.dart';
+ import '../../../domain/entities/player.dart';
+ import '../../../domain/repositories/match_repository.dart';
+ import '../../../domain/repositories/match_invitation_repository.dart';
+ import '../../../data/repositories/player_repository_impl.dart';
+ import '../../../data/repositories/team_repository_impl.dart';
++import '../../../data/repositories/match_side_player_repository_impl.dart';
++import '../../../data/repositories/match_side_repository_impl.dart';
+ import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
+ import '../../../services/auth_service.dart';
+ import '../../../core/enums/match_status.dart';
++import '../../../core/services/match_cancellation_service.dart';
+ import '../../../core/services/match_start_service.dart';
+ import '../../../core/lineup/formation_library.dart';
+ import '../../../core/utils/app_logger.dart';
+@@ -29,8 +34,11 @@ class MatchLobbyController extends GetxController {
+   final _authService = Get.find<AuthService>();
+   final _playerRepo = Get.find<PlayerRepositoryImpl>();
+   final _teamRepo = Get.find<TeamRepositoryImpl>();
++  final _sideRepo = Get.find<MatchSideRepositoryImpl>();
++  final _sidePlayerRepo = Get.find<MatchSidePlayerRepositoryImpl>();
+   final _snapshotRepo = Get.find<MatchLineupSnapshotRepositoryImpl>();
+   final _matchStartService = Get.find<MatchStartService>();
++  final _matchCancellationService = Get.find<MatchCancellationService>();
+ 
+   // ── State ──
+   final Rx<Match?> match = Rx<Match?>(null);
+@@ -67,6 +75,15 @@ class MatchLobbyController extends GetxController {
+         !hasLockedSnapshots.value;
+   }
+ 
++  bool get canCancelMatch {
++    final m = match.value;
++    return m != null &&
++        m.tournamentId == null &&
++        isOrganizer &&
++        !m.isFrozen &&
++        (m.status == MatchStatus.open || m.status == MatchStatus.full);
++  }
++
+   @override
+   void onInit() {
+     super.onInit();
+@@ -141,10 +158,31 @@ class MatchLobbyController extends GetxController {
+       if (m.teamBId != null && m.teamBId!.isNotEmpty) m.teamBId!,
+     ];
+     final teams = await _teamRepo.getTeamsByIds(teamIds);
++    final teamsById = {for (final team in teams) team.id: team};
++    final actorId = currentUserId;
++    if (m.tournamentId == null &&
++        actorId != null &&
++        actorId.isNotEmpty &&
++        m.organizerId == actorId) {
++      await _sideRepo.ensureFriendlySides(
++        match: m,
++        actorId: actorId,
++        teamADisplayName: teamsById[m.teamAId]?.name ?? 'فريق A',
++        teamBDisplayName: teamsById[m.teamBId]?.name ?? 'فريق B',
++      );
++    }
++    final results = await Future.wait<dynamic>([
++      _sideRepo.getMatchSides(m.id),
++      _sidePlayerRepo.getMatchPlayers(m.id),
++    ]);
++    final sides = results[0] as List<MatchSide>;
++    final sidePlayers = results[1] as List<MatchSidePlayer>;
+     sideViews.assignAll(
+       FriendlyMatchSideView.fromMatch(
+         match: m,
+-        teamsById: {for (final team in teams) team.id: team},
++        teamsById: teamsById,
++        sides: sides,
++        sidePlayers: sidePlayers,
+       ),
+     );
+   }
+@@ -220,18 +258,28 @@ class MatchLobbyController extends GetxController {
+   }
+ 
+   /// إلغاء المباراة
+-  Future<void> cancelMatch() async {
++  Future<void> cancelMatch({String? reason}) async {
++    final actorId = currentUserId;
++    if (actorId == null || actorId.isEmpty) {
++      Get.snackbar('غير مسموح', 'يجب تسجيل الدخول أولاً.');
++      return;
++    }
+     try {
+-      await _matchRepo.cancelMatch(matchId);
+-      Get.back();
++      final cancelled = await _matchCancellationService.cancelFriendlyMatch(
++        matchId: matchId,
++        actorId: actorId,
++        reason: reason,
++      );
++      match.value = cancelled;
+       Get.snackbar(
+         'تم الإلغاء ❌',
+         'تم إلغاء المباراة',
+         snackPosition: SnackPosition.BOTTOM,
+       );
++      Get.back();
+     } catch (e) {
+       AppLogger.error('MatchLobbyController.cancelMatch', e);
+-      Get.snackbar('خطأ', 'فشل إلغاء المباراة');
++      Get.snackbar('خطأ', _readableError(e));
+     }
+   }
+ 
+@@ -310,6 +358,139 @@ class MatchLobbyController extends GetxController {
+     }
+   }
+ 
++  Future<void> renameTemporarySide({
++    required String sideKey,
++    required String displayName,
++  }) async {
++    final m = match.value;
++    final actorId = currentUserId;
++    final normalizedSide = sideKey.trim().toUpperCase();
++    final trimmedName = displayName.trim();
++    if (m == null) return;
++    if (actorId == null || actorId.isEmpty) {
++      Get.snackbar('غير مسموح', 'يجب تسجيل الدخول أولاً.');
++      return;
++    }
++    if (m.tournamentId != null) {
++      Get.snackbar('غير متاح', 'تسمية الأطراف المؤقتة متاحة للوديات فقط.');
++      return;
++    }
++    if (!isOrganizer) {
++      Get.snackbar('غير مسموح', 'منظم المباراة فقط يمكنه تسمية الأطراف.');
++      return;
++    }
++    if (normalizedSide != 'A' && normalizedSide != 'B') {
++      Get.snackbar('خطأ', 'طرف المباراة غير صحيح.');
++      return;
++    }
++    final officialTeamId = normalizedSide == 'A' ? m.teamAId : m.teamBId;
++    if (officialTeamId != null && officialTeamId.trim().isNotEmpty) {
++      Get.snackbar('غير متاح', 'اسم الفريق الرسمي يأتي من بيانات الفريق.');
++      return;
++    }
++    if (trimmedName.isEmpty) {
++      Get.snackbar('بيانات ناقصة', 'اكتب اسم الفريق المؤقت أولاً.');
++      return;
++    }
++
++    try {
++      await _sideRepo.upsertSide(
++        match: m,
++        sideKey: normalizedSide,
++        displayName: trimmedName,
++        actorId: actorId,
++      );
++      await _loadSideViews(m);
++      Get.snackbar(
++        'تم تحديث الاسم',
++        'تم حفظ اسم فريق $normalizedSide.',
++        snackPosition: SnackPosition.BOTTOM,
++      );
++    } catch (e) {
++      AppLogger.error('MatchLobbyController.renameTemporarySide', e);
++      Get.snackbar('خطأ', 'فشل حفظ اسم الفريق المؤقت');
++    }
++  }
++
++  Future<void> addTemporaryPlayerToSide({
++    required String sideKey,
++    required String displayName,
++    String? position,
++    int? shirtNumber,
++  }) async {
++    final m = match.value;
++    final actorId = currentUserId;
++    final normalizedSide = sideKey.trim().toUpperCase();
++    final trimmedName = displayName.trim();
++    if (m == null) return;
++    if (actorId == null || actorId.isEmpty) {
++      Get.snackbar('غير مسموح', 'يجب تسجيل الدخول أولاً.');
++      return;
++    }
++    if (m.tournamentId != null) {
++      Get.snackbar('غير متاح', 'اللاعبون المؤقتون متاحون للوديات فقط.');
++      return;
++    }
++    if (!isOrganizer) {
++      Get.snackbar('غير مسموح', 'منظم المباراة فقط يمكنه تعديل الأطراف.');
++      return;
++    }
++    if (normalizedSide != 'A' && normalizedSide != 'B') {
++      Get.snackbar('خطأ', 'طرف المباراة غير صحيح.');
++      return;
++    }
++    if (m.status != MatchStatus.open && m.status != MatchStatus.full) {
++      Get.snackbar('غير متاح', 'لا يمكن تعديل اللاعبين بعد بدء المباراة.');
++      return;
++    }
++    if (trimmedName.isEmpty) {
++      Get.snackbar('بيانات ناقصة', 'اكتب اسم اللاعب المؤقت أولاً.');
++      return;
++    }
++
++    final sideView = _sideViewFor(normalizedSide);
++    final duplicateName =
++        sideView?.temporaryPlayers.any(
++          (player) => player.displayName.trim() == trimmedName,
++        ) ??
++        false;
++    if (duplicateName) {
++      Get.snackbar('موجود بالفعل', 'هذا الاسم موجود بالفعل في نفس الفريق.');
++      return;
++    }
++
++    try {
++      final side = await _sideRepo.upsertSide(
++        match: m,
++        sideKey: normalizedSide,
++        displayName: sideView?.displayName ?? 'فريق $normalizedSide',
++        actorId: actorId,
++      );
++      await _sidePlayerRepo.addTemporaryPlayer(
++        matchId: m.id,
++        sideKey: normalizedSide,
++        sideId: side.id,
++        displayName: trimmedName,
++        addedBy: actorId,
++        position: position,
++        shirtNumber: shirtNumber,
++      );
++      await _loadSideViews(m);
++      startReadiness.value = await _matchStartService.getStartReadiness(
++        matchId: matchId,
++        actorId: actorId,
++      );
++      Get.snackbar(
++        'تمت الإضافة',
++        'تمت إضافة $trimmedName إلى فريق $normalizedSide.',
++        snackPosition: SnackPosition.BOTTOM,
++      );
++    } catch (e) {
++      AppLogger.error('MatchLobbyController.addTemporaryPlayerToSide', e);
++      Get.snackbar('خطأ', 'فشل إضافة اللاعب المؤقت');
++    }
++  }
++
+   // Guest players should be added through TeamLineupEditor using the
+   // GuestPlayer + TeamMembership flow.  The old addGuestPlayer() method
+   // that created Player(isGuest: true) has been removed (Phase 4).
+@@ -413,4 +594,11 @@ class MatchLobbyController extends GetxController {
+     }
+     return raw;
+   }
++
++  FriendlyMatchSideView? _sideViewFor(String sideKey) {
++    for (final side in sideViews) {
++      if (side.sideKey == sideKey) return side;
++    }
++    return null;
++  }
+ }
+diff --git a/lib/features/match/controllers/matchday_controller.dart b/lib/features/match/controllers/matchday_controller.dart
+index 3fd6149..7f14ef6 100644
+--- a/lib/features/match/controllers/matchday_controller.dart
++++ b/lib/features/match/controllers/matchday_controller.dart
+@@ -15,6 +15,7 @@ import '../../../data/repositories/match_attendance_repository_impl.dart';
+ import '../../../data/repositories/match_check_in_repository_impl.dart';
+ import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
+ import '../../../data/repositories/match_repository_impl.dart';
++import '../../../data/repositories/match_side_repository_impl.dart';
+ import '../../../data/repositories/match_substitution_repository_impl.dart';
+ import '../../../data/repositories/player_repository_impl.dart';
+ import '../../../data/repositories/team_membership_repository_impl.dart';
+@@ -26,11 +27,13 @@ import '../../../domain/entities/match.dart';
+ import '../../../domain/entities/match_attendance.dart';
+ import '../../../domain/entities/match_check_in.dart';
+ import '../../../domain/entities/match_lineup_snapshot.dart';
++import '../../../domain/entities/match_side.dart';
+ import '../../../domain/entities/match_substitution.dart';
+ import '../../../domain/entities/player.dart';
+ import '../../../domain/entities/team.dart';
+ import '../../../domain/entities/team_membership.dart';
+ import '../../../domain/entities/tournament.dart';
++import '../models/friendly_match_side_view.dart';
+ 
+ enum MatchdayManagedSideKind { registeredTeam, guestTeam }
+ 
+@@ -129,6 +132,7 @@ class MatchdayController extends GetxController {
+   final MatchCheckInRepositoryImpl _checkInRepository;
+   final MatchAttendanceRepositoryImpl _attendanceRepository;
+   final MatchLineupSnapshotRepositoryImpl _snapshotRepository;
++  final MatchSideRepositoryImpl _matchSideRepository;
+   final MatchSubstitutionRepositoryImpl _substitutionRepository;
+   final TournamentPermissionService _tournamentPermissionService;
+ 
+@@ -147,6 +151,7 @@ class MatchdayController extends GetxController {
+     required MatchCheckInRepositoryImpl checkInRepository,
+     required MatchAttendanceRepositoryImpl attendanceRepository,
+     required MatchLineupSnapshotRepositoryImpl snapshotRepository,
++    required MatchSideRepositoryImpl matchSideRepository,
+     required MatchSubstitutionRepositoryImpl substitutionRepository,
+     required TournamentPermissionService tournamentPermissionService,
+   }) : _authSession = authSession,
+@@ -162,6 +167,7 @@ class MatchdayController extends GetxController {
+        _checkInRepository = checkInRepository,
+        _attendanceRepository = attendanceRepository,
+        _snapshotRepository = snapshotRepository,
++       _matchSideRepository = matchSideRepository,
+        _substitutionRepository = substitutionRepository,
+        _tournamentPermissionService = tournamentPermissionService;
+ 
+@@ -171,6 +177,8 @@ class MatchdayController extends GetxController {
+ 
+   final Rx<Match?> match = Rx<Match?>(null);
+   final Rx<Tournament?> tournament = Rx<Tournament?>(null);
++  final RxString sideADisplayName = 'فريق A'.obs;
++  final RxString sideBDisplayName = 'فريق B'.obs;
+   final RxList<MatchdayManagedSide> managedSides = <MatchdayManagedSide>[].obs;
+   final RxString selectedSideKey = ''.obs;
+ 
+@@ -284,6 +292,7 @@ class MatchdayController extends GetxController {
+ 
+       match.value = loadedMatch;
+       tournament.value = loadedTournament;
++      await _loadFriendlySideDisplayNames(loadedMatch);
+ 
+       final sides = await _discoverManagedSides(
+         match: loadedMatch,
+@@ -310,6 +319,39 @@ class MatchdayController extends GetxController {
+     }
+   }
+ 
++  Future<void> _loadFriendlySideDisplayNames(Match loadedMatch) async {
++    sideADisplayName.value = 'فريق A';
++    sideBDisplayName.value = 'فريق B';
++    if (loadedMatch.tournamentId != null) {
++      return;
++    }
++
++    final teamIds = <String>[
++      if (loadedMatch.teamAId != null && loadedMatch.teamAId!.isNotEmpty)
++        loadedMatch.teamAId!,
++      if (loadedMatch.teamBId != null && loadedMatch.teamBId!.isNotEmpty)
++        loadedMatch.teamBId!,
++    ];
++    final results = await Future.wait<dynamic>([
++      _teamRepository.getTeamsByIds(teamIds),
++      _matchSideRepository.getMatchSides(loadedMatch.id),
++    ]);
++    final teams = results[0] as List<Team>;
++    final sides = results[1] as List<MatchSide>;
++    final sideViews = FriendlyMatchSideView.fromMatch(
++      match: loadedMatch,
++      teamsById: {for (final team in teams) team.id: team},
++      sides: sides,
++    );
++    for (final side in sideViews) {
++      if (side.sideKey == 'A') {
++        sideADisplayName.value = side.displayName;
++      } else if (side.sideKey == 'B') {
++        sideBDisplayName.value = side.displayName;
++      }
++    }
++  }
++
+   Future<void> selectSide(String sideKey) async {
+     if (sideKey == selectedSideKey.value) {
+       return;
+@@ -577,7 +619,8 @@ class MatchdayController extends GetxController {
+         currentMatch.status != MatchStatus.completed &&
+         currentMatch.status != MatchStatus.pendingReview &&
+         currentMatch.status != MatchStatus.ratingWindow &&
+-        currentMatch.status != MatchStatus.settled;
++        currentMatch.status != MatchStatus.settled &&
++        currentMatch.status != MatchStatus.cancelled;
+   }
+ 
+   /// Navigates to TeamLineupEditorScreen for the currently selected
+diff --git a/lib/features/match/controllers/score_submit_controller.dart b/lib/features/match/controllers/score_submit_controller.dart
+index a448e28..a0f5544 100644
+--- a/lib/features/match/controllers/score_submit_controller.dart
++++ b/lib/features/match/controllers/score_submit_controller.dart
+@@ -1,13 +1,21 @@
++import 'package:flutter/material.dart';
+ import 'package:get/get.dart';
+ 
+ import '../../../core/enums/match_status.dart';
+ import '../../../core/services/match_settlement_service.dart';
+ import '../../../core/services/official_match_roster_service.dart';
+ import '../../../data/repositories/match_repository_impl.dart';
++import '../../../data/repositories/match_side_player_repository_impl.dart';
++import '../../../data/repositories/match_side_repository_impl.dart';
++import '../../../data/repositories/team_repository_impl.dart';
+ import '../../../domain/entities/match.dart';
++import '../../../domain/entities/match_side.dart';
++import '../../../domain/entities/match_side_player.dart';
+ import '../../../domain/entities/player.dart';
+ import '../../../domain/entities/player_match_stats.dart';
++import '../../../domain/entities/team.dart';
+ import '../../../services/auth_service.dart';
++import '../models/friendly_match_side_view.dart';
+ import 'match_controller.dart';
+ 
+ class ScoreSubmitController extends GetxController {
+@@ -16,6 +24,10 @@ class ScoreSubmitController extends GetxController {
+   final MatchSettlementService _settlementService = MatchSettlementService();
+   final OfficialMatchRosterService _officialRosterService =
+       OfficialMatchRosterService();
++  final MatchSideRepositoryImpl _sideRepository = MatchSideRepositoryImpl();
++  final MatchSidePlayerRepositoryImpl _sidePlayerRepository =
++      MatchSidePlayerRepositoryImpl();
++  final TeamRepositoryImpl _teamRepository = TeamRepositoryImpl();
+   final AuthService _authService = Get.find<AuthService>();
+ 
+   ScoreSubmitController({required this.matchId});
+@@ -26,10 +38,16 @@ class ScoreSubmitController extends GetxController {
+ 
+   final RxList<Player> teamAPlayers = <Player>[].obs;
+   final RxList<Player> teamBPlayers = <Player>[].obs;
++  final RxString teamASideName = 'فريق A'.obs;
++  final RxString teamBSideName = 'فريق B'.obs;
+   final Map<String, RxMap<String, dynamic>> playerStats = {};
+   final RxString selectedMvpId = ''.obs;
+   final RxBool teamACleanSheet = false.obs;
+   final RxBool teamBCleanSheet = false.obs;
++  final TextEditingController teamAScoreController = TextEditingController();
++  final TextEditingController teamBScoreController = TextEditingController();
++
++  bool get isFriendlyMatch => match.value?.tournamentId == null;
+ 
+   @override
+   void onInit() {
+@@ -47,9 +65,16 @@ class ScoreSubmitController extends GetxController {
+         errorMessage.value = 'تعذر العثور على المباراة';
+         return;
+       }
++      if (loadedMatch.status == MatchStatus.cancelled) {
++        errorMessage.value = 'هذه المباراة ملغاة ولا يمكن تسجيل نتيجة لها.';
++        return;
++      }
+ 
+       match.value = loadedMatch;
+       selectedMvpId.value = loadedMatch.mvpPlayerId ?? '';
++      teamAScoreController.text = loadedMatch.scoreTeamA?.toString() ?? '';
++      teamBScoreController.text = loadedMatch.scoreTeamB?.toString() ?? '';
++      await _loadFriendlySideNames(loadedMatch);
+ 
+       final roster = await _officialRosterService.loadRegisteredRoster(
+         matchId: loadedMatch.id,
+@@ -75,6 +100,13 @@ class ScoreSubmitController extends GetxController {
+     }
+   }
+ 
++  @override
++  void onClose() {
++    teamAScoreController.dispose();
++    teamBScoreController.dispose();
++    super.onClose();
++  }
++
+   void incrementStat(String playerId, String key) {
+     if (!playerStats.containsKey(playerId)) return;
+     playerStats[playerId]![key] = (playerStats[playerId]![key] as int) + 1;
+@@ -94,9 +126,13 @@ class ScoreSubmitController extends GetxController {
+         !(playerStats[playerId]![cardType] as bool);
+   }
+ 
+-  int get totalTeamAGoals => _sumGoals(teamAPlayers);
++  int get totalTeamAGoals => isFriendlyMatch
++      ? _parsedTeamScore(teamAScoreController.text) ?? 0
++      : _sumGoals(teamAPlayers);
+ 
+-  int get totalTeamBGoals => _sumGoals(teamBPlayers);
++  int get totalTeamBGoals => isFriendlyMatch
++      ? _parsedTeamScore(teamBScoreController.text) ?? 0
++      : _sumGoals(teamBPlayers);
+ 
+   Future<void> submit() async {
+     final currentMatch = match.value;
+@@ -112,8 +148,20 @@ class ScoreSubmitController extends GetxController {
+       return;
+     }
+ 
+-    final scoreA = totalTeamAGoals;
+-    final scoreB = totalTeamBGoals;
++    final scoreA = isFriendlyMatch
++        ? _validatedFriendlyScore(
++            teamAScoreController.text,
++            teamASideName.value,
++          )
++        : totalTeamAGoals;
++    if (scoreA == null) return;
++    final scoreB = isFriendlyMatch
++        ? _validatedFriendlyScore(
++            teamBScoreController.text,
++            teamBSideName.value,
++          )
++        : totalTeamBGoals;
++    if (scoreB == null) return;
+ 
+     teamACleanSheet.value = scoreB == 0;
+     teamBCleanSheet.value = scoreA == 0;
+@@ -178,6 +226,63 @@ class ScoreSubmitController extends GetxController {
+     }
+   }
+ 
++  Future<void> _loadFriendlySideNames(Match loadedMatch) async {
++    if (loadedMatch.tournamentId != null) {
++      teamASideName.value = 'فريق A';
++      teamBSideName.value = 'فريق B';
++      return;
++    }
++    final teamIds = <String>[
++      if (loadedMatch.teamAId != null && loadedMatch.teamAId!.isNotEmpty)
++        loadedMatch.teamAId!,
++      if (loadedMatch.teamBId != null && loadedMatch.teamBId!.isNotEmpty)
++        loadedMatch.teamBId!,
++    ];
++    final results = await Future.wait<dynamic>([
++      _teamRepository.getTeamsByIds(teamIds),
++      _sideRepository.getMatchSides(loadedMatch.id),
++      _sidePlayerRepository.getMatchPlayers(loadedMatch.id),
++    ]);
++    final teams = results[0] as List<Team>;
++    final sides = results[1] as List<MatchSide>;
++    final sidePlayers = results[2] as List<MatchSidePlayer>;
++    final sideViews = FriendlyMatchSideView.fromMatch(
++      match: loadedMatch,
++      teamsById: {for (final team in teams) team.id: team},
++      sides: sides,
++      sidePlayers: sidePlayers,
++    );
++    for (final side in sideViews) {
++      if (side.sideKey == 'A') {
++        teamASideName.value = side.displayName;
++      } else if (side.sideKey == 'B') {
++        teamBSideName.value = side.displayName;
++      }
++    }
++  }
++
++  int? _validatedFriendlyScore(String rawValue, String sideName) {
++    final trimmed = rawValue.trim();
++    final parsed = int.tryParse(trimmed);
++    if (trimmed.isEmpty || parsed == null || parsed < 0) {
++      final message = 'أدخل نتيجة صحيحة وغير سالبة لـ $sideName.';
++      errorMessage.value = message;
++      Get.snackbar(
++        'نتيجة غير صحيحة',
++        message,
++        snackPosition: SnackPosition.BOTTOM,
++      );
++      return null;
++    }
++    return parsed;
++  }
++
++  int? _parsedTeamScore(String rawValue) {
++    final parsed = int.tryParse(rawValue.trim());
++    if (parsed == null || parsed < 0) return null;
++    return parsed;
++  }
++
+   String _readableError(Object error) {
+     final raw = error.toString();
+     if (raw.startsWith('Exception: ')) {
+diff --git a/lib/features/match/models/friendly_match_side_view.dart b/lib/features/match/models/friendly_match_side_view.dart
+index df3a7fd..7d39296 100644
+--- a/lib/features/match/models/friendly_match_side_view.dart
++++ b/lib/features/match/models/friendly_match_side_view.dart
+@@ -1,4 +1,6 @@
+ import '../../../domain/entities/match.dart';
++import '../../../domain/entities/match_side.dart';
++import '../../../domain/entities/match_side_player.dart';
+ import '../../../domain/entities/team.dart';
+ 
+ class FriendlyMatchSideView {
+@@ -6,6 +8,7 @@ class FriendlyMatchSideView {
+   final String displayName;
+   final String? officialTeamId;
+   final List<String> playerIds;
++  final List<MatchSidePlayer> temporaryPlayers;
+   final bool canEditName;
+ 
+   const FriendlyMatchSideView({
+@@ -13,10 +16,13 @@ class FriendlyMatchSideView {
+     required this.displayName,
+     required this.officialTeamId,
+     required this.playerIds,
++    this.temporaryPlayers = const [],
+     this.canEditName = false,
+   });
+ 
+-  int get playerCount => playerIds.length;
++  int get registeredCount => playerIds.length;
++  int get temporaryCount => temporaryPlayers.length;
++  int get playerCount => registeredCount + temporaryCount;
+   bool get isOfficialTeam =>
+       officialTeamId != null && officialTeamId!.isNotEmpty;
+   bool get isTemporarySide => !isOfficialTeam;
+@@ -25,41 +31,86 @@ class FriendlyMatchSideView {
+   static List<FriendlyMatchSideView> fromMatch({
+     required Match match,
+     Map<String, Team> teamsById = const {},
++    List<MatchSide> sides = const [],
++    List<MatchSidePlayer> sidePlayers = const [],
+   }) {
+     return [
+-      FriendlyMatchSideView(
++      _sideView(
++        match: match,
+         sideKey: 'A',
+-        displayName: _displayNameForSide(
+-          fallback: 'فريق A',
+-          teamId: match.teamAId,
+-          teamsById: teamsById,
+-        ),
+-        officialTeamId: _nonEmpty(match.teamAId),
+-        playerIds: List<String>.unmodifiable(match.teamAPlayerIds),
++        fallbackName: 'فريق A',
++        teamId: match.teamAId,
++        playerIds: match.teamAPlayerIds,
++        teamsById: teamsById,
++        sides: sides,
++        sidePlayers: sidePlayers,
+       ),
+-      FriendlyMatchSideView(
++      _sideView(
++        match: match,
+         sideKey: 'B',
+-        displayName: _displayNameForSide(
+-          fallback: 'فريق B',
+-          teamId: match.teamBId,
+-          teamsById: teamsById,
+-        ),
+-        officialTeamId: _nonEmpty(match.teamBId),
+-        playerIds: List<String>.unmodifiable(match.teamBPlayerIds),
++        fallbackName: 'فريق B',
++        teamId: match.teamBId,
++        playerIds: match.teamBPlayerIds,
++        teamsById: teamsById,
++        sides: sides,
++        sidePlayers: sidePlayers,
+       ),
+     ];
+   }
+ 
++  static FriendlyMatchSideView _sideView({
++    required Match match,
++    required String sideKey,
++    required String fallbackName,
++    required String? teamId,
++    required List<String> playerIds,
++    required Map<String, Team> teamsById,
++    required List<MatchSide> sides,
++    required List<MatchSidePlayer> sidePlayers,
++  }) {
++    final storedSide = _storedSideFor(sides, sideKey);
++    final officialTeamId = _nonEmpty(teamId);
++    return FriendlyMatchSideView(
++      sideKey: sideKey,
++      displayName: _displayNameForSide(
++        fallback: fallbackName,
++        teamId: teamId,
++        teamsById: teamsById,
++        storedSide: storedSide,
++      ),
++      officialTeamId: officialTeamId,
++      playerIds: List<String>.unmodifiable(playerIds),
++      temporaryPlayers: List<MatchSidePlayer>.unmodifiable(
++        sidePlayers.where(
++          (player) => player.sideKey == sideKey && player.isTemporary,
++        ),
++      ),
++      canEditName: match.tournamentId == null && officialTeamId == null,
++    );
++  }
++
+   static String _displayNameForSide({
+     required String fallback,
+     required String? teamId,
+     required Map<String, Team> teamsById,
++    MatchSide? storedSide,
+   }) {
+     final normalizedTeamId = _nonEmpty(teamId);
+-    if (normalizedTeamId == null) return fallback;
+-    final teamName = teamsById[normalizedTeamId]?.name.trim();
+-    if (teamName == null || teamName.isEmpty) return fallback;
+-    return teamName;
++    if (normalizedTeamId != null) {
++      final teamName = teamsById[normalizedTeamId]?.name.trim();
++      if (teamName != null && teamName.isNotEmpty) return teamName;
++    }
++    final storedName = storedSide?.displayName.trim();
++    if (storedName != null && storedName.isNotEmpty) return storedName;
++    return fallback;
++  }
++
++  static MatchSide? _storedSideFor(List<MatchSide> sides, String sideKey) {
++    final normalizedSideKey = sideKey.trim().toUpperCase();
++    for (final side in sides) {
++      if (side.sideKey.trim().toUpperCase() == normalizedSideKey) return side;
++    }
++    return null;
+   }
+ 
+   static String? _nonEmpty(String? value) {
+diff --git a/lib/features/match/views/match_discover_screen.dart b/lib/features/match/views/match_discover_screen.dart
+index 70d7dfa..e232c99 100644
+--- a/lib/features/match/views/match_discover_screen.dart
++++ b/lib/features/match/views/match_discover_screen.dart
+@@ -496,7 +496,11 @@ class _MatchCard extends StatelessWidget {
+                 ),
+ 
+               // ── زر إلغاء المباراة (للمنظم فقط) ──
+-              if (isOrganizer && match.status == MatchStatus.open)
++              if (isOrganizer &&
++                  match.tournamentId == null &&
++                  !match.isFrozen &&
++                  (match.status == MatchStatus.open ||
++                      match.status == MatchStatus.full))
+                 Padding(
+                   padding: const EdgeInsets.only(top: AppDimensions.sm),
+                   child: OutlinedButton.icon(
+@@ -538,19 +542,36 @@ class _MatchCard extends StatelessWidget {
+   }
+ 
+   void _confirmCancel(BuildContext context) {
++    final reasonController = TextEditingController();
+     Get.dialog(
+       AlertDialog(
+         title: const Text('إلغاء المباراة'),
+-        content: const Text('هل أنت متأكد من إلغاء هذه المباراة؟'),
++        content: Column(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            const Text(
++              'هل أنت متأكد من إلغاء هذه المباراة؟ لن يتم حذف بيانات المباراة، لكنها لن تظهر كمباراة نشطة.',
++            ),
++            const SizedBox(height: AppDimensions.md),
++            TextField(
++              controller: reasonController,
++              decoration: const InputDecoration(
++                labelText: 'سبب الإلغاء اختياري',
++              ),
++              maxLines: 2,
++            ),
++          ],
++        ),
+         actions: [
+-          TextButton(onPressed: () => Get.back(), child: const Text('لا')),
++          TextButton(onPressed: () => Get.back(), child: const Text('تراجع')),
+           TextButton(
+             onPressed: () {
++              final reason = reasonController.text;
+               Get.back();
+-              controller.cancelMatch(match.id);
++              controller.cancelMatch(match.id, reason: reason);
+             },
+             child: const Text(
+-              'نعم، إلغاء',
++              'إلغاء المباراة',
+               style: TextStyle(color: AppColors.error),
+             ),
+           ),
+diff --git a/lib/features/match/views/match_lobby_screen.dart b/lib/features/match/views/match_lobby_screen.dart
+index 2805ac4..52d92ee 100644
+--- a/lib/features/match/views/match_lobby_screen.dart
++++ b/lib/features/match/views/match_lobby_screen.dart
+@@ -10,6 +10,7 @@ import '../../../core/lineup/formation_library.dart';
+ import '../../../core/services/match_start_service.dart';
+ import '../../../core/widgets/glassmorphic_container.dart';
+ import '../../../core/widgets/qr_code_widget.dart';
++import '../../../domain/entities/match_side_player.dart';
+ import '../../../domain/entities/player.dart';
+ import '../controllers/match_lobby_controller.dart';
+ import '../models/friendly_match_side_view.dart';
+@@ -60,6 +61,7 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
+             final isStartableStatus =
+                 match.status == MatchStatus.open ||
+                 match.status == MatchStatus.full;
++            final canCancelMatch = controller.canCancelMatch;
+             final readiness = controller.startReadiness.value;
+             final sideA = _sideViewFor(controller.sideViews, 'A');
+             final sideB = _sideViewFor(controller.sideViews, 'B');
+@@ -222,6 +224,9 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
+                       matchId: controller.matchId,
+                       onRemove: (playerId) =>
+                           controller.removePlayer(playerId, 'A'),
++                      onRename: sideA == null
++                          ? null
++                          : () => _showRenameTemporarySide(context, sideA),
+                       onAdd: () {
+                         Get.bottomSheet(
+                           _RegisteredPlayerPickerSheet(
+@@ -231,6 +236,8 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
+                           isScrollControlled: true,
+                         );
+                       },
++                      onAddTemporary: () =>
++                          _showAddTemporaryPlayer(context, 'A'),
+                       onInvite: () {
+                         Get.bottomSheet(
+                           InviteFriendsSheet(
+@@ -259,6 +266,9 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
+                       matchId: controller.matchId,
+                       onRemove: (playerId) =>
+                           controller.removePlayer(playerId, 'B'),
++                      onRename: sideB == null
++                          ? null
++                          : () => _showRenameTemporarySide(context, sideB),
+                       onAdd: () {
+                         Get.bottomSheet(
+                           _RegisteredPlayerPickerSheet(
+@@ -268,6 +278,8 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
+                           isScrollControlled: true,
+                         );
+                       },
++                      onAddTemporary: () =>
++                          _showAddTemporaryPlayer(context, 'B'),
+                       onInvite: () {
+                         Get.bottomSheet(
+                           InviteFriendsSheet(
+@@ -335,7 +347,7 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
+                                   ),
+                                 ),
+                               ),
+-                            if (isOpen) ...[
++                            if (canCancelMatch) ...[
+                               const SizedBox(height: AppDimensions.sm),
+                               SizedBox(
+                                 width: double.infinity,
+@@ -373,19 +385,36 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
+   }
+ 
+   void _confirmCancel(BuildContext context) {
++    final reasonController = TextEditingController();
+     Get.dialog(
+       AlertDialog(
+         title: const Text('إلغاء المباراة'),
+-        content: const Text('هل أنت متأكد من إلغاء هذه المباراة؟'),
++        content: Column(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            const Text(
++              'هل أنت متأكد من إلغاء هذه المباراة؟ لن يتم حذف بيانات المباراة، لكنها لن تظهر كمباراة نشطة.',
++            ),
++            const SizedBox(height: AppDimensions.md),
++            TextField(
++              controller: reasonController,
++              decoration: const InputDecoration(
++                labelText: 'سبب الإلغاء اختياري',
++              ),
++              maxLines: 2,
++            ),
++          ],
++        ),
+         actions: [
+-          TextButton(onPressed: () => Get.back(), child: const Text('لا')),
++          TextButton(onPressed: () => Get.back(), child: const Text('تراجع')),
+           TextButton(
+             onPressed: () {
++              final reason = reasonController.text;
+               Get.back();
+-              controller.cancelMatch();
++              controller.cancelMatch(reason: reason);
+             },
+             child: const Text(
+-              'نعم، إلغاء',
++              'إلغاء المباراة',
+               style: TextStyle(color: AppColors.error),
+             ),
+           ),
+@@ -400,6 +429,90 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
+       isScrollControlled: true,
+     );
+   }
++
++  void _showRenameTemporarySide(
++    BuildContext context,
++    FriendlyMatchSideView side,
++  ) {
++    final nameController = TextEditingController(text: side.displayName);
++    Get.dialog(
++      AlertDialog(
++        title: Text('تسمية فريق ${side.sideKey}'),
++        content: TextField(
++          controller: nameController,
++          autofocus: true,
++          textInputAction: TextInputAction.done,
++          decoration: const InputDecoration(labelText: 'اسم الفريق المؤقت'),
++          onSubmitted: (_) => _saveTemporarySideName(side, nameController),
++        ),
++        actions: [
++          TextButton(onPressed: () => Get.back(), child: const Text('إلغاء')),
++          FilledButton(
++            onPressed: () => _saveTemporarySideName(side, nameController),
++            child: const Text('حفظ'),
++          ),
++        ],
++      ),
++    );
++  }
++
++  void _saveTemporarySideName(
++    FriendlyMatchSideView side,
++    TextEditingController nameController,
++  ) {
++    final name = nameController.text.trim();
++    Get.back();
++    controller.renameTemporarySide(sideKey: side.sideKey, displayName: name);
++  }
++
++  void _showAddTemporaryPlayer(BuildContext context, String sideKey) {
++    final nameController = TextEditingController();
++    final numberController = TextEditingController();
++    final positionController = TextEditingController();
++    Get.dialog(
++      AlertDialog(
++        title: Text('لاعب مؤقت لفريق $sideKey'),
++        content: Column(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            TextField(
++              controller: nameController,
++              autofocus: true,
++              textInputAction: TextInputAction.next,
++              decoration: const InputDecoration(labelText: 'اسم اللاعب'),
++            ),
++            TextField(
++              controller: numberController,
++              keyboardType: TextInputType.number,
++              decoration: const InputDecoration(
++                labelText: 'رقم القميص اختياري',
++              ),
++            ),
++            TextField(
++              controller: positionController,
++              decoration: const InputDecoration(labelText: 'المركز اختياري'),
++            ),
++          ],
++        ),
++        actions: [
++          TextButton(onPressed: () => Get.back(), child: const Text('إلغاء')),
++          FilledButton(
++            onPressed: () {
++              final shirtNumber = int.tryParse(numberController.text.trim());
++              Get.back();
++              controller.addTemporaryPlayerToSide(
++                sideKey: sideKey,
++                displayName: nameController.text,
++                shirtNumber: shirtNumber,
++                position: positionController.text,
++              );
++            },
++            child: const Text('إضافة'),
++          ),
++        ],
++      ),
++    );
++  }
+ }
+ 
+ FriendlyMatchSideView? _sideViewFor(
+@@ -595,7 +708,9 @@ class _CollapsibleTeamSection extends StatefulWidget {
+   final bool isOpen;
+   final String matchId;
+   final void Function(String playerId) onRemove;
++  final VoidCallback? onRename;
+   final VoidCallback onAdd;
++  final VoidCallback onAddTemporary;
+   final VoidCallback onInvite;
+ 
+   const _CollapsibleTeamSection({
+@@ -606,7 +721,9 @@ class _CollapsibleTeamSection extends StatefulWidget {
+     required this.isOpen,
+     required this.matchId,
+     required this.onRemove,
++    required this.onRename,
+     required this.onAdd,
++    required this.onAddTemporary,
+     required this.onInvite,
+   });
+ 
+@@ -659,7 +776,7 @@ class _CollapsibleTeamSectionState extends State<_CollapsibleTeamSection> {
+                       const SizedBox(width: AppDimensions.sm),
+                       Obx(
+                         () => Text(
+-                          '${widget.players.length} لاعب',
++                          '${widget.players.length + sideView.temporaryCount} لاعب',
+                           style: AppTextStyles.labelMedium.copyWith(
+                             color: AppColors.textMuted,
+                           ),
+@@ -685,6 +802,15 @@ class _CollapsibleTeamSectionState extends State<_CollapsibleTeamSection> {
+                         color: AppColors.primaryLight,
+                       ),
+                     ),
++                    if (sideView.temporaryCount > 0) ...[
++                      const SizedBox(height: 2),
++                      Text(
++                        '${sideView.registeredCount} مسجل • ${sideView.temporaryCount} مؤقت',
++                        style: AppTextStyles.labelSmall.copyWith(
++                          color: AppColors.textMuted,
++                        ),
++                      ),
++                    ],
+                   ],
+                 ],
+               ),
+@@ -698,7 +824,12 @@ class _CollapsibleTeamSectionState extends State<_CollapsibleTeamSection> {
+                   TextButton.icon(
+                     onPressed: widget.onAdd,
+                     icon: const Icon(Icons.person_add_alt_1, size: 18),
+-                    label: const Text('أضف لاعب'),
++                    label: const Text('أضف لاعب مسجل'),
++                  ),
++                  TextButton.icon(
++                    onPressed: widget.onAddTemporary,
++                    icon: const Icon(Icons.badge_outlined, size: 18),
++                    label: const Text('أضف لاعب مؤقت'),
+                   ),
+                   TextButton.icon(
+                     onPressed: widget.onInvite,
+@@ -716,6 +847,17 @@ class _CollapsibleTeamSectionState extends State<_CollapsibleTeamSection> {
+                       icon: const Icon(Icons.sports_soccer_rounded, size: 18),
+                       label: const Text('التشكيلة'),
+                     )
++                  else if (sideView.playerCount > 0)
++                    TextButton.icon(
++                      onPressed: () => Get.toNamed(
++                        AppRoutes.matchSideLineupEditorForMatch(
++                          matchId: widget.matchId,
++                          sideKey: sideView.sideKey,
++                        ),
++                      ),
++                      icon: const Icon(Icons.sports_soccer_rounded, size: 18),
++                      label: const Text('تعديل التشكيلة'),
++                    )
+                   else
+                     Padding(
+                       padding: const EdgeInsets.symmetric(
+@@ -723,17 +865,23 @@ class _CollapsibleTeamSectionState extends State<_CollapsibleTeamSection> {
+                         vertical: AppDimensions.xs,
+                       ),
+                       child: Text(
+-                        'التشكيلة المؤقتة ستتوفر قريبًا',
++                        'أضف لاعبين أولًا',
+                         style: AppTextStyles.labelSmall.copyWith(
+                           color: AppColors.textMuted,
+                         ),
+                       ),
+                     ),
++                  if (sideView.canEditName)
++                    TextButton.icon(
++                      onPressed: widget.onRename,
++                      icon: const Icon(Icons.edit_rounded, size: 18),
++                      label: const Text('تسمية الفريق'),
++                    ),
+                 ],
+               ),
+             ],
+             AnimatedCrossFade(
+-              firstChild: _buildPlayerList(),
++              firstChild: _buildPlayerList(sideView),
+               secondChild: const SizedBox.shrink(),
+               crossFadeState: _expanded
+                   ? CrossFadeState.showFirst
+@@ -746,9 +894,9 @@ class _CollapsibleTeamSectionState extends State<_CollapsibleTeamSection> {
+     );
+   }
+ 
+-  Widget _buildPlayerList() {
++  Widget _buildPlayerList(FriendlyMatchSideView sideView) {
+     return Obx(() {
+-      if (widget.players.isEmpty) {
++      if (widget.players.isEmpty && sideView.temporaryPlayers.isEmpty) {
+         return Padding(
+           padding: const EdgeInsets.symmetric(vertical: AppDimensions.md),
+           child: Center(
+@@ -771,6 +919,9 @@ class _CollapsibleTeamSectionState extends State<_CollapsibleTeamSection> {
+               onRemove: () => widget.onRemove(player.id),
+             ),
+           ),
++          ...sideView.temporaryPlayers.map(
++            (player) => _TemporaryPlayerTile(player: player),
++          ),
+         ],
+       );
+     });
+@@ -1004,6 +1155,54 @@ class _PlayerTile extends StatelessWidget {
+   }
+ }
+ 
++class _TemporaryPlayerTile extends StatelessWidget {
++  final MatchSidePlayer player;
++
++  const _TemporaryPlayerTile({required this.player});
++
++  @override
++  Widget build(BuildContext context) {
++    final details = <String>[
++      if (player.position != null && player.position!.isNotEmpty)
++        player.position!,
++      if (player.shirtNumber != null) '#${player.shirtNumber}',
++      'مؤقت',
++    ].join(' • ');
++
++    return Padding(
++      padding: const EdgeInsets.symmetric(vertical: 4),
++      child: Row(
++        children: [
++          CircleAvatar(
++            radius: 18,
++            backgroundColor: AppColors.warning.withValues(alpha: 0.16),
++            child: const Icon(
++              Icons.badge_outlined,
++              size: 18,
++              color: AppColors.warning,
++            ),
++          ),
++          const SizedBox(width: AppDimensions.sm),
++          Expanded(
++            child: Column(
++              crossAxisAlignment: CrossAxisAlignment.start,
++              children: [
++                Text(player.displayName, style: AppTextStyles.bodyMedium),
++                Text(
++                  details,
++                  style: AppTextStyles.labelSmall.copyWith(
++                    color: AppColors.textMuted,
++                  ),
++                ),
++              ],
++            ),
++          ),
++        ],
++      ),
++    );
++  }
++}
++
+ /// ── Badge حالة المباراة ──
+ class _StatusChip extends StatelessWidget {
+   final MatchStatus status;
+diff --git a/lib/features/match/views/score_submit_screen.dart b/lib/features/match/views/score_submit_screen.dart
+index 12a4def..d24d152 100644
+--- a/lib/features/match/views/score_submit_screen.dart
++++ b/lib/features/match/views/score_submit_screen.dart
+@@ -32,7 +32,9 @@ class ScoreSubmitScreen extends StatelessWidget {
+         decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+         child: Obx(() {
+           if (controller.isLoading.value && controller.teamAPlayers.isEmpty) {
+-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
++            return const Center(
++              child: CircularProgressIndicator(color: AppColors.primary),
++            );
+           }
+ 
+           if (controller.errorMessage.value.isNotEmpty &&
+@@ -51,36 +53,12 @@ class ScoreSubmitScreen extends StatelessWidget {
+ 
+           return Column(
+             children: [
+-              SizedBox(height: Get.mediaQuery.padding.top + kToolbarHeight + 10),
+-              
+-              // Score Header Auto-calculation
+-              Padding(
+-                padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
+-                child: GlassmorphicContainer(
+-                  padding: const EdgeInsets.all(AppDimensions.md),
+-                  borderRadius: AppDimensions.radiusLg,
+-                  child: Row(
+-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+-                    children: [
+-                      Column(
+-                        children: [
+-                          Text('🔵 فريق A', style: AppTextStyles.titleMedium),
+-                          const SizedBox(height: 8),
+-                          Text('${controller.totalTeamAGoals}', style: AppTextStyles.displayLarge.copyWith(color: AppColors.primary)),
+-                        ],
+-                      ),
+-                      Text('VS', style: AppTextStyles.headlineMedium),
+-                      Column(
+-                        children: [
+-                          Text('🔴 فريق B', style: AppTextStyles.titleMedium),
+-                          const SizedBox(height: 8),
+-                          Text('${controller.totalTeamBGoals}', style: AppTextStyles.displayLarge.copyWith(color: AppColors.error)),
+-                        ],
+-                      ),
+-                    ],
+-                  ),
+-                ),
++              SizedBox(
++                height: Get.mediaQuery.padding.top + kToolbarHeight + 10,
+               ),
++              controller.isFriendlyMatch
++                  ? _buildFriendlyScoreInput(controller)
++                  : _buildRegisteredScoreHeader(controller),
+               const SizedBox(height: AppDimensions.lg),
+ 
+               Expanded(
+@@ -91,20 +69,46 @@ class ScoreSubmitScreen extends StatelessWidget {
+                     bottom: 120, // space for sticky button
+                   ),
+                   children: [
+-                    Text('الفريق A', style: AppTextStyles.headlineMedium.copyWith(color: AppColors.primary)),
++                    Text(
++                      controller.teamASideName.value,
++                      style: AppTextStyles.headlineMedium.copyWith(
++                        color: AppColors.primary,
++                      ),
++                    ),
+                     const SizedBox(height: AppDimensions.sm),
+-                    ...controller.teamAPlayers.map((p) => _buildPlayerStatRow(p, controller)),
+-                    
++                    if (controller.teamAPlayers.isEmpty)
++                      _buildNoRegisteredPlayersNote()
++                    else
++                      ...controller.teamAPlayers.map(
++                        (p) => _buildPlayerStatRow(p, controller),
++                      ),
++
+                     const SizedBox(height: AppDimensions.xl),
+-                    
+-                    Text('الفريق B', style: AppTextStyles.headlineMedium.copyWith(color: AppColors.error)),
++
++                    Text(
++                      controller.teamBSideName.value,
++                      style: AppTextStyles.headlineMedium.copyWith(
++                        color: AppColors.error,
++                      ),
++                    ),
+                     const SizedBox(height: AppDimensions.sm),
+-                    ...controller.teamBPlayers.map((p) => _buildPlayerStatRow(p, controller)),
++                    if (controller.teamBPlayers.isEmpty)
++                      _buildNoRegisteredPlayersNote()
++                    else
++                      ...controller.teamBPlayers.map(
++                        (p) => _buildPlayerStatRow(p, controller),
++                      ),
+ 
+                     const SizedBox(height: AppDimensions.xl),
+-                    Text('أفضل لاعب (MVP)', style: AppTextStyles.headlineMedium),
+-                    const SizedBox(height: AppDimensions.sm),
+-                    _buildMvpSelector(controller),
++                    if (controller.teamAPlayers.isNotEmpty ||
++                        controller.teamBPlayers.isNotEmpty) ...[
++                      Text(
++                        'أفضل لاعب (MVP)',
++                        style: AppTextStyles.headlineMedium,
++                      ),
++                      const SizedBox(height: AppDimensions.sm),
++                      _buildMvpSelector(controller),
++                    ],
+                   ],
+                 ),
+               ),
+@@ -113,17 +117,148 @@ class ScoreSubmitScreen extends StatelessWidget {
+         }),
+       ),
+       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+-      floatingActionButton: Obx(() => Padding(
+-        padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
+-        child: SizedBox(
+-          width: double.infinity,
+-          child: El7reefButton(
+-            text: 'اعتماد التشكيلة والنتيجة ⚽',
+-            isLoading: controller.isLoading.value,
+-            onPressed: controller.submit,
++      floatingActionButton: Obx(
++        () => Padding(
++          padding: const EdgeInsets.symmetric(
++            horizontal: AppDimensions.pagePadding,
++          ),
++          child: SizedBox(
++            width: double.infinity,
++            child: El7reefButton(
++              text: 'اعتماد التشكيلة والنتيجة ⚽',
++              isLoading: controller.isLoading.value,
++              onPressed: controller.submit,
++            ),
+           ),
+         ),
+-      )),
++      ),
++    );
++  }
++
++  Widget _buildFriendlyScoreInput(ScoreSubmitController controller) {
++    return Padding(
++      padding: const EdgeInsets.symmetric(
++        horizontal: AppDimensions.pagePadding,
++      ),
++      child: GlassmorphicContainer(
++        padding: const EdgeInsets.all(AppDimensions.md),
++        borderRadius: AppDimensions.radiusLg,
++        child: Column(
++          crossAxisAlignment: CrossAxisAlignment.stretch,
++          children: [
++            Text('النتيجة النهائية', style: AppTextStyles.titleLarge),
++            const SizedBox(height: AppDimensions.xs),
++            Text(
++              'أدخل نتيجة الفريقين مباشرة. إحصائيات اللاعبين اختيارية للمسجلين فقط.',
++              style: AppTextStyles.bodySmall.copyWith(
++                color: AppColors.textMuted,
++              ),
++            ),
++            const SizedBox(height: AppDimensions.md),
++            Row(
++              children: [
++                Expanded(
++                  child: _buildTeamScoreField(
++                    label: controller.teamASideName.value,
++                    color: AppColors.primary,
++                    textController: controller.teamAScoreController,
++                  ),
++                ),
++                Padding(
++                  padding: const EdgeInsets.symmetric(
++                    horizontal: AppDimensions.md,
++                  ),
++                  child: Text('VS', style: AppTextStyles.titleLarge),
++                ),
++                Expanded(
++                  child: _buildTeamScoreField(
++                    label: controller.teamBSideName.value,
++                    color: AppColors.error,
++                    textController: controller.teamBScoreController,
++                  ),
++                ),
++              ],
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++
++  Widget _buildRegisteredScoreHeader(ScoreSubmitController controller) {
++    return Padding(
++      padding: const EdgeInsets.symmetric(
++        horizontal: AppDimensions.pagePadding,
++      ),
++      child: GlassmorphicContainer(
++        padding: const EdgeInsets.all(AppDimensions.md),
++        borderRadius: AppDimensions.radiusLg,
++        child: Row(
++          mainAxisAlignment: MainAxisAlignment.spaceAround,
++          children: [
++            Column(
++              children: [
++                Text(
++                  controller.teamASideName.value,
++                  style: AppTextStyles.titleMedium,
++                ),
++                const SizedBox(height: 8),
++                Text(
++                  '${controller.totalTeamAGoals}',
++                  style: AppTextStyles.displayLarge.copyWith(
++                    color: AppColors.primary,
++                  ),
++                ),
++              ],
++            ),
++            Text('VS', style: AppTextStyles.headlineMedium),
++            Column(
++              children: [
++                Text(
++                  controller.teamBSideName.value,
++                  style: AppTextStyles.titleMedium,
++                ),
++                const SizedBox(height: 8),
++                Text(
++                  '${controller.totalTeamBGoals}',
++                  style: AppTextStyles.displayLarge.copyWith(
++                    color: AppColors.error,
++                  ),
++                ),
++              ],
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++
++  Widget _buildTeamScoreField({
++    required String label,
++    required Color color,
++    required TextEditingController textController,
++  }) {
++    return TextField(
++      controller: textController,
++      keyboardType: TextInputType.number,
++      textAlign: TextAlign.center,
++      style: AppTextStyles.displayLarge.copyWith(color: color),
++      decoration: InputDecoration(
++        labelText: label,
++        border: const OutlineInputBorder(),
++      ),
++    );
++  }
++
++  Widget _buildNoRegisteredPlayersNote() {
++    return GlassmorphicContainer(
++      margin: const EdgeInsets.only(bottom: AppDimensions.sm),
++      padding: const EdgeInsets.all(AppDimensions.md),
++      borderRadius: AppDimensions.radiusMd,
++      child: Text(
++        'لا يوجد لاعبون مسجلون لهذا الطرف. اللاعبون المؤقتون لا تُسجل لهم إحصائيات.',
++        style: AppTextStyles.bodySmall.copyWith(color: AppColors.textMuted),
++      ),
+     );
+   }
+ 
+@@ -145,12 +280,16 @@ class ScoreSubmitScreen extends StatelessWidget {
+                 return Row(
+                   children: [
+                     GestureDetector(
+-                      onTap: () => controller.toggleCard(player.id, 'yellowCard'),
++                      onTap: () =>
++                          controller.toggleCard(player.id, 'yellowCard'),
+                       child: Container(
+-                        width: 16, height: 24,
++                        width: 16,
++                        height: 24,
+                         margin: const EdgeInsets.only(left: 4),
+                         decoration: BoxDecoration(
+-                          color: st['yellowCard'] == true ? Colors.yellow : AppColors.surfaceBorder,
++                          color: st['yellowCard'] == true
++                              ? Colors.yellow
++                              : AppColors.surfaceBorder,
+                           borderRadius: BorderRadius.circular(2),
+                         ),
+                       ),
+@@ -158,10 +297,13 @@ class ScoreSubmitScreen extends StatelessWidget {
+                     GestureDetector(
+                       onTap: () => controller.toggleCard(player.id, 'redCard'),
+                       child: Container(
+-                        width: 16, height: 24,
++                        width: 16,
++                        height: 24,
+                         margin: const EdgeInsets.only(left: 8),
+                         decoration: BoxDecoration(
+-                          color: st['redCard'] == true ? Colors.red : AppColors.surfaceBorder,
++                          color: st['redCard'] == true
++                              ? Colors.red
++                              : AppColors.surfaceBorder,
+                           borderRadius: BorderRadius.circular(2),
+                         ),
+                       ),
+@@ -185,12 +327,22 @@ class ScoreSubmitScreen extends StatelessWidget {
+     ).animate().fadeIn().slideY(begin: 0.05);
+   }
+ 
+-  Widget _buildStatCounter(String label, String key, String playerId, ScoreSubmitController controller) {
++  Widget _buildStatCounter(
++    String label,
++    String key,
++    String playerId,
++    ScoreSubmitController controller,
++  ) {
+     return Obx(() {
+       final val = controller.playerStats[playerId]?[key] ?? 0;
+       return Column(
+         children: [
+-          Text(label, style: AppTextStyles.labelSmall.copyWith(color: AppColors.textMuted)),
++          Text(
++            label,
++            style: AppTextStyles.labelSmall.copyWith(
++              color: AppColors.textMuted,
++            ),
++          ),
+           Row(
+             children: [
+               _btn(Icons.remove, () => controller.decrementStat(playerId, key)),
+@@ -231,10 +383,13 @@ class ScoreSubmitScreen extends StatelessWidget {
+         return ChoiceChip(
+           label: Text(p.name),
+           selected: isSelected,
+-          onSelected: (_) => controller.selectedMvpId.value = isSelected ? '' : p.id,
++          onSelected: (_) =>
++              controller.selectedMvpId.value = isSelected ? '' : p.id,
+           selectedColor: AppColors.primarySurface,
+           backgroundColor: AppColors.surface,
+-          labelStyle: TextStyle(color: isSelected ? AppColors.secondary : AppColors.textPrimary),
++          labelStyle: TextStyle(
++            color: isSelected ? AppColors.secondary : AppColors.textPrimary,
++          ),
+         );
+       }).toList(),
+     );
+diff --git a/lib/features/match/widgets/matchday_header.dart b/lib/features/match/widgets/matchday_header.dart
+index d884459..e6c56a6 100644
+--- a/lib/features/match/widgets/matchday_header.dart
++++ b/lib/features/match/widgets/matchday_header.dart
+@@ -85,7 +85,7 @@ class MatchdayHeader extends StatelessWidget {
+                     _TeamBadge(label: 'A', color: AppColors.accent),
+                     const SizedBox(height: 6),
+                     Text(
+-                      'فريق A',
++                      controller.sideADisplayName.value,
+                       style: AppTextStyles.labelMedium,
+                       textAlign: TextAlign.center,
+                       maxLines: 1,
+@@ -124,7 +124,7 @@ class MatchdayHeader extends StatelessWidget {
+                     _TeamBadge(label: 'B', color: AppColors.error),
+                     const SizedBox(height: 6),
+                     Text(
+-                      'فريق B',
++                      controller.sideBDisplayName.value,
+                       style: AppTextStyles.labelMedium,
+                       textAlign: TextAlign.center,
+                       maxLines: 1,

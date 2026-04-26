@@ -5,9 +5,13 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../domain/entities/match.dart';
+import '../../../domain/entities/match_lineup_snapshot.dart';
+import '../../shareables/controllers/lineup_share_controller.dart';
 import '../../shareables/controllers/match_result_share_controller.dart';
+import '../../shareables/models/lineup_share_data.dart';
 import '../../shareables/models/match_result_share_data.dart';
 import '../../shareables/services/share_card_capture_service.dart';
+import '../../shareables/widgets/lineup_share_card.dart';
 import '../../shareables/widgets/match_result_share_card.dart';
 import '../controllers/match_result_lineup_controller.dart';
 import '../widgets/bench_bar.dart';
@@ -18,6 +22,7 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
   const MatchResultLineupScreen({super.key});
 
   static final GlobalKey _shareBoundaryKey = GlobalKey();
+  static final GlobalKey _lineupShareBoundaryKey = GlobalKey();
   static const _shareBuilder = MatchResultShareController();
   static const _captureService = ShareCardCaptureService();
 
@@ -73,9 +78,7 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
                     awayScore: match?.scoreTeamB,
                     status: match?.status,
                     startedAt: match?.startedAt,
-                    tournamentName: match?.isOrganized == true
-                        ? 'مباراة بطولة'
-                        : 'مباراة الحريف',
+                    tournamentName: null,
                     location: match?.location,
                     onShare: _hasShareableScore ? _shareResult : null,
                   ),
@@ -92,11 +95,15 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
                         controller: controller,
                         title: home.label,
                         side: home,
+                        onShare: () =>
+                            _shareLineup(context, home, AppColors.primary),
                       );
                       final awayCard = _ResultTeamLineupCard(
                         controller: controller,
                         title: away.label,
                         side: away,
+                        onShare: () =>
+                            _shareLineup(context, away, AppColors.error),
                       );
                       if (!wide) {
                         return Column(
@@ -168,20 +175,84 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
       ),
     );
 
+    var inserted = false;
     try {
       await _precacheShareLogos(shareData);
       overlay.insert(entry);
+      inserted = true;
       await WidgetsBinding.instance.endOfFrame;
       await _captureService.captureAndShare(
         boundaryKey: _shareBoundaryKey,
         fileName: 'el7reef_match_${match.id}',
         text: 'نتيجة المباراة على الحريف',
-        pixelRatio: 3,
+        pixelRatio: matchResultShareExportPixelRatio,
       );
     } catch (error) {
       Get.snackbar('تعذر المشاركة', _readableShareError(error));
     } finally {
-      entry.remove();
+      if (inserted) entry.remove();
+    }
+  }
+
+  Future<void> _shareLineup(
+    BuildContext context,
+    ResultLineupSide side,
+    Color accentColor,
+  ) async {
+    final snapshot = side.snapshot;
+    if (snapshot == null) {
+      Get.snackbar('تعذر المشاركة', 'احفظ التشكيلة أولًا قبل مشاركتها.');
+      return;
+    }
+    final shareData = Get.find<LineupShareController>().buildFromSnapshot(
+      snapshot: snapshot,
+      teamName: side.label,
+      logoUrl: side.logoUrl,
+      lineupOwnerType: _ownerType(snapshot),
+      lineupTypeLabel: _lineupTypeLabel(snapshot),
+      matchLabel: _lineupMatchLabel(),
+      accentColor: accentColor,
+    );
+    await _captureAndShareLineup(context, shareData);
+  }
+
+  Future<void> _captureAndShareLineup(
+    BuildContext context,
+    LineupShareData shareData,
+  ) async {
+    final overlay = Overlay.of(context);
+    final entry = OverlayEntry(
+      builder: (_) => Positioned(
+        left: 0,
+        top: 0,
+        child: IgnorePointer(
+          child: Opacity(
+            opacity: 0.01,
+            child: RepaintBoundary(
+              key: _lineupShareBoundaryKey,
+              child: LineupShareCard(data: shareData, exportMode: true),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    var inserted = false;
+    try {
+      await _precacheLineupLogo(context, shareData);
+      overlay.insert(entry);
+      inserted = true;
+      await WidgetsBinding.instance.endOfFrame;
+      await _captureService.captureAndShare(
+        boundaryKey: _lineupShareBoundaryKey,
+        fileName: 'el7reef_lineup_${shareData.matchId}_${shareData.ownerId}',
+        text: 'تشكيلة ${shareData.teamName} على الحريف',
+        pixelRatio: matchResultShareExportPixelRatio,
+      );
+    } catch (error) {
+      Get.snackbar('تعذر المشاركة', _readableShareError(error));
+    } finally {
+      if (inserted) entry.remove();
     }
   }
 
@@ -211,6 +282,37 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
     }
   }
 
+  Future<void> _precacheLineupLogo(
+    BuildContext context,
+    LineupShareData shareData,
+  ) async {
+    final url = shareData.logoUrl?.trim();
+    if (url == null || url.isEmpty) return;
+    try {
+      await precacheImage(NetworkImage(url), context);
+    } catch (_) {
+      // Initials fallback is used if the logo cannot be loaded in time.
+    }
+  }
+
+  LineupShareOwnerType _ownerType(MatchLineupSnapshot snapshot) {
+    if (snapshot.teamId != null) return LineupShareOwnerType.officialTeam;
+    if (snapshot.matchSideId != null) return LineupShareOwnerType.temporarySide;
+    return LineupShareOwnerType.guestTeam;
+  }
+
+  String _lineupTypeLabel(MatchLineupSnapshot snapshot) {
+    if (snapshot.teamId != null) return 'فريق رسمي';
+    if (snapshot.matchSideId != null) return 'فريق مؤقت';
+    return 'فريق ضيف';
+  }
+
+  String? _lineupMatchLabel() {
+    final currentMatch = controller.match.value;
+    if (currentMatch == null) return null;
+    return currentMatch.tournamentId == null ? 'مباراة ودية' : null;
+  }
+
   String _readableShareError(Object error) {
     final raw = error.toString();
     if (raw.startsWith('Exception: ')) {
@@ -224,11 +326,13 @@ class _ResultTeamLineupCard extends StatelessWidget {
   final MatchResultLineupController controller;
   final String title;
   final ResultLineupSide side;
+  final VoidCallback onShare;
 
   const _ResultTeamLineupCard({
     required this.controller,
     required this.title,
     required this.side,
+    required this.onShare,
   });
 
   @override
@@ -267,6 +371,12 @@ class _ResultTeamLineupCard extends StatelessWidget {
                   ],
                 ),
               ),
+              if (snapshot != null)
+                IconButton(
+                  onPressed: onShare,
+                  icon: const Icon(Icons.ios_share_rounded),
+                  tooltip: 'مشاركة التشكيلة',
+                ),
               _FormationPill(label: formation),
             ],
           ),

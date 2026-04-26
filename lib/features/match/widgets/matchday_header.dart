@@ -85,7 +85,7 @@ class MatchdayHeader extends StatelessWidget {
                     _TeamBadge(label: 'A', color: AppColors.accent),
                     const SizedBox(height: 6),
                     Text(
-                      'فريق A',
+                      controller.sideADisplayName.value,
                       style: AppTextStyles.labelMedium,
                       textAlign: TextAlign.center,
                       maxLines: 1,
@@ -124,7 +124,7 @@ class MatchdayHeader extends StatelessWidget {
                     _TeamBadge(label: 'B', color: AppColors.error),
                     const SizedBox(height: 6),
                     Text(
-                      'فريق B',
+                      controller.sideBDisplayName.value,
                       style: AppTextStyles.labelMedium,
                       textAlign: TextAlign.center,
                       maxLines: 1,

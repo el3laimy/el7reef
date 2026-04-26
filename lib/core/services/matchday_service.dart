@@ -17,6 +17,8 @@ import '../../data/models/match_attendance_model.dart';
 import '../../data/models/match_check_in_model.dart';
 import '../../data/models/match_lineup_snapshot_model.dart';
 import '../../data/models/match_model.dart';
+import '../../data/models/match_side_model.dart';
+import '../../data/models/match_side_player_model.dart';
 import '../../data/models/match_substitution_model.dart';
 import '../../data/models/player_model.dart';
 import '../../data/models/team_membership_model.dart';
@@ -30,6 +32,8 @@ import '../../domain/entities/match_attendance.dart';
 import '../../domain/entities/match_check_in.dart';
 import '../../domain/entities/match_lineup_entry.dart';
 import '../../domain/entities/match_lineup_snapshot.dart';
+import '../../domain/entities/match_side.dart';
+import '../../domain/entities/match_side_player.dart';
 import '../../domain/entities/match_substitution.dart';
 import '../../domain/entities/player.dart';
 import '../../domain/entities/team.dart';
@@ -146,6 +150,12 @@ class MatchdayService {
 
   CollectionReference<Map<String, dynamic>> get _snapshotsRef =>
       _firestore.collection(FirebasePaths.matchLineupSnapshots);
+
+  CollectionReference<Map<String, dynamic>> get _matchSidesRef =>
+      _firestore.collection(FirebasePaths.matchSides);
+
+  CollectionReference<Map<String, dynamic>> get _matchSidePlayersRef =>
+      _firestore.collection(FirebasePaths.matchSidePlayers);
 
   CollectionReference<Map<String, dynamic>> get _substitutionsRef =>
       _firestore.collection(FirebasePaths.matchSubstitutions);
@@ -858,6 +868,134 @@ class MatchdayService {
     );
   }
 
+  Future<MatchLineupSnapshot> lockMatchSideLineup({
+    required String matchId,
+    required String matchSideId,
+    required String sideKey,
+    required String actorId,
+    required List<String> starterMatchSidePlayerIds,
+    List<String> benchMatchSidePlayerIds = const [],
+    String? formationCode,
+    String? formationLabel,
+    String? notes,
+    List<SlotAssignment> slotAssignments = const [],
+    DateTime? now,
+  }) async {
+    final effectiveNow = now ?? DateTime.now();
+    final normalizedSide = _normalizeSideKey(sideKey);
+    if (actorId.trim().isEmpty) {
+      throw Exception('يجب تسجيل الدخول أولاً.');
+    }
+
+    final match = await _requireMatch(matchId);
+    _ensureMatchAvailableForPreKickoff(match);
+    if (match.tournamentId != null && match.tournamentId!.isNotEmpty) {
+      throw Exception('تشكيلات الأطراف المؤقتة متاحة للمباريات الودية فقط.');
+    }
+
+    final side = await _requireMatchSide(
+      matchId: matchId,
+      matchSideId: matchSideId,
+      sideKey: normalizedSide,
+    );
+    _ensureCanManageMatchSideLineup(match: match, side: side, actorId: actorId);
+    if (!side.isTemporary) {
+      throw Exception('استخدم محرر الفريق الرسمي لهذا الطرف.');
+    }
+
+    _ensureUniqueLineupSelection(
+      starters: starterMatchSidePlayerIds,
+      bench: benchMatchSidePlayerIds,
+    );
+    final requiredStarterCount = normalizeMatchTeamSize(match.teamSize);
+    _assertStarterCount(
+      requiredStarterCount: requiredStarterCount,
+      selectedStarters: starterMatchSidePlayerIds.length,
+      allowIncompleteLineup: true,
+    );
+
+    final sidePlayers = await _loadMatchSidePlayers(matchId, normalizedSide);
+    final sidePlayerMap = {for (final player in sidePlayers) player.id: player};
+    final selectedIds = <String>{
+      ...starterMatchSidePlayerIds,
+      ...benchMatchSidePlayerIds,
+    };
+    final missingPlayerId = selectedIds.firstWhere(
+      (playerId) => !sidePlayerMap.containsKey(playerId),
+      orElse: () => '',
+    );
+    if (missingPlayerId.isNotEmpty) {
+      throw Exception('يوجد لاعب مؤقت لا ينتمي لهذا الطرف.');
+    }
+
+    final starters = _buildMatchSideEntries(
+      selectedIds: starterMatchSidePlayerIds,
+      sidePlayerMap: sidePlayerMap,
+    );
+    final bench = _buildMatchSideEntries(
+      selectedIds: benchMatchSidePlayerIds,
+      sidePlayerMap: sidePlayerMap,
+    );
+    _assertSlotAssignmentsBelongToStarters(
+      starters: starters,
+      slotAssignments: slotAssignments,
+      useMatchSidePlayerIdAsKey: true,
+    );
+
+    final snapshotId = _matchSideSnapshotId(
+      matchId: matchId,
+      matchSideId: matchSideId,
+    );
+    final snapshotRef = _snapshotsRef.doc(snapshotId);
+    final decoratedStarters = _decorateEntriesWithSlotAssignments(
+      entries: starters,
+      slotAssignments: slotAssignments,
+      useMatchSidePlayerIdAsKey: true,
+    );
+    final snapshot = MatchLineupSnapshot(
+      id: snapshotId,
+      matchId: matchId,
+      matchSideId: matchSideId,
+      sideKey: normalizedSide,
+      starters: decoratedStarters,
+      bench: bench,
+      lockedBy: actorId,
+      lockedAt: effectiveNow,
+      playerCount: requiredStarterCount,
+      formationCode: _normalizeOptionalText(formationCode),
+      formationLabel: _normalizeOptionalText(formationLabel),
+      notes: _normalizeOptionalText(notes),
+    );
+
+    return _firestore.runTransaction<MatchLineupSnapshot>((transaction) async {
+      final existingSnapshot = await transaction.get(snapshotRef);
+      if (existingSnapshot.exists && existingSnapshot.data() != null) {
+        return MatchLineupSnapshotModel.fromJson(
+          existingSnapshot.data()!,
+          existingSnapshot.id,
+        ).toEntity();
+      }
+
+      final matchSnapshot = await transaction.get(_matchesRef.doc(matchId));
+      if (!matchSnapshot.exists || matchSnapshot.data() == null) {
+        throw Exception('المباراة المطلوبة غير موجودة.');
+      }
+      final transactionMatch = MatchModel.fromJson(
+        matchSnapshot.data()!,
+        matchSnapshot.id,
+      ).toEntity();
+      _ensureMatchAvailableForPreKickoff(transactionMatch);
+      transaction.set(
+        snapshotRef,
+        MatchLineupSnapshotModel.fromEntity(snapshot).toJson(),
+      );
+      transaction.update(_matchesRef.doc(matchId), {
+        'matchSideLineupSnapshotIds.$matchSideId': snapshotId,
+      });
+      return snapshot;
+    });
+  }
+
   Future<void> unlockLineup({
     required String matchId,
     required String snapshotId,
@@ -911,6 +1049,10 @@ class MatchdayService {
       }
       if (snapshot.guestTeamId != null) {
         updates['guestLineupSnapshotIds.${snapshot.guestTeamId}'] =
+            FieldValue.delete();
+      }
+      if (snapshot.matchSideId != null) {
+        updates['matchSideLineupSnapshotIds.${snapshot.matchSideId}'] =
             FieldValue.delete();
       }
       if (updates.isNotEmpty) {
@@ -1093,6 +1235,54 @@ class MatchdayService {
       registration: registration,
       canVerify: hasOrganizerLevelAccess,
     );
+  }
+
+  Future<MatchSide> _requireMatchSide({
+    required String matchId,
+    required String matchSideId,
+    required String sideKey,
+  }) async {
+    final snapshot = await _matchSidesRef.doc(matchSideId).get();
+    if (!snapshot.exists || snapshot.data() == null) {
+      throw Exception('طرف المباراة المؤقت غير موجود.');
+    }
+    final side = MatchSideModel.fromJson(
+      snapshot.data()!,
+      snapshot.id,
+    ).toEntity();
+    if (side.matchId != matchId || _normalizeSideKey(side.sideKey) != sideKey) {
+      throw Exception('طرف المباراة لا يخص هذه المباراة.');
+    }
+    return side;
+  }
+
+  Future<List<MatchSidePlayer>> _loadMatchSidePlayers(
+    String matchId,
+    String sideKey,
+  ) async {
+    final snapshot = await _matchSidePlayersRef
+        .where('matchId', isEqualTo: matchId)
+        .get();
+    final normalizedSide = _normalizeSideKey(sideKey);
+    return snapshot.docs
+        .map(
+          (doc) => MatchSidePlayerModel.fromJson(doc.data(), doc.id).toEntity(),
+        )
+        .where((player) => _normalizeSideKey(player.sideKey) == normalizedSide)
+        .toList(growable: false);
+  }
+
+  void _ensureCanManageMatchSideLineup({
+    required Match match,
+    required MatchSide side,
+    required String actorId,
+  }) {
+    if (match.organizerId == actorId ||
+        side.captainUserId == actorId ||
+        side.managedByUserIds.contains(actorId)) {
+      return;
+    }
+    throw Exception('لا تملك صلاحية تعديل تشكيلة هذا الطرف.');
   }
 
   Future<Match> _requireMatch(String matchId) async {
@@ -1278,7 +1468,8 @@ class MatchdayService {
         match.status == MatchStatus.completed ||
         match.status == MatchStatus.pendingReview ||
         match.status == MatchStatus.ratingWindow ||
-        match.status == MatchStatus.settled) {
+        match.status == MatchStatus.settled ||
+        match.status == MatchStatus.cancelled) {
       throw Exception(
         'لا يمكن تنفيذ check-in أو lineup lock بعد انطلاق المباراة.',
       );
@@ -1293,7 +1484,8 @@ class MatchdayService {
     if (match.status == MatchStatus.completed ||
         match.status == MatchStatus.pendingReview ||
         match.status == MatchStatus.ratingWindow ||
-        match.status == MatchStatus.settled) {
+        match.status == MatchStatus.settled ||
+        match.status == MatchStatus.cancelled) {
       throw Exception('لا يمكن تسجيل تبديلات بعد انتهاء المباراة.');
     }
   }
@@ -1690,11 +1882,13 @@ class MatchdayService {
 
   /// Decorates pre-built [MatchLineupEntry] instances with pitch-position data
   /// from [slotAssignments].  The lookup key is [teamMembershipId] by default,
-  /// or [guestPlayerId] when [useGuestPlayerIdAsKey] is true.
+  /// [guestPlayerId] for guest teams, or [matchSidePlayerId] for temporary
+  /// friendly sides.
   List<MatchLineupEntry> _decorateEntriesWithSlotAssignments({
     required List<MatchLineupEntry> entries,
     required List<SlotAssignment> slotAssignments,
     bool useGuestPlayerIdAsKey = false,
+    bool useMatchSidePlayerIdAsKey = false,
   }) {
     if (slotAssignments.isEmpty) {
       return entries;
@@ -1707,6 +1901,8 @@ class MatchdayService {
         .map((entry) {
           final lookupKey = useGuestPlayerIdAsKey
               ? entry.guestPlayerId
+              : useMatchSidePlayerIdAsKey
+              ? entry.matchSidePlayerId
               : entry.teamMembershipId;
           if (lookupKey == null) return entry;
           final assignment = assignmentMap[lookupKey];
@@ -1727,6 +1923,7 @@ class MatchdayService {
     required List<MatchLineupEntry> starters,
     required List<SlotAssignment> slotAssignments,
     bool useGuestPlayerIdAsKey = false,
+    bool useMatchSidePlayerIdAsKey = false,
   }) {
     if (slotAssignments.isEmpty) return;
 
@@ -1734,6 +1931,8 @@ class MatchdayService {
         .map(
           (entry) => useGuestPlayerIdAsKey
               ? entry.guestPlayerId
+              : useMatchSidePlayerIdAsKey
+              ? entry.matchSidePlayerId
               : entry.teamMembershipId,
         )
         .whereType<String>()
@@ -1769,6 +1968,32 @@ class MatchdayService {
           attendanceStatus: attendance.status,
           displayName: guestPlayer.displayName,
           position: guestPlayer.preferredPosition,
+        ),
+      );
+    }
+    return entries;
+  }
+
+  List<MatchLineupEntry> _buildMatchSideEntries({
+    required List<String> selectedIds,
+    required Map<String, MatchSidePlayer> sidePlayerMap,
+  }) {
+    final entries = <MatchLineupEntry>[];
+    for (final matchSidePlayerId in selectedIds) {
+      final sidePlayer = sidePlayerMap[matchSidePlayerId];
+      if (sidePlayer == null) {
+        throw Exception('يوجد لاعب مؤقت غير موجود داخل طرف المباراة.');
+      }
+      entries.add(
+        MatchLineupEntry(
+          attendanceId: 'matchSidePlayer::$matchSidePlayerId',
+          matchSidePlayerId: matchSidePlayerId,
+          role: TeamMembershipRole.player,
+          availability: TeamMemberAvailability.available,
+          attendanceStatus: MatchAttendanceStatus.present,
+          displayName: sidePlayer.displayName,
+          position: sidePlayer.position,
+          ratingEligible: sidePlayer.ratingEligible && sidePlayer.isRegistered,
         ),
       );
     }
@@ -1967,6 +2192,21 @@ class MatchdayService {
     required String guestTeamId,
   }) {
     return 'match::$matchId::guest::$guestTeamId::lineup';
+  }
+
+  String _matchSideSnapshotId({
+    required String matchId,
+    required String matchSideId,
+  }) {
+    return 'match::$matchId::side::$matchSideId::lineup';
+  }
+
+  String _normalizeSideKey(String sideKey) {
+    final normalized = sideKey.trim().toUpperCase();
+    if (normalized != 'A' && normalized != 'B') {
+      throw Exception('طرف المباراة غير صحيح.');
+    }
+    return normalized;
   }
 
   String? _normalizeOptionalText(String? value) {

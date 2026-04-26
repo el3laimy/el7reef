@@ -16,6 +16,8 @@ abstract class AppRoutes {
   static const String matchDetails = '/match/details/:id';
   static const String teamLineupEditor =
       '/match/:matchId/lineup/editor/:teamId';
+  static const String matchSideLineupEditor =
+      '/match/:matchId/lineup/side/:sideKey';
   static const String matchResultLineup = '/match/:matchId/lineup/result';
   static const String rating = '/rating/:matchId';
   static const String mvpVote = '/rating/mvp/:matchId';
@@ -89,6 +91,10 @@ abstract class AppRoutes {
     required String matchId,
     required String teamId,
   }) => '/match/$matchId/lineup/editor/$teamId';
+  static String matchSideLineupEditorForMatch({
+    required String matchId,
+    required String sideKey,
+  }) => '/match/$matchId/lineup/side/${sideKey.trim().toUpperCase()}';
   static String matchResultLineupById(String matchId) =>
       '/match/$matchId/lineup/result';
   static String mvpVoteForMatch(String matchId) => '/rating/mvp/$matchId';

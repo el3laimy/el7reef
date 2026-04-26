@@ -8,12 +8,14 @@ class MatchLineupEntryModel {
   final String? teamMembershipId;
   final String? playerId;
   final String? guestPlayerId;
+  final String? matchSidePlayerId;
   final String? claimedFromGuestPlayerId;
   final TeamMembershipRole role;
   final TeamMemberAvailability availability;
   final MatchAttendanceStatus attendanceStatus;
   final String displayName;
   final String? position;
+  final bool ratingEligible;
 
   // ── Slot assignment (nullable for backward compatibility) ──
   final String? slotId;
@@ -28,12 +30,14 @@ class MatchLineupEntryModel {
     this.teamMembershipId,
     this.playerId,
     this.guestPlayerId,
+    this.matchSidePlayerId,
     this.claimedFromGuestPlayerId,
     required this.role,
     required this.availability,
     required this.attendanceStatus,
     required this.displayName,
     this.position,
+    this.ratingEligible = true,
     this.slotId,
     this.slotRole,
     this.lineIndex,
@@ -48,26 +52,31 @@ class MatchLineupEntryModel {
       teamMembershipId: json['teamMembershipId'] as String?,
       playerId: json['playerId'] as String?,
       guestPlayerId: json['guestPlayerId'] as String?,
+      matchSidePlayerId: json['matchSidePlayerId'] as String?,
       claimedFromGuestPlayerId: json['claimedFromGuestPlayerId'] as String?,
       role: TeamMembershipRole.values.firstWhere(
-        (value) => value.name ==
+        (value) =>
+            value.name ==
             (json['role'] as String? ?? TeamMembershipRole.player.name),
         orElse: () => TeamMembershipRole.player,
       ),
       availability: TeamMemberAvailability.values.firstWhere(
-        (value) => value.name ==
+        (value) =>
+            value.name ==
             (json['availability'] as String? ??
                 TeamMemberAvailability.available.name),
         orElse: () => TeamMemberAvailability.available,
       ),
       attendanceStatus: MatchAttendanceStatus.values.firstWhere(
-        (value) => value.name ==
+        (value) =>
+            value.name ==
             (json['attendanceStatus'] as String? ??
                 MatchAttendanceStatus.pending.name),
         orElse: () => MatchAttendanceStatus.pending,
       ),
       displayName: json['displayName'] as String? ?? '',
       position: json['position'] as String?,
+      ratingEligible: json['ratingEligible'] as bool? ?? true,
       slotId: json['slotId'] as String?,
       slotRole: json['slotRole'] as String?,
       lineIndex: (json['lineIndex'] as num?)?.toInt(),
@@ -83,12 +92,14 @@ class MatchLineupEntryModel {
       'teamMembershipId': teamMembershipId,
       'playerId': playerId,
       'guestPlayerId': guestPlayerId,
+      'matchSidePlayerId': matchSidePlayerId,
       'claimedFromGuestPlayerId': claimedFromGuestPlayerId,
       'role': role.name,
       'availability': availability.name,
       'attendanceStatus': attendanceStatus.name,
       'displayName': displayName,
       'position': position,
+      'ratingEligible': ratingEligible,
       'slotId': slotId,
       'slotRole': slotRole,
       'lineIndex': lineIndex,
@@ -104,12 +115,14 @@ class MatchLineupEntryModel {
       teamMembershipId: teamMembershipId,
       playerId: playerId,
       guestPlayerId: guestPlayerId,
+      matchSidePlayerId: matchSidePlayerId,
       claimedFromGuestPlayerId: claimedFromGuestPlayerId,
       role: role,
       availability: availability,
       attendanceStatus: attendanceStatus,
       displayName: displayName,
       position: position,
+      ratingEligible: ratingEligible,
       slotId: slotId,
       slotRole: slotRole,
       lineIndex: lineIndex,
@@ -125,12 +138,14 @@ class MatchLineupEntryModel {
       teamMembershipId: entry.teamMembershipId,
       playerId: entry.playerId,
       guestPlayerId: entry.guestPlayerId,
+      matchSidePlayerId: entry.matchSidePlayerId,
       claimedFromGuestPlayerId: entry.claimedFromGuestPlayerId,
       role: entry.role,
       availability: entry.availability,
       attendanceStatus: entry.attendanceStatus,
       displayName: entry.displayName,
       position: entry.position,
+      ratingEligible: entry.ratingEligible,
       slotId: entry.slotId,
       slotRole: entry.slotRole,
       lineIndex: entry.lineIndex,

@@ -10,6 +10,7 @@ import '../../../core/lineup/formation_library.dart';
 import '../../../core/services/match_start_service.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../core/widgets/qr_code_widget.dart';
+import '../../../domain/entities/match_side_player.dart';
 import '../../../domain/entities/player.dart';
 import '../controllers/match_lobby_controller.dart';
 import '../models/friendly_match_side_view.dart';
@@ -60,6 +61,7 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
             final isStartableStatus =
                 match.status == MatchStatus.open ||
                 match.status == MatchStatus.full;
+            final canCancelMatch = controller.canCancelMatch;
             final readiness = controller.startReadiness.value;
             final sideA = _sideViewFor(controller.sideViews, 'A');
             final sideB = _sideViewFor(controller.sideViews, 'B');
@@ -222,6 +224,9 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                       matchId: controller.matchId,
                       onRemove: (playerId) =>
                           controller.removePlayer(playerId, 'A'),
+                      onRename: sideA == null
+                          ? null
+                          : () => _showRenameTemporarySide(context, sideA),
                       onAdd: () {
                         Get.bottomSheet(
                           _RegisteredPlayerPickerSheet(
@@ -231,6 +236,8 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                           isScrollControlled: true,
                         );
                       },
+                      onAddTemporary: () =>
+                          _showAddTemporaryPlayer(context, 'A'),
                       onInvite: () {
                         Get.bottomSheet(
                           InviteFriendsSheet(
@@ -259,6 +266,9 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                       matchId: controller.matchId,
                       onRemove: (playerId) =>
                           controller.removePlayer(playerId, 'B'),
+                      onRename: sideB == null
+                          ? null
+                          : () => _showRenameTemporarySide(context, sideB),
                       onAdd: () {
                         Get.bottomSheet(
                           _RegisteredPlayerPickerSheet(
@@ -268,6 +278,8 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                           isScrollControlled: true,
                         );
                       },
+                      onAddTemporary: () =>
+                          _showAddTemporaryPlayer(context, 'B'),
                       onInvite: () {
                         Get.bottomSheet(
                           InviteFriendsSheet(
@@ -335,7 +347,7 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                                   ),
                                 ),
                               ),
-                            if (isOpen) ...[
+                            if (canCancelMatch) ...[
                               const SizedBox(height: AppDimensions.sm),
                               SizedBox(
                                 width: double.infinity,
@@ -373,19 +385,36 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
   }
 
   void _confirmCancel(BuildContext context) {
+    final reasonController = TextEditingController();
     Get.dialog(
       AlertDialog(
         title: const Text('إلغاء المباراة'),
-        content: const Text('هل أنت متأكد من إلغاء هذه المباراة؟'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'هل أنت متأكد من إلغاء هذه المباراة؟ لن يتم حذف بيانات المباراة، لكنها لن تظهر كمباراة نشطة.',
+            ),
+            const SizedBox(height: AppDimensions.md),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'سبب الإلغاء اختياري',
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
         actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('لا')),
+          TextButton(onPressed: () => Get.back(), child: const Text('تراجع')),
           TextButton(
             onPressed: () {
+              final reason = reasonController.text;
               Get.back();
-              controller.cancelMatch();
+              controller.cancelMatch(reason: reason);
             },
             child: const Text(
-              'نعم، إلغاء',
+              'إلغاء المباراة',
               style: TextStyle(color: AppColors.error),
             ),
           ),
@@ -398,6 +427,90 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
     Get.bottomSheet(
       _MatchSettingsSheet(controller: controller),
       isScrollControlled: true,
+    );
+  }
+
+  void _showRenameTemporarySide(
+    BuildContext context,
+    FriendlyMatchSideView side,
+  ) {
+    final nameController = TextEditingController(text: side.displayName);
+    Get.dialog(
+      AlertDialog(
+        title: Text('تسمية فريق ${side.sideKey}'),
+        content: TextField(
+          controller: nameController,
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          decoration: const InputDecoration(labelText: 'اسم الفريق المؤقت'),
+          onSubmitted: (_) => _saveTemporarySideName(side, nameController),
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('إلغاء')),
+          FilledButton(
+            onPressed: () => _saveTemporarySideName(side, nameController),
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _saveTemporarySideName(
+    FriendlyMatchSideView side,
+    TextEditingController nameController,
+  ) {
+    final name = nameController.text.trim();
+    Get.back();
+    controller.renameTemporarySide(sideKey: side.sideKey, displayName: name);
+  }
+
+  void _showAddTemporaryPlayer(BuildContext context, String sideKey) {
+    final nameController = TextEditingController();
+    final numberController = TextEditingController();
+    final positionController = TextEditingController();
+    Get.dialog(
+      AlertDialog(
+        title: Text('لاعب مؤقت لفريق $sideKey'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              autofocus: true,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(labelText: 'اسم اللاعب'),
+            ),
+            TextField(
+              controller: numberController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'رقم القميص اختياري',
+              ),
+            ),
+            TextField(
+              controller: positionController,
+              decoration: const InputDecoration(labelText: 'المركز اختياري'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('إلغاء')),
+          FilledButton(
+            onPressed: () {
+              final shirtNumber = int.tryParse(numberController.text.trim());
+              Get.back();
+              controller.addTemporaryPlayerToSide(
+                sideKey: sideKey,
+                displayName: nameController.text,
+                shirtNumber: shirtNumber,
+                position: positionController.text,
+              );
+            },
+            child: const Text('إضافة'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -595,7 +708,9 @@ class _CollapsibleTeamSection extends StatefulWidget {
   final bool isOpen;
   final String matchId;
   final void Function(String playerId) onRemove;
+  final VoidCallback? onRename;
   final VoidCallback onAdd;
+  final VoidCallback onAddTemporary;
   final VoidCallback onInvite;
 
   const _CollapsibleTeamSection({
@@ -606,7 +721,9 @@ class _CollapsibleTeamSection extends StatefulWidget {
     required this.isOpen,
     required this.matchId,
     required this.onRemove,
+    required this.onRename,
     required this.onAdd,
+    required this.onAddTemporary,
     required this.onInvite,
   });
 
@@ -659,7 +776,7 @@ class _CollapsibleTeamSectionState extends State<_CollapsibleTeamSection> {
                       const SizedBox(width: AppDimensions.sm),
                       Obx(
                         () => Text(
-                          '${widget.players.length} لاعب',
+                          '${widget.players.length + sideView.temporaryCount} لاعب',
                           style: AppTextStyles.labelMedium.copyWith(
                             color: AppColors.textMuted,
                           ),
@@ -685,6 +802,15 @@ class _CollapsibleTeamSectionState extends State<_CollapsibleTeamSection> {
                         color: AppColors.primaryLight,
                       ),
                     ),
+                    if (sideView.temporaryCount > 0) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '${sideView.registeredCount} مسجل • ${sideView.temporaryCount} مؤقت',
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ],
                   ],
                 ],
               ),
@@ -698,7 +824,12 @@ class _CollapsibleTeamSectionState extends State<_CollapsibleTeamSection> {
                   TextButton.icon(
                     onPressed: widget.onAdd,
                     icon: const Icon(Icons.person_add_alt_1, size: 18),
-                    label: const Text('أضف لاعب'),
+                    label: const Text('أضف لاعب مسجل'),
+                  ),
+                  TextButton.icon(
+                    onPressed: widget.onAddTemporary,
+                    icon: const Icon(Icons.badge_outlined, size: 18),
+                    label: const Text('أضف لاعب مؤقت'),
                   ),
                   TextButton.icon(
                     onPressed: widget.onInvite,
@@ -716,6 +847,17 @@ class _CollapsibleTeamSectionState extends State<_CollapsibleTeamSection> {
                       icon: const Icon(Icons.sports_soccer_rounded, size: 18),
                       label: const Text('التشكيلة'),
                     )
+                  else if (sideView.playerCount > 0)
+                    TextButton.icon(
+                      onPressed: () => Get.toNamed(
+                        AppRoutes.matchSideLineupEditorForMatch(
+                          matchId: widget.matchId,
+                          sideKey: sideView.sideKey,
+                        ),
+                      ),
+                      icon: const Icon(Icons.sports_soccer_rounded, size: 18),
+                      label: const Text('تعديل التشكيلة'),
+                    )
                   else
                     Padding(
                       padding: const EdgeInsets.symmetric(
@@ -723,17 +865,23 @@ class _CollapsibleTeamSectionState extends State<_CollapsibleTeamSection> {
                         vertical: AppDimensions.xs,
                       ),
                       child: Text(
-                        'التشكيلة المؤقتة ستتوفر قريبًا',
+                        'أضف لاعبين أولًا',
                         style: AppTextStyles.labelSmall.copyWith(
                           color: AppColors.textMuted,
                         ),
                       ),
                     ),
+                  if (sideView.canEditName)
+                    TextButton.icon(
+                      onPressed: widget.onRename,
+                      icon: const Icon(Icons.edit_rounded, size: 18),
+                      label: const Text('تسمية الفريق'),
+                    ),
                 ],
               ),
             ],
             AnimatedCrossFade(
-              firstChild: _buildPlayerList(),
+              firstChild: _buildPlayerList(sideView),
               secondChild: const SizedBox.shrink(),
               crossFadeState: _expanded
                   ? CrossFadeState.showFirst
@@ -746,9 +894,9 @@ class _CollapsibleTeamSectionState extends State<_CollapsibleTeamSection> {
     );
   }
 
-  Widget _buildPlayerList() {
+  Widget _buildPlayerList(FriendlyMatchSideView sideView) {
     return Obx(() {
-      if (widget.players.isEmpty) {
+      if (widget.players.isEmpty && sideView.temporaryPlayers.isEmpty) {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: AppDimensions.md),
           child: Center(
@@ -770,6 +918,9 @@ class _CollapsibleTeamSectionState extends State<_CollapsibleTeamSection> {
               canRemove: widget.isOrganizer && widget.isOpen,
               onRemove: () => widget.onRemove(player.id),
             ),
+          ),
+          ...sideView.temporaryPlayers.map(
+            (player) => _TemporaryPlayerTile(player: player),
           ),
         ],
       );
@@ -998,6 +1149,54 @@ class _PlayerTile extends StatelessWidget {
               ),
               tooltip: 'إزالة',
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TemporaryPlayerTile extends StatelessWidget {
+  final MatchSidePlayer player;
+
+  const _TemporaryPlayerTile({required this.player});
+
+  @override
+  Widget build(BuildContext context) {
+    final details = <String>[
+      if (player.position != null && player.position!.isNotEmpty)
+        player.position!,
+      if (player.shirtNumber != null) '#${player.shirtNumber}',
+      'مؤقت',
+    ].join(' • ');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: AppColors.warning.withValues(alpha: 0.16),
+            child: const Icon(
+              Icons.badge_outlined,
+              size: 18,
+              color: AppColors.warning,
+            ),
+          ),
+          const SizedBox(width: AppDimensions.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(player.displayName, style: AppTextStyles.bodyMedium),
+                Text(
+                  details,
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

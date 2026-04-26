@@ -32,7 +32,9 @@ class ScoreSubmitScreen extends StatelessWidget {
         decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
         child: Obx(() {
           if (controller.isLoading.value && controller.teamAPlayers.isEmpty) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+            return const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            );
           }
 
           if (controller.errorMessage.value.isNotEmpty &&
@@ -51,36 +53,12 @@ class ScoreSubmitScreen extends StatelessWidget {
 
           return Column(
             children: [
-              SizedBox(height: Get.mediaQuery.padding.top + kToolbarHeight + 10),
-              
-              // Score Header Auto-calculation
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
-                child: GlassmorphicContainer(
-                  padding: const EdgeInsets.all(AppDimensions.md),
-                  borderRadius: AppDimensions.radiusLg,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      Column(
-                        children: [
-                          Text('🔵 فريق A', style: AppTextStyles.titleMedium),
-                          const SizedBox(height: 8),
-                          Text('${controller.totalTeamAGoals}', style: AppTextStyles.displayLarge.copyWith(color: AppColors.primary)),
-                        ],
-                      ),
-                      Text('VS', style: AppTextStyles.headlineMedium),
-                      Column(
-                        children: [
-                          Text('🔴 فريق B', style: AppTextStyles.titleMedium),
-                          const SizedBox(height: 8),
-                          Text('${controller.totalTeamBGoals}', style: AppTextStyles.displayLarge.copyWith(color: AppColors.error)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+              SizedBox(
+                height: Get.mediaQuery.padding.top + kToolbarHeight + 10,
               ),
+              controller.isFriendlyMatch
+                  ? _buildFriendlyScoreInput(controller)
+                  : _buildRegisteredScoreHeader(controller),
               const SizedBox(height: AppDimensions.lg),
 
               Expanded(
@@ -91,20 +69,46 @@ class ScoreSubmitScreen extends StatelessWidget {
                     bottom: 120, // space for sticky button
                   ),
                   children: [
-                    Text('الفريق A', style: AppTextStyles.headlineMedium.copyWith(color: AppColors.primary)),
+                    Text(
+                      controller.teamASideName.value,
+                      style: AppTextStyles.headlineMedium.copyWith(
+                        color: AppColors.primary,
+                      ),
+                    ),
                     const SizedBox(height: AppDimensions.sm),
-                    ...controller.teamAPlayers.map((p) => _buildPlayerStatRow(p, controller)),
-                    
-                    const SizedBox(height: AppDimensions.xl),
-                    
-                    Text('الفريق B', style: AppTextStyles.headlineMedium.copyWith(color: AppColors.error)),
-                    const SizedBox(height: AppDimensions.sm),
-                    ...controller.teamBPlayers.map((p) => _buildPlayerStatRow(p, controller)),
+                    if (controller.teamAPlayers.isEmpty)
+                      _buildNoRegisteredPlayersNote()
+                    else
+                      ...controller.teamAPlayers.map(
+                        (p) => _buildPlayerStatRow(p, controller),
+                      ),
 
                     const SizedBox(height: AppDimensions.xl),
-                    Text('أفضل لاعب (MVP)', style: AppTextStyles.headlineMedium),
+
+                    Text(
+                      controller.teamBSideName.value,
+                      style: AppTextStyles.headlineMedium.copyWith(
+                        color: AppColors.error,
+                      ),
+                    ),
                     const SizedBox(height: AppDimensions.sm),
-                    _buildMvpSelector(controller),
+                    if (controller.teamBPlayers.isEmpty)
+                      _buildNoRegisteredPlayersNote()
+                    else
+                      ...controller.teamBPlayers.map(
+                        (p) => _buildPlayerStatRow(p, controller),
+                      ),
+
+                    const SizedBox(height: AppDimensions.xl),
+                    if (controller.teamAPlayers.isNotEmpty ||
+                        controller.teamBPlayers.isNotEmpty) ...[
+                      Text(
+                        'أفضل لاعب (MVP)',
+                        style: AppTextStyles.headlineMedium,
+                      ),
+                      const SizedBox(height: AppDimensions.sm),
+                      _buildMvpSelector(controller),
+                    ],
                   ],
                 ),
               ),
@@ -113,17 +117,148 @@ class ScoreSubmitScreen extends StatelessWidget {
         }),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: Obx(() => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
-        child: SizedBox(
-          width: double.infinity,
-          child: El7reefButton(
-            text: 'اعتماد التشكيلة والنتيجة ⚽',
-            isLoading: controller.isLoading.value,
-            onPressed: controller.submit,
+      floatingActionButton: Obx(
+        () => Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppDimensions.pagePadding,
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            child: El7reefButton(
+              text: 'اعتماد التشكيلة والنتيجة ⚽',
+              isLoading: controller.isLoading.value,
+              onPressed: controller.submit,
+            ),
           ),
         ),
-      )),
+      ),
+    );
+  }
+
+  Widget _buildFriendlyScoreInput(ScoreSubmitController controller) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimensions.pagePadding,
+      ),
+      child: GlassmorphicContainer(
+        padding: const EdgeInsets.all(AppDimensions.md),
+        borderRadius: AppDimensions.radiusLg,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('النتيجة النهائية', style: AppTextStyles.titleLarge),
+            const SizedBox(height: AppDimensions.xs),
+            Text(
+              'أدخل نتيجة الفريقين مباشرة. إحصائيات اللاعبين اختيارية للمسجلين فقط.',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: AppDimensions.md),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildTeamScoreField(
+                    label: controller.teamASideName.value,
+                    color: AppColors.primary,
+                    textController: controller.teamAScoreController,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppDimensions.md,
+                  ),
+                  child: Text('VS', style: AppTextStyles.titleLarge),
+                ),
+                Expanded(
+                  child: _buildTeamScoreField(
+                    label: controller.teamBSideName.value,
+                    color: AppColors.error,
+                    textController: controller.teamBScoreController,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRegisteredScoreHeader(ScoreSubmitController controller) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimensions.pagePadding,
+      ),
+      child: GlassmorphicContainer(
+        padding: const EdgeInsets.all(AppDimensions.md),
+        borderRadius: AppDimensions.radiusLg,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            Column(
+              children: [
+                Text(
+                  controller.teamASideName.value,
+                  style: AppTextStyles.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${controller.totalTeamAGoals}',
+                  style: AppTextStyles.displayLarge.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
+            Text('VS', style: AppTextStyles.headlineMedium),
+            Column(
+              children: [
+                Text(
+                  controller.teamBSideName.value,
+                  style: AppTextStyles.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${controller.totalTeamBGoals}',
+                  style: AppTextStyles.displayLarge.copyWith(
+                    color: AppColors.error,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTeamScoreField({
+    required String label,
+    required Color color,
+    required TextEditingController textController,
+  }) {
+    return TextField(
+      controller: textController,
+      keyboardType: TextInputType.number,
+      textAlign: TextAlign.center,
+      style: AppTextStyles.displayLarge.copyWith(color: color),
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+      ),
+    );
+  }
+
+  Widget _buildNoRegisteredPlayersNote() {
+    return GlassmorphicContainer(
+      margin: const EdgeInsets.only(bottom: AppDimensions.sm),
+      padding: const EdgeInsets.all(AppDimensions.md),
+      borderRadius: AppDimensions.radiusMd,
+      child: Text(
+        'لا يوجد لاعبون مسجلون لهذا الطرف. اللاعبون المؤقتون لا تُسجل لهم إحصائيات.',
+        style: AppTextStyles.bodySmall.copyWith(color: AppColors.textMuted),
+      ),
     );
   }
 
@@ -145,12 +280,16 @@ class ScoreSubmitScreen extends StatelessWidget {
                 return Row(
                   children: [
                     GestureDetector(
-                      onTap: () => controller.toggleCard(player.id, 'yellowCard'),
+                      onTap: () =>
+                          controller.toggleCard(player.id, 'yellowCard'),
                       child: Container(
-                        width: 16, height: 24,
+                        width: 16,
+                        height: 24,
                         margin: const EdgeInsets.only(left: 4),
                         decoration: BoxDecoration(
-                          color: st['yellowCard'] == true ? Colors.yellow : AppColors.surfaceBorder,
+                          color: st['yellowCard'] == true
+                              ? Colors.yellow
+                              : AppColors.surfaceBorder,
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -158,10 +297,13 @@ class ScoreSubmitScreen extends StatelessWidget {
                     GestureDetector(
                       onTap: () => controller.toggleCard(player.id, 'redCard'),
                       child: Container(
-                        width: 16, height: 24,
+                        width: 16,
+                        height: 24,
                         margin: const EdgeInsets.only(left: 8),
                         decoration: BoxDecoration(
-                          color: st['redCard'] == true ? Colors.red : AppColors.surfaceBorder,
+                          color: st['redCard'] == true
+                              ? Colors.red
+                              : AppColors.surfaceBorder,
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -185,12 +327,22 @@ class ScoreSubmitScreen extends StatelessWidget {
     ).animate().fadeIn().slideY(begin: 0.05);
   }
 
-  Widget _buildStatCounter(String label, String key, String playerId, ScoreSubmitController controller) {
+  Widget _buildStatCounter(
+    String label,
+    String key,
+    String playerId,
+    ScoreSubmitController controller,
+  ) {
     return Obx(() {
       final val = controller.playerStats[playerId]?[key] ?? 0;
       return Column(
         children: [
-          Text(label, style: AppTextStyles.labelSmall.copyWith(color: AppColors.textMuted)),
+          Text(
+            label,
+            style: AppTextStyles.labelSmall.copyWith(
+              color: AppColors.textMuted,
+            ),
+          ),
           Row(
             children: [
               _btn(Icons.remove, () => controller.decrementStat(playerId, key)),
@@ -231,10 +383,13 @@ class ScoreSubmitScreen extends StatelessWidget {
         return ChoiceChip(
           label: Text(p.name),
           selected: isSelected,
-          onSelected: (_) => controller.selectedMvpId.value = isSelected ? '' : p.id,
+          onSelected: (_) =>
+              controller.selectedMvpId.value = isSelected ? '' : p.id,
           selectedColor: AppColors.primarySurface,
           backgroundColor: AppColors.surface,
-          labelStyle: TextStyle(color: isSelected ? AppColors.secondary : AppColors.textPrimary),
+          labelStyle: TextStyle(
+            color: isSelected ? AppColors.secondary : AppColors.textPrimary,
+          ),
         );
       }).toList(),
     );

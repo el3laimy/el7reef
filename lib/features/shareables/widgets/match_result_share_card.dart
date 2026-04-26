@@ -6,6 +6,9 @@ import '../../../app/theme/app_text_styles.dart';
 import '../models/match_result_share_data.dart';
 
 class MatchResultShareCard extends StatelessWidget {
+  static const double exportLogicalWidth = 360;
+  static const double exportLogicalHeight = 450;
+
   final MatchResultShareData data;
   final bool exportMode;
 
@@ -20,8 +23,8 @@ class MatchResultShareCard extends StatelessWidget {
     final content = Directionality(
       textDirection: TextDirection.rtl,
       child: Container(
-        width: exportMode ? 360 : null,
-        height: exportMode ? 450 : null,
+        width: exportMode ? exportLogicalWidth : null,
+        height: exportMode ? exportLogicalHeight : null,
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
           color: const Color(0xFF08111F),
@@ -171,35 +174,7 @@ class _CardContent extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           const Spacer(),
-          Directionality(
-            textDirection: TextDirection.ltr,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: _TeamPanel(
-                    name: data.teamAName,
-                    logoUrl: data.teamALogoUrl,
-                    formation: data.teamAFormation,
-                    accent: data.teamAAccent,
-                    winnerSide: data.winnerSide == 'A',
-                    exportMode: exportMode,
-                  ),
-                ),
-                _ScoreBlock(data: data, exportMode: exportMode),
-                Expanded(
-                  child: _TeamPanel(
-                    name: data.teamBName,
-                    logoUrl: data.teamBLogoUrl,
-                    formation: data.teamBFormation,
-                    accent: data.teamBAccent,
-                    winnerSide: data.winnerSide == 'B',
-                    exportMode: exportMode,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _TeamScoreRow(data: data, exportMode: exportMode),
           const Spacer(),
           _FooterMeta(data: data, exportMode: exportMode),
         ],
@@ -248,6 +223,47 @@ class _TopMeta extends StatelessWidget {
   }
 }
 
+class _TeamScoreRow extends StatelessWidget {
+  final MatchResultShareData data;
+  final bool exportMode;
+
+  const _TeamScoreRow({required this.data, required this.exportMode});
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      // Score semantics are fixed: Team A is left, Team B is right.
+      textDirection: TextDirection.ltr,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: _TeamPanel(
+              name: data.teamAName,
+              logoUrl: data.teamALogoUrl,
+              formation: data.teamAFormation,
+              accent: data.teamAAccent,
+              winnerSide: data.winnerSide == 'A',
+              exportMode: exportMode,
+            ),
+          ),
+          _ScoreBlock(data: data, exportMode: exportMode),
+          Expanded(
+            child: _TeamPanel(
+              name: data.teamBName,
+              logoUrl: data.teamBLogoUrl,
+              formation: data.teamBFormation,
+              accent: data.teamBAccent,
+              winnerSide: data.winnerSide == 'B',
+              exportMode: exportMode,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _TeamPanel extends StatelessWidget {
   final String name;
   final String? logoUrl;
@@ -274,57 +290,60 @@ class _TeamPanel extends StatelessWidget {
       fontWeight: FontWeight.w900,
       height: 1.08,
     );
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.center,
-          children: [
-            Container(
-              width: logoSize + (exportMode ? 12 : 12),
-              height: logoSize + (exportMode ? 12 : 12),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: accent.withValues(alpha: 0.16),
-                border: Border.all(color: accent.withValues(alpha: 0.42)),
-              ),
-            ),
-            _TeamLogo(
-              name: name,
-              logoUrl: logoUrl,
-              accent: accent,
-              size: logoSize,
-              exportMode: exportMode,
-            ),
-            if (winnerSide)
-              Positioned(
-                top: exportMode ? -6 : -6,
-                right: exportMode ? -6 : -6,
-                child: Icon(
-                  Icons.emoji_events_rounded,
-                  size: exportMode ? 18 : 18,
-                  color: const Color(0xFFF7C948),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: logoSize + (exportMode ? 12 : 12),
+                height: logoSize + (exportMode ? 12 : 12),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: accent.withValues(alpha: 0.16),
+                  border: Border.all(color: accent.withValues(alpha: 0.42)),
                 ),
               ),
-          ],
-        ),
-        SizedBox(height: exportMode ? 10 : 10),
-        Text(
-          name,
-          style: nameStyle,
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        SizedBox(height: exportMode ? 8 : 8),
-        if (formation != null && formation!.isNotEmpty)
-          _FormationChip(
-            label: formation!,
-            accent: accent,
-            exportMode: exportMode,
+              _TeamLogo(
+                name: name,
+                logoUrl: logoUrl,
+                accent: accent,
+                size: logoSize,
+                exportMode: exportMode,
+              ),
+              if (winnerSide)
+                PositionedDirectional(
+                  top: exportMode ? -6 : -6,
+                  end: exportMode ? -6 : -6,
+                  child: Icon(
+                    Icons.emoji_events_rounded,
+                    size: exportMode ? 18 : 18,
+                    color: const Color(0xFFF7C948),
+                  ),
+                ),
+            ],
           ),
-      ],
+          SizedBox(height: exportMode ? 10 : 10),
+          Text(
+            name,
+            style: nameStyle,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          SizedBox(height: exportMode ? 8 : 8),
+          if (formation != null && formation!.isNotEmpty)
+            _FormationChip(
+              label: formation!,
+              accent: accent,
+              exportMode: exportMode,
+            ),
+        ],
+      ),
     );
   }
 }

@@ -8,6 +8,8 @@ abstract class FirebasePaths {
   static const String teamFormationTemplates = 'teamFormationTemplates';
   static const String teamRosterSnapshots = 'teamRosterSnapshots';
   static const String matches = 'matches';
+  static const String matchSides = 'matchSides';
+  static const String matchSidePlayers = 'matchSidePlayers';
   static const String matchCheckIns = 'matchCheckIns';
   static const String matchAttendances = 'matchAttendances';
   static const String matchLineupSnapshots = 'matchLineupSnapshots';
@@ -33,7 +35,7 @@ abstract class FirebasePaths {
   static const String friendRequests = 'friendRequests';
   static const String matchInvitations = 'matchInvitations';
   static const String challenges = 'challenges';
-  static const String userVotes = 'userVotes';       // Fan voting
+  static const String userVotes = 'userVotes'; // Fan voting
   static const String fanVotingSessions = 'fanVotingSessions';
   static const String fantasySlots = 'fantasySlots';
   static const String transferRecords = 'transferRecords';

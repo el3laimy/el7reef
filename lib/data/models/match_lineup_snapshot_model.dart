@@ -7,6 +7,8 @@ class MatchLineupSnapshotModel {
   final String matchId;
   final String? teamId;
   final String? guestTeamId;
+  final String? matchSideId;
+  final String? sideKey;
   final String? tournamentRegistrationId;
   final String? checkInId;
   final List<MatchLineupEntryModel> starters;
@@ -23,6 +25,8 @@ class MatchLineupSnapshotModel {
     required this.matchId,
     this.teamId,
     this.guestTeamId,
+    this.matchSideId,
+    this.sideKey,
     this.tournamentRegistrationId,
     this.checkInId,
     required this.starters,
@@ -44,6 +48,8 @@ class MatchLineupSnapshotModel {
       matchId: json['matchId'] as String? ?? '',
       teamId: json['teamId'] as String?,
       guestTeamId: json['guestTeamId'] as String?,
+      matchSideId: json['matchSideId'] as String?,
+      sideKey: json['sideKey'] as String?,
       tournamentRegistrationId: json['tournamentRegistrationId'] as String?,
       checkInId: json['checkInId'] as String?,
       starters: (json['starters'] as List<dynamic>? ?? const [])
@@ -76,6 +82,8 @@ class MatchLineupSnapshotModel {
       'matchId': matchId,
       'teamId': teamId,
       'guestTeamId': guestTeamId,
+      'matchSideId': matchSideId,
+      'sideKey': sideKey,
       'tournamentRegistrationId': tournamentRegistrationId,
       'checkInId': checkInId,
       'starters': starters.map((entry) => entry.toJson()).toList(),
@@ -97,6 +105,8 @@ class MatchLineupSnapshotModel {
       matchId: matchId,
       teamId: teamId,
       guestTeamId: guestTeamId,
+      matchSideId: matchSideId,
+      sideKey: sideKey,
       tournamentRegistrationId: tournamentRegistrationId,
       checkInId: checkInId,
       starters: starters
@@ -118,6 +128,8 @@ class MatchLineupSnapshotModel {
       matchId: snapshot.matchId,
       teamId: snapshot.teamId,
       guestTeamId: snapshot.guestTeamId,
+      matchSideId: snapshot.matchSideId,
+      sideKey: snapshot.sideKey,
       tournamentRegistrationId: snapshot.tournamentRegistrationId,
       checkInId: snapshot.checkInId,
       starters: snapshot.starters

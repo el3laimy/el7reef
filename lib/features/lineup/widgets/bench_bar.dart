@@ -170,7 +170,7 @@ class _BenchPlayerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = compact ? 34.0 : 40.0;
-    final roleColor = player.isGuest
+    final roleColor = (player.isGuest || player.isTemporary)
         ? AppColors.warning
         : lineupPlayerRoleColor(player);
     return InkWell(
@@ -219,9 +219,15 @@ class _BenchPlayerCard extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             Text(
-              player.isGuest ? 'ضيف' : (player.preferredPosition ?? 'لاعب'),
+              player.isTemporary
+                  ? 'مؤقت'
+                  : player.isGuest
+                  ? 'ضيف'
+                  : (player.preferredPosition ?? 'لاعب'),
               style: AppTextStyles.labelSmall.copyWith(
-                color: player.isGuest ? AppColors.warning : roleColor,
+                color: (player.isGuest || player.isTemporary)
+                    ? AppColors.warning
+                    : roleColor,
                 fontSize: 8.5,
                 letterSpacing: 0,
               ),
@@ -246,7 +252,9 @@ class _Initial extends StatelessWidget {
       child: Text(
         lineupInitialsForPlayer(player),
         style: AppTextStyles.titleMedium.copyWith(
-          color: player.isGuest ? AppColors.warning : AppColors.primaryLight,
+          color: (player.isGuest || player.isTemporary)
+              ? AppColors.warning
+              : AppColors.primaryLight,
           fontWeight: FontWeight.w900,
         ),
       ),

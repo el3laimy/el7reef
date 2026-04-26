@@ -1,13 +1,21 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/enums/match_status.dart';
 import '../../../core/services/match_settlement_service.dart';
 import '../../../core/services/official_match_roster_service.dart';
 import '../../../data/repositories/match_repository_impl.dart';
+import '../../../data/repositories/match_side_player_repository_impl.dart';
+import '../../../data/repositories/match_side_repository_impl.dart';
+import '../../../data/repositories/team_repository_impl.dart';
 import '../../../domain/entities/match.dart';
+import '../../../domain/entities/match_side.dart';
+import '../../../domain/entities/match_side_player.dart';
 import '../../../domain/entities/player.dart';
 import '../../../domain/entities/player_match_stats.dart';
+import '../../../domain/entities/team.dart';
 import '../../../services/auth_service.dart';
+import '../models/friendly_match_side_view.dart';
 import 'match_controller.dart';
 
 class ScoreSubmitController extends GetxController {
@@ -16,6 +24,10 @@ class ScoreSubmitController extends GetxController {
   final MatchSettlementService _settlementService = MatchSettlementService();
   final OfficialMatchRosterService _officialRosterService =
       OfficialMatchRosterService();
+  final MatchSideRepositoryImpl _sideRepository = MatchSideRepositoryImpl();
+  final MatchSidePlayerRepositoryImpl _sidePlayerRepository =
+      MatchSidePlayerRepositoryImpl();
+  final TeamRepositoryImpl _teamRepository = TeamRepositoryImpl();
   final AuthService _authService = Get.find<AuthService>();
 
   ScoreSubmitController({required this.matchId});
@@ -26,10 +38,16 @@ class ScoreSubmitController extends GetxController {
 
   final RxList<Player> teamAPlayers = <Player>[].obs;
   final RxList<Player> teamBPlayers = <Player>[].obs;
+  final RxString teamASideName = 'فريق A'.obs;
+  final RxString teamBSideName = 'فريق B'.obs;
   final Map<String, RxMap<String, dynamic>> playerStats = {};
   final RxString selectedMvpId = ''.obs;
   final RxBool teamACleanSheet = false.obs;
   final RxBool teamBCleanSheet = false.obs;
+  final TextEditingController teamAScoreController = TextEditingController();
+  final TextEditingController teamBScoreController = TextEditingController();
+
+  bool get isFriendlyMatch => match.value?.tournamentId == null;
 
   @override
   void onInit() {
@@ -47,9 +65,16 @@ class ScoreSubmitController extends GetxController {
         errorMessage.value = 'تعذر العثور على المباراة';
         return;
       }
+      if (loadedMatch.status == MatchStatus.cancelled) {
+        errorMessage.value = 'هذه المباراة ملغاة ولا يمكن تسجيل نتيجة لها.';
+        return;
+      }
 
       match.value = loadedMatch;
       selectedMvpId.value = loadedMatch.mvpPlayerId ?? '';
+      teamAScoreController.text = loadedMatch.scoreTeamA?.toString() ?? '';
+      teamBScoreController.text = loadedMatch.scoreTeamB?.toString() ?? '';
+      await _loadFriendlySideNames(loadedMatch);
 
       final roster = await _officialRosterService.loadRegisteredRoster(
         matchId: loadedMatch.id,
@@ -75,6 +100,13 @@ class ScoreSubmitController extends GetxController {
     }
   }
 
+  @override
+  void onClose() {
+    teamAScoreController.dispose();
+    teamBScoreController.dispose();
+    super.onClose();
+  }
+
   void incrementStat(String playerId, String key) {
     if (!playerStats.containsKey(playerId)) return;
     playerStats[playerId]![key] = (playerStats[playerId]![key] as int) + 1;
@@ -94,9 +126,13 @@ class ScoreSubmitController extends GetxController {
         !(playerStats[playerId]![cardType] as bool);
   }
 
-  int get totalTeamAGoals => _sumGoals(teamAPlayers);
+  int get totalTeamAGoals => isFriendlyMatch
+      ? _parsedTeamScore(teamAScoreController.text) ?? 0
+      : _sumGoals(teamAPlayers);
 
-  int get totalTeamBGoals => _sumGoals(teamBPlayers);
+  int get totalTeamBGoals => isFriendlyMatch
+      ? _parsedTeamScore(teamBScoreController.text) ?? 0
+      : _sumGoals(teamBPlayers);
 
   Future<void> submit() async {
     final currentMatch = match.value;
@@ -112,8 +148,20 @@ class ScoreSubmitController extends GetxController {
       return;
     }
 
-    final scoreA = totalTeamAGoals;
-    final scoreB = totalTeamBGoals;
+    final scoreA = isFriendlyMatch
+        ? _validatedFriendlyScore(
+            teamAScoreController.text,
+            teamASideName.value,
+          )
+        : totalTeamAGoals;
+    if (scoreA == null) return;
+    final scoreB = isFriendlyMatch
+        ? _validatedFriendlyScore(
+            teamBScoreController.text,
+            teamBSideName.value,
+          )
+        : totalTeamBGoals;
+    if (scoreB == null) return;
 
     teamACleanSheet.value = scoreB == 0;
     teamBCleanSheet.value = scoreA == 0;
@@ -176,6 +224,63 @@ class ScoreSubmitController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  Future<void> _loadFriendlySideNames(Match loadedMatch) async {
+    if (loadedMatch.tournamentId != null) {
+      teamASideName.value = 'فريق A';
+      teamBSideName.value = 'فريق B';
+      return;
+    }
+    final teamIds = <String>[
+      if (loadedMatch.teamAId != null && loadedMatch.teamAId!.isNotEmpty)
+        loadedMatch.teamAId!,
+      if (loadedMatch.teamBId != null && loadedMatch.teamBId!.isNotEmpty)
+        loadedMatch.teamBId!,
+    ];
+    final results = await Future.wait<dynamic>([
+      _teamRepository.getTeamsByIds(teamIds),
+      _sideRepository.getMatchSides(loadedMatch.id),
+      _sidePlayerRepository.getMatchPlayers(loadedMatch.id),
+    ]);
+    final teams = results[0] as List<Team>;
+    final sides = results[1] as List<MatchSide>;
+    final sidePlayers = results[2] as List<MatchSidePlayer>;
+    final sideViews = FriendlyMatchSideView.fromMatch(
+      match: loadedMatch,
+      teamsById: {for (final team in teams) team.id: team},
+      sides: sides,
+      sidePlayers: sidePlayers,
+    );
+    for (final side in sideViews) {
+      if (side.sideKey == 'A') {
+        teamASideName.value = side.displayName;
+      } else if (side.sideKey == 'B') {
+        teamBSideName.value = side.displayName;
+      }
+    }
+  }
+
+  int? _validatedFriendlyScore(String rawValue, String sideName) {
+    final trimmed = rawValue.trim();
+    final parsed = int.tryParse(trimmed);
+    if (trimmed.isEmpty || parsed == null || parsed < 0) {
+      final message = 'أدخل نتيجة صحيحة وغير سالبة لـ $sideName.';
+      errorMessage.value = message;
+      Get.snackbar(
+        'نتيجة غير صحيحة',
+        message,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return null;
+    }
+    return parsed;
+  }
+
+  int? _parsedTeamScore(String rawValue) {
+    final parsed = int.tryParse(rawValue.trim());
+    if (parsed == null || parsed < 0) return null;
+    return parsed;
   }
 
   String _readableError(Object error) {

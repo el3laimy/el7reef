@@ -288,11 +288,13 @@ class TeamLineupEditorController extends GetxController {
 
     final targetPlayerId = oldTargetSlot.playerId;
     final targetGuestPlayerId = oldTargetSlot.guestPlayerId;
+    final targetMatchSidePlayerId = oldTargetSlot.matchSidePlayerId;
     final targetIsCaptain = oldTargetSlot.isCaptain;
     updatedSlots[targetIndex] = oldTargetSlot.assignPlayer(draggedPlayer);
     updatedSlots[sourceIndex] = oldSourceSlot.copyWith(
       playerId: targetPlayerId,
       guestPlayerId: targetGuestPlayerId,
+      matchSidePlayerId: targetMatchSidePlayerId,
       isCaptain: targetIsCaptain,
     );
     _assignUniqueSlots(updatedSlots);
@@ -503,6 +505,7 @@ class TeamLineupEditorController extends GetxController {
                 y: entry.slotY ?? 50,
                 playerId: player.isRegistered ? player.id : null,
                 guestPlayerId: player.isGuest ? player.id : null,
+                matchSidePlayerId: player.isTemporary ? player.id : null,
               );
             })
             .toList(growable: false),
@@ -586,7 +589,8 @@ class TeamLineupEditorController extends GetxController {
       id: entry.teamMembershipId ?? entry.participantId,
       name: entry.displayName,
       preferredPosition: entry.position,
-      isRegistered: !entry.isGuest,
+      isRegistered: entry.playerId != null,
+      isTemporary: entry.matchSidePlayerId != null,
     );
   }
 

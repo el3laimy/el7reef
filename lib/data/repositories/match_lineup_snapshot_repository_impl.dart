@@ -10,7 +10,7 @@ class MatchLineupSnapshotRepositoryImpl
   final FirebaseFirestore _firestore;
 
   MatchLineupSnapshotRepositoryImpl({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _snapshotsRef =>
       _firestore.collection(FirebasePaths.matchLineupSnapshots);
@@ -32,9 +32,14 @@ class MatchLineupSnapshotRepositoryImpl
 
   @override
   Future<List<MatchLineupSnapshot>> getMatchSnapshots(String matchId) async {
-    final snapshot = await _snapshotsRef.where('matchId', isEqualTo: matchId).get();
+    final snapshot = await _snapshotsRef
+        .where('matchId', isEqualTo: matchId)
+        .get();
     final lineups = snapshot.docs
-        .map((doc) => MatchLineupSnapshotModel.fromJson(doc.data(), doc.id).toEntity())
+        .map(
+          (doc) =>
+              MatchLineupSnapshotModel.fromJson(doc.data(), doc.id).toEntity(),
+        )
         .toList(growable: true);
     lineups.sort((left, right) => left.lockedAt.compareTo(right.lockedAt));
     return lineups;
@@ -65,6 +70,23 @@ class MatchLineupSnapshotRepositoryImpl
     final snapshot = await _snapshotsRef
         .where('matchId', isEqualTo: matchId)
         .where('guestTeamId', isEqualTo: guestTeamId)
+        .limit(1)
+        .get();
+    if (snapshot.docs.isEmpty) {
+      return null;
+    }
+    final doc = snapshot.docs.first;
+    return MatchLineupSnapshotModel.fromJson(doc.data(), doc.id).toEntity();
+  }
+
+  @override
+  Future<MatchLineupSnapshot?> getSnapshotByMatchSideId({
+    required String matchId,
+    required String matchSideId,
+  }) async {
+    final snapshot = await _snapshotsRef
+        .where('matchId', isEqualTo: matchId)
+        .where('matchSideId', isEqualTo: matchSideId)
         .limit(1)
         .get();
     if (snapshot.docs.isEmpty) {

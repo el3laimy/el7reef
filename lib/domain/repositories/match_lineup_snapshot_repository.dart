@@ -12,5 +12,9 @@ abstract class MatchLineupSnapshotRepository {
     required String matchId,
     required String guestTeamId,
   });
+  Future<MatchLineupSnapshot?> getSnapshotByMatchSideId({
+    required String matchId,
+    required String matchSideId,
+  });
   Future<void> deleteSnapshot(String snapshotId);
 }

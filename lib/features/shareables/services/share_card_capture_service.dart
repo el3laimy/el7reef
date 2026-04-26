@@ -6,6 +6,8 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+const double matchResultShareExportPixelRatio = 3.0;
+
 class ShareCardCaptureService {
   const ShareCardCaptureService();
 
@@ -13,7 +15,7 @@ class ShareCardCaptureService {
     required GlobalKey boundaryKey,
     required String fileName,
     String? text,
-    double pixelRatio = 3.2,
+    double pixelRatio = matchResultShareExportPixelRatio,
   }) async {
     final context = boundaryKey.currentContext;
     if (context == null) {

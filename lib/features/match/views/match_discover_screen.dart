@@ -496,7 +496,11 @@ class _MatchCard extends StatelessWidget {
                 ),
 
               // ── زر إلغاء المباراة (للمنظم فقط) ──
-              if (isOrganizer && match.status == MatchStatus.open)
+              if (isOrganizer &&
+                  match.tournamentId == null &&
+                  !match.isFrozen &&
+                  (match.status == MatchStatus.open ||
+                      match.status == MatchStatus.full))
                 Padding(
                   padding: const EdgeInsets.only(top: AppDimensions.sm),
                   child: OutlinedButton.icon(
@@ -538,19 +542,36 @@ class _MatchCard extends StatelessWidget {
   }
 
   void _confirmCancel(BuildContext context) {
+    final reasonController = TextEditingController();
     Get.dialog(
       AlertDialog(
         title: const Text('إلغاء المباراة'),
-        content: const Text('هل أنت متأكد من إلغاء هذه المباراة؟'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'هل أنت متأكد من إلغاء هذه المباراة؟ لن يتم حذف بيانات المباراة، لكنها لن تظهر كمباراة نشطة.',
+            ),
+            const SizedBox(height: AppDimensions.md),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'سبب الإلغاء اختياري',
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
         actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('لا')),
+          TextButton(onPressed: () => Get.back(), child: const Text('تراجع')),
           TextButton(
             onPressed: () {
+              final reason = reasonController.text;
               Get.back();
-              controller.cancelMatch(match.id);
+              controller.cancelMatch(match.id, reason: reason);
             },
             child: const Text(
-              'نعم، إلغاء',
+              'إلغاء المباراة',
               style: TextStyle(color: AppColors.error),
             ),
           ),

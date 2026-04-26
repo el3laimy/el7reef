@@ -6,11 +6,16 @@ import '../../../core/lineup/lineup_types.dart';
 import '../../../core/lineup/lineup_utils.dart';
 import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
 import '../../../data/repositories/match_repository_impl.dart';
+import '../../../data/repositories/match_side_player_repository_impl.dart';
+import '../../../data/repositories/match_side_repository_impl.dart';
 import '../../../data/repositories/team_repository_impl.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/entities/match_lineup_entry.dart';
 import '../../../domain/entities/match_lineup_snapshot.dart';
+import '../../../domain/entities/match_side.dart';
+import '../../../domain/entities/match_side_player.dart';
 import '../../../domain/entities/team.dart';
+import '../../match/models/friendly_match_side_view.dart';
 
 class ResultLineupSide {
   final String label;
@@ -24,19 +29,27 @@ class MatchResultLineupController extends GetxController {
   final MatchRepositoryImpl _matchRepository;
   final TeamRepositoryImpl _teamRepository;
   final MatchLineupSnapshotRepositoryImpl _snapshotRepository;
+  final MatchSideRepositoryImpl _matchSideRepository;
+  final MatchSidePlayerRepositoryImpl _matchSidePlayerRepository;
 
   MatchResultLineupController({
     required MatchRepositoryImpl matchRepository,
     required TeamRepositoryImpl teamRepository,
     required MatchLineupSnapshotRepositoryImpl snapshotRepository,
+    required MatchSideRepositoryImpl matchSideRepository,
+    required MatchSidePlayerRepositoryImpl matchSidePlayerRepository,
   }) : _matchRepository = matchRepository,
        _teamRepository = teamRepository,
-       _snapshotRepository = snapshotRepository;
+       _snapshotRepository = snapshotRepository,
+       _matchSideRepository = matchSideRepository,
+       _matchSidePlayerRepository = matchSidePlayerRepository;
 
   final RxBool isLoading = true.obs;
   final RxString errorMessage = ''.obs;
   final Rx<Match?> match = Rx<Match?>(null);
   final RxMap<String, Team> teams = <String, Team>{}.obs;
+  final RxList<MatchSide> matchSides = <MatchSide>[].obs;
+  final RxList<MatchSidePlayer> matchSidePlayers = <MatchSidePlayer>[].obs;
   final RxList<MatchLineupSnapshot> snapshots = <MatchLineupSnapshot>[].obs;
 
   String get matchId => Get.parameters['matchId'] ?? Get.parameters['id'] ?? '';
@@ -45,10 +58,13 @@ class MatchResultLineupController extends GetxController {
     final currentMatch = match.value;
     final teamId = currentMatch?.teamAId;
     final team = teamId == null ? null : teams[teamId];
+    // FriendlyMatchSideView reads matchSides, so renamed temporary sides feed
+    // both the result screen and the share-card data.
+    final sideView = _friendlySideView('A');
     return ResultLineupSide(
-      label: team?.name ?? 'الفريق الأول',
+      label: sideView?.displayName ?? team?.name ?? 'فريق A',
       logoUrl: team?.logoUrl,
-      snapshot: _snapshotForTeam(teamId),
+      snapshot: _snapshotForSide(sideKey: 'A', teamId: teamId),
     );
   }
 
@@ -56,10 +72,13 @@ class MatchResultLineupController extends GetxController {
     final currentMatch = match.value;
     final teamId = currentMatch?.teamBId;
     final team = teamId == null ? null : teams[teamId];
+    // FriendlyMatchSideView reads matchSides, so renamed temporary sides feed
+    // both the result screen and the share-card data.
+    final sideView = _friendlySideView('B');
     return ResultLineupSide(
-      label: team?.name ?? 'الفريق الثاني',
+      label: sideView?.displayName ?? team?.name ?? 'فريق B',
       logoUrl: team?.logoUrl,
-      snapshot: _snapshotForTeam(teamId),
+      snapshot: _snapshotForSide(sideKey: 'B', teamId: teamId),
     );
   }
 
@@ -89,10 +108,18 @@ class MatchResultLineupController extends GetxController {
         if (loadedMatch.teamAId != null) loadedMatch.teamAId!,
         if (loadedMatch.teamBId != null) loadedMatch.teamBId!,
       ]);
+      final loadedSides = loadedMatch.tournamentId == null
+          ? await _matchSideRepository.getMatchSides(loadedMatch.id)
+          : <MatchSide>[];
+      final loadedSidePlayers = loadedMatch.tournamentId == null
+          ? await _matchSidePlayerRepository.getMatchPlayers(loadedMatch.id)
+          : <MatchSidePlayer>[];
 
       match.value = loadedMatch;
       snapshots.assignAll(loadedSnapshots);
       teams.assignAll({for (final team in loadedTeams) team.id: team});
+      matchSides.assignAll(loadedSides);
+      matchSidePlayers.assignAll(loadedSidePlayers);
     } catch (error) {
       errorMessage.value = _readableError(error);
     } finally {
@@ -173,6 +200,7 @@ class MatchResultLineupController extends GetxController {
             y: entry.slotY ?? 50,
             playerId: player.isRegistered ? player.id : null,
             guestPlayerId: player.isGuest ? player.id : null,
+            matchSidePlayerId: player.isTemporary ? player.id : null,
           );
         })
         .toList(growable: false);
@@ -211,12 +239,26 @@ class MatchResultLineupController extends GetxController {
     return snapshot.bench.map(_lineupPlayerFromEntry).toList(growable: false);
   }
 
-  MatchLineupSnapshot? _snapshotForTeam(String? teamId) {
-    if (teamId == null) {
-      return null;
+  MatchLineupSnapshot? _snapshotForSide({
+    required String sideKey,
+    required String? teamId,
+  }) {
+    if (teamId != null) {
+      for (final snapshot in snapshots) {
+        if (snapshot.teamId == teamId) {
+          return snapshot;
+        }
+      }
     }
+    final currentMatch = match.value;
+    final matchSideId = currentMatch == null
+        ? null
+        : '${currentMatch.id}_${sideKey.trim().toUpperCase()}';
+    if (matchSideId == null) return null;
     for (final snapshot in snapshots) {
-      if (snapshot.teamId == teamId) {
+      if (snapshot.matchSideId == matchSideId ||
+          snapshot.sideKey?.trim().toUpperCase() ==
+              sideKey.trim().toUpperCase()) {
         return snapshot;
       }
     }
@@ -228,8 +270,26 @@ class MatchResultLineupController extends GetxController {
       id: entry.participantId,
       name: entry.displayName,
       preferredPosition: entry.position,
-      isRegistered: !entry.isGuest,
+      isRegistered: entry.playerId != null,
+      isTemporary: entry.matchSidePlayerId != null,
     );
+  }
+
+  FriendlyMatchSideView? _friendlySideView(String sideKey) {
+    final currentMatch = match.value;
+    if (currentMatch == null || currentMatch.tournamentId != null) {
+      return null;
+    }
+    final views = FriendlyMatchSideView.fromMatch(
+      match: currentMatch,
+      teamsById: teams,
+      sides: matchSides,
+      sidePlayers: matchSidePlayers,
+    );
+    for (final side in views) {
+      if (side.sideKey == sideKey) return side;
+    }
+    return null;
   }
 
   String _readableError(Object error) {
