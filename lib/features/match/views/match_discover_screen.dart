@@ -384,9 +384,11 @@ class _MatchCard extends StatelessWidget {
                     child: Column(
                       children: [
                         const Text('🔵', style: TextStyle(fontSize: 28)),
-                        Text(
-                          '${match.teamAPlayerIds.length} لاعب',
-                          style: AppTextStyles.titleMedium,
+                        Obx(
+                          () => Text(
+                            controller.participantCountLabel(match, 'A'),
+                            style: AppTextStyles.titleMedium,
+                          ),
                         ),
                       ],
                     ),
@@ -408,9 +410,11 @@ class _MatchCard extends StatelessWidget {
                     child: Column(
                       children: [
                         const Text('🔴', style: TextStyle(fontSize: 28)),
-                        Text(
-                          '${match.teamBPlayerIds.length} لاعب',
-                          style: AppTextStyles.titleMedium,
+                        Obx(
+                          () => Text(
+                            controller.participantCountLabel(match, 'B'),
+                            style: AppTextStyles.titleMedium,
+                          ),
                         ),
                       ],
                     ),

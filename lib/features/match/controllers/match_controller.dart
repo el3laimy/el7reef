@@ -12,17 +12,33 @@ import '../../../data/repositories/match_side_player_repository_impl.dart';
 import '../../../domain/entities/match.dart';
 import '../../../services/auth_service.dart';
 
+class MatchTemporaryParticipantCounts {
+  final int teamA;
+  final int teamB;
+
+  const MatchTemporaryParticipantCounts({
+    required this.teamA,
+    required this.teamB,
+  });
+
+  int forSide(String sideKey) {
+    return sideKey.trim().toUpperCase() == 'A' ? teamA : teamB;
+  }
+}
+
 /// كونترولر المباراة — يدير دورة حياة المباراة الكاملة
 class MatchController extends GetxController {
   final AuthService _authService = Get.find<AuthService>();
   final MatchRepositoryImpl _matchRepo = MatchRepositoryImpl();
+  final MatchSidePlayerRepositoryImpl _sidePlayerRepo =
+      MatchSidePlayerRepositoryImpl();
   final MatchCancellationService _cancellationService =
       MatchCancellationService();
   final MatchSettlementService _settlementService = MatchSettlementService();
   late final MatchStartService _matchStartService = MatchStartService(
     matchRepo: _matchRepo,
     snapshotRepo: MatchLineupSnapshotRepositoryImpl(),
-    sidePlayerRepo: MatchSidePlayerRepositoryImpl(),
+    sidePlayerRepo: _sidePlayerRepo,
   );
 
   /// المستخدم الحالي — للتحقق من صلاحيات المنظم في الـ Views
@@ -32,6 +48,9 @@ class MatchController extends GetxController {
   final RxList<Match> liveMatches = <Match>[].obs;
   final RxList<Match> myMatches = <Match>[].obs;
   final Rx<Match?> currentMatch = Rx<Match?>(null);
+  final RxMap<String, MatchTemporaryParticipantCounts>
+  temporaryParticipantCountsByMatch =
+      <String, MatchTemporaryParticipantCounts>{}.obs;
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
 
@@ -46,7 +65,9 @@ class MatchController extends GetxController {
   Future<void> loadLiveMatches() async {
     try {
       isLoading.value = true;
-      liveMatches.value = await _matchRepo.getLiveMatches();
+      final matches = await _matchRepo.getLiveMatches();
+      liveMatches.value = matches;
+      await _loadTemporaryParticipantCounts(matches);
     } catch (e) {
       AppLogger.error('MatchController.loadLiveMatches', e);
       errorMessage.value = 'فشل تحميل المباريات';
@@ -60,10 +81,31 @@ class MatchController extends GetxController {
     final uid = _authService.currentUserId;
     if (uid == null) return;
     try {
-      myMatches.value = await _matchRepo.getPlayerMatches(uid);
+      final matches = await _matchRepo.getPlayerMatches(uid);
+      myMatches.value = matches;
+      await _loadTemporaryParticipantCounts(matches);
     } catch (e) {
       AppLogger.error('MatchController.loadMyMatches', e);
     }
+  }
+
+  String participantCountLabel(Match match, String sideKey) {
+    final normalizedSide = sideKey.trim().toUpperCase();
+    final registeredCount = normalizedSide == 'A'
+        ? match.teamAPlayerIds.length
+        : match.teamBPlayerIds.length;
+    final isFriendlyMatch =
+        match.tournamentId == null || match.tournamentId!.isEmpty;
+    if (!isFriendlyMatch) {
+      return '$registeredCount لاعب';
+    }
+
+    final temporaryCounts = temporaryParticipantCountsByMatch[match.id];
+    if (temporaryCounts == null) {
+      return '$registeredCount+ لاعب';
+    }
+
+    return '${registeredCount + temporaryCounts.forSide(normalizedSide)} لاعب';
   }
 
   /// إنشاء مباراة جديدة
@@ -107,6 +149,8 @@ class MatchController extends GetxController {
       await _matchRepo.createMatch(match);
       currentMatch.value = match;
       liveMatches.insert(0, match);
+      temporaryParticipantCountsByMatch[match.id] =
+          const MatchTemporaryParticipantCounts(teamA: 0, teamB: 0);
 
       Get.snackbar(
         'تم ✅',
@@ -120,6 +164,66 @@ class MatchController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  Future<void> _loadTemporaryParticipantCounts(Iterable<Match> matches) async {
+    final friendlyMatches = matches.where(_isFriendlyMatch).toList();
+    if (friendlyMatches.isEmpty) return;
+
+    final nextCounts = Map<String, MatchTemporaryParticipantCounts>.of(
+      temporaryParticipantCountsByMatch,
+    );
+    for (final match in friendlyMatches) {
+      nextCounts.remove(match.id);
+    }
+    temporaryParticipantCountsByMatch.assignAll(nextCounts);
+
+    final loadedCounts =
+        await Future.wait<MapEntry<String, MatchTemporaryParticipantCounts>?>(
+          friendlyMatches.map((match) async {
+            try {
+              final players = await _sidePlayerRepo.getTemporaryPlayersForMatch(
+                match.id,
+              );
+              var teamA = 0;
+              var teamB = 0;
+              for (final player in players) {
+                switch (player.sideKey.trim().toUpperCase()) {
+                  case 'A':
+                    teamA++;
+                    break;
+                  case 'B':
+                    teamB++;
+                    break;
+                }
+              }
+              return MapEntry(
+                match.id,
+                MatchTemporaryParticipantCounts(teamA: teamA, teamB: teamB),
+              );
+            } catch (e) {
+              AppLogger.error(
+                'MatchController._loadTemporaryParticipantCounts(${match.id})',
+                e,
+              );
+              return null;
+            }
+          }),
+        );
+
+    final updatedCounts = Map<String, MatchTemporaryParticipantCounts>.of(
+      temporaryParticipantCountsByMatch,
+    );
+    for (final entry in loadedCounts) {
+      if (entry != null) {
+        updatedCounts[entry.key] = entry.value;
+      }
+    }
+    temporaryParticipantCountsByMatch.assignAll(updatedCounts);
+  }
+
+  bool _isFriendlyMatch(Match match) {
+    return match.tournamentId == null || match.tournamentId!.isEmpty;
   }
 
   /// ── صلاحيات المنظم ──
