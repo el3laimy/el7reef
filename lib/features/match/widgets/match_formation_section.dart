@@ -81,16 +81,6 @@ class MatchFormationSection extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (controller.isOrganizer)
-                  TextButton.icon(
-                    onPressed: () => Get.snackbar(
-                      'قريبًا',
-                      'إضافة اللاعبين المؤقتين لهذه المباراة ستتوفر قريبًا.',
-                      snackPosition: SnackPosition.BOTTOM,
-                    ),
-                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                    label: const Text('لاعب مؤقت'),
-                  ),
               ],
             ),
             const SizedBox(height: AppDimensions.sm),

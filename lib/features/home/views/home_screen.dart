@@ -529,6 +529,7 @@ class _LiveMatchCard extends StatelessWidget {
         : match.status == MatchStatus.open
             ? AppColors.success
             : AppColors.textMuted;
+    final matchController = Get.find<MatchController>();
 
     return Container(
       width: 200,
@@ -605,9 +606,11 @@ class _LiveMatchCard extends StatelessWidget {
               children: [
                 Icon(Icons.people_outline, size: 14, color: AppColors.textMuted),
                 const SizedBox(width: 4),
-                Text(
-                  '${match.teamAPlayerIds.length + match.teamBPlayerIds.length} لاعب',
-                  style: AppTextStyles.labelSmall,
+                Obx(
+                  () => Text(
+                    matchController.totalParticipantCountLabel(match),
+                    style: AppTextStyles.labelSmall,
+                  ),
                 ),
                 const Spacer(),
                 if (match.isFrozen)

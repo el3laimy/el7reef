@@ -247,20 +247,20 @@ class MatchSideLineupEditorController extends GetxController {
     );
   }
 
-  Future<void> saveConfirmedLineup() async {
+  Future<bool> saveConfirmedLineup() async {
     final actorId = currentUserId;
     final side = matchSide.value;
     if (actorId == null || actorId.isEmpty) {
       Get.snackbar('خطأ', 'يجب تسجيل الدخول أولاً.');
-      return;
+      return false;
     }
     if (side == null) {
       Get.snackbar('خطأ', 'تعذر تحديد طرف المباراة.');
-      return;
+      return false;
     }
     if (starterMatchSidePlayerIds.length != playerCount.value) {
       final confirmed = await _confirmIncompleteLineup();
-      if (!confirmed) return;
+      if (!confirmed) return false;
     }
 
     try {
@@ -278,9 +278,10 @@ class MatchSideLineupEditorController extends GetxController {
       );
       confirmedSnapshot.value = snapshot;
       _seedFromSnapshot(snapshot);
-      Get.snackbar('تم حفظ التشكيلة', 'تم تثبيت تشكيلة الطرف المؤقت.');
+      return true;
     } catch (error) {
       Get.snackbar('تعذر حفظ التشكيلة', _readableError(error));
+      return false;
     } finally {
       isSaving.value = false;
     }

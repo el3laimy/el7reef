@@ -108,6 +108,23 @@ class MatchController extends GetxController {
     return '${registeredCount + temporaryCounts.forSide(normalizedSide)} لاعب';
   }
 
+  String totalParticipantCountLabel(Match match) {
+    final registeredTotal =
+        match.teamAPlayerIds.length + match.teamBPlayerIds.length;
+    final isFriendlyMatch =
+        match.tournamentId == null || match.tournamentId!.isEmpty;
+    if (!isFriendlyMatch) {
+      return '$registeredTotal لاعب';
+    }
+
+    final temporaryCounts = temporaryParticipantCountsByMatch[match.id];
+    if (temporaryCounts == null) {
+      return '$registeredTotal+ لاعب';
+    }
+
+    return '${registeredTotal + temporaryCounts.teamA + temporaryCounts.teamB} لاعب';
+  }
+
   /// إنشاء مباراة جديدة
   Future<String?> createMatch({
     required List<String> teamAIds,

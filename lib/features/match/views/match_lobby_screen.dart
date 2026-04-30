@@ -321,7 +321,10 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
                                   onPressed: readiness.canStart
-                                      ? controller.startMatch
+                                      ? () => _handleStartMatchPressed(
+                                          sideA: sideA,
+                                          sideB: sideB,
+                                        )
                                       : null,
                                   icon: const Icon(Icons.play_arrow_rounded),
                                   label: Text(
@@ -430,6 +433,54 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
     );
   }
 
+  Future<void> _handleStartMatchPressed({
+    required FriendlyMatchSideView? sideA,
+    required FriendlyMatchSideView? sideB,
+  }) async {
+    final match = controller.match.value;
+    final readiness = controller.startReadiness.value;
+    final isFriendlyMatch =
+        match != null &&
+        (match.tournamentId == null || match.tournamentId!.isEmpty);
+    if (match == null ||
+        !isFriendlyMatch ||
+        !readiness.canStart ||
+        controller.hasLockedSnapshots.value) {
+      await controller.startMatch();
+      return;
+    }
+
+    Get.bottomSheet(
+      _StartWithoutLineupNudgeSheet(
+        sideA: sideA,
+        sideB: sideB,
+        onStartWithoutLineup: () async {
+          Get.back();
+          await controller.startMatch();
+        },
+        onCreateLineup: (side) async {
+          Get.back();
+          await Get.toNamed(_lineupRouteForSide(side));
+          await controller.refresh();
+        },
+      ),
+      isScrollControlled: true,
+    );
+  }
+
+  String _lineupRouteForSide(FriendlyMatchSideView side) {
+    if (side.canOpenOfficialLineup && side.officialTeamId != null) {
+      return AppRoutes.teamLineupEditorForMatch(
+        matchId: controller.matchId,
+        teamId: side.officialTeamId!,
+      );
+    }
+    return AppRoutes.matchSideLineupEditorForMatch(
+      matchId: controller.matchId,
+      sideKey: side.sideKey,
+    );
+  }
+
   void _showRenameTemporarySide(
     BuildContext context,
     FriendlyMatchSideView side,
@@ -510,6 +561,77 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
             child: const Text('إضافة'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _StartWithoutLineupNudgeSheet extends StatelessWidget {
+  final FriendlyMatchSideView? sideA;
+  final FriendlyMatchSideView? sideB;
+  final Future<void> Function() onStartWithoutLineup;
+  final Future<void> Function(FriendlyMatchSideView side) onCreateLineup;
+
+  const _StartWithoutLineupNudgeSheet({
+    required this.sideA,
+    required this.sideB,
+    required this.onStartWithoutLineup,
+    required this.onCreateLineup,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final lineupSides = [sideA, sideB]
+        .whereType<FriendlyMatchSideView>()
+        .where((side) => side.playerCount > 0)
+        .toList(growable: false);
+
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.all(AppDimensions.lg),
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppDimensions.radiusXl),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('تبدأ من غير تشكيلة؟', style: AppTextStyles.headlineSmall),
+            const SizedBox(height: AppDimensions.sm),
+            Text(
+              'التشكيلة اختيارية، لكنها تخلي الماتش شكله احترافي وتقدر تشاركها مع اللاعبين.',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            if (lineupSides.isNotEmpty) ...[
+              const SizedBox(height: AppDimensions.lg),
+              ...lineupSides.map(
+                (side) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppDimensions.sm),
+                  child: FilledButton.icon(
+                    onPressed: () => onCreateLineup(side),
+                    icon: const Icon(Icons.sports_soccer_rounded),
+                    label: Text('اعمل تشكيلة ${side.displayName}'),
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: AppDimensions.sm),
+            OutlinedButton.icon(
+              onPressed: onStartWithoutLineup,
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: const Text('ابدأ بدون تشكيلة'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.warning,
+                side: const BorderSide(color: AppColors.warning),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

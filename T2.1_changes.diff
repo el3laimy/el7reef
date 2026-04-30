@@ -1,0 +1,55 @@
+diff --git a/lib/features/home/views/home_screen.dart b/lib/features/home/views/home_screen.dart
+index 964891f..239c84c 100644
+--- a/lib/features/home/views/home_screen.dart
++++ b/lib/features/home/views/home_screen.dart
+@@ -529,6 +529,7 @@ class _LiveMatchCard extends StatelessWidget {
+         : match.status == MatchStatus.open
+             ? AppColors.success
+             : AppColors.textMuted;
++    final matchController = Get.find<MatchController>();
+ 
+     return Container(
+       width: 200,
+@@ -605,9 +606,11 @@ class _LiveMatchCard extends StatelessWidget {
+               children: [
+                 Icon(Icons.people_outline, size: 14, color: AppColors.textMuted),
+                 const SizedBox(width: 4),
+-                Text(
+-                  '${match.teamAPlayerIds.length + match.teamBPlayerIds.length} لاعب',
+-                  style: AppTextStyles.labelSmall,
++                Obx(
++                  () => Text(
++                    matchController.totalParticipantCountLabel(match),
++                    style: AppTextStyles.labelSmall,
++                  ),
+                 ),
+                 const Spacer(),
+                 if (match.isFrozen)
+diff --git a/lib/features/match/controllers/match_controller.dart b/lib/features/match/controllers/match_controller.dart
+index 0a283f8..d1ff3f7 100644
+--- a/lib/features/match/controllers/match_controller.dart
++++ b/lib/features/match/controllers/match_controller.dart
+@@ -108,6 +108,23 @@ class MatchController extends GetxController {
+     return '${registeredCount + temporaryCounts.forSide(normalizedSide)} لاعب';
+   }
+ 
++  String totalParticipantCountLabel(Match match) {
++    final registeredTotal =
++        match.teamAPlayerIds.length + match.teamBPlayerIds.length;
++    final isFriendlyMatch =
++        match.tournamentId == null || match.tournamentId!.isEmpty;
++    if (!isFriendlyMatch) {
++      return '$registeredTotal لاعب';
++    }
++
++    final temporaryCounts = temporaryParticipantCountsByMatch[match.id];
++    if (temporaryCounts == null) {
++      return '$registeredTotal+ لاعب';
++    }
++
++    return '${registeredTotal + temporaryCounts.teamA + temporaryCounts.teamB} لاعب';
++  }
++
+   /// إنشاء مباراة جديدة
+   Future<String?> createMatch({
+     required List<String> teamAIds,

@@ -332,6 +332,7 @@ class _MatchCard extends StatelessWidget {
         match.isOrganized ||
         match.teamAId != null ||
         match.teamBId != null;
+    final hasResult = match.scoreTeamA != null && match.scoreTeamB != null;
 
     return GlassmorphicContainer(
           padding: const EdgeInsets.all(AppDimensions.md),
@@ -423,6 +424,22 @@ class _MatchCard extends StatelessWidget {
               ),
 
               const SizedBox(height: AppDimensions.md),
+
+              if (hasResult)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.only(bottom: AppDimensions.md),
+                  child: OutlinedButton.icon(
+                    onPressed: () =>
+                        Get.toNamed(AppRoutes.matchResultLineupById(match.id)),
+                    icon: const Icon(Icons.ios_share_rounded, size: 18),
+                    label: const Text('عرض ومشاركة النتيجة'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                    ),
+                  ),
+                ),
 
               if (canOpenMatchday)
                 Container(

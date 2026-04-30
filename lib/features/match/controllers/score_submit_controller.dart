@@ -134,9 +134,9 @@ class ScoreSubmitController extends GetxController {
       ? _parsedTeamScore(teamBScoreController.text) ?? 0
       : _sumGoals(teamBPlayers);
 
-  Future<void> submit() async {
+  Future<Match?> submit() async {
     final currentMatch = match.value;
-    if (currentMatch == null) return;
+    if (currentMatch == null) return null;
     final actorId = _authService.currentUserId;
     if (actorId == null || actorId.isEmpty) {
       errorMessage.value = 'يجب تسجيل الدخول أولاً لتسجيل النتيجة.';
@@ -145,7 +145,7 @@ class ScoreSubmitController extends GetxController {
         errorMessage.value,
         snackPosition: SnackPosition.BOTTOM,
       );
-      return;
+      return null;
     }
 
     final scoreA = isFriendlyMatch
@@ -154,14 +154,14 @@ class ScoreSubmitController extends GetxController {
             teamASideName.value,
           )
         : totalTeamAGoals;
-    if (scoreA == null) return;
+    if (scoreA == null) return null;
     final scoreB = isFriendlyMatch
         ? _validatedFriendlyScore(
             teamBScoreController.text,
             teamBSideName.value,
           )
         : totalTeamBGoals;
-    if (scoreB == null) return;
+    if (scoreB == null) return null;
 
     teamACleanSheet.value = scoreB == 0;
     teamBCleanSheet.value = scoreA == 0;
@@ -199,6 +199,18 @@ class ScoreSubmitController extends GetxController {
         await Get.find<MatchController>().loadMyMatches();
       }
 
+      final updatedMatch =
+          await _matchRepo.getMatch(currentMatch.id) ??
+          currentMatch.copyWith(
+            scoreTeamA: scoreA,
+            scoreTeamB: scoreB,
+            mvpPlayerId: selectedMvpId.value.isEmpty
+                ? null
+                : selectedMvpId.value,
+            status: result.status,
+          );
+      match.value = updatedMatch;
+
       if (result.status == MatchStatus.pendingReview) {
         Get.snackbar(
           'تحت المراجعة',
@@ -213,7 +225,7 @@ class ScoreSubmitController extends GetxController {
         );
       }
 
-      Get.back();
+      return updatedMatch;
     } catch (error) {
       errorMessage.value = 'فشل حفظ النتيجة: ${_readableError(error)}';
       Get.snackbar(
@@ -221,6 +233,7 @@ class ScoreSubmitController extends GetxController {
         errorMessage.value,
         snackPosition: SnackPosition.BOTTOM,
       );
+      return null;
     } finally {
       isLoading.value = false;
     }

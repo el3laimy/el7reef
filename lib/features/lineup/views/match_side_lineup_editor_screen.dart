@@ -14,6 +14,7 @@ import '../widgets/bench_bar.dart';
 import '../widgets/formation_control_bar.dart';
 import '../widgets/lineup_bottom_action_bar.dart';
 import '../widgets/lineup_player_display.dart';
+import '../widgets/lineup_save_success_share_sheet.dart';
 import '../widgets/player_picker_sheet.dart';
 import '../widgets/professional_pitch_card.dart';
 
@@ -113,7 +114,9 @@ class MatchSideLineupEditorScreen
                     LineupBottomActionBar(
                       isSaving: controller.isSaving.value,
                       canStart: false,
-                      onSave: controller.saveConfirmedLineup,
+                      onSave: () {
+                        _handleSaveLineup(context);
+                      },
                       onStartMatch: null,
                     ),
                   const SizedBox(height: AppDimensions.xl),
@@ -216,6 +219,29 @@ class MatchSideLineupEditorScreen
         ),
       ),
     );
+  }
+
+  Future<void> _handleSaveLineup(BuildContext context) async {
+    final saved = await controller.saveConfirmedLineup();
+    if (!saved || !context.mounted) return;
+
+    Get.bottomSheet(
+      LineupSaveSuccessShareSheet(
+        isIncomplete: _savedLineupIsIncomplete(),
+        onShare: () {
+          Get.back();
+          _shareLineup(context);
+        },
+        onContinueEditing: () => Get.back(),
+      ),
+      isScrollControlled: true,
+    );
+  }
+
+  bool _savedLineupIsIncomplete() {
+    final snapshot = controller.confirmedSnapshot.value;
+    return snapshot != null &&
+        snapshot.starters.length < controller.playerCount.value;
   }
 
   Future<void> _shareLineup(BuildContext context) async {

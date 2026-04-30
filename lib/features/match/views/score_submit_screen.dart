@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
+import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../core/widgets/el7reef_button.dart';
+import '../../../domain/entities/match.dart';
 import '../../../domain/entities/player.dart';
 import '../controllers/score_submit_controller.dart';
 
@@ -125,14 +127,46 @@ class ScoreSubmitScreen extends StatelessWidget {
           child: SizedBox(
             width: double.infinity,
             child: El7reefButton(
-              text: 'اعتماد التشكيلة والنتيجة ⚽',
+              text: 'حفظ النتيجة ⚽',
               isLoading: controller.isLoading.value,
-              onPressed: controller.submit,
+              onPressed: () {
+                _handleSubmit(context, controller);
+              },
             ),
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _handleSubmit(
+    BuildContext context,
+    ScoreSubmitController controller,
+  ) async {
+    final updatedMatch = await controller.submit();
+    if (updatedMatch == null || !context.mounted) return;
+
+    Get.bottomSheet(
+      _ResultSubmitSuccessSheet(
+        scoreLine: _scoreLine(updatedMatch, controller),
+        onShareResult: () {
+          Get.back();
+          Get.offNamed(AppRoutes.matchResultLineupById(updatedMatch.id));
+        },
+        onReturnToMatch: () {
+          Get.back();
+          Get.back(result: updatedMatch);
+        },
+      ),
+      isScrollControlled: true,
+    );
+  }
+
+  String? _scoreLine(Match match, ScoreSubmitController controller) {
+    final scoreA = match.scoreTeamA;
+    final scoreB = match.scoreTeamB;
+    if (scoreA == null || scoreB == null) return null;
+    return '${controller.teamASideName.value} $scoreA - $scoreB ${controller.teamBSideName.value}';
   }
 
   Widget _buildFriendlyScoreInput(ScoreSubmitController controller) {
@@ -392,6 +426,84 @@ class ScoreSubmitScreen extends StatelessWidget {
           ),
         );
       }).toList(),
+    );
+  }
+}
+
+class _ResultSubmitSuccessSheet extends StatelessWidget {
+  final String? scoreLine;
+  final VoidCallback onShareResult;
+  final VoidCallback onReturnToMatch;
+
+  const _ResultSubmitSuccessSheet({
+    required this.scoreLine,
+    required this.onShareResult,
+    required this.onReturnToMatch,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.all(AppDimensions.lg),
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(AppDimensions.radiusXl),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('تم تسجيل النتيجة ✅', style: AppTextStyles.headlineSmall),
+              const SizedBox(height: AppDimensions.sm),
+              Text(
+                'النتيجة جاهزة للمشاركة مع اللاعبين.',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              if (scoreLine != null) ...[
+                const SizedBox(height: AppDimensions.md),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppDimensions.md,
+                    vertical: AppDimensions.sm,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Text(
+                    scoreLine!,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.titleLarge.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: AppDimensions.lg),
+              FilledButton.icon(
+                onPressed: onShareResult,
+                icon: const Icon(Icons.ios_share_rounded),
+                label: const Text('مشاركة النتيجة'),
+              ),
+              const SizedBox(height: AppDimensions.sm),
+              TextButton(
+                onPressed: onReturnToMatch,
+                child: const Text('العودة للمباراة'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

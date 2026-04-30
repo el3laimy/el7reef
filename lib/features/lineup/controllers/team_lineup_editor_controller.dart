@@ -352,11 +352,11 @@ class TeamLineupEditorController extends GetxController {
     }
   }
 
-  Future<void> saveConfirmedLineup() async {
+  Future<bool> saveConfirmedLineup() async {
     final actorId = currentUserId;
     if (actorId == null || actorId.isEmpty) {
       Get.snackbar('خطأ', 'يجب تسجيل الدخول أولاً.');
-      return;
+      return false;
     }
     final starters = starterMembershipIds;
     var allowIncompleteFriendlyLineup = false;
@@ -371,13 +371,13 @@ class TeamLineupEditorController extends GetxController {
           'التشكيلة غير مكتملة',
           'أكمل ${playerCount.value} لاعبين أساسيين قبل حفظ التشكيلة.',
         );
-        return;
+        return false;
       }
       final confirmed = await _confirmIncompleteFriendlyLineup(
         selectedStarters: starters.length,
       );
       if (!confirmed) {
-        return;
+        return false;
       }
       allowIncompleteFriendlyLineup = true;
     }
@@ -410,9 +410,10 @@ class TeamLineupEditorController extends GetxController {
       );
       confirmedSnapshot.value = result.snapshot;
       _seedFromSnapshot(result.snapshot);
-      Get.snackbar('تم حفظ التشكيلة', 'تم تثبيت نسخة المباراة بنجاح.');
+      return true;
     } catch (error) {
       Get.snackbar('تعذر حفظ التشكيلة', _readableError(error));
+      return false;
     } finally {
       isSaving.value = false;
     }
