@@ -247,6 +247,12 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                           isScrollControlled: true,
                         );
                       },
+                      onEditTemporary: (player) =>
+                          _showEditTemporaryPlayer(context, 'A', player),
+                      onRemoveTemporary: (player) =>
+                          _showRemoveTemporaryConfirm(context, 'A', player),
+                      onInviteTemporary: (player) =>
+                          controller.inviteTemporaryPlayer(player: player),
                     ).animate().fadeIn(delay: 300.ms),
                   ),
 
@@ -289,6 +295,12 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                           isScrollControlled: true,
                         );
                       },
+                      onEditTemporary: (player) =>
+                          _showEditTemporaryPlayer(context, 'B', player),
+                      onRemoveTemporary: (player) =>
+                          _showRemoveTemporaryConfirm(context, 'B', player),
+                      onInviteTemporary: (player) =>
+                          controller.inviteTemporaryPlayer(player: player),
                     ).animate().fadeIn(delay: 400.ms),
                   ),
 
@@ -564,6 +576,90 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
       ),
     );
   }
+
+  void _showEditTemporaryPlayer(
+    BuildContext context,
+    String sideKey,
+    MatchSidePlayer player,
+  ) {
+    final nameController = TextEditingController(text: player.displayName);
+    final numberController = TextEditingController(
+      text: player.shirtNumber?.toString() ?? '',
+    );
+    final positionController = TextEditingController(
+      text: player.position ?? '',
+    );
+    Get.dialog(
+      AlertDialog(
+        title: Text('تعديل ${player.displayName}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              autofocus: true,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(labelText: 'اسم اللاعب'),
+            ),
+            TextField(
+              controller: numberController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'رقم القميص اختياري',
+              ),
+            ),
+            TextField(
+              controller: positionController,
+              decoration: const InputDecoration(labelText: 'المركز اختياري'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('إلغاء')),
+          FilledButton(
+            onPressed: () {
+              final shirtNumber = int.tryParse(numberController.text.trim());
+              Get.back();
+              controller.editTemporaryPlayer(
+                sideKey: sideKey,
+                playerId: player.id,
+                displayName: nameController.text,
+                shirtNumber: shirtNumber,
+                position: positionController.text,
+              );
+            },
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRemoveTemporaryConfirm(
+    BuildContext context,
+    String sideKey,
+    MatchSidePlayer player,
+  ) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('حذف لاعب مؤقت'),
+        content: Text('هل أنت متأكد من حذف ${player.displayName} من المباراة؟'),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('إلغاء')),
+          TextButton(
+            onPressed: () {
+              Get.back();
+              controller.removeTemporaryPlayerFromSide(
+                sideKey: sideKey,
+                playerId: player.id,
+              );
+            },
+            child: const Text('حذف', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _StartWithoutLineupNudgeSheet extends StatelessWidget {
@@ -834,6 +930,9 @@ class _CollapsibleTeamSection extends StatefulWidget {
   final VoidCallback onAdd;
   final VoidCallback onAddTemporary;
   final VoidCallback onInvite;
+  final void Function(MatchSidePlayer player) onEditTemporary;
+  final void Function(MatchSidePlayer player) onRemoveTemporary;
+  final void Function(MatchSidePlayer player) onInviteTemporary;
 
   const _CollapsibleTeamSection({
     required this.sideView,
@@ -847,6 +946,9 @@ class _CollapsibleTeamSection extends StatefulWidget {
     required this.onAdd,
     required this.onAddTemporary,
     required this.onInvite,
+    required this.onEditTemporary,
+    required this.onRemoveTemporary,
+    required this.onInviteTemporary,
   });
 
   @override
@@ -1042,7 +1144,13 @@ class _CollapsibleTeamSectionState extends State<_CollapsibleTeamSection> {
             ),
           ),
           ...sideView.temporaryPlayers.map(
-            (player) => _TemporaryPlayerTile(player: player),
+            (player) => _TemporaryPlayerTile(
+              player: player,
+              canManage: widget.isOrganizer && widget.isOpen,
+              onEdit: () => widget.onEditTemporary(player),
+              onRemove: () => widget.onRemoveTemporary(player),
+              onInvite: () => widget.onInviteTemporary(player),
+            ),
           ),
         ],
       );
@@ -1279,8 +1387,18 @@ class _PlayerTile extends StatelessWidget {
 
 class _TemporaryPlayerTile extends StatelessWidget {
   final MatchSidePlayer player;
+  final bool canManage;
+  final VoidCallback? onEdit;
+  final VoidCallback? onRemove;
+  final VoidCallback? onInvite;
 
-  const _TemporaryPlayerTile({required this.player});
+  const _TemporaryPlayerTile({
+    required this.player,
+    this.canManage = false,
+    this.onEdit,
+    this.onRemove,
+    this.onInvite,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1309,7 +1427,12 @@ class _TemporaryPlayerTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(player.displayName, style: AppTextStyles.bodyMedium),
+                Text(
+                  player.displayName,
+                  style: AppTextStyles.bodyMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 Text(
                   details,
                   style: AppTextStyles.labelSmall.copyWith(
@@ -1319,6 +1442,61 @@ class _TemporaryPlayerTile extends StatelessWidget {
               ],
             ),
           ),
+          if (canManage)
+            PopupMenuButton<String>(
+              icon: const Icon(
+                Icons.more_vert_rounded,
+                size: 20,
+                color: AppColors.textMuted,
+              ),
+              tooltip: 'خيارات',
+              onSelected: (value) {
+                switch (value) {
+                  case 'edit':
+                    onEdit?.call();
+                  case 'remove':
+                    onRemove?.call();
+                  case 'invite':
+                    onInvite?.call();
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit_rounded, size: 18),
+                      SizedBox(width: 8),
+                      Text('تعديل'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'invite',
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_add_alt_1_rounded, size: 18),
+                      SizedBox(width: 8),
+                      Text('ادعُه يسجل'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'remove',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.remove_circle_outline,
+                        size: 18,
+                        color: AppColors.error,
+                      ),
+                      const SizedBox(width: 8),
+                      Text('حذف', style: TextStyle(color: AppColors.error)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );

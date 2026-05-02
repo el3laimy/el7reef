@@ -28,6 +28,9 @@ class BenchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textScale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
+    final benchListHeight = _benchListHeight(textScale);
+    final cardWidth = _benchCardWidth(textScale);
     Widget content = Container(
       padding: const EdgeInsets.all(AppDimensions.md),
       decoration: BoxDecoration(
@@ -53,13 +56,16 @@ class BenchBar extends StatelessWidget {
                 size: 18,
               ),
               const SizedBox(width: AppDimensions.sm),
-              Text(
-                '$title (${players.length})',
-                style: AppTextStyles.titleMedium.copyWith(
-                  color: AppColors.textPrimary,
+              Expanded(
+                child: Text(
+                  '$title (${players.length})',
+                  style: AppTextStyles.titleMedium.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Spacer(),
               if (onAddGuest != null)
                 TextButton.icon(
                   onPressed: onAddGuest,
@@ -91,7 +97,7 @@ class BenchBar extends StatelessWidget {
             )
           else
             SizedBox(
-              height: compact ? 80 : 95,
+              height: benchListHeight,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: players.length,
@@ -111,7 +117,8 @@ class BenchBar extends StatelessWidget {
                       feedback: Material(
                         color: Colors.transparent,
                         child: SizedBox(
-                          width: compact ? 82 : 96,
+                          width: cardWidth,
+                          height: benchListHeight,
                           child: Opacity(opacity: 0.85, child: card),
                         ),
                       ),
@@ -154,6 +161,16 @@ class BenchBar extends StatelessWidget {
 
     return content;
   }
+
+  double _benchListHeight(double textScale) {
+    final base = compact ? 80.0 : 95.0;
+    return base + ((textScale - 1) * (compact ? 18.0 : 22.0));
+  }
+
+  double _benchCardWidth(double textScale) {
+    final base = compact ? 82.0 : 96.0;
+    return base + ((textScale - 1) * 10.0);
+  }
 }
 
 class _BenchPlayerCard extends StatelessWidget {
@@ -169,73 +186,105 @@ class _BenchPlayerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = compact ? 34.0 : 40.0;
     final roleColor = (player.isGuest || player.isTemporary)
         ? AppColors.warning
         : lineupPlayerRoleColor(player);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-      child: Container(
-        width: compact ? 82 : 96,
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: const Color(0xFF07111F).withValues(alpha: 0.88),
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-          border: Border.all(color: roleColor.withValues(alpha: 0.5)),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: roleColor.withValues(alpha: 0.16),
-                border: Border.all(color: roleColor),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: (player.photoUrl ?? '').isNotEmpty
-                  ? Image.network(
-                      player.photoUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _Initial(player: player),
-                    )
-                  : _Initial(player: player),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final availableHeight = constraints.maxHeight.isFinite
+              ? constraints.maxHeight
+              : compact
+              ? 80.0
+              : 95.0;
+          final cardWidth = constraints.maxWidth.isFinite
+              ? constraints.maxWidth
+              : compact
+              ? 82.0
+              : 96.0;
+          final padding = (availableHeight * 0.08).clamp(5.0, 8.0);
+          final avatarSize = (availableHeight * (compact ? 0.38 : 0.4)).clamp(
+            compact ? 28.0 : 34.0,
+            compact ? 36.0 : 42.0,
+          );
+          final nameFontSize = (availableHeight * 0.13).clamp(
+            compact ? 9.0 : 10.0,
+            compact ? 11.0 : 12.0,
+          );
+          final metaFontSize = (availableHeight * 0.1).clamp(7.5, 9.5);
+
+          return Container(
+            width: cardWidth,
+            padding: EdgeInsets.all(padding),
+            decoration: BoxDecoration(
+              color: const Color(0xFF07111F).withValues(alpha: 0.88),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+              border: Border.all(color: roleColor.withValues(alpha: 0.5)),
             ),
-            const SizedBox(height: 5),
-            Text(
-              lineupDisplayName(player),
-              style: AppTextStyles.labelSmall.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: compact ? 10 : 11,
-                letterSpacing: 0,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.max,
+              children: [
+                Container(
+                  width: avatarSize,
+                  height: avatarSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: roleColor.withValues(alpha: 0.16),
+                    border: Border.all(color: roleColor),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: (player.photoUrl ?? '').isNotEmpty
+                      ? Image.network(
+                          player.photoUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              _Initial(player: player),
+                        )
+                      : _Initial(player: player),
+                ),
+                SizedBox(height: (availableHeight * 0.05).clamp(3.0, 5.0)),
+                Flexible(
+                  child: Text(
+                    lineupDisplayName(player),
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: nameFontSize,
+                      height: 1.05,
+                      letterSpacing: 0,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                Flexible(
+                  child: Text(
+                    player.isTemporary
+                        ? 'مؤقت'
+                        : player.isGuest
+                        ? 'ضيف'
+                        : (player.preferredPosition ?? 'لاعب'),
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: (player.isGuest || player.isTemporary)
+                          ? AppColors.warning
+                          : roleColor,
+                      fontSize: metaFontSize,
+                      height: 1.05,
+                      letterSpacing: 0,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
             ),
-            Text(
-              player.isTemporary
-                  ? 'مؤقت'
-                  : player.isGuest
-                  ? 'ضيف'
-                  : (player.preferredPosition ?? 'لاعب'),
-              style: AppTextStyles.labelSmall.copyWith(
-                color: (player.isGuest || player.isTemporary)
-                    ? AppColors.warning
-                    : roleColor,
-                fontSize: 8.5,
-                letterSpacing: 0,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -249,13 +298,22 @@ class _Initial extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Text(
-        lineupInitialsForPlayer(player),
-        style: AppTextStyles.titleMedium.copyWith(
-          color: (player.isGuest || player.isTemporary)
-              ? AppColors.warning
-              : AppColors.primaryLight,
-          fontWeight: FontWeight.w900,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Text(
+            lineupInitialsForPlayer(player),
+            style: AppTextStyles.titleMedium.copyWith(
+              color: (player.isGuest || player.isTemporary)
+                  ? AppColors.warning
+                  : AppColors.primaryLight,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.clip,
+          ),
         ),
       ),
     );

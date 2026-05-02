@@ -76,6 +76,47 @@ class MatchSidePlayerRepositoryImpl {
     return player;
   }
 
+  Future<void> updateTemporaryPlayer({
+    required String playerId,
+    required String displayName,
+    String? position,
+    int? shirtNumber,
+  }) async {
+    final ref = _playersRef.doc(playerId);
+    final snapshot = await ref.get();
+    if (!snapshot.exists || snapshot.data() == null) {
+      throw Exception('اللاعب المؤقت المطلوب غير موجود.');
+    }
+    final existing = MatchSidePlayerModel.fromJson(
+      snapshot.data()!,
+      snapshot.id,
+    ).toEntity();
+    if (!existing.isTemporary) {
+      throw Exception('لا يمكن تعديل لاعب غير مؤقت من هنا.');
+    }
+    await ref.update({
+      'displayName': displayName,
+      'position': _nonEmpty(position),
+      'shirtNumber': shirtNumber,
+    });
+  }
+
+  Future<void> removeTemporaryPlayer({required String playerId}) async {
+    final ref = _playersRef.doc(playerId);
+    final snapshot = await ref.get();
+    if (!snapshot.exists || snapshot.data() == null) {
+      throw Exception('اللاعب المؤقت المطلوب غير موجود.');
+    }
+    final existing = MatchSidePlayerModel.fromJson(
+      snapshot.data()!,
+      snapshot.id,
+    ).toEntity();
+    if (!existing.isTemporary) {
+      throw Exception('لا يمكن حذف لاعب غير مؤقت من هنا.');
+    }
+    await ref.delete();
+  }
+
   String? _nonEmpty(String? value) {
     final trimmed = value?.trim();
     if (trimmed == null || trimmed.isEmpty) return null;

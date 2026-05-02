@@ -32,11 +32,13 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('تشكيلة المباراة'),
+          title: const Text('النتيجة والتشكيلات'),
           actions: [
             Obx(
               () => IconButton(
-                onPressed: _hasShareableScore ? _shareResult : null,
+                onPressed: _hasShareableScore
+                    ? () => _shareResult(context)
+                    : null,
                 icon: const Icon(Icons.share_rounded),
                 tooltip: 'مشاركة النتيجة',
               ),
@@ -80,8 +82,21 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
                     startedAt: match?.startedAt,
                     tournamentName: null,
                     location: match?.location,
-                    onShare: _hasShareableScore ? _shareResult : null,
+                    onShare: _hasShareableScore
+                        ? () => _shareResult(context)
+                        : null,
                   ),
+                  if (_hasShareableScore) ...[
+                    const SizedBox(height: AppDimensions.md),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () => _shareResult(context),
+                        icon: const Icon(Icons.ios_share_rounded),
+                        label: const Text('شارك النتيجة'),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: AppDimensions.lg),
                   _SnapshotWarning(
                     hasHome: home.snapshot != null,
@@ -150,7 +165,7 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
     return match?.scoreTeamA != null && match?.scoreTeamB != null;
   }
 
-  Future<void> _shareResult() async {
+  Future<void> _shareResult(BuildContext context) async {
     final match = controller.match.value;
     if (match == null || match.scoreTeamA == null || match.scoreTeamB == null) {
       Get.snackbar('تعذر المشاركة', 'لا توجد نتيجة لمشاركتها بعد.');
@@ -158,7 +173,6 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
     }
 
     final shareData = _buildShareData(match);
-    final overlay = Overlay.of(Get.context!);
     final entry = OverlayEntry(
       builder: (_) => Positioned(
         left: 0,
@@ -177,7 +191,15 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
 
     var inserted = false;
     try {
-      await _precacheShareLogos(shareData);
+      await _precacheShareLogos(context, shareData);
+      if (!context.mounted) return;
+
+      final overlay = Overlay.maybeOf(context, rootOverlay: true);
+      if (overlay == null) {
+        Get.snackbar('تعذر المشاركة', 'تعذر تجهيز نافذة المشاركة.');
+        return;
+      }
+
       overlay.insert(entry);
       inserted = true;
       await WidgetsBinding.instance.endOfFrame;
@@ -268,12 +290,14 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
     );
   }
 
-  Future<void> _precacheShareLogos(MatchResultShareData shareData) async {
-    final context = Get.context;
-    if (context == null) return;
+  Future<void> _precacheShareLogos(
+    BuildContext context,
+    MatchResultShareData shareData,
+  ) async {
     for (final logoUrl in [shareData.teamALogoUrl, shareData.teamBLogoUrl]) {
       final url = logoUrl?.trim();
       if (url == null || url.isEmpty) continue;
+      if (!context.mounted) return;
       try {
         await precacheImage(NetworkImage(url), context);
       } catch (_) {

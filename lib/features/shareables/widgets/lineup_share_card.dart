@@ -5,8 +5,8 @@ import '../../lineup/widgets/lineup_player_display.dart';
 import '../models/lineup_share_data.dart';
 
 class LineupShareCard extends StatelessWidget {
-  static const double exportLogicalWidth = 360;
-  static const double exportLogicalHeight = 450;
+  static const double exportLogicalWidth = 432;
+  static const double exportLogicalHeight = 540;
 
   final LineupShareData data;
   final bool exportMode;
@@ -24,7 +24,7 @@ class LineupShareCard extends StatelessWidget {
       child: Container(
         width: exportMode ? exportLogicalWidth : null,
         height: exportMode ? exportLogicalHeight : null,
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: const Color(0xFF07111F),
           borderRadius: BorderRadius.circular(exportMode ? 20 : 26),
@@ -45,23 +45,23 @@ class LineupShareCard extends StatelessWidget {
             children: [
               Positioned.fill(child: _LineupShareBackground(data: data)),
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(18),
                 child: Column(
                   children: [
                     _LineupHeader(data: data, exportMode: exportMode),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     Expanded(
                       child: _SharePitch(
                         players: data.pitchPlayers,
                         exportMode: exportMode,
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     _BenchStrip(
                       players: data.benchPlayers,
                       exportMode: exportMode,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     _Footer(data: data, exportMode: exportMode),
                   ],
                 ),
@@ -127,10 +127,13 @@ class _LineupHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final temporaryCount =
+        data.pitchPlayers.where((player) => player.isTemporary).length +
+        data.benchPlayers.where((player) => player.isTemporary).length;
     return Row(
       children: [
         _TeamAvatar(data: data, exportMode: exportMode),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -139,14 +142,14 @@ class _LineupHeader extends StatelessWidget {
                 data.teamName,
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: exportMode ? 18 : 20,
+                  fontSize: exportMode ? 22 : 24,
                   fontWeight: FontWeight.w900,
-                  height: 1.05,
+                  height: 1.08,
                 ),
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
@@ -167,6 +170,12 @@ class _LineupHeader extends StatelessWidget {
                       accent: AppColors.success,
                       exportMode: exportMode,
                     ),
+                  if (temporaryCount > 0)
+                    _InfoChip(
+                      label: '$temporaryCount لاعب مؤقت',
+                      accent: AppColors.warning,
+                      exportMode: exportMode,
+                    ),
                 ],
               ),
             ],
@@ -185,7 +194,7 @@ class _TeamAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = exportMode ? 48.0 : 54.0;
+    final size = exportMode ? 56.0 : 60.0;
     final fallback = Container(
       width: size,
       height: size,
@@ -202,7 +211,7 @@ class _TeamAvatar extends StatelessWidget {
           data.initials,
           style: TextStyle(
             color: Colors.white,
-            fontSize: exportMode ? 16 : 18,
+            fontSize: exportMode ? 18 : 20,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -249,8 +258,8 @@ class _SharePitch extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final nodeWidth = exportMode ? 56.0 : 62.0;
-            final nodeHeight = exportMode ? 44.0 : 48.0;
+            final nodeWidth = (constraints.maxWidth / 5).clamp(68.0, 78.0);
+            final nodeHeight = exportMode ? 64.0 : 68.0;
             return Stack(
               children: [
                 Positioned.fill(child: CustomPaint(painter: _PitchPainter())),
@@ -309,50 +318,75 @@ class _PitchPlayerNode extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: exportMode ? 24 : 28,
-            height: exportMode ? 24 : 28,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color,
-              boxShadow: [
-                BoxShadow(color: color.withValues(alpha: 0.48), blurRadius: 12),
-              ],
-              border: Border.all(color: Colors.white.withValues(alpha: 0.75)),
-            ),
-            child: Center(
-              child: Text(
-                player.shirtNumber == null
-                    ? player.initials
-                    : '${player.shirtNumber}',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: player.shirtNumber == null ? 9 : 10,
-                  fontWeight: FontWeight.w900,
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: exportMode ? 28 : 30,
+                height: exportMode ? 28 : 30,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color,
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.48),
+                      blurRadius: 12,
+                    ),
+                  ],
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.75),
+                  ),
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.clip,
+                child: Center(
+                  child: Text(
+                    player.shirtNumber == null
+                        ? player.initials
+                        : '${player.shirtNumber}',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: player.shirtNumber == null ? 10 : 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.clip,
+                  ),
+                ),
               ),
-            ),
+              if (player.isTemporary)
+                PositionedDirectional(
+                  top: -1,
+                  end: -1,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: AppColors.warning,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF0E3A29)),
+                    ),
+                  ),
+                ),
+            ],
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 4),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+            width: width,
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.48),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: color.withValues(alpha: 0.55)),
+              color: Colors.black.withValues(alpha: 0.58),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: color.withValues(alpha: 0.5)),
             ),
             child: Text(
               player.displayName,
               textAlign: TextAlign.center,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: Colors.white,
-                fontSize: exportMode ? 8 : 9,
+                fontSize: exportMode ? 9.8 : 10.5,
                 fontWeight: FontWeight.w800,
-                height: 1,
+                height: 1.08,
               ),
             ),
           ),
@@ -373,93 +407,40 @@ class _BenchStrip extends StatelessWidget {
     if (players.isEmpty) {
       return const SizedBox(height: 16);
     }
-    final visible = players.take(4).toList(growable: false);
+    final visible = players.take(6).toList(growable: false);
     final extra = players.length - visible.length;
+    final names = [
+      ...visible.map((player) => player.displayName),
+      if (extra > 0) '+$extra',
+    ].join('، ');
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.24),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
-      child: Row(
-        children: [
-          Text(
-            'البدلاء',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.72),
-              fontSize: exportMode ? 9 : 10,
-              fontWeight: FontWeight.w800,
+      child: Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: 'البدلاء: ',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.72),
+                fontWeight: FontWeight.w900,
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Wrap(
-              spacing: 5,
-              runSpacing: 5,
-              children: [
-                for (final player in visible)
-                  _BenchChip(player: player, exportMode: exportMode),
-                if (extra > 0)
-                  _ExtraBenchChip(extra: extra, exportMode: exportMode),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BenchChip extends StatelessWidget {
-  final LineupShareBenchPlayerData player;
-  final bool exportMode;
-
-  const _BenchChip({required this.player, required this.exportMode});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 74),
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        player.displayName,
-        maxLines: 1,
+            TextSpan(text: names),
+          ],
+        ),
+        maxLines: 2,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: Colors.white,
-          fontSize: exportMode ? 8 : 9,
+          fontSize: exportMode ? 10.5 : 11.5,
           fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-class _ExtraBenchChip extends StatelessWidget {
-  final int extra;
-  final bool exportMode;
-
-  const _ExtraBenchChip({required this.extra, required this.exportMode});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        '+$extra',
-        style: TextStyle(
-          color: AppColors.primaryLight,
-          fontSize: exportMode ? 8 : 9,
-          fontWeight: FontWeight.w900,
+          height: 1.25,
         ),
       ),
     );
@@ -487,7 +468,7 @@ class _Footer extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.58),
-              fontSize: exportMode ? 9 : 10,
+              fontSize: exportMode ? 10 : 11,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -497,7 +478,7 @@ class _Footer extends StatelessWidget {
           'EL7REEF  •  الحريف',
           style: TextStyle(
             color: AppColors.primaryLight,
-            fontSize: exportMode ? 10 : 12,
+            fontSize: exportMode ? 12 : 13,
             fontWeight: FontWeight.w900,
             letterSpacing: 0,
           ),
@@ -522,8 +503,8 @@ class _InfoChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: exportMode ? 8 : 9,
-        vertical: exportMode ? 4 : 5,
+        horizontal: exportMode ? 9 : 10,
+        vertical: exportMode ? 5 : 6,
       ),
       decoration: BoxDecoration(
         color: accent.withValues(alpha: 0.14),
@@ -534,7 +515,7 @@ class _InfoChip extends StatelessWidget {
         label,
         style: TextStyle(
           color: Colors.white.withValues(alpha: 0.88),
-          fontSize: exportMode ? 8 : 9,
+          fontSize: exportMode ? 9.5 : 10,
           fontWeight: FontWeight.w800,
         ),
       ),

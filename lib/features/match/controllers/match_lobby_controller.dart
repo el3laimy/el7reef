@@ -495,6 +495,129 @@ class MatchLobbyController extends GetxController {
   // GuestPlayer + TeamMembership flow.  The old addGuestPlayer() method
   // that created Player(isGuest: true) has been removed (Phase 4).
 
+  /// تعديل لاعب مؤقت (اسم، مركز، رقم قميص)
+  Future<void> editTemporaryPlayer({
+    required String sideKey,
+    required String playerId,
+    required String displayName,
+    String? position,
+    int? shirtNumber,
+  }) async {
+    final m = match.value;
+    final actorId = currentUserId;
+    final normalizedSide = sideKey.trim().toUpperCase();
+    final trimmedName = displayName.trim();
+    if (m == null) return;
+    if (actorId == null || actorId.isEmpty) {
+      Get.snackbar('غير مسموح', 'يجب تسجيل الدخول أولاً.');
+      return;
+    }
+    if (m.tournamentId != null) {
+      Get.snackbar('غير متاح', 'تعديل اللاعبين المؤقتين متاح للوديات فقط.');
+      return;
+    }
+    if (!isOrganizer) {
+      Get.snackbar('غير مسموح', 'منظم المباراة فقط يمكنه تعديل الأطراف.');
+      return;
+    }
+    if (m.status != MatchStatus.open && m.status != MatchStatus.full) {
+      Get.snackbar('غير متاح', 'لا يمكن تعديل اللاعبين بعد بدء المباراة.');
+      return;
+    }
+    if (trimmedName.isEmpty) {
+      Get.snackbar('بيانات ناقصة', 'اكتب اسم اللاعب المؤقت أولاً.');
+      return;
+    }
+
+    final sideView = _sideViewFor(normalizedSide);
+    final duplicateName =
+        sideView?.temporaryPlayers.any(
+          (p) => p.id != playerId && p.displayName.trim() == trimmedName,
+        ) ??
+        false;
+    if (duplicateName) {
+      Get.snackbar('موجود بالفعل', 'هذا الاسم موجود بالفعل في نفس الفريق.');
+      return;
+    }
+
+    try {
+      await _sidePlayerRepo.updateTemporaryPlayer(
+        playerId: playerId,
+        displayName: trimmedName,
+        position: position,
+        shirtNumber: shirtNumber,
+      );
+      await _loadSideViews(m);
+      Get.snackbar(
+        'تم التعديل ✏️',
+        'تم تحديث بيانات اللاعب المؤقت.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (e) {
+      AppLogger.error('MatchLobbyController.editTemporaryPlayer', e);
+      Get.snackbar('خطأ', _readableError(e));
+    }
+  }
+
+  /// حذف لاعب مؤقت من فريق
+  Future<void> removeTemporaryPlayerFromSide({
+    required String sideKey,
+    required String playerId,
+  }) async {
+    final m = match.value;
+    final actorId = currentUserId;
+    if (m == null) return;
+    if (actorId == null || actorId.isEmpty) {
+      Get.snackbar('غير مسموح', 'يجب تسجيل الدخول أولاً.');
+      return;
+    }
+    if (m.tournamentId != null) {
+      Get.snackbar('غير متاح', 'حذف اللاعبين المؤقتين متاح للوديات فقط.');
+      return;
+    }
+    if (!isOrganizer) {
+      Get.snackbar('غير مسموح', 'منظم المباراة فقط يمكنه تعديل الأطراف.');
+      return;
+    }
+    if (m.status != MatchStatus.open && m.status != MatchStatus.full) {
+      Get.snackbar('غير متاح', 'لا يمكن تعديل اللاعبين بعد بدء المباراة.');
+      return;
+    }
+
+    try {
+      await _sidePlayerRepo.removeTemporaryPlayer(playerId: playerId);
+      await _loadSideViews(m);
+      if (actorId.isNotEmpty) {
+        startReadiness.value = await _matchStartService.getStartReadiness(
+          matchId: matchId,
+          actorId: actorId,
+        );
+      }
+      Get.snackbar(
+        'تمت الإزالة 🗑️',
+        'تم حذف اللاعب المؤقت.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (e) {
+      AppLogger.error('MatchLobbyController.removeTemporaryPlayerFromSide', e);
+      Get.snackbar('خطأ', _readableError(e));
+    }
+  }
+
+  /// دعوة لاعب مؤقت للتسجيل (V1: مشاركة رسالة نصية مع رابط المباراة)
+  void inviteTemporaryPlayer({required MatchSidePlayer player}) {
+    final text =
+        '${player.displayName}، '
+        'أنت مسجل كلاعب مؤقت في المباراة. '
+        'سجّل في التطبيق وانضم:\n$inviteLink';
+    Clipboard.setData(ClipboardData(text: text));
+    Get.snackbar(
+      'تم النسخ 📋',
+      'تم نسخ رسالة الدعوة لـ ${player.displayName}',
+      snackPosition: SnackPosition.BOTTOM,
+    );
+  }
+
   /// إزالة لاعب من فريق
   Future<void> removePlayer(String playerId, String side) async {
     try {
