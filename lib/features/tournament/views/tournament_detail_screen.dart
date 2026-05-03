@@ -6,9 +6,12 @@ import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/constants/feature_flags.dart';
 import '../../../core/enums/tournament_enums.dart';
 import '../../../core/widgets/el7reef_button.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/services/tournament_top_scorers_resolver.dart';
+import '../../../domain/entities/participant_ref.dart';
 import '../../../domain/entities/tournament.dart';
 import '../../../services/auth_service.dart';
 import '../controllers/tournament_detail_controller.dart';
@@ -110,12 +113,19 @@ class TournamentDetailScreen extends GetView<TournamentDetailController> {
                         championLabel: controller.winnerDisplayName.value,
                       ).animate().fadeIn(delay: 180.ms),
                       const SizedBox(height: AppDimensions.md),
+                      _TopScorersSection(
+                        isLoading: controller.isLoadingTopScorers.value,
+                        errorMessage: controller.topScorersErrorMessage.value,
+                        scorers: controller.topScorers,
+                      ).animate().fadeIn(delay: 220.ms),
+                      const SizedBox(height: AppDimensions.md),
                       if (!isOrganizer &&
                           tournament.status == TournamentStatus.registration)
                         _RegisterTeamButton(
                           tournament: tournament,
                         ).animate().fadeIn(delay: 260.ms),
-                      if (tournament.isFantasyEnabled)
+                      if (FeatureFlags.fantasyUiEnabled &&
+                          tournament.isFantasyEnabled)
                         _FantasyLeagueButton(
                           tournament: tournament,
                         ).animate().fadeIn(delay: 300.ms),
@@ -133,6 +143,157 @@ class TournamentDetailScreen extends GetView<TournamentDetailController> {
       ),
     );
   }
+}
+
+class _TopScorersSection extends StatelessWidget {
+  final bool isLoading;
+  final String errorMessage;
+  final List<TournamentTopScorerEntry> scorers;
+
+  const _TopScorersSection({
+    required this.isLoading,
+    required this.errorMessage,
+    required this.scorers,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassmorphicContainer(
+      padding: const EdgeInsets.all(AppDimensions.md),
+      borderRadius: AppDimensions.radiusLg,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.sports_score_rounded, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Text('هدافو البطولة', style: AppTextStyles.titleMedium),
+            ],
+          ),
+          const SizedBox(height: AppDimensions.sm),
+          if (isLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: AppDimensions.md),
+              child: Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            )
+          else if (errorMessage.isNotEmpty)
+            Text(
+              errorMessage,
+              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error),
+            )
+          else if (scorers.isEmpty)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('لم يتم تسجيل هدافين بعد', style: AppTextStyles.bodyLarge),
+                const SizedBox(height: 4),
+                Text(
+                  'ستظهر هنا أهداف اللاعبين بعد تسجيل نتائج المباريات.',
+                  style: AppTextStyles.bodySmall,
+                ),
+              ],
+            )
+          else
+            ...scorers.indexed.map((item) {
+              final rank = item.$1 + 1;
+              final scorer = item.$2;
+              return _TopScorerRow(rank: rank, scorer: scorer);
+            }),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopScorerRow extends StatelessWidget {
+  final int rank;
+  final TournamentTopScorerEntry scorer;
+
+  const _TopScorerRow({required this.rank, required this.scorer});
+
+  @override
+  Widget build(BuildContext context) {
+    final actor = scorer.actor;
+    final goals = scorer.goals;
+    final isGuest = actor.kind == ParticipantRefKind.guestPlayer;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.primarySurface,
+              borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+            ),
+            child: Text(
+              '$rank',
+              style: AppTextStyles.labelLarge.copyWith(
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    actor.displayName,
+                    style: AppTextStyles.bodyLarge,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (isGuest) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(
+                        AppDimensions.radiusFull,
+                      ),
+                    ),
+                    child: Text(
+                      'ضيف',
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            _goalCountLabel(goals),
+            style: AppTextStyles.labelLarge.copyWith(color: AppColors.primary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _goalCountLabel(int goals) {
+  return goals == 1 ? '1 هدف' : '$goals أهداف';
 }
 
 class _InfoCard extends StatelessWidget {
@@ -307,7 +468,7 @@ class _OperationsSnapshot extends StatelessWidget {
                   AppRoutes.tournamentParticipantsById(tournament.id),
                 ),
                 icon: const Icon(Icons.groups_2_outlined),
-                label: const Text('Participants'),
+                label: const Text('المشاركون'),
               ),
               OutlinedButton.icon(
                 onPressed: tournament.currentGroupStageId == null
@@ -316,7 +477,7 @@ class _OperationsSnapshot extends StatelessWidget {
                         AppRoutes.tournamentGroupsById(tournament.id),
                       ),
                 icon: const Icon(Icons.grid_view_rounded),
-                label: const Text('Groups'),
+                label: const Text('المجموعات'),
               ),
               OutlinedButton.icon(
                 onPressed:
@@ -327,7 +488,7 @@ class _OperationsSnapshot extends StatelessWidget {
                         AppRoutes.tournamentFixturesById(tournament.id),
                       ),
                 icon: const Icon(Icons.calendar_month_rounded),
-                label: const Text('Fixtures'),
+                label: const Text('المباريات'),
               ),
               OutlinedButton.icon(
                 onPressed: tournament.currentGroupStageId == null
@@ -336,7 +497,7 @@ class _OperationsSnapshot extends StatelessWidget {
                         AppRoutes.tournamentStandingsById(tournament.id),
                       ),
                 icon: const Icon(Icons.leaderboard_rounded),
-                label: const Text('Standings'),
+                label: const Text('الترتيب'),
               ),
               OutlinedButton.icon(
                 onPressed: tournament.currentKnockoutBracketId == null
@@ -345,7 +506,7 @@ class _OperationsSnapshot extends StatelessWidget {
                         AppRoutes.tournamentBracketById(tournament.id),
                       ),
                 icon: const Icon(Icons.account_tree_outlined),
-                label: const Text('Bracket'),
+                label: const Text('الإقصاء'),
               ),
             ],
           ),
@@ -437,7 +598,7 @@ class _OrganizerPanel extends StatelessWidget {
               AppRoutes.organizerDashboardForTournament(tournament.id),
             ),
             icon: const Icon(Icons.dashboard_customize_rounded),
-            label: const Text('Tournament Operations Dashboard'),
+            label: const Text('لوحة تشغيل البطولة'),
           ),
           const SizedBox(height: AppDimensions.sm),
           OutlinedButton.icon(
@@ -448,13 +609,16 @@ class _OrganizerPanel extends StatelessWidget {
             label: const Text('إدارة التسجيلات'),
           ),
           const SizedBox(height: AppDimensions.sm),
-          OutlinedButton.icon(
-            onPressed: () =>
-                Get.toNamed(AppRoutes.tournamentAssistantsById(tournament.id)),
-            icon: const Icon(Icons.manage_accounts_rounded),
-            label: const Text('إدارة المساعدين'),
-          ),
-          const SizedBox(height: AppDimensions.sm),
+          if (FeatureFlags.organizerAdvancedOpsEnabled) ...[
+            OutlinedButton.icon(
+              onPressed: () => Get.toNamed(
+                AppRoutes.tournamentAssistantsById(tournament.id),
+              ),
+              icon: const Icon(Icons.manage_accounts_rounded),
+              label: const Text('إدارة المساعدين'),
+            ),
+            const SizedBox(height: AppDimensions.sm),
+          ],
           Text(
             'عمليات المراحل والتوليد والنشر والإغلاق أصبحت من dashboard التشغيلية فقط لتفادي status flips غير آمنة.',
             style: AppTextStyles.bodySmall.copyWith(color: AppColors.textMuted),

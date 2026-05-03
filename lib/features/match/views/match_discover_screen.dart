@@ -5,6 +5,7 @@ import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/constants/feature_flags.dart';
 import '../../../core/enums/match_status.dart';
 import '../../../core/lineup/formation_library.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
@@ -21,8 +22,10 @@ class MatchDiscoverScreen extends GetView<MatchController> {
 
   @override
   Widget build(BuildContext context) {
+    final challengesEnabled = FeatureFlags.challengesUiEnabled;
+
     return DefaultTabController(
-      length: 3,
+      length: challengesEnabled ? 3 : 2,
       child: Scaffold(
         appBar: AppBar(
           title: Row(
@@ -41,11 +44,11 @@ class MatchDiscoverScreen extends GetView<MatchController> {
               },
             ),
           ],
-          bottom: const TabBar(
+          bottom: TabBar(
             tabs: [
-              Tab(text: 'مبارياتي'),
-              Tab(text: 'اكتشاف'),
-              Tab(text: 'التحديات'),
+              const Tab(text: 'مبارياتي'),
+              const Tab(text: 'اكتشاف'),
+              if (challengesEnabled) const Tab(text: 'التحديات'),
             ],
             indicatorColor: AppColors.primary,
             labelColor: AppColors.primary,
@@ -55,8 +58,12 @@ class MatchDiscoverScreen extends GetView<MatchController> {
           decoration: const BoxDecoration(
             gradient: AppColors.backgroundGradient,
           ),
-          child: const TabBarView(
-            children: [_MyMatchesTab(), _DiscoverTab(), _ChallengesTab()],
+          child: TabBarView(
+            children: [
+              const _MyMatchesTab(),
+              const _DiscoverTab(),
+              if (challengesEnabled) const _ChallengesTab(),
+            ],
           ),
         ),
       ),
@@ -346,7 +353,8 @@ class _MatchCard extends StatelessWidget {
                 children: [
                   _StatusBadge(status: match.status),
                   const Spacer(),
-                  if (match.isGoldenRating)
+                  if (FeatureFlags.goldenRatingUiEnabled &&
+                      match.isGoldenRating)
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
@@ -504,15 +512,16 @@ class _MatchCard extends StatelessWidget {
                       ),
                       tooltip: 'تجميد',
                     ),
-                    IconButton(
-                      onPressed: () =>
-                          controller.activateGoldenRating(match.id),
-                      icon: const Icon(
-                        Icons.star_outline,
-                        color: AppColors.secondary,
+                    if (FeatureFlags.goldenRatingUiEnabled)
+                      IconButton(
+                        onPressed: () =>
+                            controller.activateGoldenRating(match.id),
+                        icon: const Icon(
+                          Icons.star_outline,
+                          color: AppColors.secondary,
+                        ),
+                        tooltip: 'تقييم ذهبي',
                       ),
-                      tooltip: 'تقييم ذهبي',
-                    ),
                   ],
                 ),
 

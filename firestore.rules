@@ -354,6 +354,71 @@ service cloud.firestore {
           .data.ownerPlayerId == request.auth.uid;
     }
 
+    function hasValidMatchEventActor(data) {
+      return data.actor is map &&
+        data.actor.keys().hasOnly([
+          'kind',
+          'id',
+          'displayName',
+          'linkedPlayerId'
+        ]) &&
+        data.actor.kind in ['player', 'guestPlayer', 'matchSidePlayer'] &&
+        data.actor.id is string &&
+        data.actor.id.size() > 0 &&
+        data.actor.displayName is string &&
+        data.actor.displayName.size() > 0 &&
+        (
+          !data.actor.keys().hasAny(['linkedPlayerId']) ||
+          data.actor.linkedPlayerId == null ||
+          data.actor.linkedPlayerId is string
+        );
+    }
+
+    function hasValidMatchEventOptionalFields(data) {
+      return (
+          !data.keys().hasAny(['tournamentId']) ||
+          data.tournamentId == null ||
+          data.tournamentId is string
+        ) &&
+        (
+          !data.keys().hasAny(['minute']) ||
+          data.minute == null ||
+          data.minute is int
+        );
+    }
+
+    function canCreateMatchEvent(data) {
+      return isAuthenticated() &&
+        data.keys().hasOnly([
+          'matchId',
+          'tournamentId',
+          'eventType',
+          'sideKey',
+          'actor',
+          'minute',
+          'createdBy',
+          'createdAt',
+          'status'
+        ]) &&
+        data.createdBy == request.auth.uid &&
+        data.matchId is string &&
+        data.eventType in ['goal', 'mvp'] &&
+        data.sideKey in ['A', 'B'] &&
+        data.createdAt is int &&
+        data.status == 'active' &&
+        hasValidMatchEventActor(data) &&
+        hasValidMatchEventOptionalFields(data);
+    }
+
+    function canVoidMatchEvent() {
+      return isAuthenticated() &&
+        resource.data.createdBy == request.auth.uid &&
+        resource.data.status == 'active' &&
+        request.resource.data.status == 'voided' &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status']);
+    }
+
     match /players/{playerId} {
       allow read: if isAuthenticated();
       allow create: if isOwner(playerId);
@@ -433,6 +498,13 @@ service cloud.firestore {
         allow create, update: if isMatchOrganizerById(matchId);
         allow delete: if false;
       }
+    }
+
+    match /matchEvents/{eventId} {
+      allow read: if isAuthenticated();
+      allow create: if canCreateMatchEvent(request.resource.data);
+      allow update: if canVoidMatchEvent();
+      allow delete: if false;
     }
 
     match /matchCheckIns/{checkInId} {

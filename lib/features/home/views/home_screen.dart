@@ -20,7 +20,7 @@ import '../../team/views/my_teams_screen.dart';
 
 import '../../social/widgets/activity_feed_widget.dart';
 
-/// الشاشة الرئيسية — Hub مع Bottom Navigation
+/// الشاشة الرئيسية — V1 Tournament-first hub with secondary loops preserved.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -38,9 +38,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   late final List<Widget> _pages = [
-    _HomeTab(onNavigateToTab: (i) => setState(() => _currentIndex = i)),
-    const MatchDiscoverScreen(),
-    const TournamentListScreen(),
+    if (FeatureFlags.friendlyMatchTopLevelEnabled)
+      _HomeTab(onNavigateToTab: (i) => setState(() => _currentIndex = i)),
+    if (FeatureFlags.friendlyMatchTopLevelEnabled)
+      const MatchDiscoverScreen()
+    else
+      const TournamentListScreen(),
+    if (FeatureFlags.friendlyMatchTopLevelEnabled)
+      const TournamentListScreen()
+    else
+      const MatchDiscoverScreen(),
     const MyTeamsScreen(),
     const ProfileScreen(),
   ];
@@ -48,10 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _pages),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: AppColors.surface,
@@ -67,31 +71,32 @@ class _HomeScreenState extends State<HomeScreen> {
           unselectedItemColor: AppColors.textMuted,
           type: BottomNavigationBarType.fixed,
           elevation: 0,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home_rounded),
-              label: 'الرئيسية',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.explore_outlined),
-              activeIcon: Icon(Icons.explore_rounded),
-              label: 'اكتشاف',
-            ),
+          items: [
+            if (FeatureFlags.friendlyMatchTopLevelEnabled)
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.home_outlined),
+                activeIcon: Icon(Icons.home_rounded),
+                label: 'الرئيسية',
+              ),
             BottomNavigationBarItem(
               icon: Icon(Icons.emoji_events_outlined),
               activeIcon: Icon(Icons.emoji_events_rounded),
-              label: 'دورات',
+              label: 'البطولات',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.sports_soccer_outlined),
+              activeIcon: Icon(Icons.sports_soccer_rounded),
+              label: 'المباريات',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.group_outlined),
               activeIcon: Icon(Icons.group_rounded),
-              label: 'فرقي',
+              label: 'الفرق',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
               activeIcon: Icon(Icons.person_rounded),
-              label: 'بروفايل',
+              label: 'أنا',
             ),
           ],
         ),
@@ -125,349 +130,400 @@ class _HomeTab extends StatelessWidget {
             },
             color: AppColors.primary,
             child: CustomScrollView(
-             slivers: [
-              // ── Header ──
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppDimensions.pagePadding),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.asset(
-                                'assets/images/logo_icon.png',
-                                height: 36,
-                                width: 36,
-                                fit: BoxFit.cover,
+              slivers: [
+                // ── Header ──
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppDimensions.pagePadding),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.asset(
+                                  'assets/images/logo_icon.png',
+                                  height: 36,
+                                  width: 36,
+                                  fit: BoxFit.cover,
+                                ),
                               ),
+                              const SizedBox(height: AppDimensions.sm),
+                              Text(
+                                'أهلاً ${player?.name ?? 'يا حريف'} 👋',
+                                style: AppTextStyles.headlineMedium,
+                              ),
+                              Text(
+                                'جاهز للملعب النهارده؟',
+                                style: AppTextStyles.bodyMedium,
+                              ),
+                            ],
+                          ),
+                        ).animate().fadeIn(duration: 500.ms),
+                        const SizedBox(width: AppDimensions.sm),
+                        if (player != null) ...[
+                          RankTierBadge(
+                            rating: player.rating,
+                          ).animate().fadeIn(delay: 200.ms),
+                          const SizedBox(width: AppDimensions.sm),
+                          CircleAvatar(
+                            radius: 22,
+                            backgroundColor: AppColors.primarySurface,
+                            backgroundImage: player.photoThumbUrl != null
+                                ? NetworkImage(player.photoThumbUrl!)
+                                : null,
+                            child: player.photoThumbUrl == null
+                                ? const Icon(
+                                    Icons.person,
+                                    color: AppColors.primary,
+                                    size: 22,
+                                  )
+                                : null,
+                          ).animate().fadeIn(delay: 300.ms),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+
+                // ── بطاقة Rating السريعة ──
+                if (player != null)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppDimensions.pagePadding,
+                      ),
+                      child: GlassmorphicContainer(
+                        padding: const EdgeInsets.all(AppDimensions.lg),
+                        borderRadius: AppDimensions.radiusLg,
+                        child: Row(
+                          children: [
+                            // Rating
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'تقييمك الحالي',
+                                  style: AppTextStyles.labelMedium,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${player.rating}',
+                                  style: AppTextStyles.ratingLarge.copyWith(
+                                    fontSize: 36,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: AppDimensions.sm),
-                            Text(
-                              'أهلاً ${player?.name ?? 'يا حريف'} 👋',
-                              style: AppTextStyles.headlineMedium,
+                            const Spacer(),
+                            // Stats مصغرة
+                            Column(
+                              children: [
+                                _miniStat('${player.totalMatches}', 'مباراة'),
+                                const SizedBox(height: 8),
+                                _miniStat('${player.wins}', 'فوز'),
+                              ],
                             ),
-                            Text(
-                              'جاهز للملعب النهارده؟',
-                              style: AppTextStyles.bodyMedium,
+                            const SizedBox(width: AppDimensions.lg),
+                            Column(
+                              children: [
+                                _miniStat('${player.mvpCount}', 'MVP'),
+                                const SizedBox(height: 8),
+                                _miniStat(
+                                  '${player.winRate.toStringAsFixed(0)}%',
+                                  'نسبة',
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ).animate().fadeIn(duration: 500.ms),
-                      const SizedBox(width: AppDimensions.sm),
-                      if (player != null) ...[                        
-                        RankTierBadge(rating: player.rating)
-                            .animate()
-                            .fadeIn(delay: 200.ms),
-                        const SizedBox(width: AppDimensions.sm),
-                        CircleAvatar(
-                          radius: 22,
-                          backgroundColor: AppColors.primarySurface,
-                          backgroundImage: player.photoThumbUrl != null
-                              ? NetworkImage(player.photoThumbUrl!)
-                              : null,
-                          child: player.photoThumbUrl == null
-                              ? const Icon(Icons.person, color: AppColors.primary, size: 22)
-                              : null,
-                        ).animate().fadeIn(delay: 300.ms),
+                      ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.1),
+                    ),
+                  ),
+
+                // ── Quick Actions ──
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppDimensions.pagePadding),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'إجراءات سريعة',
+                          style: AppTextStyles.titleLarge,
+                        ).animate().fadeIn(delay: 400.ms),
+                        const SizedBox(height: AppDimensions.md),
+                        Row(
+                          children: [
+                            _actionCard(
+                              '⚽',
+                              'المباريات',
+                              AppColors.primary,
+                              () => onNavigateToTab(1),
+                            ),
+                            const SizedBox(width: AppDimensions.md),
+                            _actionCard(
+                              '🏆',
+                              'البطولات',
+                              AppColors.secondary,
+                              () => onNavigateToTab(2),
+                            ),
+                            const SizedBox(width: AppDimensions.md),
+                            _actionCard(
+                              '👥',
+                              'فرقي',
+                              AppColors.accent,
+                              () => onNavigateToTab(3),
+                            ),
+                          ],
+                        ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.1),
+                        const SizedBox(height: AppDimensions.md),
+                        if (FeatureFlags.fantasyUiEnabled) ...[
+                          Row(
+                            children: [
+                              _actionCard(
+                                '✨',
+                                'فانتازي\nليج',
+                                AppColors.secondary,
+                                () => Get.toNamed(AppRoutes.fantasyHome),
+                              ),
+                              const SizedBox(width: AppDimensions.md),
+                              Expanded(
+                                flex: 2,
+                                child: GlassmorphicContainer(
+                                  padding: const EdgeInsets.all(
+                                    AppDimensions.md,
+                                  ),
+                                  borderRadius: AppDimensions.radiusLg,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'ابدأ فانتازي الحريف',
+                                        style: AppTextStyles.titleMedium,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'ابنِ تشكيلتك وادخل سباق النقاط في الدوري العالمي أو البطولات المفعّل عليها الفانتازي.',
+                                        style: AppTextStyles.bodySmall,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ).animate().fadeIn(delay: 560.ms).slideY(begin: 0.1),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
-              ),
 
-              // ── بطاقة Rating السريعة ──
-              if (player != null)
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: AppDimensions.sm),
+                ),
+
+                // ── Activity Feed ──
+                if (FeatureFlags.activityFeedEnabled)
+                  const SliverToBoxAdapter(child: ActivityFeedWidget()),
+
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: AppDimensions.lg),
+                ),
+
+                // ── المباريات الجارية ──
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppDimensions.pagePadding,
+                      0,
+                      AppDimensions.pagePadding,
+                      AppDimensions.sm,
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          'المباريات الجارية',
+                          style: AppTextStyles.titleLarge,
+                        ).animate().fadeIn(delay: 500.ms),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: () => onNavigateToTab(1),
+                          child: Text(
+                            'عرض الكل',
+                            style: AppTextStyles.labelMedium.copyWith(
+                              color: AppColors.primary,
+                            ),
+                          ).animate().fadeIn(delay: 500.ms),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // ── قائمة المباريات الحية ──
+                SliverToBoxAdapter(
+                  child: Obx(() {
+                    final matchCtrl = Get.find<MatchController>();
+                    final liveMatches = matchCtrl.liveMatches;
+
+                    if (matchCtrl.isLoading.value && liveMatches.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppDimensions.pagePadding,
+                        ),
+                        child: LoadingShimmer.list(count: 2),
+                      );
+                    }
+
+                    if (liveMatches.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppDimensions.pagePadding,
+                        ),
+                        child: GlassmorphicContainer(
+                          padding: const EdgeInsets.all(AppDimensions.lg),
+                          borderRadius: AppDimensions.radiusLg,
+                          child: Row(
+                            children: [
+                              const Text('⚽', style: TextStyle(fontSize: 32)),
+                              const SizedBox(width: AppDimensions.md),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'ما فيش مباريات جارية',
+                                      style: AppTextStyles.titleMedium,
+                                    ),
+                                    Text(
+                                      'كن أول من يبدأ!',
+                                      style: AppTextStyles.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ).animate().fadeIn(delay: 600.ms),
+                      );
+                    }
+
+                    return SizedBox(
+                      height: 130,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppDimensions.pagePadding,
+                        ),
+                        itemCount: liveMatches.length.clamp(0, 5),
+                        itemBuilder: (context, index) {
+                          final match = liveMatches[index];
+                          return GestureDetector(
+                            onTap: () =>
+                                Get.toNamed('/match/lobby/${match.id}'),
+                            child: _LiveMatchCard(match: match, index: index),
+                          );
+                        },
+                      ),
+                    );
+                  }),
+                ),
+
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: AppDimensions.md),
+                ),
+
+                // ── آخر مباراياتي ──
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppDimensions.pagePadding,
                     ),
-                    child: GlassmorphicContainer(
-                      padding: const EdgeInsets.all(AppDimensions.lg),
-                      borderRadius: AppDimensions.radiusLg,
-                      child: Row(
-                        children: [
-                          // Rating
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('تقييمك الحالي',
-                                  style: AppTextStyles.labelMedium),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${player.rating}',
-                                style: AppTextStyles.ratingLarge.copyWith(fontSize: 36),
-                              ),
-                            ],
-                          ),
-                          const Spacer(),
-                          // Stats مصغرة
-                          Column(
-                            children: [
-                              _miniStat('${player.totalMatches}', 'مباراة'),
-                              const SizedBox(height: 8),
-                              _miniStat('${player.wins}', 'فوز'),
-                            ],
-                          ),
-                          const SizedBox(width: AppDimensions.lg),
-                          Column(
-                            children: [
-                              _miniStat('${player.mvpCount}', 'MVP'),
-                              const SizedBox(height: 8),
-                              _miniStat(
-                                '${player.winRate.toStringAsFixed(0)}%',
-                                'نسبة',
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.1),
+                    child: Text(
+                      'آخر مبارياتي',
+                      style: AppTextStyles.titleLarge,
+                    ).animate().fadeIn(delay: 600.ms),
                   ),
                 ),
-
-              // ── Quick Actions ──
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppDimensions.pagePadding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('إجراءات سريعة',
-                              style: AppTextStyles.titleLarge)
-                          .animate()
-                          .fadeIn(delay: 400.ms),
-                      const SizedBox(height: AppDimensions.md),
-                      Row(
-                        children: [
-                          _actionCard(
-                            '⚽', 'المباريات', AppColors.primary,
-                            () => onNavigateToTab(1),
-                          ),
-                          const SizedBox(width: AppDimensions.md),
-                          _actionCard(
-                            '🏆', 'البطولات', AppColors.secondary,
-                            () => onNavigateToTab(2),
-                          ),
-                          const SizedBox(width: AppDimensions.md),
-                          _actionCard(
-                            '👥', 'فرقي', AppColors.accent,
-                            () => onNavigateToTab(3),
-                          ),
-                        ],
-                      ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.1),
-                      const SizedBox(height: AppDimensions.md),
-                      if (FeatureFlags.fantasyUiEnabled) ...[
-                      Row(
-                        children: [
-                          _actionCard(
-                            '✨', 'فانتازي\nليج', AppColors.secondary,
-                            () => Get.toNamed(AppRoutes.fantasyHome),
-                          ),
-                          const SizedBox(width: AppDimensions.md),
-                          Expanded(
-                            flex: 2,
-                            child: GlassmorphicContainer(
-                              padding: const EdgeInsets.all(AppDimensions.md),
-                              borderRadius: AppDimensions.radiusLg,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'ابدأ فانتازي الحريف',
-                                    style: AppTextStyles.titleMedium,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'ابنِ تشكيلتك وادخل سباق النقاط في الدوري العالمي أو البطولات المفعّل عليها الفانتازي.',
-                                    style: AppTextStyles.bodySmall,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ).animate().fadeIn(delay: 560.ms).slideY(begin: 0.1),
-                      ],
-                    ],
-                  ),
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: AppDimensions.sm),
                 ),
-              ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: AppDimensions.sm)),
+                SliverToBoxAdapter(
+                  child: Obx(() {
+                    final matchCtrl = Get.find<MatchController>();
+                    final myMatches = matchCtrl.myMatches;
 
-              // ── Activity Feed ──
-              const SliverToBoxAdapter(
-                child: ActivityFeedWidget(),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: AppDimensions.lg)),
-
-              // ── المباريات الجارية ──
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppDimensions.pagePadding, 0,
-                    AppDimensions.pagePadding, AppDimensions.sm,
-                  ),
-                  child: Row(
-                    children: [
-                      Text('المباريات الجارية', style: AppTextStyles.titleLarge)
-                          .animate().fadeIn(delay: 500.ms),
-                      const Spacer(),
-                      GestureDetector(
-                        onTap: () => onNavigateToTab(1),
-                        child: Text('عرض الكل',
-                            style: AppTextStyles.labelMedium.copyWith(
-                              color: AppColors.primary,
-                            )).animate().fadeIn(delay: 500.ms),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // ── قائمة المباريات الحية ──
-              SliverToBoxAdapter(
-                child: Obx(() {
-                  final matchCtrl = Get.find<MatchController>();
-                  final liveMatches = matchCtrl.liveMatches;
-
-                  if (matchCtrl.isLoading.value && liveMatches.isEmpty) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
-                      child: LoadingShimmer.list(count: 2),
-                    );
-                  }
-
-                  if (liveMatches.isEmpty) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppDimensions.pagePadding,
-                      ),
-                      child: GlassmorphicContainer(
-                        padding: const EdgeInsets.all(AppDimensions.lg),
-                        borderRadius: AppDimensions.radiusLg,
-                        child: Row(
-                          children: [
-                            const Text('⚽', style: TextStyle(fontSize: 32)),
-                            const SizedBox(width: AppDimensions.md),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('ما فيش مباريات جارية',
-                                      style: AppTextStyles.titleMedium),
-                                  Text('كن أول من يبدأ!',
-                                      style: AppTextStyles.bodySmall),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ).animate().fadeIn(delay: 600.ms),
-                    );
-                  }
-
-                  return SizedBox(
-                    height: 130,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppDimensions.pagePadding,
-                      ),
-                      itemCount: liveMatches.length.clamp(0, 5),
-                      itemBuilder: (context, index) {
-                        final match = liveMatches[index];
-                        return GestureDetector(
-                          onTap: () => Get.toNamed('/match/lobby/${match.id}'),
-                          child: _LiveMatchCard(match: match, index: index),
-                        );
-                      },
-                    ),
-                  );
-                }),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: AppDimensions.md)),
-
-              // ── آخر مباراياتي ──
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppDimensions.pagePadding,
-                  ),
-                  child: Text('آخر مبارياتي', style: AppTextStyles.titleLarge)
-                      .animate().fadeIn(delay: 600.ms),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: AppDimensions.sm)),
-
-              SliverToBoxAdapter(
-                child: Obx(() {
-                  final matchCtrl = Get.find<MatchController>();
-                  final myMatches = matchCtrl.myMatches;
-
-                  if (matchCtrl.isLoading.value && myMatches.isEmpty) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
-                      child: LoadingShimmer.list(count: 2),
-                    );
-                  }
-
-                  if (myMatches.isEmpty) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppDimensions.pagePadding,
-                      ),
-                      child: GlassmorphicContainer(
-                        padding: const EdgeInsets.all(AppDimensions.lg),
-                        borderRadius: AppDimensions.radiusLg,
-                        child: Row(
-                          children: [
-                            const Text('📋', style: TextStyle(fontSize: 32)),
-                            const SizedBox(width: AppDimensions.md),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('ماعندكش مباريات لسه',
-                                      style: AppTextStyles.titleMedium),
-                                  Text('العب أول مباراة وابدأ رحلتك!',
-                                      style: AppTextStyles.bodySmall),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ).animate().fadeIn(delay: 700.ms),
-                    );
-                  }
-
-                  return Column(
-                    children: myMatches.take(3).toList().asMap().entries.map((e) {
+                    if (matchCtrl.isLoading.value && myMatches.isEmpty) {
                       return Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppDimensions.pagePadding, 0,
-                          AppDimensions.pagePadding, AppDimensions.sm,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppDimensions.pagePadding,
                         ),
-                        child: GestureDetector(
-                          onTap: () => Get.toNamed('/match/lobby/${e.value.id}'),
-                          child: _MyMatchCard(match: e.value, index: e.key),
-                        ),
+                        child: LoadingShimmer.list(count: 2),
                       );
-                    }).toList(),
-                  );
-                }),
-              ),
+                    }
 
-            ],
-          ),  // CustomScrollView
-          );  // RefreshIndicator
+                    if (myMatches.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppDimensions.pagePadding,
+                        ),
+                        child: GlassmorphicContainer(
+                          padding: const EdgeInsets.all(AppDimensions.lg),
+                          borderRadius: AppDimensions.radiusLg,
+                          child: Row(
+                            children: [
+                              const Text('📋', style: TextStyle(fontSize: 32)),
+                              const SizedBox(width: AppDimensions.md),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'ماعندكش مباريات لسه',
+                                      style: AppTextStyles.titleMedium,
+                                    ),
+                                    Text(
+                                      'العب أول مباراة وابدأ رحلتك!',
+                                      style: AppTextStyles.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ).animate().fadeIn(delay: 700.ms),
+                      );
+                    }
+
+                    return Column(
+                      children: myMatches.take(3).toList().asMap().entries.map((
+                        e,
+                      ) {
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppDimensions.pagePadding,
+                            0,
+                            AppDimensions.pagePadding,
+                            AppDimensions.sm,
+                          ),
+                          child: GestureDetector(
+                            onTap: () =>
+                                Get.toNamed('/match/lobby/${e.value.id}'),
+                            child: _MyMatchCard(match: e.value, index: e.key),
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  }),
+                ),
+              ],
+            ), // CustomScrollView
+          ); // RefreshIndicator
         }),
       ),
     );
@@ -476,15 +532,21 @@ class _HomeTab extends StatelessWidget {
   Widget _miniStat(String value, String label) {
     return Column(
       children: [
-        Text(value,
-            style: AppTextStyles.titleLarge.copyWith(color: AppColors.primary)),
+        Text(
+          value,
+          style: AppTextStyles.titleLarge.copyWith(color: AppColors.primary),
+        ),
         Text(label, style: AppTextStyles.labelSmall),
       ],
     );
   }
 
   Widget _actionCard(
-      String emoji, String label, Color color, VoidCallback onTap) {
+    String emoji,
+    String label,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
@@ -512,9 +574,6 @@ class _HomeTab extends StatelessWidget {
   }
 }
 
-
-
-
 // ── بطاقة المباراة الجارية (أفقية - Carousel) ──
 class _LiveMatchCard extends StatelessWidget {
   final Match match;
@@ -527,103 +586,114 @@ class _LiveMatchCard extends StatelessWidget {
     final Color statusColor = match.status == MatchStatus.live
         ? AppColors.primary
         : match.status == MatchStatus.open
-            ? AppColors.success
-            : AppColors.textMuted;
+        ? AppColors.success
+        : AppColors.textMuted;
     final matchController = Get.find<MatchController>();
 
     return Container(
-      width: 200,
-      margin: const EdgeInsetsDirectional.only(end: AppDimensions.sm),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-        border: Border.all(
-          color: statusColor.withValues(alpha: 0.35),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: statusColor.withValues(alpha: 0.12),
-            blurRadius: 10,
-            spreadRadius: 1,
+          width: 200,
+          margin: const EdgeInsetsDirectional.only(end: AppDimensions.sm),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+            border: Border.all(
+              color: statusColor.withValues(alpha: 0.35),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: statusColor.withValues(alpha: 0.12),
+                blurRadius: 10,
+                spreadRadius: 1,
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // حالة المباراة
-            Row(
+          child: Padding(
+            padding: const EdgeInsets.all(AppDimensions.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: statusColor,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  match.status == MatchStatus.live
-                      ? 'جارية الآن'
-                      : match.status == MatchStatus.open
+                // حالة المباراة
+                Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: statusColor,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      match.status == MatchStatus.live
+                          ? 'جارية الآن'
+                          : match.status == MatchStatus.open
                           ? 'مفتوحة'
                           : 'منتهية',
-                  style: AppTextStyles.labelSmall.copyWith(color: statusColor),
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: statusColor,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (match.isGoldenRating)
+                      const Icon(
+                        Icons.star_rounded,
+                        color: AppColors.secondary,
+                        size: 16,
+                      ),
+                  ],
                 ),
-                const Spacer(),
-                if (match.isGoldenRating)
-                  const Icon(Icons.star_rounded,
-                      color: AppColors.secondary, size: 16),
-              ],
-            ),
 
-            // الفريقان والنتيجة
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('🔵', style: const TextStyle(fontSize: 22)),
-                const SizedBox(width: 6),
-                match.isCompleted && match.scoreTeamA != null
-                    ? Text(
-                        '${match.scoreTeamA} - ${match.scoreTeamB}',
-                        style: AppTextStyles.titleLarge.copyWith(
-                          color: AppColors.textPrimary,
-                        ),
-                      )
-                    : Text('vs', style: AppTextStyles.titleMedium),
-                const SizedBox(width: 6),
-                Text('🔴', style: const TextStyle(fontSize: 22)),
-              ],
-            ),
-
-            // تفاصيل
-            Row(
-              children: [
-                Icon(Icons.people_outline, size: 14, color: AppColors.textMuted),
-                const SizedBox(width: 4),
-                Obx(
-                  () => Text(
-                    matchController.totalParticipantCountLabel(match),
-                    style: AppTextStyles.labelSmall,
-                  ),
+                // الفريقان والنتيجة
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('🔵', style: const TextStyle(fontSize: 22)),
+                    const SizedBox(width: 6),
+                    match.isCompleted && match.scoreTeamA != null
+                        ? Text(
+                            '${match.scoreTeamA} - ${match.scoreTeamB}',
+                            style: AppTextStyles.titleLarge.copyWith(
+                              color: AppColors.textPrimary,
+                            ),
+                          )
+                        : Text('vs', style: AppTextStyles.titleMedium),
+                    const SizedBox(width: 6),
+                    Text('🔴', style: const TextStyle(fontSize: 22)),
+                  ],
                 ),
-                const Spacer(),
-                if (match.isFrozen)
-                  const Icon(Icons.lock, size: 14, color: AppColors.error),
+
+                // تفاصيل
+                Row(
+                  children: [
+                    Icon(
+                      Icons.people_outline,
+                      size: 14,
+                      color: AppColors.textMuted,
+                    ),
+                    const SizedBox(width: 4),
+                    Obx(
+                      () => Text(
+                        matchController.totalParticipantCountLabel(match),
+                        style: AppTextStyles.labelSmall,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (match.isFrozen)
+                      const Icon(Icons.lock, size: 14, color: AppColors.error),
+                  ],
+                ),
               ],
             ),
-          ],
-        ),
-      ),
-    ).animate(delay: (100 * index).ms).fadeIn(duration: 400.ms).slideX(begin: 0.2);
+          ),
+        )
+        .animate(delay: (100 * index).ms)
+        .fadeIn(duration: 400.ms)
+        .slideX(begin: 0.2);
   }
 }
-
 
 // ── بطاقة مبارياتي الأخيرة ──
 class _MyMatchCard extends StatelessWidget {
@@ -659,70 +729,81 @@ class _MyMatchCard extends StatelessWidget {
     }
 
     return GlassmorphicContainer(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimensions.md,
-        vertical: AppDimensions.sm,
-      ),
-      borderRadius: AppDimensions.radiusMd,
-      child: Row(
-        children: [
-          // أيقونة النتيجة
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: resultColor.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-              border: Border.all(color: resultColor.withValues(alpha: 0.4)),
-            ),
-            child: Center(
-              child: Text(
-                resultLabel == 'فوز' ? '🏆' : resultLabel == 'خسارة' ? '😤' : '🤝',
-                style: const TextStyle(fontSize: 20),
-              ),
-            ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppDimensions.md,
+            vertical: AppDimensions.sm,
           ),
-          const SizedBox(width: AppDimensions.md),
+          borderRadius: AppDimensions.radiusMd,
+          child: Row(
+            children: [
+              // أيقونة النتيجة
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: resultColor.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: resultColor.withValues(alpha: 0.4)),
+                ),
+                child: Center(
+                  child: Text(
+                    resultLabel == 'فوز'
+                        ? '🏆'
+                        : resultLabel == 'خسارة'
+                        ? '😤'
+                        : '🤝',
+                    style: const TextStyle(fontSize: 20),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppDimensions.md),
 
-          // معلومات المباراة
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  match.status == MatchStatus.settled
-                      ? 'مباراة منتهية'
-                      : match.status == MatchStatus.live
+              // معلومات المباراة
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      match.status == MatchStatus.settled
+                          ? 'مباراة منتهية'
+                          : match.status == MatchStatus.live
                           ? 'مباراة جارية'
                           : 'قيد التسوية',
-                  style: AppTextStyles.titleMedium,
+                      style: AppTextStyles.titleMedium,
+                    ),
+                    Text(
+                      _formatDate(match.createdAt),
+                      style: AppTextStyles.labelSmall,
+                    ),
+                  ],
                 ),
-                Text(
-                  _formatDate(match.createdAt),
-                  style: AppTextStyles.labelSmall,
-                ),
-              ],
-            ),
-          ),
+              ),
 
-          // النتيجة
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (myScore != null)
-                Text(
-                  '$myScore - $oppScore',
-                  style: AppTextStyles.titleLarge.copyWith(color: resultColor),
-                ),
-              Text(
-                resultLabel,
-                style: AppTextStyles.labelSmall.copyWith(color: resultColor),
+              // النتيجة
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (myScore != null)
+                    Text(
+                      '$myScore - $oppScore',
+                      style: AppTextStyles.titleLarge.copyWith(
+                        color: resultColor,
+                      ),
+                    ),
+                  Text(
+                    resultLabel,
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: resultColor,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
-    ).animate(delay: (120 * index).ms).fadeIn(duration: 400.ms).slideY(begin: 0.1);
+        )
+        .animate(delay: (120 * index).ms)
+        .fadeIn(duration: 400.ms)
+        .slideY(begin: 0.1);
   }
 
   String _formatDate(DateTime date) {

@@ -12,18 +12,22 @@ import 'package:el7reef/core/services/match_settlement_service.dart';
 import 'package:el7reef/core/services/tournament_lifecycle_service.dart';
 import 'package:el7reef/core/services/tournament_registration_service.dart';
 import 'package:el7reef/core/constants/firebase_paths.dart';
+import 'package:el7reef/data/models/guest_player_model.dart';
 import 'package:el7reef/data/models/match_check_in_model.dart';
 import 'package:el7reef/data/models/match_lineup_snapshot_model.dart';
+import 'package:el7reef/data/models/match_side_player_model.dart';
 import 'package:el7reef/data/repositories/group_standing_snapshot_repository_impl.dart';
 import 'package:el7reef/data/repositories/knockout_tie_repository_impl.dart';
 import 'package:el7reef/data/repositories/match_repository_impl.dart';
 import 'package:el7reef/data/repositories/player_repository_impl.dart';
 import 'package:el7reef/data/repositories/team_repository_impl.dart';
 import 'package:el7reef/data/repositories/tournament_repository_impl.dart';
+import 'package:el7reef/domain/entities/guest_player.dart';
 import 'package:el7reef/domain/entities/match.dart';
 import 'package:el7reef/domain/entities/match_check_in.dart';
 import 'package:el7reef/domain/entities/match_lineup_entry.dart';
 import 'package:el7reef/domain/entities/match_lineup_snapshot.dart';
+import 'package:el7reef/domain/entities/match_side_player.dart';
 import 'package:el7reef/domain/entities/player.dart';
 import 'package:el7reef/domain/entities/team.dart';
 import 'package:el7reef/domain/entities/tournament.dart';
@@ -109,9 +113,13 @@ void main() {
           now: now.add(const Duration(minutes: 15)),
         );
         final fixture = groupStage.fixtures.first;
+        await matchRepository.updateMatch(
+          fixture.copyWith(status: MatchStatus.live),
+        );
 
         await settlementService.submitScore(
           matchId: fixture.id,
+          actorId: 'organizer-1',
           scoreA: 2,
           scoreB: 0,
         );
@@ -128,7 +136,10 @@ void main() {
           isTrue,
         );
 
-        await settlementService.approveScore(matchId: fixture.id);
+        await settlementService.approveScore(
+          matchId: fixture.id,
+          actorId: 'organizer-1',
+        );
 
         final savedStandings = await standingsRepository.getGroupStageSnapshots(
           groupStage.groupStageId,
@@ -176,9 +187,13 @@ void main() {
           now: now.add(const Duration(minutes: 25)),
         );
         final finalMatch = knockout.matches.single;
+        await matchRepository.updateMatch(
+          finalMatch.copyWith(status: MatchStatus.live),
+        );
 
         await settlementService.submitScore(
           matchId: finalMatch.id,
+          actorId: 'organizer-1',
           scoreA: 1,
           scoreB: 0,
         );
@@ -192,7 +207,10 @@ void main() {
         expect(pendingProgress?.bracket.championParticipantId, isNull);
         expect(pendingTie?.winnerParticipantId, isNull);
 
-        await settlementService.approveScore(matchId: finalMatch.id);
+        await settlementService.approveScore(
+          matchId: finalMatch.id,
+          actorId: 'organizer-1',
+        );
 
         final advancedTie = await tieRepository.getTie(knockout.ties.single.id);
         expect(advancedTie?.winnerParticipantId, finalMatch.teamAParticipantId);
@@ -225,12 +243,19 @@ void main() {
 
         for (final fixture in publishedFixtures) {
           final score = _groupScoreFor(fixture.teamAId!, fixture.teamBId!);
+          await matchRepository.updateMatch(
+            fixture.copyWith(status: MatchStatus.live),
+          );
           await settlementService.submitScore(
             matchId: fixture.id,
+            actorId: 'organizer-1',
             scoreA: score.$1,
             scoreB: score.$2,
           );
-          await settlementService.approveScore(matchId: fixture.id);
+          await settlementService.approveScore(
+            matchId: fixture.id,
+            actorId: 'organizer-1',
+          );
         }
 
         final savedStandings = await standingsRepository.getGroupStageSnapshots(
@@ -255,13 +280,20 @@ void main() {
         );
 
         expect(scheduledFinal.venueId, 'Main Court');
+        await matchRepository.updateMatch(
+          scheduledFinal.copyWith(status: MatchStatus.live),
+        );
 
         await settlementService.submitScore(
           matchId: scheduledFinal.id,
+          actorId: 'organizer-1',
           scoreA: 2,
           scoreB: 1,
         );
-        await settlementService.approveScore(matchId: scheduledFinal.id);
+        await settlementService.approveScore(
+          matchId: scheduledFinal.id,
+          actorId: 'organizer-1',
+        );
 
         final finalTie = await tieRepository.getTie(knockout.ties.single.id);
         final completedTournament = await lifecycleService.completeTournament(
@@ -319,6 +351,7 @@ void main() {
 
         await settlementService.submitScore(
           matchId: fixture.id,
+          actorId: 'organizer-1',
           scoreA: 2,
           scoreB: 1,
           mvpPlayerId: 'team-1-player-1',
@@ -338,7 +371,10 @@ void main() {
           ]),
         );
 
-        await settlementService.approveScore(matchId: fixture.id);
+        await settlementService.approveScore(
+          matchId: fixture.id,
+          actorId: 'organizer-1',
+        );
 
         final homeStarter = await playerRepository.getPlayer('team-1-player-1');
         final awayStarter = await playerRepository.getPlayer('team-2-player-1');
@@ -346,7 +382,295 @@ void main() {
         expect(awayStarter?.totalMatches, 1);
       },
     );
+
+    test('submitScore accepts registered MVP as before', () async {
+      await _seedFriendlyMatch(
+        matchRepository: matchRepository,
+        matchId: 'registered-mvp-match',
+        now: now,
+        teamAPlayerIds: const ['registered-mvp'],
+        teamBPlayerIds: const ['registered-opponent'],
+      );
+      await playerRepository.createPlayer(
+        _player(id: 'registered-mvp', name: 'Registered MVP', now: now),
+      );
+      await playerRepository.createPlayer(
+        _player(id: 'registered-opponent', name: 'Opponent', now: now),
+      );
+
+      await settlementService.submitScore(
+        matchId: 'registered-mvp-match',
+        actorId: 'organizer-1',
+        scoreA: 3,
+        scoreB: 1,
+        mvpPlayerId: 'registered-mvp',
+      );
+
+      final scoredMatch = await matchRepository.getMatch(
+        'registered-mvp-match',
+      );
+      expect(scoredMatch?.mvpPlayerId, 'registered-mvp');
+      expect(scoredMatch?.status, MatchStatus.completed);
+    });
+
+    test('submitScore accepts guest player MVP from full roster', () async {
+      await _seedFriendlyMatch(
+        matchRepository: matchRepository,
+        matchId: 'guest-mvp-match',
+        now: now,
+      );
+      await _saveGuestPlayer(
+        firestore: firestore,
+        guestPlayer: _guestPlayer(
+          id: 'guest-mvp',
+          displayName: 'Guest MVP',
+          linkedPlayerId: 'claimed-player',
+          now: now,
+        ),
+      );
+      await _seedGuestLineupSnapshot(
+        firestore: firestore,
+        matchId: 'guest-mvp-match',
+        guestPlayerId: 'guest-mvp',
+        now: now,
+      );
+
+      await settlementService.submitScore(
+        matchId: 'guest-mvp-match',
+        actorId: 'organizer-1',
+        scoreA: 2,
+        scoreB: 2,
+        mvpPlayerId: 'guest-mvp',
+      );
+
+      final scoredMatch = await matchRepository.getMatch('guest-mvp-match');
+      expect(scoredMatch?.mvpPlayerId, 'guest-mvp');
+      expect(scoredMatch?.status, MatchStatus.completed);
+    });
+
+    test('submitScore accepts temporary match-side player MVP', () async {
+      await _seedFriendlyMatch(
+        matchRepository: matchRepository,
+        matchId: 'temporary-mvp-match',
+        now: now,
+      );
+      await _saveMatchSidePlayer(
+        firestore: firestore,
+        player: MatchSidePlayer(
+          id: 'temporary-mvp',
+          matchId: 'temporary-mvp-match',
+          sideKey: 'A',
+          sideId: 'temporary-mvp-match_A',
+          kind: 'temporary',
+          displayName: 'Temporary MVP',
+          ratingEligible: false,
+          addedBy: 'organizer-1',
+          createdAt: now,
+        ),
+      );
+
+      await settlementService.submitScore(
+        matchId: 'temporary-mvp-match',
+        actorId: 'organizer-1',
+        scoreA: 1,
+        scoreB: 0,
+        mvpPlayerId: 'temporary-mvp',
+      );
+
+      final scoredMatch = await matchRepository.getMatch('temporary-mvp-match');
+      expect(scoredMatch?.mvpPlayerId, 'temporary-mvp');
+      expect(scoredMatch?.status, MatchStatus.completed);
+    });
+
+    test(
+      'submitScore rejects MVP id outside the full participant roster',
+      () async {
+        await _seedFriendlyMatch(
+          matchRepository: matchRepository,
+          matchId: 'invalid-mvp-match',
+          now: now,
+          teamAPlayerIds: const ['registered-player'],
+        );
+        await playerRepository.createPlayer(
+          _player(id: 'registered-player', name: 'Registered', now: now),
+        );
+
+        await expectLater(
+          settlementService.submitScore(
+            matchId: 'invalid-mvp-match',
+            actorId: 'organizer-1',
+            scoreA: 1,
+            scoreB: 1,
+            mvpPlayerId: 'not-in-roster',
+          ),
+          throwsA(isA<StateError>()),
+        );
+
+        final unchangedMatch = await matchRepository.getMatch(
+          'invalid-mvp-match',
+        );
+        expect(unchangedMatch?.status, MatchStatus.live);
+        expect(unchangedMatch?.mvpPlayerId, isNull);
+      },
+    );
+
+    test(
+      'approveScore with guest MVP keeps registered-only rating behavior',
+      () async {
+        await _seedFriendlyMatch(
+          matchRepository: matchRepository,
+          matchId: 'guest-approval-match',
+          now: now,
+          teamAId: 'team-a',
+          teamBId: 'team-b',
+          teamAPlayerIds: const ['registered-a'],
+          teamBPlayerIds: const ['registered-b'],
+        );
+        await playerRepository.createPlayer(
+          _player(id: 'registered-a', name: 'Registered A', now: now),
+        );
+        await playerRepository.createPlayer(
+          _player(id: 'registered-b', name: 'Registered B', now: now),
+        );
+        await _saveGuestPlayer(
+          firestore: firestore,
+          guestPlayer: _guestPlayer(
+            id: 'guest-approval-mvp',
+            displayName: 'Guest Approval MVP',
+            now: now,
+          ),
+        );
+        await _seedGuestLineupSnapshot(
+          firestore: firestore,
+          matchId: 'guest-approval-match',
+          guestPlayerId: 'guest-approval-mvp',
+          now: now,
+        );
+
+        await settlementService.submitScore(
+          matchId: 'guest-approval-match',
+          actorId: 'organizer-1',
+          scoreA: 2,
+          scoreB: 0,
+          mvpPlayerId: 'guest-approval-mvp',
+        );
+        await settlementService.approveScore(
+          matchId: 'guest-approval-match',
+          actorId: 'organizer-1',
+        );
+
+        final homePlayer = await playerRepository.getPlayer('registered-a');
+        final awayPlayer = await playerRepository.getPlayer('registered-b');
+        expect(homePlayer?.totalMatches, 1);
+        expect(awayPlayer?.totalMatches, 1);
+        expect(homePlayer?.mvpCount, 0);
+        expect(awayPlayer?.mvpCount, 0);
+        final settledMatch = await matchRepository.getMatch(
+          'guest-approval-match',
+        );
+        expect(settledMatch?.status, MatchStatus.settled);
+        expect(settledMatch?.mvpPlayerId, 'guest-approval-mvp');
+      },
+    );
   });
+}
+
+Player _player({
+  required String id,
+  required String name,
+  required DateTime now,
+}) {
+  return Player(id: id, name: name, createdAt: now, lastActiveAt: now);
+}
+
+GuestPlayer _guestPlayer({
+  required String id,
+  required String displayName,
+  String? linkedPlayerId,
+  required DateTime now,
+}) {
+  return GuestPlayer(
+    id: id,
+    displayName: displayName,
+    normalizedName: displayName.toLowerCase(),
+    createdBy: 'organizer-1',
+    createdAt: now,
+    updatedAt: now,
+    linkedPlayerId: linkedPlayerId,
+  );
+}
+
+Future<void> _seedFriendlyMatch({
+  required MatchRepositoryImpl matchRepository,
+  required String matchId,
+  required DateTime now,
+  String? teamAId,
+  String? teamBId,
+  List<String> teamAPlayerIds = const [],
+  List<String> teamBPlayerIds = const [],
+}) async {
+  await matchRepository.createMatch(
+    Match(
+      id: matchId,
+      organizerId: 'organizer-1',
+      teamAId: teamAId,
+      teamBId: teamBId,
+      teamAPlayerIds: teamAPlayerIds,
+      teamBPlayerIds: teamBPlayerIds,
+      status: MatchStatus.live,
+      createdAt: now,
+    ),
+  );
+}
+
+Future<void> _saveGuestPlayer({
+  required FakeFirebaseFirestore firestore,
+  required GuestPlayer guestPlayer,
+}) async {
+  await firestore
+      .collection(FirebasePaths.guestPlayers)
+      .doc(guestPlayer.id)
+      .set(GuestPlayerModel.fromEntity(guestPlayer).toJson());
+}
+
+Future<void> _saveMatchSidePlayer({
+  required FakeFirebaseFirestore firestore,
+  required MatchSidePlayer player,
+}) async {
+  await firestore
+      .collection(FirebasePaths.matchSidePlayers)
+      .doc(player.id)
+      .set(MatchSidePlayerModel.fromEntity(player).toJson());
+}
+
+Future<void> _seedGuestLineupSnapshot({
+  required FakeFirebaseFirestore firestore,
+  required String matchId,
+  required String guestPlayerId,
+  required DateTime now,
+}) async {
+  final snapshot = MatchLineupSnapshot(
+    id: 'match::$matchId::side::A::lineup',
+    matchId: matchId,
+    matchSideId: '${matchId}_A',
+    sideKey: 'A',
+    starters: <MatchLineupEntry>[
+      MatchLineupEntry(
+        attendanceId: 'attendance::$matchId::$guestPlayerId',
+        guestPlayerId: guestPlayerId,
+        role: TeamMembershipRole.player,
+        availability: TeamMemberAvailability.available,
+        attendanceStatus: MatchAttendanceStatus.present,
+        displayName: 'Guest MVP',
+      ),
+    ],
+    lockedBy: 'organizer-1',
+    lockedAt: now,
+  );
+  await firestore
+      .collection(FirebasePaths.matchLineupSnapshots)
+      .doc(snapshot.id)
+      .set(MatchLineupSnapshotModel.fromEntity(snapshot).toJson());
 }
 
 Future<void> _seedRegisteredPlayersForFixture({

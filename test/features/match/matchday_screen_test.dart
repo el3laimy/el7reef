@@ -22,6 +22,7 @@ import 'package:el7reef/data/repositories/match_attendance_repository_impl.dart'
 import 'package:el7reef/data/repositories/match_check_in_repository_impl.dart';
 import 'package:el7reef/data/repositories/match_lineup_snapshot_repository_impl.dart';
 import 'package:el7reef/data/repositories/match_repository_impl.dart';
+import 'package:el7reef/data/repositories/match_side_repository_impl.dart';
 import 'package:el7reef/data/repositories/match_substitution_repository_impl.dart';
 import 'package:el7reef/data/repositories/player_repository_impl.dart';
 import 'package:el7reef/data/repositories/team_membership_repository_impl.dart';
@@ -99,6 +100,10 @@ void main() {
     );
     Get.put<MatchLineupSnapshotRepositoryImpl>(
       MatchLineupSnapshotRepositoryImpl(firestore: firestore),
+      permanent: true,
+    );
+    Get.put<MatchSideRepositoryImpl>(
+      MatchSideRepositoryImpl(firestore: firestore),
       permanent: true,
     );
     Get.put<MatchSubstitutionRepositoryImpl>(
@@ -472,6 +477,7 @@ MatchdayController _putDirectController({
       checkInRepository: Get.find<MatchCheckInRepositoryImpl>(),
       attendanceRepository: Get.find<MatchAttendanceRepositoryImpl>(),
       snapshotRepository: Get.find<MatchLineupSnapshotRepositoryImpl>(),
+      matchSideRepository: Get.find<MatchSideRepositoryImpl>(),
       substitutionRepository: Get.find<MatchSubstitutionRepositoryImpl>(),
       tournamentPermissionService: Get.find<TournamentPermissionService>(),
     ),

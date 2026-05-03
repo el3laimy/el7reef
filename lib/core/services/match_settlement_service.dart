@@ -64,14 +64,17 @@ class MatchSettlementService {
     );
     final eligiblePlayerIds = officialRoster.allPlayerIds.toSet();
     final normalizedMvpId = _normalizeOptionalId(mvpPlayerId);
-    if (normalizedMvpId != null &&
-        eligiblePlayerIds.isNotEmpty &&
-        !eligiblePlayerIds.contains(normalizedMvpId)) {
-      throw StateError('لا يمكن اختيار MVP خارج roster الرسمية للمباراة.');
+    if (normalizedMvpId != null) {
+      final participantRoster = await _officialRosterService
+          .loadParticipantRoster(matchId: matchId);
+      final participantIds = participantRoster.allParticipants
+          .map((participant) => participant.id)
+          .toSet();
+      if (!participantIds.contains(normalizedMvpId)) {
+        throw StateError('لا يمكن اختيار MVP خارج roster المباراة.');
+      }
     }
-    final effectiveMvpId = eligiblePlayerIds.contains(normalizedMvpId)
-        ? normalizedMvpId
-        : null;
+    final effectiveMvpId = normalizedMvpId;
     final officialDetailedStats = detailedStats
         .where((stats) => eligiblePlayerIds.contains(stats.playerId))
         .toList(growable: false);
@@ -213,6 +216,10 @@ class MatchSettlementService {
       // V1 rates registered players only. If either side has no registered
       // eligible players, skip rating deltas rather than treating guests as
       // Player documents or calculating a one-sided official rating result.
+      // mvpPlayerId may now store a Player.id, GuestPlayer.id, or
+      // MatchSidePlayer.id. Guest/MSP MVPs are preserved on the match, but only
+      // registered Player.id matches grant rating bonuses; the future MatchEvent
+      // MVP dual-write will carry the full ParticipantRef.
       if (canApplyRatingDeltas) {
         for (final player in teamAPlayers) {
           final delta = RatingEngine.calculateMatchDelta(

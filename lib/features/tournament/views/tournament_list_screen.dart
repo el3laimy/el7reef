@@ -5,6 +5,7 @@ import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/constants/feature_flags.dart';
 import '../../../core/enums/tournament_enums.dart';
 import '../../../core/widgets/el7reef_button.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
@@ -58,20 +59,27 @@ class TournamentListScreen extends GetView<TournamentController> {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: AppDimensions.pagePadding),
+                      horizontal: AppDimensions.pagePadding,
+                    ),
                     child: Row(
                       children: [
-                        Text('الدورات الجارية',
-                            style: AppTextStyles.titleLarge),
+                        Text(
+                          'الدورات الجارية',
+                          style: AppTextStyles.titleLarge,
+                        ),
                         const Spacer(),
-                        Obx(() => _CountBadge(
-                            count: controller.liveTournaments.length)),
+                        Obx(
+                          () => _CountBadge(
+                            count: controller.liveTournaments.length,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ),
                 const SliverToBoxAdapter(
-                    child: SizedBox(height: AppDimensions.sm)),
+                  child: SizedBox(height: AppDimensions.sm),
+                ),
 
                 // ── القائمة ──
                 controller.liveTournaments.isEmpty
@@ -93,7 +101,8 @@ class TournamentListScreen extends GetView<TournamentController> {
                       ),
 
                 const SliverToBoxAdapter(
-                    child: SizedBox(height: AppDimensions.xxl)),
+                  child: SizedBox(height: AppDimensions.xxl),
+                ),
               ],
             ),
           );
@@ -135,7 +144,9 @@ class _TournamentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (Color statusColor, String statusLabel) = _statusInfo(tournament.status);
+    final (Color statusColor, String statusLabel) = _statusInfo(
+      tournament.status,
+    );
 
     return GestureDetector(
       onTap: () => Get.toNamed(AppRoutes.tournamentDetailById(tournament.id)),
@@ -150,10 +161,12 @@ class _TournamentCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(tournament.name,
-                      style: AppTextStyles.titleLarge,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
+                  child: Text(
+                    tournament.name,
+                    style: AppTextStyles.titleLarge,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 _StatusBadge(color: statusColor, label: statusLabel),
               ],
@@ -166,13 +179,13 @@ class _TournamentCard extends StatelessWidget {
               children: [
                 _InfoChip(
                   icon: Icons.groups_rounded,
-                  label:
-                      '${tournament.teamCount}/${tournament.maxTeams} فريق',
+                  label: '${tournament.teamCount}/${tournament.maxTeams} فريق',
                 ),
                 const SizedBox(width: AppDimensions.sm),
                 _InfoChip(
                   icon: Icons.sports_soccer,
-                  label: '${tournament.teamSize.value}v${tournament.teamSize.value}',
+                  label:
+                      '${tournament.teamSize.value}v${tournament.teamSize.value}',
                 ),
                 if (tournament.location != null) ...[
                   const SizedBox(width: AppDimensions.sm),
@@ -193,23 +206,28 @@ class _TournamentCard extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: tournament.fillRate.clamp(0.0, 1.0),
                 backgroundColor: AppColors.surfaceBorder,
-                valueColor:
-                    AlwaysStoppedAnimation<Color>(statusColor),
+                valueColor: AlwaysStoppedAnimation<Color>(statusColor),
                 minHeight: 4,
               ),
             ),
 
-            if (tournament.isFantasyEnabled) ...[
+            if (FeatureFlags.fantasyUiEnabled &&
+                tournament.isFantasyEnabled) ...[
               const SizedBox(height: AppDimensions.xs),
               Row(
                 children: [
-                  const Icon(Icons.auto_awesome,
-                      color: AppColors.secondary, size: 14),
+                  const Icon(
+                    Icons.auto_awesome,
+                    color: AppColors.secondary,
+                    size: 14,
+                  ),
                   const SizedBox(width: 4),
-                  Text('الفانتازي مفعَّل',
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: AppColors.secondary,
-                      )),
+                  Text(
+                    'الفانتازي مفعَّل',
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColors.secondary,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -247,7 +265,8 @@ class _CreateTournamentSheet extends StatelessWidget {
       decoration: const BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppDimensions.radiusXl)),
+          top: Radius.circular(AppDimensions.radiusXl),
+        ),
       ),
       child: SingleChildScrollView(
         child: Form(
@@ -259,7 +278,8 @@ class _CreateTournamentSheet extends StatelessWidget {
               // مقبض
               Center(
                 child: Container(
-                  width: 40, height: 4,
+                  width: 40,
+                  height: 4,
                   decoration: BoxDecoration(
                     color: AppColors.surfaceBorder,
                     borderRadius: BorderRadius.circular(2),
@@ -277,8 +297,10 @@ class _CreateTournamentSheet extends StatelessWidget {
                 decoration: const InputDecoration(
                   labelText: 'اسم الدورة',
                   hintText: 'مثال: كأس حي الزيتون',
-                  prefixIcon: Icon(Icons.emoji_events_outlined,
-                      color: AppColors.textMuted),
+                  prefixIcon: Icon(
+                    Icons.emoji_events_outlined,
+                    color: AppColors.textMuted,
+                  ),
                 ),
               ),
               const SizedBox(height: AppDimensions.md),
@@ -289,8 +311,10 @@ class _CreateTournamentSheet extends StatelessWidget {
                 decoration: const InputDecoration(
                   labelText: 'الموقع (اختياري)',
                   hintText: 'مثال: ملعب البلدية',
-                  prefixIcon:
-                      Icon(Icons.location_on_outlined, color: AppColors.textMuted),
+                  prefixIcon: Icon(
+                    Icons.location_on_outlined,
+                    color: AppColors.textMuted,
+                  ),
                 ),
               ),
               const SizedBox(height: AppDimensions.md),
@@ -298,133 +322,108 @@ class _CreateTournamentSheet extends StatelessWidget {
               // حجم الفريق
               Text('حجم الفريق', style: AppTextStyles.labelMedium),
               const SizedBox(height: AppDimensions.xs),
-              Obx(() => Wrap(
-                    spacing: AppDimensions.sm,
-                    children: TournamentTeamSize.values.map((size) {
-                      final selected =
-                          controller.selectedTeamSize.value == size;
-                      return ChoiceChip(
-                        label: Text('${size.value}v${size.value}'),
-                        selected: selected,
-                        onSelected: (_) =>
-                            controller.selectedTeamSize.value = size,
-                        selectedColor: AppColors.primarySurface,
-                        side: BorderSide(
-                          color: selected
-                              ? AppColors.primary
-                              : AppColors.surfaceBorder,
-                        ),
-                      );
-                    }).toList(),
-                  )),
+              Obx(
+                () => Wrap(
+                  spacing: AppDimensions.sm,
+                  children: TournamentTeamSize.values.map((size) {
+                    final selected = controller.selectedTeamSize.value == size;
+                    return ChoiceChip(
+                      label: Text('${size.value}v${size.value}'),
+                      selected: selected,
+                      onSelected: (_) =>
+                          controller.selectedTeamSize.value = size,
+                      selectedColor: AppColors.primarySurface,
+                      side: BorderSide(
+                        color: selected
+                            ? AppColors.primary
+                            : AppColors.surfaceBorder,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
               const SizedBox(height: AppDimensions.md),
 
               // نوع الدورة
               Text('نوع الدورة', style: AppTextStyles.labelMedium),
               const SizedBox(height: AppDimensions.xs),
-              Obx(() => Column(
-                    children: TournamentFormat.values.map((f) {
-                      final selected =
-                          controller.selectedFormat.value == f;
-                      return GestureDetector(
-                        onTap: () => controller.selectedFormat.value = f,
-                        child: Container(
-                          margin: const EdgeInsets.only(
-                              bottom: AppDimensions.xs),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppDimensions.md,
-                            vertical: AppDimensions.sm,
+              Obx(
+                () => Column(
+                  children: TournamentFormat.values.map((f) {
+                    final selected = controller.selectedFormat.value == f;
+                    return GestureDetector(
+                      onTap: () => controller.selectedFormat.value = f,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: AppDimensions.xs),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppDimensions.md,
+                          vertical: AppDimensions.sm,
+                        ),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? AppColors.primarySurface
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(
+                            AppDimensions.radiusMd,
                           ),
-                          decoration: BoxDecoration(
+                          border: Border.all(
                             color: selected
-                                ? AppColors.primarySurface
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(
-                                AppDimensions.radiusMd),
-                            border: Border.all(
-                              color: selected
-                                  ? AppColors.primary
-                                  : AppColors.surfaceBorder,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                selected
-                                    ? Icons.radio_button_checked
-                                    : Icons.radio_button_unchecked,
-                                color: selected
-                                    ? AppColors.primary
-                                    : AppColors.textMuted,
-                                size: 20,
-                              ),
-                              const SizedBox(width: AppDimensions.sm),
-                              Text(_formatLabel(f),
-                                  style: AppTextStyles.bodyMedium.copyWith(
-                                    color: selected
-                                        ? AppColors.primary
-                                        : AppColors.textPrimary,
-                                  )),
-                            ],
+                                ? AppColors.primary
+                                : AppColors.surfaceBorder,
                           ),
                         ),
-                      );
-                    }).toList(),
-                  )),
+                        child: Row(
+                          children: [
+                            Icon(
+                              selected
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_unchecked,
+                              color: selected
+                                  ? AppColors.primary
+                                  : AppColors.textMuted,
+                              size: 20,
+                            ),
+                            const SizedBox(width: AppDimensions.sm),
+                            Text(
+                              _formatLabel(f),
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: selected
+                                    ? AppColors.primary
+                                    : AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
               const SizedBox(height: AppDimensions.md),
 
               // عدد الفرق
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: controller.maxTeamsController,
-                      validator: controller.validateMaxTeams,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'عدد الفرق',
-                        prefixIcon: Icon(Icons.groups_outlined,
-                            color: AppColors.textMuted),
-                      ),
-                    ),
+              TextFormField(
+                controller: controller.maxTeamsController,
+                validator: controller.validateMaxTeams,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'عدد الفرق',
+                  prefixIcon: Icon(
+                    Icons.groups_outlined,
+                    color: AppColors.textMuted,
                   ),
-                  const SizedBox(width: AppDimensions.md),
-                  // تفعيل الفانتازي
-                  Obx(() => Column(
-                        children: [
-                          Switch(
-                            value: controller.isFantasyEnabled.value,
-                            onChanged: (v) =>
-                                controller.isFantasyEnabled.value = v,
-                            thumbColor:
-                                WidgetStateProperty.resolveWith((states) {
-                              if (states.contains(WidgetState.selected)) {
-                                return AppColors.secondary;
-                              }
-                              return AppColors.textMuted;
-                            }),
-                            trackColor:
-                                WidgetStateProperty.resolveWith((states) {
-                              if (states.contains(WidgetState.selected)) {
-                                return AppColors.secondary
-                                    .withValues(alpha: 0.4);
-                              }
-                              return AppColors.surfaceBorder;
-                            }),
-                          ),
-                          Text('فانتازي', style: AppTextStyles.labelSmall),
-                        ],
-                      )),
-                ],
+                ),
               ),
               const SizedBox(height: AppDimensions.xl),
 
-              Obx(() => El7reefButton(
-                    text: 'إنشاء الدورة',
-                    icon: Icons.check_circle_outline,
-                    isLoading: controller.isLoading.value,
-                    onPressed: controller.createTournament,
-                  )),
+              Obx(
+                () => El7reefButton(
+                  text: 'إنشاء الدورة',
+                  icon: Icons.check_circle_outline,
+                  isLoading: controller.isLoading.value,
+                  onPressed: controller.createTournament,
+                ),
+              ),
             ],
           ),
         ),
@@ -454,8 +453,10 @@ class _StatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
         border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
-      child: Text(label,
-          style: AppTextStyles.labelSmall.copyWith(color: color)),
+      child: Text(
+        label,
+        style: AppTextStyles.labelSmall.copyWith(color: color),
+      ),
     );
   }
 }
@@ -475,9 +476,11 @@ class _InfoChip extends StatelessWidget {
         const SizedBox(width: 4),
         ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxWidth ?? 120),
-          child: Text(label,
-              style: AppTextStyles.labelSmall,
-              overflow: TextOverflow.ellipsis),
+          child: Text(
+            label,
+            style: AppTextStyles.labelSmall,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );
@@ -496,9 +499,10 @@ class _CountBadge extends StatelessWidget {
         color: AppColors.primary.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
       ),
-      child: Text('$count دورة',
-          style:
-              AppTextStyles.labelSmall.copyWith(color: AppColors.primary)),
+      child: Text(
+        '$count دورة',
+        style: AppTextStyles.labelSmall.copyWith(color: AppColors.primary),
+      ),
     );
   }
 }

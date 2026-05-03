@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/constants/feature_flags.dart';
 import '../../../core/enums/tournament_enums.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
@@ -29,7 +30,7 @@ class TournamentController extends GetxController {
       TournamentFormat.groupsThenKnockout.obs;
   final Rx<TournamentTeamSize> selectedTeamSize =
       TournamentTeamSize.fiveVsFive.obs;
-  final RxBool isFantasyEnabled = true.obs;
+  final RxBool isFantasyEnabled = false.obs;
 
   @override
   void onInit() {
@@ -86,7 +87,8 @@ class TournamentController extends GetxController {
         teamSize: selectedTeamSize.value,
         maxTeams: int.tryParse(maxTeamsController.text) ?? 8,
         status: TournamentStatus.registration,
-        isFantasyEnabled: isFantasyEnabled.value,
+        isFantasyEnabled:
+            FeatureFlags.fantasyUiEnabled && isFantasyEnabled.value,
         createdAt: DateTime.now(),
       );
 
@@ -115,7 +117,7 @@ class TournamentController extends GetxController {
     maxTeamsController.text = '8';
     selectedFormat.value = TournamentFormat.groupsThenKnockout;
     selectedTeamSize.value = TournamentTeamSize.fiveVsFive;
-    isFantasyEnabled.value = true;
+    isFantasyEnabled.value = false;
   }
 
   // ── Validators ──

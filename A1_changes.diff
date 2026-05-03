@@ -1,0 +1,3181 @@
+diff --git a/AGENTS.md b/AGENTS.md
+index 307c681..79b069e 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -1,55 +1,77 @@
+ # AGENTS.md
+ 
+ ## Project
+-El7reef is an Arabic-first Flutter/GetX football street-match app.
++El7reef is an Arabic-first Flutter/GetX football street-match and tournament app.
+ 
+ The V1 product goal is:
+-Let an organizer create a friendly match, add registered or temporary players, optionally create a lineup, start the match, submit the result, and share lineup/result cards.
++**Tournament Ego MVP** — Let an organizer run a street tournament with registered and guest teams/players, record match results with goal scorers and MVP (including guests), generate leaderboards, and produce shareable pride cards that drive player claims and viral growth.
+ 
+ ## Current priority
+-Focus on the Friendly Match Core Loop before tournaments, fantasy, or advanced social features.
++Focus on the Tournament Ego Core Loop. Friendlies and challenges are secondary retention loops between tournaments.
+ 
+ Core loop:
+-Create Match
+-→ Add Players / Guests
+-→ Optional Lineup
+-→ Start Match
+-→ Submit Result
+-→ Share Result / Lineup
+-→ Invite More People
++Create Tournament
++→ Add Teams (registered or guest)
++→ Add Players (registered or guest)
++→ Generate Fixtures
++→ Play Matches
++→ Record Results + Goal Scorers + MVP (guests included)
++→ Update Standings & Top Scorers
++→ Share Pride Cards (Result / MVP / Player / Top Scorers / Champion)
++→ Guest Players Claim Profiles
++→ Challenges & Friendlies between tournaments
+ 
+ ## Product principles
+ - Arabic RTL first.
+ - Street football reality first: not all players have accounts.
+-- Temporary players are first-class citizens.
+-- Lineups are optional, but the UX should strongly encourage creating and sharing them.
++- Temporary players and guest teams are first-class citizens.
++- Guest players MUST be able to receive goals, MVP, and appear in share cards and leaderboards.
++- Tournaments are the heart of the app and the growth engine.
++- Matches are the building blocks that produce data. Data produces pride. Pride produces sharing. Sharing brings new players.
++- Lineups are optional, but the UX should encourage creating and sharing them.
++- Share cards must appear at moments of pride, not hidden in menus.
+ - No fake features.
+ - No dead buttons.
+-- No "coming soon" messages inside the core friendly match flow if the feature already exists elsewhere.
++- No "coming soon" messages inside the core tournament/match flow.
+ - Sharing is a growth engine, not a secondary action.
+-- Keep the match creation flow fast.
++- Fantasy UI is gated off in V1 — do not expose it.
+ 
+-## MVP scope
++## V1 scope
+ In scope:
+-- Friendly match creation.
++- Tournament creation and lifecycle (groups, knockout, hybrid).
++- Team management (registered + guest teams).
++- Player management (registered + guest players).
++- Hybrid tournament registration (official + guest teams in same tournament).
++- Match creation within tournament/challenge/friendly context.
+ - Team size selection from 5v5 to 11v11.
+-- Registered players.
+-- Temporary players.
+-- Optional lineup creation.
+-- Lineup sharing.
+-- Start match.
+-- Submit result.
+-- Result sharing.
+-- Basic teams/guest support only when needed by the core loop.
++- MatchEvent-based goal/MVP recording for ALL player types.
++- Tournament standings and top scorers leaderboards.
++- Optional lineup creation and sharing.
++- Start match, submit result, approve/settle result.
++- Share cards: Result, MVP, Player, Top Scorers, Team, Lineup, Champion.
++- Guest player/team claim via links and QR.
++- Audit events and basic dispute flow.
++- Challenges between teams as retention loop.
++- Simple friendlies (not the main message, but supported).
++- Play Store readiness: release signing, target SDK, privacy policy, data safety.
+ 
+-Out of scope for now:
++Out of scope for V1:
+ - Fantasy.
+-- Advanced tournaments.
+ - Advanced social feed.
+-- Deep statistics.
+-- Complex rankings.
+-- Maps-heavy location experience.
++- In-app chat.
++- Complex player ratings.
++- Pitch bookings.
++- Advanced maps experience.
++- Live streaming.
+ - Monetization.
++- Player transfer market.
++
++## Key technical decisions for V1
++- MatchEvent is the source of truth for goals, MVP, and match statistics — not scattered player_stats fields.
++- PlayerIdentityRef (registered | guest | matchSidePlayer) is used everywhere stats or share cards reference a player.
++- Guest players receive full statistical treatment identical to registered players.
++- Services handle all sensitive operations — not controllers writing directly to Firestore.
++- Feature gates are explicit: fantasy is off, social feed is secondary.
+ 
+ ## Codebase expectations
+ - Follow the existing architecture and naming conventions.
+@@ -62,6 +84,7 @@ Out of scope for now:
+ - Keep UI text Arabic-first where user-facing.
+ - Preserve RTL behavior.
+ - Do not remove existing features unless the task explicitly says to hide, gate, or simplify them.
++- Respect the existing design system (8px grid, Cairo font, AppDesign tokens).
+ 
+ ## Flutter commands
+ After code changes, run when available:
+@@ -81,15 +104,26 @@ At the end of every task, report:
+ 6. Risks or follow-up tasks.
+ 
+ ## Important current product decisions
+-- Firestore rules are not currently deployed, so they are not the first implementation blocker.
++- Firestore rules exist but may need updates for new collections like matchEvents.
+ - Lineups are optional, not required.
+ - If a user starts a match without a lineup, show encouragement/nudge, not a hard block.
+-- The immediate roadmap should start with Product Baseline, Friendly Match Flow, Optional Lineup Encouragement, and Result Sharing.
++- The immediate roadmap follows the Sprint Plan in docs/05_Project_Roadmap_and_Sprint_Plan.md.
++- Score submission must support guest players as goal scorers and MVP — the old message "temporary players don't get stats" must be removed.
+ 
+ ## Do not do this
+ - Do not implement the whole roadmap in one task.
+ - Do not start with fantasy.
+-- Do not start with advanced tournament work.
+ - Do not build fake UI surfaces.
+ - Do not hide important sharing actions behind tiny icons only.
+-- Do not count only registered players when temporary players are present.
+\ No newline at end of file
++- Do not count only registered players when temporary players are present.
++- Do not record stats for registered players only — guest players are first-class.
++- Do not expose fantasy toggles or UI in V1.
++- Do not treat friendlies as the core product message — tournaments are the heart.
++
++## Reference documentation
++See `docs/` for the full V1 documentation pack:
++- `docs/01_PRD_Product_Requirements_Document.md`
++- `docs/02_SRS_Software_Requirements_Specification.md`
++- `docs/03_SAD_System_Architecture_Document.md`
++- `docs/04_UI_UX_Designs.md`
++- `docs/05_Project_Roadmap_and_Sprint_Plan.md`
+\ No newline at end of file
+diff --git a/docs/codex_tasks/001_product_baseline_audit.md b/docs/codex_tasks/001_product_baseline_audit.md
+deleted file mode 100644
+index b358a18..0000000
+--- a/docs/codex_tasks/001_product_baseline_audit.md
++++ /dev/null
+@@ -1,76 +0,0 @@
+-# Task 001: Product Baseline Audit - Friendly Match Core Loop
+-
+-## Goal
+-Audit the current Friendly Match Core Loop without changing code.
+-
+-## Context
+-El7reef V1 must focus on the simplest valuable loop:
+-Create Match -> Add Players / Temporary Players -> Optional Lineup -> Start Match -> Submit Result -> Share Lineup / Result.
+-
+-Before implementation, we need a grounded audit of the current screens, controllers, services, and UX gaps.
+-
+-## Product decisions
+-- Friendly matches are the V1 priority.
+-- Lineups are optional, but the UX should encourage creating and sharing them.
+-- Temporary players are first-class participants.
+-- Do not start with fantasy, advanced tournaments, or broad social features.
+-
+-## Scope
+-Do:
+-- Inspect the current codebase for the friendly match core flow only.
+-- Identify existing screens, controllers, services, repositories, and widgets involved.
+-- Identify what already works.
+-- Identify misleading UI, dead buttons, hidden features, and hard-to-reach actions.
+-- Identify places where temporary players are not counted or shown correctly.
+-- Propose the next 5 small implementation tasks.
+-
+-Do not:
+-- Modify code.
+-- Reformat files.
+-- Implement fixes.
+-- Work on fantasy.
+-- Work on advanced tournaments.
+-- Work on social feed unless it directly affects sharing from the friendly match flow.
+-
+-## Likely files to inspect
+-- lib/features/match/views/match_discover_screen.dart
+-- lib/features/match/views/match_lobby_screen.dart
+-- lib/features/match/controllers/match_controller.dart
+-- lib/features/match/controllers/match_lobby_controller.dart
+-- lib/core/services/match_start_service.dart
+-- lib/features/lineup/views/team_lineup_editor_screen.dart
+-- lib/features/lineup/views/match_side_lineup_editor_screen.dart
+-- lib/features/lineup/controllers/team_lineup_editor_controller.dart
+-- lib/features/lineup/controllers/match_side_lineup_editor_controller.dart
+-- lib/features/shareables/widgets/lineup_share_card.dart
+-- lib/features/shareables/widgets/match_result_share_card.dart
+-- lib/features/shareables/services/share_card_capture_service.dart
+-- lib/features/match/controllers/score_submit_controller.dart
+-
+-## Required output
+-Return a concise audit with these sections:
+-1. Current core flow map.
+-2. Screens/controllers/services involved.
+-3. What already works.
+-4. What is missing or misleading.
+-5. Dead buttons or misleading "coming soon" messages in the core flow.
+-6. Places where temporary players are not counted or displayed correctly.
+-7. Share actions that are hidden, weak, or hard to discover.
+-8. Recommended next 5 small implementation tasks.
+-
+-## Acceptance criteria
+-- [ ] No code changes were made.
+-- [ ] The audit focuses on friendly match core loop only.
+-- [ ] The audit identifies specific files and UX issues.
+-- [ ] The audit identifies the next 5 implementation tasks.
+-- [ ] Fantasy and advanced tournaments are not treated as current priorities.
+-
+-## Testing/checks
+-No code changes are expected, so do not run full tests unless useful for inspection.
+-
+-## Final report
+-Return:
+-1. Audit summary.
+-2. Files inspected.
+-3. Recommended next 5 tasks.
+-4. Any uncertainty or assumptions.
+diff --git a/docs/codex_tasks/002_fix_friendly_match_participant_counts.md b/docs/codex_tasks/002_fix_friendly_match_participant_counts.md
+deleted file mode 100644
+index 3c2c0eb..0000000
+--- a/docs/codex_tasks/002_fix_friendly_match_participant_counts.md
++++ /dev/null
+@@ -1,83 +0,0 @@
+-# Task 002: Fix Friendly Match Participant Counts Outside Lobby
+-
+-## Goal
+-Make friendly match cards outside the lobby show correct participant counts including both registered and temporary players.
+-
+-## Context
+-Temporary players are first-class participants in El7reef. The audit found that the lobby already shows temporary players correctly, but discover/list cards count only `teamAPlayerIds.length` and `teamBPlayerIds.length`.
+-
+-This creates a bad user experience: a match with temporary players may look empty or under-filled outside the lobby.
+-
+-## Product decision
+-Temporary players must be treated as real match participants anywhere the user sees match participant counts.
+-
+-## Scope
+-
+-Do:
+-- Inspect UI code for friendly match cards/lists that display participant counts.
+-- Search for count usage based only on:
+-  - `teamAPlayerIds.length`
+-  - `teamBPlayerIds.length`
+-  - `teamAPlayers.length`
+-  - `teamBPlayers.length`
+-- Fix the discover/list match card counts to include temporary players where side data is available.
+-- Keep the existing lobby behavior if it already counts temporary players correctly.
+-- Prefer using existing models/services/repositories already used in the match flow.
+-- Add small helper methods only if they reduce duplication and stay local to the relevant widget/controller.
+-- Preserve Arabic RTL UI.
+-
+-Do not:
+-- Redesign the match card.
+-- Rewrite the lobby.
+-- Change match creation.
+-- Change match start rules.
+-- Change lineup logic.
+-- Change matchday behavior.
+-- Work on tournaments, fantasy, or social feed.
+-- Add new dependencies.
+-- Change Firebase collection names.
+-- Implement temporary-player edit/remove controls in this task.
+-- Implement formation preview temporary-player support in this task.
+-
+-## Likely files
+-- lib/features/match/views/match_discover_screen.dart
+-- lib/features/match/controllers/match_controller.dart
+-- lib/features/match/controllers/match_lobby_controller.dart
+-- lib/core/models/match.dart
+-- lib/core/models/match_model.dart
+-- any reusable match card widget if one exists
+-
+-## Required behavior
+-If a friendly match has:
+-- Team A: 2 registered players and 3 temporary players
+-- Team B: 1 registered player and 4 temporary players
+-
+-Then any discover/list card participant count should show:
+-- Team A: 5
+-- Team B: 5
+-
+-If temporary side data is not loaded for a card, do not show a misleading precise count that ignores temporary players. Use the best safe existing data path, or show a conservative label only if needed.
+-
+-## Acceptance criteria
+-- [ ] Discover/list match cards no longer show counts based only on registered player IDs when temporary player counts are available.
+-- [ ] Lobby counting behavior is not broken or unnecessarily rewritten.
+-- [ ] The UI remains Arabic and RTL-friendly.
+-- [ ] No unrelated tournament/fantasy/social code is changed.
+-- [ ] No dead buttons or new “coming soon” messages are introduced.
+-- [ ] The final report explains exactly how temporary counts are loaded and what fallback is used if they are unavailable.
+-
+-## Testing/checks
+-Run if available:
+-- dart analyze lib/
+-- flutter test
+-
+-If unavailable, state clearly.
+-
+-## Final report
+-Return:
+-1. Summary of changes.
+-2. Files changed.
+-3. How temporary player counts are now included.
+-4. Tests/checks run.
+-5. Any commands unavailable.
+-6. Risks or follow-up tasks.
+\ No newline at end of file
+diff --git a/docs/codex_tasks/003_remove_misleading_coming_soon_from_core_flow.md b/docs/codex_tasks/003_remove_misleading_coming_soon_from_core_flow.md
+deleted file mode 100644
+index 1a4b37f..0000000
+--- a/docs/codex_tasks/003_remove_misleading_coming_soon_from_core_flow.md
++++ /dev/null
+@@ -1,58 +0,0 @@
+-# Task 003: Remove Misleading Coming Soon UI From Core Friendly Flow
+-
+-## Goal
+-Remove or connect any misleading "coming soon" message inside the friendly match core flow when the feature already exists elsewhere.
+-
+-## Context
+-The user must not see a button for temporary players that says the feature is coming soon while temporary players are already supported in the lobby flow.
+-
+-## Product decision
+-No fake features and no misleading dead ends inside the V1 friendly match flow.
+-
+-## Scope
+-Do:
+-- Search for user-facing "coming soon" or equivalent messages related to temporary players, lineups, match setup, results, and sharing inside the friendly match core flow.
+-- For each misleading message, either connect it to the existing real flow or remove/hide the action.
+-- Keep the UX simple and Arabic-first.
+-
+-Do not:
+-- Remove legitimate deferred features outside the core flow unless they confuse the friendly match flow.
+-- Implement new large features.
+-- Start tournament/fantasy cleanup.
+-- Add dependencies.
+-
+-## Likely files
+-- lib/features/lineup/widgets/match_formation_section.dart
+-- lib/features/match/views/match_lobby_screen.dart
+-- lib/features/match/controllers/match_lobby_controller.dart
+-- lib/features/match/views/match_discover_screen.dart
+-
+-## Required behavior
+-If a user is in the friendly match setup/lineup flow, they should not hit a button that says temporary players are "coming soon" while the app already supports adding them in another part of the flow.
+-
+-A valid outcome is one of:
+-- the action opens the existing add temporary player flow, or
+-- the misleading action is removed from that surface, or
+-- the copy is changed to guide the user to the correct existing place.
+-
+-## Acceptance criteria
+-- [ ] No misleading "coming soon" dead end remains in the core friendly match flow for temporary players.
+-- [ ] Any changed action either works or clearly guides the user.
+-- [ ] No unrelated features are removed.
+-- [ ] User-facing text remains Arabic-first where touched.
+-- [ ] No broad redesign is introduced.
+-
+-## Testing/checks
+-Run if available:
+-- dart analyze lib/
+-- flutter test
+-
+-If unavailable, state that clearly.
+-
+-## Final report
+-Return:
+-1. Summary of changes.
+-2. Files changed.
+-3. UX behavior changed.
+-4. Tests/checks run.
+-5. Remaining misleading/deferred surfaces, if any.
+diff --git a/docs/codex_tasks/004_start_match_optional_lineup_nudge.md b/docs/codex_tasks/004_start_match_optional_lineup_nudge.md
+deleted file mode 100644
+index 281e028..0000000
+--- a/docs/codex_tasks/004_start_match_optional_lineup_nudge.md
++++ /dev/null
+@@ -1,74 +0,0 @@
+-# Task 004: Optional Lineup Nudge Before Starting Match
+-
+-## Goal
+-When the user starts a friendly match without saved lineups, show a nudge that encourages creating a lineup but still allows starting without one.
+-
+-## Context
+-Lineups are optional in El7reef V1 because street football must stay fast. But lineups are important for pride, sharing, and growth, so the app should encourage them at the right moment.
+-
+-## Product decision
+-Lineups are optional, not required. Use encouragement, not blocking.
+-
+-## Scope
+-Do:
+-- Detect when a friendly match is being started without saved lineups/snapshots.
+-- Show a clear bottom sheet/dialog before starting.
+-- Provide two actions:
+-  1. Create lineup first.
+-  2. Start without lineup.
+-- Preserve the existing ability to start quickly.
+-- Keep organized/tournament behavior unchanged unless existing code already shares the same path and requires a safe guard.
+-
+-Do not:
+-- Make lineups required globally.
+-- Change match status rules unnecessarily.
+-- Rewrite the lineup system.
+-- Modify tournament/fantasy flows.
+-- Add dependencies.
+-
+-## Likely files
+-- lib/features/match/views/match_lobby_screen.dart
+-- lib/features/match/controllers/match_lobby_controller.dart
+-- lib/core/services/match_start_service.dart
+-- lib/features/lineup/controllers/team_lineup_editor_controller.dart
+-- lib/features/lineup/controllers/match_side_lineup_editor_controller.dart
+-
+-## Required behavior
+-When the user taps Start Match for a friendly match and no lineup has been saved:
+-- Show a bottom sheet/dialog explaining that lineups are optional but make the match more professional and shareable.
+-- Primary action: create lineup first.
+-- Secondary action: start without lineup.
+-
+-When at least the relevant lineup is already saved, do not show unnecessary friction.
+-
+-## Suggested Arabic UX copy
+-Use existing tone and localization style. Suggested meaning:
+-- Title: "Start without a lineup?"
+-- Body: "The lineup is optional, but it makes the match look better and lets you share a professional card with the players."
+-- Primary: "Create lineup first"
+-- Secondary: "Start without lineup"
+-
+-Translate naturally into the app's Arabic tone.
+-
+-## Acceptance criteria
+-- [ ] Starting a friendly match without lineup shows a nudge, not a hard block.
+-- [ ] User can choose to create lineup first.
+-- [ ] User can choose to start without lineup.
+-- [ ] Existing start match validation still works.
+-- [ ] No tournament/fantasy behavior is broken.
+-- [ ] User-facing text is Arabic-first.
+-
+-## Testing/checks
+-Run if available:
+-- dart analyze lib/
+-- flutter test
+-
+-If unavailable, state that clearly.
+-
+-## Final report
+-Return:
+-1. Summary of changes.
+-2. Files changed.
+-3. UX behavior changed.
+-4. Tests/checks run.
+-5. Risks or follow-up tasks.
+diff --git a/docs/codex_tasks/005_lineup_save_success_share_cta.md b/docs/codex_tasks/005_lineup_save_success_share_cta.md
+deleted file mode 100644
+index df89a0b..0000000
+--- a/docs/codex_tasks/005_lineup_save_success_share_cta.md
++++ /dev/null
+@@ -1,65 +0,0 @@
+-# Task 005: Clear Share CTA After Saving Lineup
+-
+-## Goal
+-After a lineup is saved successfully, show a clear user-facing CTA to share the lineup, not only a small AppBar icon.
+-
+-## Context
+-Lineup sharing is a growth engine for El7reef. If sharing is hidden, users may never discover one of the most important V1 behaviors.
+-
+-## Product decision
+-Sharing must be visible and encouraged in the core flow.
+-
+-## Scope
+-Do:
+-- Identify the successful lineup save path for team lineups and match-side lineups.
+-- After save success, show a bottom sheet/snackbar/dialog with a clear share action.
+-- Keep the existing AppBar share icon if present, but do not rely on it as the only action.
+-- Reuse the existing share/capture service and share card widgets.
+-- Handle incomplete lineups gracefully if current flow allows saving them.
+-
+-Do not:
+-- Redesign the entire lineup editor.
+-- Build a new share card system.
+-- Add dependencies.
+-- Change lineup formation rules.
+-- Modify tournament/fantasy features.
+-
+-## Likely files
+-- lib/features/lineup/controllers/team_lineup_editor_controller.dart
+-- lib/features/lineup/controllers/match_side_lineup_editor_controller.dart
+-- lib/features/lineup/views/team_lineup_editor_screen.dart
+-- lib/features/lineup/views/match_side_lineup_editor_screen.dart
+-- lib/features/shareables/widgets/lineup_share_card.dart
+-- lib/features/shareables/services/share_card_capture_service.dart
+-
+-## Required behavior
+-After a lineup is saved successfully:
+-- Show a clear success message.
+-- Offer a visible action to share the lineup immediately.
+-- Offer a secondary action to return to the match/lobby or continue editing.
+-
+-If the lineup is incomplete and saving is allowed:
+-- Make it clear that the saved lineup is incomplete before sharing.
+-
+-## Acceptance criteria
+-- [ ] User sees a clear share CTA after saving a lineup.
+-- [ ] Existing AppBar share behavior remains working if present.
+-- [ ] Share action reuses existing share card/capture infrastructure.
+-- [ ] Incomplete lineup behavior remains clear.
+-- [ ] User-facing text is Arabic-first.
+-- [ ] No unrelated features are changed.
+-
+-## Testing/checks
+-Run if available:
+-- dart analyze lib/
+-- flutter test
+-
+-If unavailable, state that clearly.
+-
+-## Final report
+-Return:
+-1. Summary of changes.
+-2. Files changed.
+-3. UX behavior changed.
+-4. Tests/checks run.
+-5. Risks or follow-up tasks.
+diff --git a/docs/codex_tasks/006_result_submit_share_cta.md b/docs/codex_tasks/006_result_submit_share_cta.md
+deleted file mode 100644
+index ed9aa5d..0000000
+--- a/docs/codex_tasks/006_result_submit_share_cta.md
++++ /dev/null
+@@ -1,65 +0,0 @@
+-# Task 006: Show Result Share CTA After Score Submission
+-
+-## Goal
+-After submitting a match result, show a clear result/share CTA instead of simply navigating back.
+-
+-## Context
+-The moment after submitting the score is one of the strongest sharing moments in El7reef. The user should be invited to share the result immediately.
+-
+-## Product decision
+-Result sharing is part of the V1 core loop.
+-
+-## Scope
+-Do:
+-- Locate the score submission success flow.
+-- After a successful score submission, show a bottom sheet/dialog/result action surface.
+-- Include a clear action to share the result card.
+-- Include a secondary action to return to matches/lobby/details.
+-- Reuse existing result share card/controller/services.
+-
+-Do not:
+-- Rewrite score settlement logic.
+-- Change match result data model unless necessary.
+-- Build a new share system.
+-- Modify tournament result settlement unless the same controller is explicitly shared and must remain safe.
+-- Add dependencies.
+-
+-## Likely files
+-- lib/features/match/controllers/score_submit_controller.dart
+-- lib/features/match/views/score_submit_screen.dart
+-- lib/features/lineup/views/match_result_lineup_screen.dart
+-- lib/features/shareables/widgets/match_result_share_card.dart
+-- lib/features/shareables/services/share_card_capture_service.dart
+-- lib/features/shareables/controllers/match_result_share_controller.dart
+-
+-## Required behavior
+-After the user submits a score successfully:
+-- Show confirmation that the result was saved.
+-- Show the score clearly if data is available.
+-- Offer a primary action to share the result.
+-- Offer a secondary action to return to a relevant screen.
+-
+-The user should not be dropped back without a visible next step.
+-
+-## Acceptance criteria
+-- [ ] Successful score submission shows result/share actions.
+-- [ ] Result share action opens or triggers existing result share flow.
+-- [ ] User can still return without sharing.
+-- [ ] Existing validation and score save logic remains intact.
+-- [ ] User-facing text is Arabic-first.
+-- [ ] No unrelated features are changed.
+-
+-## Testing/checks
+-Run if available:
+-- dart analyze lib/
+-- flutter test
+-
+-If unavailable, state that clearly.
+-
+-## Final report
+-Return:
+-1. Summary of changes.
+-2. Files changed.
+-3. UX behavior changed.
+-4. Tests/checks run.
+-5. Risks or follow-up tasks.
+diff --git a/docs/codex_tasks/007_result_share_entry_points.md b/docs/codex_tasks/007_result_share_entry_points.md
+deleted file mode 100644
+index 4fc9500..0000000
+--- a/docs/codex_tasks/007_result_share_entry_points.md
++++ /dev/null
+@@ -1,59 +0,0 @@
+-# Task 007: Add Clear Result Share Entry Points After Result Exists
+-
+-## Goal
+-Make result sharing easy to find after a match result already exists.
+-
+-## Context
+-A user may submit a result and decide to share later. Result sharing should not only be available immediately after submission.
+-
+-## Product decision
+-Sharing is a growth engine and should be discoverable from relevant result surfaces.
+-
+-## Scope
+-Do:
+-- Identify match cards/details/screens where a completed result is shown.
+-- Add or improve a clear result share action when a result exists.
+-- Reuse existing result share card/capture infrastructure.
+-- Keep changes minimal and focused.
+-
+-Do not:
+-- Redesign the entire match list.
+-- Add new share card types.
+-- Change score data model.
+-- Modify fantasy/tournament features unless they share the same result card component safely.
+-
+-## Likely files
+-- lib/features/match/views/match_discover_screen.dart
+-- lib/features/match/views/match_lobby_screen.dart
+-- lib/features/match/widgets/*
+-- lib/features/shareables/widgets/match_result_share_card.dart
+-- lib/features/shareables/controllers/match_result_share_controller.dart
+-- lib/features/shareables/services/share_card_capture_service.dart
+-
+-## Required behavior
+-When a match result exists:
+-- The user can find a clear share action from a relevant match/result surface.
+-- The action should use existing result share functionality.
+-- It should not be hidden only behind a tiny or ambiguous icon if the screen has room for a labeled CTA.
+-
+-## Acceptance criteria
+-- [ ] At least one clear post-result share entry point exists outside the immediate score-submit success flow.
+-- [ ] The entry point appears only when a result exists.
+-- [ ] The share action uses existing infrastructure.
+-- [ ] No unrelated redesign is introduced.
+-- [ ] User-facing text is Arabic-first.
+-
+-## Testing/checks
+-Run if available:
+-- dart analyze lib/
+-- flutter test
+-
+-If unavailable, state that clearly.
+-
+-## Final report
+-Return:
+-1. Summary of changes.
+-2. Files changed.
+-3. UX behavior changed.
+-4. Tests/checks run.
+-5. Risks or follow-up tasks.
+diff --git a/docs/codex_tasks/008_friendly_match_manual_qa_checklist.md b/docs/codex_tasks/008_friendly_match_manual_qa_checklist.md
+deleted file mode 100644
+index 565473a..0000000
+--- a/docs/codex_tasks/008_friendly_match_manual_qa_checklist.md
++++ /dev/null
+@@ -1,64 +0,0 @@
+-# Task 008: Friendly Match Manual QA Checklist
+-
+-## Goal
+-Create or update a manual QA checklist for the Friendly Match Core Loop.
+-
+-## Context
+-After several UX changes, we need a repeatable manual QA path to confirm the user can complete the V1 loop without confusion.
+-
+-## Product decision
+-The MVP is successful only when the full friendly match flow works end-to-end for registered and temporary players.
+-
+-## Scope
+-Do:
+-- Create or update a QA checklist document under docs/.
+-- Cover the complete core flow:
+-  Create Match -> Add Players / Temporary Players -> Optional Lineup -> Start Match -> Submit Result -> Share Lineup / Result.
+-- Include expected behavior and failure signs.
+-- Include Arabic RTL and mobile usability checks.
+-
+-Do not:
+-- Modify app code unless necessary for a tiny doc link or comment.
+-- Add dependencies.
+-- Work on tournaments/fantasy/social feed.
+-
+-## Suggested file
+-- docs/qa/friendly_match_core_loop_qa.md
+-
+-## Required checklist areas
+-Include checks for:
+-- Create a 7v7 friendly match.
+-- Add registered players.
+-- Add temporary players.
+-- Verify counts include temporary players.
+-- Open lineup editor.
+-- Save complete lineup.
+-- Save incomplete lineup if allowed and verify warning.
+-- Share lineup.
+-- Start match with lineup.
+-- Start match without lineup and verify nudge.
+-- Submit score.
+-- Share result immediately after score submission.
+-- Share result later from a result surface.
+-- Verify no misleading "coming soon" appears in the core flow.
+-- Verify Arabic text and RTL layout.
+-
+-## Acceptance criteria
+-- [ ] QA checklist file exists under docs/qa/.
+-- [ ] Checklist covers the full V1 friendly match loop.
+-- [ ] Checklist includes expected results and red flags.
+-- [ ] Checklist includes temporary players and share flows.
+-- [ ] No app behavior is changed unless explicitly justified.
+-
+-## Testing/checks
+-No code tests required if only docs changed.
+-If code changed, run if available:
+-- dart analyze lib/
+-- flutter test
+-
+-## Final report
+-Return:
+-1. Summary of documentation changes.
+-2. Files changed.
+-3. Any code changes, if any.
+-4. Follow-up QA recommendations.
+diff --git a/docs/implementation_plan.md b/docs/implementation_plan.md
+deleted file mode 100644
+index 3132f25..0000000
+--- a/docs/implementation_plan.md
++++ /dev/null
+@@ -1,127 +0,0 @@
+-# El7reef Implementation Plan
+-
+-## Vision
+-El7reef V1 is an Arabic-first street football app that helps organizers create friendly matches, add players even if they are not registered, optionally create lineups, submit results, and share beautiful football cards.
+-
+-## V1 Goal
+-Own the best simple Arabic experience for organizing and sharing a street football match.
+-
+-## Core User Journey
+-Create Match
+-→ Add Players / Guests
+-→ Optional Lineup
+-→ Start Match
+-→ Submit Result
+-→ Share Result / Lineup
+-→ Invite More People
+-
+-## MVP Acceptance Criteria
+-The MVP is successful when a user can:
+-
+-1. Create a 7v7 friendly match.
+-2. Add registered players.
+-3. Add temporary players.
+-4. See correct player counts including temporary players.
+-5. Create an optional lineup.
+-6. Save a complete or incomplete lineup with clear warnings.
+-7. Share the lineup from a clear CTA.
+-8. Start the match without being forced to create a lineup.
+-9. See a nudge before starting without a lineup.
+-10. Submit the final score.
+-11. Share the result immediately after submitting.
+-12. Complete the flow without dead buttons or misleading "coming soon" messages.
+-
+-## Roadmap
+-
+-### Sprint 0: Product Baseline
+-Goal:
+-Define MVP scope, hide distractions, and document the current implementation.
+-
+-Deliverables:
+-- Confirm MVP screens.
+-- Confirm disabled/deferred features.
+-- Confirm feature flags.
+-- Confirm core flow.
+-- Create QA checklist.
+-
+-### Sprint 1: Friendly Match Flow
+-Goal:
+-Make friendly match creation and lobby flow clear and usable.
+-
+-Deliverables:
+-- Clear create match flow.
+-- Correct player counts.
+-- Temporary players visible as real match participants.
+-- Remove misleading "coming soon" messages from core flow.
+-- Clear CTAs in match lobby.
+-
+-### Sprint 2: Optional Lineup Encouragement
+-Goal:
+-Lineups remain optional but are strongly encouraged.
+-
+-Deliverables:
+-- Nudge before starting without lineup.
+-- Clear "Create Lineup" CTA.
+-- Clear "Share Lineup" CTA after saving.
+-- Incomplete lineup warning.
+-
+-### Sprint 3: Result & Share Loop
+-Goal:
+-Turn match completion into a share moment.
+-
+-Deliverables:
+-- Result submission flow shows share actions.
+-- Result card can be opened/shared clearly.
+-- Share fallback/error handling.
+-- Result share CTA accessible from match details/card.
+-
+-### Sprint 4: Guest Identity
+-Goal:
+-Make temporary players first-class citizens.
+-
+-Deliverables:
+-- Better temporary player add/edit flow.
+-- Temporary players appear consistently in counts, lineups, and share cards.
+-- Prepare basic invite/claim path.
+-
+-### Sprint 5: Teams V1
+-Goal:
+-Allow captains to manage simple teams.
+-
+-Deliverables:
+-- Create team.
+-- Add registered and temporary players.
+-- Team profile.
+-- Simple captain/manager controls.
+-- Team lineup reuse.
+-
+-### Sprint 6: Backend Readiness
+-Goal:
+-Prepare for real deployment.
+-
+-Deliverables:
+-- Firestore rules aligned with used collections.
+-- Storage rules reviewed.
+-- Required indexes documented.
+-- Permission model reviewed.
+-- Emulator/staging testing plan.
+-
+-### Sprint 7: Tournaments Lite
+-Goal:
+-Manage small real tournaments without fake surfaces.
+-
+-Deliverables:
+-- Create tournament.
+-- Add/approve teams.
+-- Generate groups/fixtures.
+-- Submit results.
+-- Show real standings.
+-- Complete champion flow.
+-
+-## Deferred
+-- Fantasy.
+-- Advanced social feed.
+-- Advanced stats.
+-- Advanced rankings.
+-- Heavy maps/location experience.
+-- Monetization.
+\ No newline at end of file
+diff --git a/lib/core/constants/feature_flags.dart b/lib/core/constants/feature_flags.dart
+index 61d7a67..12ab7f5 100644
+--- a/lib/core/constants/feature_flags.dart
++++ b/lib/core/constants/feature_flags.dart
+@@ -2,7 +2,14 @@
+ /// until they are backed by production-ready data flows.
+ abstract class FeatureFlags {
+   static const bool fantasyUiEnabled = false;
+-  static const bool activityFeedEnabled = true;
++  static const bool activityFeedEnabled = false;
++  static const bool challengesUiEnabled = false;
++  static const bool friendlyMatchTopLevelEnabled = false;
++  static const bool socialUiEnabled = false;
++  static const bool organizerAdvancedOpsEnabled = false;
++  static const bool goldenRatingUiEnabled = false;
++  static const bool profileSettingsUiEnabled = false;
++  static const bool profileSharingUiEnabled = false;
+   static const bool guestIdentityEnabled = true;
+   static const bool hybridTournamentRegistrationEnabled = true;
+   static const bool matchdayUiEnabled = true;
+diff --git a/lib/features/home/views/home_screen.dart b/lib/features/home/views/home_screen.dart
+index 239c84c..9539c53 100644
+--- a/lib/features/home/views/home_screen.dart
++++ b/lib/features/home/views/home_screen.dart
+@@ -20,7 +20,7 @@ import '../../team/views/my_teams_screen.dart';
+ 
+ import '../../social/widgets/activity_feed_widget.dart';
+ 
+-/// الشاشة الرئيسية — Hub مع Bottom Navigation
++/// الشاشة الرئيسية — V1 Tournament-first hub with secondary loops preserved.
+ class HomeScreen extends StatefulWidget {
+   const HomeScreen({super.key});
+ 
+@@ -38,9 +38,16 @@ class _HomeScreenState extends State<HomeScreen> {
+   }
+ 
+   late final List<Widget> _pages = [
+-    _HomeTab(onNavigateToTab: (i) => setState(() => _currentIndex = i)),
+-    const MatchDiscoverScreen(),
+-    const TournamentListScreen(),
++    if (FeatureFlags.friendlyMatchTopLevelEnabled)
++      _HomeTab(onNavigateToTab: (i) => setState(() => _currentIndex = i)),
++    if (FeatureFlags.friendlyMatchTopLevelEnabled)
++      const MatchDiscoverScreen()
++    else
++      const TournamentListScreen(),
++    if (FeatureFlags.friendlyMatchTopLevelEnabled)
++      const TournamentListScreen()
++    else
++      const MatchDiscoverScreen(),
+     const MyTeamsScreen(),
+     const ProfileScreen(),
+   ];
+@@ -48,10 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
+   @override
+   Widget build(BuildContext context) {
+     return Scaffold(
+-      body: IndexedStack(
+-        index: _currentIndex,
+-        children: _pages,
+-      ),
++      body: IndexedStack(index: _currentIndex, children: _pages),
+       bottomNavigationBar: Container(
+         decoration: const BoxDecoration(
+           color: AppColors.surface,
+@@ -67,31 +71,32 @@ class _HomeScreenState extends State<HomeScreen> {
+           unselectedItemColor: AppColors.textMuted,
+           type: BottomNavigationBarType.fixed,
+           elevation: 0,
+-          items: const [
+-            BottomNavigationBarItem(
+-              icon: Icon(Icons.home_outlined),
+-              activeIcon: Icon(Icons.home_rounded),
+-              label: 'الرئيسية',
+-            ),
+-            BottomNavigationBarItem(
+-              icon: Icon(Icons.explore_outlined),
+-              activeIcon: Icon(Icons.explore_rounded),
+-              label: 'اكتشاف',
+-            ),
++          items: [
++            if (FeatureFlags.friendlyMatchTopLevelEnabled)
++              const BottomNavigationBarItem(
++                icon: Icon(Icons.home_outlined),
++                activeIcon: Icon(Icons.home_rounded),
++                label: 'الرئيسية',
++              ),
+             BottomNavigationBarItem(
+               icon: Icon(Icons.emoji_events_outlined),
+               activeIcon: Icon(Icons.emoji_events_rounded),
+-              label: 'دورات',
++              label: 'البطولات',
++            ),
++            BottomNavigationBarItem(
++              icon: Icon(Icons.sports_soccer_outlined),
++              activeIcon: Icon(Icons.sports_soccer_rounded),
++              label: 'المباريات',
+             ),
+             BottomNavigationBarItem(
+               icon: Icon(Icons.group_outlined),
+               activeIcon: Icon(Icons.group_rounded),
+-              label: 'فرقي',
++              label: 'الفرق',
+             ),
+             BottomNavigationBarItem(
+               icon: Icon(Icons.person_outline),
+               activeIcon: Icon(Icons.person_rounded),
+-              label: 'بروفايل',
++              label: 'أنا',
+             ),
+           ],
+         ),
+@@ -125,349 +130,400 @@ class _HomeTab extends StatelessWidget {
+             },
+             color: AppColors.primary,
+             child: CustomScrollView(
+-             slivers: [
+-              // ── Header ──
+-              SliverToBoxAdapter(
+-                child: Padding(
+-                  padding: const EdgeInsets.all(AppDimensions.pagePadding),
+-                  child: Row(
+-                    children: [
+-                      Expanded(
+-                        child: Column(
+-                          crossAxisAlignment: CrossAxisAlignment.start,
+-                          children: [
+-                            ClipRRect(
+-                              borderRadius: BorderRadius.circular(8),
+-                              child: Image.asset(
+-                                'assets/images/logo_icon.png',
+-                                height: 36,
+-                                width: 36,
+-                                fit: BoxFit.cover,
+-                              ),
+-                            ),
+-                            const SizedBox(height: AppDimensions.sm),
+-                            Text(
+-                              'أهلاً ${player?.name ?? 'يا حريف'} 👋',
+-                              style: AppTextStyles.headlineMedium,
+-                            ),
+-                            Text(
+-                              'جاهز للملعب النهارده؟',
+-                              style: AppTextStyles.bodyMedium,
+-                            ),
+-                          ],
+-                        ),
+-                      ).animate().fadeIn(duration: 500.ms),
+-                      const SizedBox(width: AppDimensions.sm),
+-                      if (player != null) ...[                        
+-                        RankTierBadge(rating: player.rating)
+-                            .animate()
+-                            .fadeIn(delay: 200.ms),
+-                        const SizedBox(width: AppDimensions.sm),
+-                        CircleAvatar(
+-                          radius: 22,
+-                          backgroundColor: AppColors.primarySurface,
+-                          backgroundImage: player.photoThumbUrl != null
+-                              ? NetworkImage(player.photoThumbUrl!)
+-                              : null,
+-                          child: player.photoThumbUrl == null
+-                              ? const Icon(Icons.person, color: AppColors.primary, size: 22)
+-                              : null,
+-                        ).animate().fadeIn(delay: 300.ms),
+-                      ],
+-                    ],
+-                  ),
+-                ),
+-              ),
+-
+-              // ── بطاقة Rating السريعة ──
+-              if (player != null)
++              slivers: [
++                // ── Header ──
+                 SliverToBoxAdapter(
+                   child: Padding(
+-                    padding: const EdgeInsets.symmetric(
+-                      horizontal: AppDimensions.pagePadding,
+-                    ),
+-                    child: GlassmorphicContainer(
+-                      padding: const EdgeInsets.all(AppDimensions.lg),
+-                      borderRadius: AppDimensions.radiusLg,
+-                      child: Row(
+-                        children: [
+-                          // Rating
+-                          Column(
++                    padding: const EdgeInsets.all(AppDimensions.pagePadding),
++                    child: Row(
++                      children: [
++                        Expanded(
++                          child: Column(
+                             crossAxisAlignment: CrossAxisAlignment.start,
+                             children: [
+-                              Text('تقييمك الحالي',
+-                                  style: AppTextStyles.labelMedium),
+-                              const SizedBox(height: 4),
++                              ClipRRect(
++                                borderRadius: BorderRadius.circular(8),
++                                child: Image.asset(
++                                  'assets/images/logo_icon.png',
++                                  height: 36,
++                                  width: 36,
++                                  fit: BoxFit.cover,
++                                ),
++                              ),
++                              const SizedBox(height: AppDimensions.sm),
+                               Text(
+-                                '${player.rating}',
+-                                style: AppTextStyles.ratingLarge.copyWith(fontSize: 36),
++                                'أهلاً ${player?.name ?? 'يا حريف'} 👋',
++                                style: AppTextStyles.headlineMedium,
+                               ),
+-                            ],
+-                          ),
+-                          const Spacer(),
+-                          // Stats مصغرة
+-                          Column(
+-                            children: [
+-                              _miniStat('${player.totalMatches}', 'مباراة'),
+-                              const SizedBox(height: 8),
+-                              _miniStat('${player.wins}', 'فوز'),
+-                            ],
+-                          ),
+-                          const SizedBox(width: AppDimensions.lg),
+-                          Column(
+-                            children: [
+-                              _miniStat('${player.mvpCount}', 'MVP'),
+-                              const SizedBox(height: 8),
+-                              _miniStat(
+-                                '${player.winRate.toStringAsFixed(0)}%',
+-                                'نسبة',
++                              Text(
++                                'جاهز للملعب النهارده؟',
++                                style: AppTextStyles.bodyMedium,
+                               ),
+                             ],
+                           ),
++                        ).animate().fadeIn(duration: 500.ms),
++                        const SizedBox(width: AppDimensions.sm),
++                        if (player != null) ...[
++                          RankTierBadge(
++                            rating: player.rating,
++                          ).animate().fadeIn(delay: 200.ms),
++                          const SizedBox(width: AppDimensions.sm),
++                          CircleAvatar(
++                            radius: 22,
++                            backgroundColor: AppColors.primarySurface,
++                            backgroundImage: player.photoThumbUrl != null
++                                ? NetworkImage(player.photoThumbUrl!)
++                                : null,
++                            child: player.photoThumbUrl == null
++                                ? const Icon(
++                                    Icons.person,
++                                    color: AppColors.primary,
++                                    size: 22,
++                                  )
++                                : null,
++                          ).animate().fadeIn(delay: 300.ms),
+                         ],
+-                      ),
+-                    ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.1),
++                      ],
++                    ),
+                   ),
+                 ),
+ 
+-              // ── Quick Actions ──
+-              SliverToBoxAdapter(
+-                child: Padding(
+-                  padding: const EdgeInsets.all(AppDimensions.pagePadding),
+-                  child: Column(
+-                    crossAxisAlignment: CrossAxisAlignment.start,
+-                    children: [
+-                      Text('إجراءات سريعة',
+-                              style: AppTextStyles.titleLarge)
+-                          .animate()
+-                          .fadeIn(delay: 400.ms),
+-                      const SizedBox(height: AppDimensions.md),
+-                      Row(
+-                        children: [
+-                          _actionCard(
+-                            '⚽', 'المباريات', AppColors.primary,
+-                            () => onNavigateToTab(1),
+-                          ),
+-                          const SizedBox(width: AppDimensions.md),
+-                          _actionCard(
+-                            '🏆', 'البطولات', AppColors.secondary,
+-                            () => onNavigateToTab(2),
+-                          ),
+-                          const SizedBox(width: AppDimensions.md),
+-                          _actionCard(
+-                            '👥', 'فرقي', AppColors.accent,
+-                            () => onNavigateToTab(3),
+-                          ),
+-                        ],
+-                      ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.1),
+-                      const SizedBox(height: AppDimensions.md),
+-                      if (FeatureFlags.fantasyUiEnabled) ...[
+-                      Row(
+-                        children: [
+-                          _actionCard(
+-                            '✨', 'فانتازي\nليج', AppColors.secondary,
+-                            () => Get.toNamed(AppRoutes.fantasyHome),
+-                          ),
+-                          const SizedBox(width: AppDimensions.md),
+-                          Expanded(
+-                            flex: 2,
+-                            child: GlassmorphicContainer(
+-                              padding: const EdgeInsets.all(AppDimensions.md),
+-                              borderRadius: AppDimensions.radiusLg,
+-                              child: Column(
+-                                crossAxisAlignment: CrossAxisAlignment.start,
+-                                children: [
+-                                  Text(
+-                                    'ابدأ فانتازي الحريف',
+-                                    style: AppTextStyles.titleMedium,
++                // ── بطاقة Rating السريعة ──
++                if (player != null)
++                  SliverToBoxAdapter(
++                    child: Padding(
++                      padding: const EdgeInsets.symmetric(
++                        horizontal: AppDimensions.pagePadding,
++                      ),
++                      child: GlassmorphicContainer(
++                        padding: const EdgeInsets.all(AppDimensions.lg),
++                        borderRadius: AppDimensions.radiusLg,
++                        child: Row(
++                          children: [
++                            // Rating
++                            Column(
++                              crossAxisAlignment: CrossAxisAlignment.start,
++                              children: [
++                                Text(
++                                  'تقييمك الحالي',
++                                  style: AppTextStyles.labelMedium,
++                                ),
++                                const SizedBox(height: 4),
++                                Text(
++                                  '${player.rating}',
++                                  style: AppTextStyles.ratingLarge.copyWith(
++                                    fontSize: 36,
++                                  ),
++                                ),
++                              ],
++                            ),
++                            const Spacer(),
++                            // Stats مصغرة
++                            Column(
++                              children: [
++                                _miniStat('${player.totalMatches}', 'مباراة'),
++                                const SizedBox(height: 8),
++                                _miniStat('${player.wins}', 'فوز'),
++                              ],
++                            ),
++                            const SizedBox(width: AppDimensions.lg),
++                            Column(
++                              children: [
++                                _miniStat('${player.mvpCount}', 'MVP'),
++                                const SizedBox(height: 8),
++                                _miniStat(
++                                  '${player.winRate.toStringAsFixed(0)}%',
++                                  'نسبة',
++                                ),
++                              ],
++                            ),
++                          ],
++                        ),
++                      ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.1),
++                    ),
++                  ),
++
++                // ── Quick Actions ──
++                SliverToBoxAdapter(
++                  child: Padding(
++                    padding: const EdgeInsets.all(AppDimensions.pagePadding),
++                    child: Column(
++                      crossAxisAlignment: CrossAxisAlignment.start,
++                      children: [
++                        Text(
++                          'إجراءات سريعة',
++                          style: AppTextStyles.titleLarge,
++                        ).animate().fadeIn(delay: 400.ms),
++                        const SizedBox(height: AppDimensions.md),
++                        Row(
++                          children: [
++                            _actionCard(
++                              '⚽',
++                              'المباريات',
++                              AppColors.primary,
++                              () => onNavigateToTab(1),
++                            ),
++                            const SizedBox(width: AppDimensions.md),
++                            _actionCard(
++                              '🏆',
++                              'البطولات',
++                              AppColors.secondary,
++                              () => onNavigateToTab(2),
++                            ),
++                            const SizedBox(width: AppDimensions.md),
++                            _actionCard(
++                              '👥',
++                              'فرقي',
++                              AppColors.accent,
++                              () => onNavigateToTab(3),
++                            ),
++                          ],
++                        ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.1),
++                        const SizedBox(height: AppDimensions.md),
++                        if (FeatureFlags.fantasyUiEnabled) ...[
++                          Row(
++                            children: [
++                              _actionCard(
++                                '✨',
++                                'فانتازي\nليج',
++                                AppColors.secondary,
++                                () => Get.toNamed(AppRoutes.fantasyHome),
++                              ),
++                              const SizedBox(width: AppDimensions.md),
++                              Expanded(
++                                flex: 2,
++                                child: GlassmorphicContainer(
++                                  padding: const EdgeInsets.all(
++                                    AppDimensions.md,
+                                   ),
+-                                  const SizedBox(height: 4),
+-                                  Text(
+-                                    'ابنِ تشكيلتك وادخل سباق النقاط في الدوري العالمي أو البطولات المفعّل عليها الفانتازي.',
+-                                    style: AppTextStyles.bodySmall,
++                                  borderRadius: AppDimensions.radiusLg,
++                                  child: Column(
++                                    crossAxisAlignment:
++                                        CrossAxisAlignment.start,
++                                    children: [
++                                      Text(
++                                        'ابدأ فانتازي الحريف',
++                                        style: AppTextStyles.titleMedium,
++                                      ),
++                                      const SizedBox(height: 4),
++                                      Text(
++                                        'ابنِ تشكيلتك وادخل سباق النقاط في الدوري العالمي أو البطولات المفعّل عليها الفانتازي.',
++                                        style: AppTextStyles.bodySmall,
++                                      ),
++                                    ],
+                                   ),
+-                                ],
++                                ),
+                               ),
+-                            ),
+-                          ),
++                            ],
++                          ).animate().fadeIn(delay: 560.ms).slideY(begin: 0.1),
+                         ],
+-                      ).animate().fadeIn(delay: 560.ms).slideY(begin: 0.1),
+                       ],
+-                    ],
++                    ),
+                   ),
+                 ),
+-              ),
+ 
+-              const SliverToBoxAdapter(child: SizedBox(height: AppDimensions.sm)),
++                const SliverToBoxAdapter(
++                  child: SizedBox(height: AppDimensions.sm),
++                ),
+ 
+-              // ── Activity Feed ──
+-              const SliverToBoxAdapter(
+-                child: ActivityFeedWidget(),
+-              ),
++                // ── Activity Feed ──
++                if (FeatureFlags.activityFeedEnabled)
++                  const SliverToBoxAdapter(child: ActivityFeedWidget()),
+ 
+-              const SliverToBoxAdapter(child: SizedBox(height: AppDimensions.lg)),
++                const SliverToBoxAdapter(
++                  child: SizedBox(height: AppDimensions.lg),
++                ),
+ 
+-              // ── المباريات الجارية ──
+-              SliverToBoxAdapter(
+-                child: Padding(
+-                  padding: const EdgeInsets.fromLTRB(
+-                    AppDimensions.pagePadding, 0,
+-                    AppDimensions.pagePadding, AppDimensions.sm,
+-                  ),
+-                  child: Row(
+-                    children: [
+-                      Text('المباريات الجارية', style: AppTextStyles.titleLarge)
+-                          .animate().fadeIn(delay: 500.ms),
+-                      const Spacer(),
+-                      GestureDetector(
+-                        onTap: () => onNavigateToTab(1),
+-                        child: Text('عرض الكل',
++                // ── المباريات الجارية ──
++                SliverToBoxAdapter(
++                  child: Padding(
++                    padding: const EdgeInsets.fromLTRB(
++                      AppDimensions.pagePadding,
++                      0,
++                      AppDimensions.pagePadding,
++                      AppDimensions.sm,
++                    ),
++                    child: Row(
++                      children: [
++                        Text(
++                          'المباريات الجارية',
++                          style: AppTextStyles.titleLarge,
++                        ).animate().fadeIn(delay: 500.ms),
++                        const Spacer(),
++                        GestureDetector(
++                          onTap: () => onNavigateToTab(1),
++                          child: Text(
++                            'عرض الكل',
+                             style: AppTextStyles.labelMedium.copyWith(
+                               color: AppColors.primary,
+-                            )).animate().fadeIn(delay: 500.ms),
+-                      ),
+-                    ],
++                            ),
++                          ).animate().fadeIn(delay: 500.ms),
++                        ),
++                      ],
++                    ),
+                   ),
+                 ),
+-              ),
+ 
+-              // ── قائمة المباريات الحية ──
+-              SliverToBoxAdapter(
+-                child: Obx(() {
+-                  final matchCtrl = Get.find<MatchController>();
+-                  final liveMatches = matchCtrl.liveMatches;
++                // ── قائمة المباريات الحية ──
++                SliverToBoxAdapter(
++                  child: Obx(() {
++                    final matchCtrl = Get.find<MatchController>();
++                    final liveMatches = matchCtrl.liveMatches;
+ 
+-                  if (matchCtrl.isLoading.value && liveMatches.isEmpty) {
+-                    return Padding(
+-                      padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
+-                      child: LoadingShimmer.list(count: 2),
+-                    );
+-                  }
++                    if (matchCtrl.isLoading.value && liveMatches.isEmpty) {
++                      return Padding(
++                        padding: const EdgeInsets.symmetric(
++                          horizontal: AppDimensions.pagePadding,
++                        ),
++                        child: LoadingShimmer.list(count: 2),
++                      );
++                    }
+ 
+-                  if (liveMatches.isEmpty) {
+-                    return Padding(
+-                      padding: const EdgeInsets.symmetric(
+-                        horizontal: AppDimensions.pagePadding,
+-                      ),
+-                      child: GlassmorphicContainer(
+-                        padding: const EdgeInsets.all(AppDimensions.lg),
+-                        borderRadius: AppDimensions.radiusLg,
+-                        child: Row(
+-                          children: [
+-                            const Text('⚽', style: TextStyle(fontSize: 32)),
+-                            const SizedBox(width: AppDimensions.md),
+-                            Expanded(
+-                              child: Column(
+-                                crossAxisAlignment: CrossAxisAlignment.start,
+-                                children: [
+-                                  Text('ما فيش مباريات جارية',
+-                                      style: AppTextStyles.titleMedium),
+-                                  Text('كن أول من يبدأ!',
+-                                      style: AppTextStyles.bodySmall),
+-                                ],
++                    if (liveMatches.isEmpty) {
++                      return Padding(
++                        padding: const EdgeInsets.symmetric(
++                          horizontal: AppDimensions.pagePadding,
++                        ),
++                        child: GlassmorphicContainer(
++                          padding: const EdgeInsets.all(AppDimensions.lg),
++                          borderRadius: AppDimensions.radiusLg,
++                          child: Row(
++                            children: [
++                              const Text('⚽', style: TextStyle(fontSize: 32)),
++                              const SizedBox(width: AppDimensions.md),
++                              Expanded(
++                                child: Column(
++                                  crossAxisAlignment: CrossAxisAlignment.start,
++                                  children: [
++                                    Text(
++                                      'ما فيش مباريات جارية',
++                                      style: AppTextStyles.titleMedium,
++                                    ),
++                                    Text(
++                                      'كن أول من يبدأ!',
++                                      style: AppTextStyles.bodySmall,
++                                    ),
++                                  ],
++                                ),
+                               ),
+-                            ),
+-                          ],
++                            ],
++                          ),
++                        ).animate().fadeIn(delay: 600.ms),
++                      );
++                    }
++
++                    return SizedBox(
++                      height: 130,
++                      child: ListView.builder(
++                        scrollDirection: Axis.horizontal,
++                        padding: const EdgeInsets.symmetric(
++                          horizontal: AppDimensions.pagePadding,
+                         ),
+-                      ).animate().fadeIn(delay: 600.ms),
+-                    );
+-                  }
+-
+-                  return SizedBox(
+-                    height: 130,
+-                    child: ListView.builder(
+-                      scrollDirection: Axis.horizontal,
+-                      padding: const EdgeInsets.symmetric(
+-                        horizontal: AppDimensions.pagePadding,
++                        itemCount: liveMatches.length.clamp(0, 5),
++                        itemBuilder: (context, index) {
++                          final match = liveMatches[index];
++                          return GestureDetector(
++                            onTap: () =>
++                                Get.toNamed('/match/lobby/${match.id}'),
++                            child: _LiveMatchCard(match: match, index: index),
++                          );
++                        },
+                       ),
+-                      itemCount: liveMatches.length.clamp(0, 5),
+-                      itemBuilder: (context, index) {
+-                        final match = liveMatches[index];
+-                        return GestureDetector(
+-                          onTap: () => Get.toNamed('/match/lobby/${match.id}'),
+-                          child: _LiveMatchCard(match: match, index: index),
+-                        );
+-                      },
+-                    ),
+-                  );
+-                }),
+-              ),
++                    );
++                  }),
++                ),
+ 
+-              const SliverToBoxAdapter(child: SizedBox(height: AppDimensions.md)),
++                const SliverToBoxAdapter(
++                  child: SizedBox(height: AppDimensions.md),
++                ),
+ 
+-              // ── آخر مباراياتي ──
+-              SliverToBoxAdapter(
+-                child: Padding(
+-                  padding: const EdgeInsets.symmetric(
+-                    horizontal: AppDimensions.pagePadding,
++                // ── آخر مباراياتي ──
++                SliverToBoxAdapter(
++                  child: Padding(
++                    padding: const EdgeInsets.symmetric(
++                      horizontal: AppDimensions.pagePadding,
++                    ),
++                    child: Text(
++                      'آخر مبارياتي',
++                      style: AppTextStyles.titleLarge,
++                    ).animate().fadeIn(delay: 600.ms),
+                   ),
+-                  child: Text('آخر مبارياتي', style: AppTextStyles.titleLarge)
+-                      .animate().fadeIn(delay: 600.ms),
+                 ),
+-              ),
+-              const SliverToBoxAdapter(child: SizedBox(height: AppDimensions.sm)),
+-
+-              SliverToBoxAdapter(
+-                child: Obx(() {
+-                  final matchCtrl = Get.find<MatchController>();
+-                  final myMatches = matchCtrl.myMatches;
++                const SliverToBoxAdapter(
++                  child: SizedBox(height: AppDimensions.sm),
++                ),
+ 
+-                  if (matchCtrl.isLoading.value && myMatches.isEmpty) {
+-                    return Padding(
+-                      padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
+-                      child: LoadingShimmer.list(count: 2),
+-                    );
+-                  }
++                SliverToBoxAdapter(
++                  child: Obx(() {
++                    final matchCtrl = Get.find<MatchController>();
++                    final myMatches = matchCtrl.myMatches;
+ 
+-                  if (myMatches.isEmpty) {
+-                    return Padding(
+-                      padding: const EdgeInsets.symmetric(
+-                        horizontal: AppDimensions.pagePadding,
+-                      ),
+-                      child: GlassmorphicContainer(
+-                        padding: const EdgeInsets.all(AppDimensions.lg),
+-                        borderRadius: AppDimensions.radiusLg,
+-                        child: Row(
+-                          children: [
+-                            const Text('📋', style: TextStyle(fontSize: 32)),
+-                            const SizedBox(width: AppDimensions.md),
+-                            Expanded(
+-                              child: Column(
+-                                crossAxisAlignment: CrossAxisAlignment.start,
+-                                children: [
+-                                  Text('ماعندكش مباريات لسه',
+-                                      style: AppTextStyles.titleMedium),
+-                                  Text('العب أول مباراة وابدأ رحلتك!',
+-                                      style: AppTextStyles.bodySmall),
+-                                ],
+-                              ),
+-                            ),
+-                          ],
++                    if (matchCtrl.isLoading.value && myMatches.isEmpty) {
++                      return Padding(
++                        padding: const EdgeInsets.symmetric(
++                          horizontal: AppDimensions.pagePadding,
+                         ),
+-                      ).animate().fadeIn(delay: 700.ms),
+-                    );
+-                  }
++                        child: LoadingShimmer.list(count: 2),
++                      );
++                    }
+ 
+-                  return Column(
+-                    children: myMatches.take(3).toList().asMap().entries.map((e) {
++                    if (myMatches.isEmpty) {
+                       return Padding(
+-                        padding: const EdgeInsets.fromLTRB(
+-                          AppDimensions.pagePadding, 0,
+-                          AppDimensions.pagePadding, AppDimensions.sm,
+-                        ),
+-                        child: GestureDetector(
+-                          onTap: () => Get.toNamed('/match/lobby/${e.value.id}'),
+-                          child: _MyMatchCard(match: e.value, index: e.key),
++                        padding: const EdgeInsets.symmetric(
++                          horizontal: AppDimensions.pagePadding,
+                         ),
++                        child: GlassmorphicContainer(
++                          padding: const EdgeInsets.all(AppDimensions.lg),
++                          borderRadius: AppDimensions.radiusLg,
++                          child: Row(
++                            children: [
++                              const Text('📋', style: TextStyle(fontSize: 32)),
++                              const SizedBox(width: AppDimensions.md),
++                              Expanded(
++                                child: Column(
++                                  crossAxisAlignment: CrossAxisAlignment.start,
++                                  children: [
++                                    Text(
++                                      'ماعندكش مباريات لسه',
++                                      style: AppTextStyles.titleMedium,
++                                    ),
++                                    Text(
++                                      'العب أول مباراة وابدأ رحلتك!',
++                                      style: AppTextStyles.bodySmall,
++                                    ),
++                                  ],
++                                ),
++                              ),
++                            ],
++                          ),
++                        ).animate().fadeIn(delay: 700.ms),
+                       );
+-                    }).toList(),
+-                  );
+-                }),
+-              ),
+-
+-            ],
+-          ),  // CustomScrollView
+-          );  // RefreshIndicator
++                    }
++
++                    return Column(
++                      children: myMatches.take(3).toList().asMap().entries.map((
++                        e,
++                      ) {
++                        return Padding(
++                          padding: const EdgeInsets.fromLTRB(
++                            AppDimensions.pagePadding,
++                            0,
++                            AppDimensions.pagePadding,
++                            AppDimensions.sm,
++                          ),
++                          child: GestureDetector(
++                            onTap: () =>
++                                Get.toNamed('/match/lobby/${e.value.id}'),
++                            child: _MyMatchCard(match: e.value, index: e.key),
++                          ),
++                        );
++                      }).toList(),
++                    );
++                  }),
++                ),
++              ],
++            ), // CustomScrollView
++          ); // RefreshIndicator
+         }),
+       ),
+     );
+@@ -476,15 +532,21 @@ class _HomeTab extends StatelessWidget {
+   Widget _miniStat(String value, String label) {
+     return Column(
+       children: [
+-        Text(value,
+-            style: AppTextStyles.titleLarge.copyWith(color: AppColors.primary)),
++        Text(
++          value,
++          style: AppTextStyles.titleLarge.copyWith(color: AppColors.primary),
++        ),
+         Text(label, style: AppTextStyles.labelSmall),
+       ],
+     );
+   }
+ 
+   Widget _actionCard(
+-      String emoji, String label, Color color, VoidCallback onTap) {
++    String emoji,
++    String label,
++    Color color,
++    VoidCallback onTap,
++  ) {
+     return Expanded(
+       child: GestureDetector(
+         onTap: onTap,
+@@ -512,9 +574,6 @@ class _HomeTab extends StatelessWidget {
+   }
+ }
+ 
+-
+-
+-
+ // ── بطاقة المباراة الجارية (أفقية - Carousel) ──
+ class _LiveMatchCard extends StatelessWidget {
+   final Match match;
+@@ -527,104 +586,115 @@ class _LiveMatchCard extends StatelessWidget {
+     final Color statusColor = match.status == MatchStatus.live
+         ? AppColors.primary
+         : match.status == MatchStatus.open
+-            ? AppColors.success
+-            : AppColors.textMuted;
++        ? AppColors.success
++        : AppColors.textMuted;
+     final matchController = Get.find<MatchController>();
+ 
+     return Container(
+-      width: 200,
+-      margin: const EdgeInsetsDirectional.only(end: AppDimensions.sm),
+-      decoration: BoxDecoration(
+-        color: AppColors.surface,
+-        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+-        border: Border.all(
+-          color: statusColor.withValues(alpha: 0.35),
+-          width: 1,
+-        ),
+-        boxShadow: [
+-          BoxShadow(
+-            color: statusColor.withValues(alpha: 0.12),
+-            blurRadius: 10,
+-            spreadRadius: 1,
++          width: 200,
++          margin: const EdgeInsetsDirectional.only(end: AppDimensions.sm),
++          decoration: BoxDecoration(
++            color: AppColors.surface,
++            borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
++            border: Border.all(
++              color: statusColor.withValues(alpha: 0.35),
++              width: 1,
++            ),
++            boxShadow: [
++              BoxShadow(
++                color: statusColor.withValues(alpha: 0.12),
++                blurRadius: 10,
++                spreadRadius: 1,
++              ),
++            ],
+           ),
+-        ],
+-      ),
+-      child: Padding(
+-        padding: const EdgeInsets.all(AppDimensions.md),
+-        child: Column(
+-          crossAxisAlignment: CrossAxisAlignment.start,
+-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+-          children: [
+-            // حالة المباراة
+-            Row(
++          child: Padding(
++            padding: const EdgeInsets.all(AppDimensions.md),
++            child: Column(
++              crossAxisAlignment: CrossAxisAlignment.start,
++              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+               children: [
+-                Container(
+-                  width: 8,
+-                  height: 8,
+-                  decoration: BoxDecoration(
+-                    shape: BoxShape.circle,
+-                    color: statusColor,
+-                  ),
+-                ),
+-                const SizedBox(width: 6),
+-                Text(
+-                  match.status == MatchStatus.live
+-                      ? 'جارية الآن'
+-                      : match.status == MatchStatus.open
++                // حالة المباراة
++                Row(
++                  children: [
++                    Container(
++                      width: 8,
++                      height: 8,
++                      decoration: BoxDecoration(
++                        shape: BoxShape.circle,
++                        color: statusColor,
++                      ),
++                    ),
++                    const SizedBox(width: 6),
++                    Text(
++                      match.status == MatchStatus.live
++                          ? 'جارية الآن'
++                          : match.status == MatchStatus.open
+                           ? 'مفتوحة'
+                           : 'منتهية',
+-                  style: AppTextStyles.labelSmall.copyWith(color: statusColor),
++                      style: AppTextStyles.labelSmall.copyWith(
++                        color: statusColor,
++                      ),
++                    ),
++                    const Spacer(),
++                    if (match.isGoldenRating)
++                      const Icon(
++                        Icons.star_rounded,
++                        color: AppColors.secondary,
++                        size: 16,
++                      ),
++                  ],
+                 ),
+-                const Spacer(),
+-                if (match.isGoldenRating)
+-                  const Icon(Icons.star_rounded,
+-                      color: AppColors.secondary, size: 16),
+-              ],
+-            ),
+ 
+-            // الفريقان والنتيجة
+-            Row(
+-              mainAxisAlignment: MainAxisAlignment.center,
+-              children: [
+-                Text('🔵', style: const TextStyle(fontSize: 22)),
+-                const SizedBox(width: 6),
+-                match.isCompleted && match.scoreTeamA != null
+-                    ? Text(
+-                        '${match.scoreTeamA} - ${match.scoreTeamB}',
+-                        style: AppTextStyles.titleLarge.copyWith(
+-                          color: AppColors.textPrimary,
+-                        ),
+-                      )
+-                    : Text('vs', style: AppTextStyles.titleMedium),
+-                const SizedBox(width: 6),
+-                Text('🔴', style: const TextStyle(fontSize: 22)),
+-              ],
+-            ),
++                // الفريقان والنتيجة
++                Row(
++                  mainAxisAlignment: MainAxisAlignment.center,
++                  children: [
++                    Text('🔵', style: const TextStyle(fontSize: 22)),
++                    const SizedBox(width: 6),
++                    match.isCompleted && match.scoreTeamA != null
++                        ? Text(
++                            '${match.scoreTeamA} - ${match.scoreTeamB}',
++                            style: AppTextStyles.titleLarge.copyWith(
++                              color: AppColors.textPrimary,
++                            ),
++                          )
++                        : Text('vs', style: AppTextStyles.titleMedium),
++                    const SizedBox(width: 6),
++                    Text('🔴', style: const TextStyle(fontSize: 22)),
++                  ],
++                ),
+ 
+-            // تفاصيل
+-            Row(
+-              children: [
+-                Icon(Icons.people_outline, size: 14, color: AppColors.textMuted),
+-                const SizedBox(width: 4),
+-                Obx(
+-                  () => Text(
+-                    matchController.totalParticipantCountLabel(match),
+-                    style: AppTextStyles.labelSmall,
+-                  ),
++                // تفاصيل
++                Row(
++                  children: [
++                    Icon(
++                      Icons.people_outline,
++                      size: 14,
++                      color: AppColors.textMuted,
++                    ),
++                    const SizedBox(width: 4),
++                    Obx(
++                      () => Text(
++                        matchController.totalParticipantCountLabel(match),
++                        style: AppTextStyles.labelSmall,
++                      ),
++                    ),
++                    const Spacer(),
++                    if (match.isFrozen)
++                      const Icon(Icons.lock, size: 14, color: AppColors.error),
++                  ],
+                 ),
+-                const Spacer(),
+-                if (match.isFrozen)
+-                  const Icon(Icons.lock, size: 14, color: AppColors.error),
+               ],
+             ),
+-          ],
+-        ),
+-      ),
+-    ).animate(delay: (100 * index).ms).fadeIn(duration: 400.ms).slideX(begin: 0.2);
++          ),
++        )
++        .animate(delay: (100 * index).ms)
++        .fadeIn(duration: 400.ms)
++        .slideX(begin: 0.2);
+   }
+ }
+ 
+-
+ // ── بطاقة مبارياتي الأخيرة ──
+ class _MyMatchCard extends StatelessWidget {
+   final Match match;
+@@ -659,70 +729,81 @@ class _MyMatchCard extends StatelessWidget {
+     }
+ 
+     return GlassmorphicContainer(
+-      padding: const EdgeInsets.symmetric(
+-        horizontal: AppDimensions.md,
+-        vertical: AppDimensions.sm,
+-      ),
+-      borderRadius: AppDimensions.radiusMd,
+-      child: Row(
+-        children: [
+-          // أيقونة النتيجة
+-          Container(
+-            width: 44,
+-            height: 44,
+-            decoration: BoxDecoration(
+-              color: resultColor.withValues(alpha: 0.12),
+-              shape: BoxShape.circle,
+-              border: Border.all(color: resultColor.withValues(alpha: 0.4)),
+-            ),
+-            child: Center(
+-              child: Text(
+-                resultLabel == 'فوز' ? '🏆' : resultLabel == 'خسارة' ? '😤' : '🤝',
+-                style: const TextStyle(fontSize: 20),
+-              ),
+-            ),
++          padding: const EdgeInsets.symmetric(
++            horizontal: AppDimensions.md,
++            vertical: AppDimensions.sm,
+           ),
+-          const SizedBox(width: AppDimensions.md),
+-
+-          // معلومات المباراة
+-          Expanded(
+-            child: Column(
+-              crossAxisAlignment: CrossAxisAlignment.start,
+-              children: [
+-                Text(
+-                  match.status == MatchStatus.settled
+-                      ? 'مباراة منتهية'
+-                      : match.status == MatchStatus.live
++          borderRadius: AppDimensions.radiusMd,
++          child: Row(
++            children: [
++              // أيقونة النتيجة
++              Container(
++                width: 44,
++                height: 44,
++                decoration: BoxDecoration(
++                  color: resultColor.withValues(alpha: 0.12),
++                  shape: BoxShape.circle,
++                  border: Border.all(color: resultColor.withValues(alpha: 0.4)),
++                ),
++                child: Center(
++                  child: Text(
++                    resultLabel == 'فوز'
++                        ? '🏆'
++                        : resultLabel == 'خسارة'
++                        ? '😤'
++                        : '🤝',
++                    style: const TextStyle(fontSize: 20),
++                  ),
++                ),
++              ),
++              const SizedBox(width: AppDimensions.md),
++
++              // معلومات المباراة
++              Expanded(
++                child: Column(
++                  crossAxisAlignment: CrossAxisAlignment.start,
++                  children: [
++                    Text(
++                      match.status == MatchStatus.settled
++                          ? 'مباراة منتهية'
++                          : match.status == MatchStatus.live
+                           ? 'مباراة جارية'
+                           : 'قيد التسوية',
+-                  style: AppTextStyles.titleMedium,
+-                ),
+-                Text(
+-                  _formatDate(match.createdAt),
+-                  style: AppTextStyles.labelSmall,
++                      style: AppTextStyles.titleMedium,
++                    ),
++                    Text(
++                      _formatDate(match.createdAt),
++                      style: AppTextStyles.labelSmall,
++                    ),
++                  ],
+                 ),
+-              ],
+-            ),
+-          ),
++              ),
+ 
+-          // النتيجة
+-          Column(
+-            crossAxisAlignment: CrossAxisAlignment.end,
+-            children: [
+-              if (myScore != null)
+-                Text(
+-                  '$myScore - $oppScore',
+-                  style: AppTextStyles.titleLarge.copyWith(color: resultColor),
+-                ),
+-              Text(
+-                resultLabel,
+-                style: AppTextStyles.labelSmall.copyWith(color: resultColor),
++              // النتيجة
++              Column(
++                crossAxisAlignment: CrossAxisAlignment.end,
++                children: [
++                  if (myScore != null)
++                    Text(
++                      '$myScore - $oppScore',
++                      style: AppTextStyles.titleLarge.copyWith(
++                        color: resultColor,
++                      ),
++                    ),
++                  Text(
++                    resultLabel,
++                    style: AppTextStyles.labelSmall.copyWith(
++                      color: resultColor,
++                    ),
++                  ),
++                ],
+               ),
+             ],
+           ),
+-        ],
+-      ),
+-    ).animate(delay: (120 * index).ms).fadeIn(duration: 400.ms).slideY(begin: 0.1);
++        )
++        .animate(delay: (120 * index).ms)
++        .fadeIn(duration: 400.ms)
++        .slideY(begin: 0.1);
+   }
+ 
+   String _formatDate(DateTime date) {
+diff --git a/lib/features/match/views/match_discover_screen.dart b/lib/features/match/views/match_discover_screen.dart
+index d0770db..3532210 100644
+--- a/lib/features/match/views/match_discover_screen.dart
++++ b/lib/features/match/views/match_discover_screen.dart
+@@ -5,6 +5,7 @@ import '../../../app/routes/app_routes.dart';
+ import '../../../app/theme/app_colors.dart';
+ import '../../../app/theme/app_dimensions.dart';
+ import '../../../app/theme/app_text_styles.dart';
++import '../../../core/constants/feature_flags.dart';
+ import '../../../core/enums/match_status.dart';
+ import '../../../core/lineup/formation_library.dart';
+ import '../../../core/widgets/glassmorphic_container.dart';
+@@ -21,8 +22,10 @@ class MatchDiscoverScreen extends GetView<MatchController> {
+ 
+   @override
+   Widget build(BuildContext context) {
++    final challengesEnabled = FeatureFlags.challengesUiEnabled;
++
+     return DefaultTabController(
+-      length: 3,
++      length: challengesEnabled ? 3 : 2,
+       child: Scaffold(
+         appBar: AppBar(
+           title: Row(
+@@ -41,11 +44,11 @@ class MatchDiscoverScreen extends GetView<MatchController> {
+               },
+             ),
+           ],
+-          bottom: const TabBar(
++          bottom: TabBar(
+             tabs: [
+-              Tab(text: 'مبارياتي'),
+-              Tab(text: 'اكتشاف'),
+-              Tab(text: 'التحديات'),
++              const Tab(text: 'مبارياتي'),
++              const Tab(text: 'اكتشاف'),
++              if (challengesEnabled) const Tab(text: 'التحديات'),
+             ],
+             indicatorColor: AppColors.primary,
+             labelColor: AppColors.primary,
+@@ -55,8 +58,12 @@ class MatchDiscoverScreen extends GetView<MatchController> {
+           decoration: const BoxDecoration(
+             gradient: AppColors.backgroundGradient,
+           ),
+-          child: const TabBarView(
+-            children: [_MyMatchesTab(), _DiscoverTab(), _ChallengesTab()],
++          child: TabBarView(
++            children: [
++              const _MyMatchesTab(),
++              const _DiscoverTab(),
++              if (challengesEnabled) const _ChallengesTab(),
++            ],
+           ),
+         ),
+       ),
+@@ -346,7 +353,8 @@ class _MatchCard extends StatelessWidget {
+                 children: [
+                   _StatusBadge(status: match.status),
+                   const Spacer(),
+-                  if (match.isGoldenRating)
++                  if (FeatureFlags.goldenRatingUiEnabled &&
++                      match.isGoldenRating)
+                     Container(
+                       padding: const EdgeInsets.symmetric(
+                         horizontal: 8,
+@@ -504,15 +512,16 @@ class _MatchCard extends StatelessWidget {
+                       ),
+                       tooltip: 'تجميد',
+                     ),
+-                    IconButton(
+-                      onPressed: () =>
+-                          controller.activateGoldenRating(match.id),
+-                      icon: const Icon(
+-                        Icons.star_outline,
+-                        color: AppColors.secondary,
++                    if (FeatureFlags.goldenRatingUiEnabled)
++                      IconButton(
++                        onPressed: () =>
++                            controller.activateGoldenRating(match.id),
++                        icon: const Icon(
++                          Icons.star_outline,
++                          color: AppColors.secondary,
++                        ),
++                        tooltip: 'تقييم ذهبي',
+                       ),
+-                      tooltip: 'تقييم ذهبي',
+-                    ),
+                   ],
+                 ),
+ 
+diff --git a/lib/features/profile/views/profile_screen.dart b/lib/features/profile/views/profile_screen.dart
+index f9476cf..5ecad29 100644
+--- a/lib/features/profile/views/profile_screen.dart
++++ b/lib/features/profile/views/profile_screen.dart
+@@ -6,6 +6,7 @@ import '../../../app/routes/app_routes.dart';
+ import '../../../app/theme/app_colors.dart';
+ import '../../../app/theme/app_dimensions.dart';
+ import '../../../app/theme/app_text_styles.dart';
++import '../../../core/constants/feature_flags.dart';
+ import '../../../core/services/photo_upload_service.dart';
+ import '../../../core/widgets/dynamic_frame_widget.dart';
+ import '../../../core/widgets/glassmorphic_container.dart';
+@@ -36,9 +37,7 @@ class ProfileScreen extends GetView<ProfileController> {
+           return CustomScrollView(
+             slivers: [
+               // ── Hero Header ──
+-              SliverToBoxAdapter(
+-                child: _buildHeroCard(player, context),
+-              ),
++              SliverToBoxAdapter(child: _buildHeroCard(player, context)),
+ 
+               // ── Quick Actions ──
+               SliverToBoxAdapter(
+@@ -122,15 +121,23 @@ class ProfileScreen extends GetView<ProfileController> {
+             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+             children: [
+               IconButton(
+-                icon: const Icon(Icons.arrow_back_ios_new,
+-                    color: AppColors.textMuted, size: 20),
++                icon: const Icon(
++                  Icons.arrow_back_ios_new,
++                  color: AppColors.textMuted,
++                  size: 20,
++                ),
+                 onPressed: () => Get.back(),
+               ),
+-              IconButton(
+-                icon: const Icon(Icons.settings_outlined,
+-                    color: AppColors.textMuted),
+-                onPressed: () {},
+-              ),
++              if (FeatureFlags.profileSettingsUiEnabled)
++                IconButton(
++                  icon: const Icon(
++                    Icons.settings_outlined,
++                    color: AppColors.textMuted,
++                  ),
++                  onPressed: () {},
++                )
++              else
++                const SizedBox(width: 48),
+             ],
+           ),
+ 
+@@ -163,11 +170,13 @@ class ProfileScreen extends GetView<ProfileController> {
+                     decoration: BoxDecoration(
+                       color: AppColors.primary,
+                       shape: BoxShape.circle,
+-                      border: Border.all(
+-                          color: AppColors.background, width: 2),
++                      border: Border.all(color: AppColors.background, width: 2),
++                    ),
++                    child: const Icon(
++                      Icons.camera_alt,
++                      color: Colors.white,
++                      size: 16,
+                     ),
+-                    child: const Icon(Icons.camera_alt,
+-                        color: Colors.white, size: 16),
+                   ),
+                 ),
+               ],
+@@ -203,12 +212,16 @@ class ProfileScreen extends GetView<ProfileController> {
+                   )
+                 : Container(
+                     padding: const EdgeInsets.symmetric(
+-                        horizontal: 12, vertical: 4),
++                      horizontal: 12,
++                      vertical: 4,
++                    ),
+                     decoration: BoxDecoration(
+                       border: Border.all(
+-                          color: AppColors.primary.withValues(alpha: 0.5)),
++                        color: AppColors.primary.withValues(alpha: 0.5),
++                      ),
+                       borderRadius: BorderRadius.circular(
+-                          AppDimensions.radiusFull),
++                        AppDimensions.radiusFull,
++                      ),
+                     ),
+                     child: Text(
+                       '+ اختار Username',
+@@ -222,9 +235,10 @@ class ProfileScreen extends GetView<ProfileController> {
+           const SizedBox(height: AppDimensions.sm),
+ 
+           // ── الرتبة ──
+-          RankTierBadge(rating: player.rating, size: 28)
+-              .animate()
+-              .fadeIn(delay: 300.ms),
++          RankTierBadge(
++            rating: player.rating,
++            size: 28,
++          ).animate().fadeIn(delay: 300.ms),
+ 
+           const SizedBox(height: AppDimensions.md),
+ 
+@@ -237,14 +251,8 @@ class ProfileScreen extends GetView<ProfileController> {
+             borderRadius: AppDimensions.radiusXl,
+             child: Column(
+               children: [
+-                Text(
+-                  '${player.rating}',
+-                  style: AppTextStyles.ratingLarge,
+-                ),
+-                Text(
+-                  'نقاط التقييم',
+-                  style: AppTextStyles.labelMedium,
+-                ),
++                Text('${player.rating}', style: AppTextStyles.ratingLarge),
++                Text('نقاط التقييم', style: AppTextStyles.labelMedium),
+               ],
+             ),
+           ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.2),
+@@ -255,8 +263,7 @@ class ProfileScreen extends GetView<ProfileController> {
+ 
+   /// ── Avatar Placeholder ──
+   Widget _avatarPlaceholder(Player player) {
+-    final initial =
+-        player.name.isNotEmpty ? player.name[0].toUpperCase() : '?';
++    final initial = player.name.isNotEmpty ? player.name[0].toUpperCase() : '?';
+     return Container(
+       color: AppColors.primarySurface,
+       child: Center(
+@@ -274,49 +281,49 @@ class ProfileScreen extends GetView<ProfileController> {
+ 
+   /// ── Quick Actions (QR + Friends + Teams) — Task 6.2.5 ──
+   Widget _buildQuickActions(Player player, BuildContext context) {
+-    return Row(
+-      children: [
+-        _actionButton(
+-          icon: Icons.qr_code_2,
+-          label: 'الباركود',
+-          color: AppColors.accent,
+-          onTap: () {
+-            QrCodeDialog.show(
+-              context,
+-              qrData: player.qrCode ?? '7reef://player/${player.id}',
+-              playerName: player.name,
+-              username: player.username,
+-            );
+-          },
+-        ),
+-        const SizedBox(width: AppDimensions.sm),
+-        _actionButton(
+-          icon: Icons.qr_code_scanner,
+-          label: 'مسح QR',
+-          color: AppColors.primary,
+-          onTap: () => Get.toNamed(AppRoutes.qrScanner),
+-        ),
+-        const SizedBox(width: AppDimensions.sm),
++    final actions = <Widget>[
++      _actionButton(
++        icon: Icons.qr_code_2,
++        label: 'الباركود',
++        color: AppColors.accent,
++        onTap: () {
++          QrCodeDialog.show(
++            context,
++            qrData: player.qrCode ?? '7reef://player/${player.id}',
++            playerName: player.name,
++            username: player.username,
++          );
++        },
++      ),
++      _actionButton(
++        icon: Icons.qr_code_scanner,
++        label: 'مسح QR',
++        color: AppColors.primary,
++        onTap: () => Get.toNamed(AppRoutes.qrScanner),
++      ),
++      if (FeatureFlags.socialUiEnabled)
+         _actionButton(
+           icon: Icons.people_outline,
+           label: 'أصدقاء',
+           color: AppColors.secondary,
+           badge: player.friendIds.length,
+-          onTap: () {
+-            // سيُفتح لاحقاً (Phase 6.4)
+-            Get.snackbar('قريباً', 'الأصدقاء — قيد التطوير 🔧',
+-                snackPosition: SnackPosition.BOTTOM);
+-          },
++          onTap: () => Get.toNamed(AppRoutes.friends),
+         ),
+-        const SizedBox(width: AppDimensions.sm),
++      if (FeatureFlags.profileSharingUiEnabled)
+         _actionButton(
+           icon: Icons.share_outlined,
+           label: 'مشاركة',
+           color: AppColors.success,
+-          onTap: () {
+-            // Share profile link
+-          },
++          onTap: () {},
+         ),
++    ];
++
++    return Row(
++      children: [
++        for (var i = 0; i < actions.length; i++) ...[
++          if (i > 0) const SizedBox(width: AppDimensions.sm),
++          actions[i],
++        ],
+       ],
+     ).animate().fadeIn(delay: 450.ms).slideY(begin: 0.1);
+   }
+@@ -353,7 +360,9 @@ class ProfileScreen extends GetView<ProfileController> {
+                         child: Text(
+                           '$badge',
+                           style: const TextStyle(
+-                              color: Colors.white, fontSize: 10),
++                            color: Colors.white,
++                            fontSize: 10,
++                          ),
+                         ),
+                       ),
+                     ),
+@@ -377,9 +386,12 @@ class ProfileScreen extends GetView<ProfileController> {
+     final player = controller.currentPlayer;
+     if (player == null) return;
+ 
+-    Get.snackbar('جارٍ الرفع...', 'يتم رفع صورتك الشخصية',
+-        snackPosition: SnackPosition.BOTTOM,
+-        showProgressIndicator: true);
++    Get.snackbar(
++      'جارٍ الرفع...',
++      'يتم رفع صورتك الشخصية',
++      snackPosition: SnackPosition.BOTTOM,
++      showProgressIndicator: true,
++    );
+ 
+     final result = await service.uploadProfilePhoto(
+       userId: player.id,
+@@ -395,11 +407,17 @@ class ProfileScreen extends GetView<ProfileController> {
+       await repo.updatePlayer(updated);
+       await controller.refreshProfile();
+ 
+-      Get.snackbar('تم ✅', 'تم تحديث صورتك الشخصية',
+-          snackPosition: SnackPosition.BOTTOM);
++      Get.snackbar(
++        'تم ✅',
++        'تم تحديث صورتك الشخصية',
++        snackPosition: SnackPosition.BOTTOM,
++      );
+     } else {
+-      Get.snackbar('خطأ', 'فشل رفع الصورة، حاول مجدداً',
+-          snackPosition: SnackPosition.BOTTOM);
++      Get.snackbar(
++        'خطأ',
++        'فشل رفع الصورة، حاول مجدداً',
++        snackPosition: SnackPosition.BOTTOM,
++      );
+     }
+   }
+ 
+@@ -415,16 +433,41 @@ class ProfileScreen extends GetView<ProfileController> {
+           const SizedBox(height: AppDimensions.md),
+           Row(
+             children: [
+-              _statItem('المباريات', '${player.totalMatches}', Icons.sports_soccer, AppColors.accent),
+-              _statItem('الفوز', '${player.wins}', Icons.emoji_events, AppColors.success),
+-              _statItem('التعادل', '${player.draws}', Icons.handshake, AppColors.secondary),
+-              _statItem('الخسارة', '${player.losses}', Icons.trending_down, AppColors.error),
++              _statItem(
++                'المباريات',
++                '${player.totalMatches}',
++                Icons.sports_soccer,
++                AppColors.accent,
++              ),
++              _statItem(
++                'الفوز',
++                '${player.wins}',
++                Icons.emoji_events,
++                AppColors.success,
++              ),
++              _statItem(
++                'التعادل',
++                '${player.draws}',
++                Icons.handshake,
++                AppColors.secondary,
++              ),
++              _statItem(
++                'الخسارة',
++                '${player.losses}',
++                Icons.trending_down,
++                AppColors.error,
++              ),
+             ],
+           ),
+           const SizedBox(height: AppDimensions.md),
+           Row(
+             children: [
+-              _statItem('MVP', '${player.mvpCount}', Icons.star, AppColors.secondary),
++              _statItem(
++                'MVP',
++                '${player.mvpCount}',
++                Icons.star,
++                AppColors.secondary,
++              ),
+               _statItem(
+                 'نسبة الفوز',
+                 '${player.winRate.toStringAsFixed(0)}%',
+@@ -436,8 +479,8 @@ class ProfileScreen extends GetView<ProfileController> {
+                 player.trustLevel.name == 'veteran'
+                     ? 'مخضرم'
+                     : player.trustLevel.name == 'active'
+-                        ? 'نشط'
+-                        : 'جديد',
++                    ? 'نشط'
++                    : 'جديد',
+                 Icons.verified,
+                 player.trustLevel.name == 'veteran'
+                     ? AppColors.secondary
+@@ -457,10 +500,7 @@ class ProfileScreen extends GetView<ProfileController> {
+         children: [
+           Icon(icon, color: color, size: 22),
+           const SizedBox(height: 6),
+-          Text(
+-            value,
+-            style: AppTextStyles.titleLarge.copyWith(color: color),
+-          ),
++          Text(value, style: AppTextStyles.titleLarge.copyWith(color: color)),
+           Text(label, style: AppTextStyles.labelSmall),
+         ],
+       ),
+@@ -477,39 +517,47 @@ class ProfileScreen extends GetView<ProfileController> {
+         children: [
+           Text('المركز الأساسي', style: AppTextStyles.titleLarge),
+           const SizedBox(height: AppDimensions.sm),
+-          Obx(() => Wrap(
+-                spacing: AppDimensions.sm,
+-                runSpacing: AppDimensions.sm,
+-                children: controller.positions.map((pos) {
+-                  final isSelected = controller.selectedPosition.value == pos;
+-                  return GestureDetector(
+-                    onTap: () => controller.updatePosition(pos),
+-                    child: AnimatedContainer(
+-                      duration: const Duration(milliseconds: 200),
+-                      padding: const EdgeInsets.symmetric(
+-                        horizontal: AppDimensions.md,
+-                        vertical: AppDimensions.sm,
++          Obx(
++            () => Wrap(
++              spacing: AppDimensions.sm,
++              runSpacing: AppDimensions.sm,
++              children: controller.positions.map((pos) {
++                final isSelected = controller.selectedPosition.value == pos;
++                return GestureDetector(
++                  onTap: () => controller.updatePosition(pos),
++                  child: AnimatedContainer(
++                    duration: const Duration(milliseconds: 200),
++                    padding: const EdgeInsets.symmetric(
++                      horizontal: AppDimensions.md,
++                      vertical: AppDimensions.sm,
++                    ),
++                    decoration: BoxDecoration(
++                      color: isSelected
++                          ? AppColors.primarySurface
++                          : AppColors.surface,
++                      borderRadius: BorderRadius.circular(
++                        AppDimensions.radiusFull,
+                       ),
+-                      decoration: BoxDecoration(
++                      border: Border.all(
+                         color: isSelected
+-                            ? AppColors.primarySurface
+-                            : AppColors.surface,
+-                        borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+-                        border: Border.all(
+-                          color: isSelected ? AppColors.primary : AppColors.surfaceBorder,
+-                          width: isSelected ? 2 : 1,
+-                        ),
++                            ? AppColors.primary
++                            : AppColors.surfaceBorder,
++                        width: isSelected ? 2 : 1,
+                       ),
+-                      child: Text(
+-                        controller.positionLabels[pos] ?? pos,
+-                        style: AppTextStyles.labelLarge.copyWith(
+-                          color: isSelected ? AppColors.primary : AppColors.textSecondary,
+-                        ),
++                    ),
++                    child: Text(
++                      controller.positionLabels[pos] ?? pos,
++                      style: AppTextStyles.labelLarge.copyWith(
++                        color: isSelected
++                            ? AppColors.primary
++                            : AppColors.textSecondary,
+                       ),
+                     ),
+-                  );
+-                }).toList(),
+-              )),
++                  ),
++                );
++              }).toList(),
++            ),
++          ),
+         ],
+       ),
+     ).animate().fadeIn(delay: 600.ms, duration: 500.ms).slideY(begin: 0.1);
+@@ -522,20 +570,27 @@ class ProfileScreen extends GetView<ProfileController> {
+       borderRadius: AppDimensions.radiusLg,
+       child: Column(
+         children: [
+-          _infoRow(Icons.calendar_today, 'تاريخ الانضمام',
+-              _formatDate(player.createdAt)),
++          _infoRow(
++            Icons.calendar_today,
++            'تاريخ الانضمام',
++            _formatDate(player.createdAt),
++          ),
+           const Divider(color: AppColors.surfaceBorder, height: 24),
+-          _infoRow(Icons.access_time, 'آخر نشاط',
+-              _formatDate(player.lastActiveAt)),
++          _infoRow(
++            Icons.access_time,
++            'آخر نشاط',
++            _formatDate(player.lastActiveAt),
++          ),
+           const Divider(color: AppColors.surfaceBorder, height: 24),
+-          _infoRow(Icons.group, 'الفرق',
+-              '${player.teamIds.length} فريق'),
++          _infoRow(Icons.group, 'الفرق', '${player.teamIds.length} فريق'),
+           const Divider(color: AppColors.surfaceBorder, height: 24),
+-          _infoRow(Icons.people, 'الأصدقاء',
+-              '${player.friendIds.length} صديق'),
++          _infoRow(Icons.people, 'الأصدقاء', '${player.friendIds.length} صديق'),
+           const Divider(color: AppColors.surfaceBorder, height: 24),
+-          _infoRow(Icons.military_tech, 'الإنجازات',
+-              '${player.achievementIds.length} إنجاز'),
++          _infoRow(
++            Icons.military_tech,
++            'الإنجازات',
++            '${player.achievementIds.length} إنجاز',
++          ),
+         ],
+       ),
+     ).animate().fadeIn(delay: 700.ms, duration: 500.ms).slideY(begin: 0.1);
+diff --git a/lib/features/tournament/controllers/tournament_controller.dart b/lib/features/tournament/controllers/tournament_controller.dart
+index 59d31fa..06b4352 100644
+--- a/lib/features/tournament/controllers/tournament_controller.dart
++++ b/lib/features/tournament/controllers/tournament_controller.dart
+@@ -1,6 +1,7 @@
+ import 'package:flutter/material.dart';
+ import 'package:get/get.dart';
+ import 'package:uuid/uuid.dart';
++import '../../../core/constants/feature_flags.dart';
+ import '../../../core/enums/tournament_enums.dart';
+ import '../../../core/utils/app_logger.dart';
+ import '../../../data/repositories/tournament_repository_impl.dart';
+@@ -29,7 +30,7 @@ class TournamentController extends GetxController {
+       TournamentFormat.groupsThenKnockout.obs;
+   final Rx<TournamentTeamSize> selectedTeamSize =
+       TournamentTeamSize.fiveVsFive.obs;
+-  final RxBool isFantasyEnabled = true.obs;
++  final RxBool isFantasyEnabled = false.obs;
+ 
+   @override
+   void onInit() {
+@@ -86,7 +87,8 @@ class TournamentController extends GetxController {
+         teamSize: selectedTeamSize.value,
+         maxTeams: int.tryParse(maxTeamsController.text) ?? 8,
+         status: TournamentStatus.registration,
+-        isFantasyEnabled: isFantasyEnabled.value,
++        isFantasyEnabled:
++            FeatureFlags.fantasyUiEnabled && isFantasyEnabled.value,
+         createdAt: DateTime.now(),
+       );
+ 
+@@ -115,7 +117,7 @@ class TournamentController extends GetxController {
+     maxTeamsController.text = '8';
+     selectedFormat.value = TournamentFormat.groupsThenKnockout;
+     selectedTeamSize.value = TournamentTeamSize.fiveVsFive;
+-    isFantasyEnabled.value = true;
++    isFantasyEnabled.value = false;
+   }
+ 
+   // ── Validators ──
+diff --git a/lib/features/tournament/views/tournament_detail_screen.dart b/lib/features/tournament/views/tournament_detail_screen.dart
+index b6c5232..09035fe 100644
+--- a/lib/features/tournament/views/tournament_detail_screen.dart
++++ b/lib/features/tournament/views/tournament_detail_screen.dart
+@@ -6,6 +6,7 @@ import '../../../app/routes/app_routes.dart';
+ import '../../../app/theme/app_colors.dart';
+ import '../../../app/theme/app_dimensions.dart';
+ import '../../../app/theme/app_text_styles.dart';
++import '../../../core/constants/feature_flags.dart';
+ import '../../../core/enums/tournament_enums.dart';
+ import '../../../core/widgets/el7reef_button.dart';
+ import '../../../core/widgets/glassmorphic_container.dart';
+@@ -115,7 +116,8 @@ class TournamentDetailScreen extends GetView<TournamentDetailController> {
+                         _RegisterTeamButton(
+                           tournament: tournament,
+                         ).animate().fadeIn(delay: 260.ms),
+-                      if (tournament.isFantasyEnabled)
++                      if (FeatureFlags.fantasyUiEnabled &&
++                          tournament.isFantasyEnabled)
+                         _FantasyLeagueButton(
+                           tournament: tournament,
+                         ).animate().fadeIn(delay: 300.ms),
+@@ -307,7 +309,7 @@ class _OperationsSnapshot extends StatelessWidget {
+                   AppRoutes.tournamentParticipantsById(tournament.id),
+                 ),
+                 icon: const Icon(Icons.groups_2_outlined),
+-                label: const Text('Participants'),
++                label: const Text('المشاركون'),
+               ),
+               OutlinedButton.icon(
+                 onPressed: tournament.currentGroupStageId == null
+@@ -316,7 +318,7 @@ class _OperationsSnapshot extends StatelessWidget {
+                         AppRoutes.tournamentGroupsById(tournament.id),
+                       ),
+                 icon: const Icon(Icons.grid_view_rounded),
+-                label: const Text('Groups'),
++                label: const Text('المجموعات'),
+               ),
+               OutlinedButton.icon(
+                 onPressed:
+@@ -327,7 +329,7 @@ class _OperationsSnapshot extends StatelessWidget {
+                         AppRoutes.tournamentFixturesById(tournament.id),
+                       ),
+                 icon: const Icon(Icons.calendar_month_rounded),
+-                label: const Text('Fixtures'),
++                label: const Text('المباريات'),
+               ),
+               OutlinedButton.icon(
+                 onPressed: tournament.currentGroupStageId == null
+@@ -336,7 +338,7 @@ class _OperationsSnapshot extends StatelessWidget {
+                         AppRoutes.tournamentStandingsById(tournament.id),
+                       ),
+                 icon: const Icon(Icons.leaderboard_rounded),
+-                label: const Text('Standings'),
++                label: const Text('الترتيب'),
+               ),
+               OutlinedButton.icon(
+                 onPressed: tournament.currentKnockoutBracketId == null
+@@ -345,7 +347,7 @@ class _OperationsSnapshot extends StatelessWidget {
+                         AppRoutes.tournamentBracketById(tournament.id),
+                       ),
+                 icon: const Icon(Icons.account_tree_outlined),
+-                label: const Text('Bracket'),
++                label: const Text('الإقصاء'),
+               ),
+             ],
+           ),
+@@ -437,7 +439,7 @@ class _OrganizerPanel extends StatelessWidget {
+               AppRoutes.organizerDashboardForTournament(tournament.id),
+             ),
+             icon: const Icon(Icons.dashboard_customize_rounded),
+-            label: const Text('Tournament Operations Dashboard'),
++            label: const Text('لوحة تشغيل البطولة'),
+           ),
+           const SizedBox(height: AppDimensions.sm),
+           OutlinedButton.icon(
+@@ -448,13 +450,16 @@ class _OrganizerPanel extends StatelessWidget {
+             label: const Text('إدارة التسجيلات'),
+           ),
+           const SizedBox(height: AppDimensions.sm),
+-          OutlinedButton.icon(
+-            onPressed: () =>
+-                Get.toNamed(AppRoutes.tournamentAssistantsById(tournament.id)),
+-            icon: const Icon(Icons.manage_accounts_rounded),
+-            label: const Text('إدارة المساعدين'),
+-          ),
+-          const SizedBox(height: AppDimensions.sm),
++          if (FeatureFlags.organizerAdvancedOpsEnabled) ...[
++            OutlinedButton.icon(
++              onPressed: () => Get.toNamed(
++                AppRoutes.tournamentAssistantsById(tournament.id),
++              ),
++              icon: const Icon(Icons.manage_accounts_rounded),
++              label: const Text('إدارة المساعدين'),
++            ),
++            const SizedBox(height: AppDimensions.sm),
++          ],
+           Text(
+             'عمليات المراحل والتوليد والنشر والإغلاق أصبحت من dashboard التشغيلية فقط لتفادي status flips غير آمنة.',
+             style: AppTextStyles.bodySmall.copyWith(color: AppColors.textMuted),
+diff --git a/lib/features/tournament/views/tournament_list_screen.dart b/lib/features/tournament/views/tournament_list_screen.dart
+index 6bb9efa..5ac38ca 100644
+--- a/lib/features/tournament/views/tournament_list_screen.dart
++++ b/lib/features/tournament/views/tournament_list_screen.dart
+@@ -5,6 +5,7 @@ import '../../../app/routes/app_routes.dart';
+ import '../../../app/theme/app_colors.dart';
+ import '../../../app/theme/app_dimensions.dart';
+ import '../../../app/theme/app_text_styles.dart';
++import '../../../core/constants/feature_flags.dart';
+ import '../../../core/enums/tournament_enums.dart';
+ import '../../../core/widgets/el7reef_button.dart';
+ import '../../../core/widgets/glassmorphic_container.dart';
+@@ -58,20 +59,27 @@ class TournamentListScreen extends GetView<TournamentController> {
+                 SliverToBoxAdapter(
+                   child: Padding(
+                     padding: const EdgeInsets.symmetric(
+-                        horizontal: AppDimensions.pagePadding),
++                      horizontal: AppDimensions.pagePadding,
++                    ),
+                     child: Row(
+                       children: [
+-                        Text('الدورات الجارية',
+-                            style: AppTextStyles.titleLarge),
++                        Text(
++                          'الدورات الجارية',
++                          style: AppTextStyles.titleLarge,
++                        ),
+                         const Spacer(),
+-                        Obx(() => _CountBadge(
+-                            count: controller.liveTournaments.length)),
++                        Obx(
++                          () => _CountBadge(
++                            count: controller.liveTournaments.length,
++                          ),
++                        ),
+                       ],
+                     ),
+                   ),
+                 ),
+                 const SliverToBoxAdapter(
+-                    child: SizedBox(height: AppDimensions.sm)),
++                  child: SizedBox(height: AppDimensions.sm),
++                ),
+ 
+                 // ── القائمة ──
+                 controller.liveTournaments.isEmpty
+@@ -93,7 +101,8 @@ class TournamentListScreen extends GetView<TournamentController> {
+                       ),
+ 
+                 const SliverToBoxAdapter(
+-                    child: SizedBox(height: AppDimensions.xxl)),
++                  child: SizedBox(height: AppDimensions.xxl),
++                ),
+               ],
+             ),
+           );
+@@ -135,7 +144,9 @@ class _TournamentCard extends StatelessWidget {
+ 
+   @override
+   Widget build(BuildContext context) {
+-    final (Color statusColor, String statusLabel) = _statusInfo(tournament.status);
++    final (Color statusColor, String statusLabel) = _statusInfo(
++      tournament.status,
++    );
+ 
+     return GestureDetector(
+       onTap: () => Get.toNamed(AppRoutes.tournamentDetailById(tournament.id)),
+@@ -150,10 +161,12 @@ class _TournamentCard extends StatelessWidget {
+             Row(
+               children: [
+                 Expanded(
+-                  child: Text(tournament.name,
+-                      style: AppTextStyles.titleLarge,
+-                      maxLines: 1,
+-                      overflow: TextOverflow.ellipsis),
++                  child: Text(
++                    tournament.name,
++                    style: AppTextStyles.titleLarge,
++                    maxLines: 1,
++                    overflow: TextOverflow.ellipsis,
++                  ),
+                 ),
+                 _StatusBadge(color: statusColor, label: statusLabel),
+               ],
+@@ -166,13 +179,13 @@ class _TournamentCard extends StatelessWidget {
+               children: [
+                 _InfoChip(
+                   icon: Icons.groups_rounded,
+-                  label:
+-                      '${tournament.teamCount}/${tournament.maxTeams} فريق',
++                  label: '${tournament.teamCount}/${tournament.maxTeams} فريق',
+                 ),
+                 const SizedBox(width: AppDimensions.sm),
+                 _InfoChip(
+                   icon: Icons.sports_soccer,
+-                  label: '${tournament.teamSize.value}v${tournament.teamSize.value}',
++                  label:
++                      '${tournament.teamSize.value}v${tournament.teamSize.value}',
+                 ),
+                 if (tournament.location != null) ...[
+                   const SizedBox(width: AppDimensions.sm),
+@@ -193,23 +206,28 @@ class _TournamentCard extends StatelessWidget {
+               child: LinearProgressIndicator(
+                 value: tournament.fillRate.clamp(0.0, 1.0),
+                 backgroundColor: AppColors.surfaceBorder,
+-                valueColor:
+-                    AlwaysStoppedAnimation<Color>(statusColor),
++                valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                 minHeight: 4,
+               ),
+             ),
+ 
+-            if (tournament.isFantasyEnabled) ...[
++            if (FeatureFlags.fantasyUiEnabled &&
++                tournament.isFantasyEnabled) ...[
+               const SizedBox(height: AppDimensions.xs),
+               Row(
+                 children: [
+-                  const Icon(Icons.auto_awesome,
+-                      color: AppColors.secondary, size: 14),
++                  const Icon(
++                    Icons.auto_awesome,
++                    color: AppColors.secondary,
++                    size: 14,
++                  ),
+                   const SizedBox(width: 4),
+-                  Text('الفانتازي مفعَّل',
+-                      style: AppTextStyles.labelSmall.copyWith(
+-                        color: AppColors.secondary,
+-                      )),
++                  Text(
++                    'الفانتازي مفعَّل',
++                    style: AppTextStyles.labelSmall.copyWith(
++                      color: AppColors.secondary,
++                    ),
++                  ),
+                 ],
+               ),
+             ],
+@@ -247,7 +265,8 @@ class _CreateTournamentSheet extends StatelessWidget {
+       decoration: const BoxDecoration(
+         color: AppColors.surface,
+         borderRadius: BorderRadius.vertical(
+-            top: Radius.circular(AppDimensions.radiusXl)),
++          top: Radius.circular(AppDimensions.radiusXl),
++        ),
+       ),
+       child: SingleChildScrollView(
+         child: Form(
+@@ -259,7 +278,8 @@ class _CreateTournamentSheet extends StatelessWidget {
+               // مقبض
+               Center(
+                 child: Container(
+-                  width: 40, height: 4,
++                  width: 40,
++                  height: 4,
+                   decoration: BoxDecoration(
+                     color: AppColors.surfaceBorder,
+                     borderRadius: BorderRadius.circular(2),
+@@ -277,8 +297,10 @@ class _CreateTournamentSheet extends StatelessWidget {
+                 decoration: const InputDecoration(
+                   labelText: 'اسم الدورة',
+                   hintText: 'مثال: كأس حي الزيتون',
+-                  prefixIcon: Icon(Icons.emoji_events_outlined,
+-                      color: AppColors.textMuted),
++                  prefixIcon: Icon(
++                    Icons.emoji_events_outlined,
++                    color: AppColors.textMuted,
++                  ),
+                 ),
+               ),
+               const SizedBox(height: AppDimensions.md),
+@@ -289,8 +311,10 @@ class _CreateTournamentSheet extends StatelessWidget {
+                 decoration: const InputDecoration(
+                   labelText: 'الموقع (اختياري)',
+                   hintText: 'مثال: ملعب البلدية',
+-                  prefixIcon:
+-                      Icon(Icons.location_on_outlined, color: AppColors.textMuted),
++                  prefixIcon: Icon(
++                    Icons.location_on_outlined,
++                    color: AppColors.textMuted,
++                  ),
+                 ),
+               ),
+               const SizedBox(height: AppDimensions.md),
+@@ -298,133 +322,108 @@ class _CreateTournamentSheet extends StatelessWidget {
+               // حجم الفريق
+               Text('حجم الفريق', style: AppTextStyles.labelMedium),
+               const SizedBox(height: AppDimensions.xs),
+-              Obx(() => Wrap(
+-                    spacing: AppDimensions.sm,
+-                    children: TournamentTeamSize.values.map((size) {
+-                      final selected =
+-                          controller.selectedTeamSize.value == size;
+-                      return ChoiceChip(
+-                        label: Text('${size.value}v${size.value}'),
+-                        selected: selected,
+-                        onSelected: (_) =>
+-                            controller.selectedTeamSize.value = size,
+-                        selectedColor: AppColors.primarySurface,
+-                        side: BorderSide(
+-                          color: selected
+-                              ? AppColors.primary
+-                              : AppColors.surfaceBorder,
+-                        ),
+-                      );
+-                    }).toList(),
+-                  )),
++              Obx(
++                () => Wrap(
++                  spacing: AppDimensions.sm,
++                  children: TournamentTeamSize.values.map((size) {
++                    final selected = controller.selectedTeamSize.value == size;
++                    return ChoiceChip(
++                      label: Text('${size.value}v${size.value}'),
++                      selected: selected,
++                      onSelected: (_) =>
++                          controller.selectedTeamSize.value = size,
++                      selectedColor: AppColors.primarySurface,
++                      side: BorderSide(
++                        color: selected
++                            ? AppColors.primary
++                            : AppColors.surfaceBorder,
++                      ),
++                    );
++                  }).toList(),
++                ),
++              ),
+               const SizedBox(height: AppDimensions.md),
+ 
+               // نوع الدورة
+               Text('نوع الدورة', style: AppTextStyles.labelMedium),
+               const SizedBox(height: AppDimensions.xs),
+-              Obx(() => Column(
+-                    children: TournamentFormat.values.map((f) {
+-                      final selected =
+-                          controller.selectedFormat.value == f;
+-                      return GestureDetector(
+-                        onTap: () => controller.selectedFormat.value = f,
+-                        child: Container(
+-                          margin: const EdgeInsets.only(
+-                              bottom: AppDimensions.xs),
+-                          padding: const EdgeInsets.symmetric(
+-                            horizontal: AppDimensions.md,
+-                            vertical: AppDimensions.sm,
++              Obx(
++                () => Column(
++                  children: TournamentFormat.values.map((f) {
++                    final selected = controller.selectedFormat.value == f;
++                    return GestureDetector(
++                      onTap: () => controller.selectedFormat.value = f,
++                      child: Container(
++                        margin: const EdgeInsets.only(bottom: AppDimensions.xs),
++                        padding: const EdgeInsets.symmetric(
++                          horizontal: AppDimensions.md,
++                          vertical: AppDimensions.sm,
++                        ),
++                        decoration: BoxDecoration(
++                          color: selected
++                              ? AppColors.primarySurface
++                              : Colors.transparent,
++                          borderRadius: BorderRadius.circular(
++                            AppDimensions.radiusMd,
+                           ),
+-                          decoration: BoxDecoration(
++                          border: Border.all(
+                             color: selected
+-                                ? AppColors.primarySurface
+-                                : Colors.transparent,
+-                            borderRadius: BorderRadius.circular(
+-                                AppDimensions.radiusMd),
+-                            border: Border.all(
++                                ? AppColors.primary
++                                : AppColors.surfaceBorder,
++                          ),
++                        ),
++                        child: Row(
++                          children: [
++                            Icon(
++                              selected
++                                  ? Icons.radio_button_checked
++                                  : Icons.radio_button_unchecked,
+                               color: selected
+                                   ? AppColors.primary
+-                                  : AppColors.surfaceBorder,
++                                  : AppColors.textMuted,
++                              size: 20,
+                             ),
+-                          ),
+-                          child: Row(
+-                            children: [
+-                              Icon(
+-                                selected
+-                                    ? Icons.radio_button_checked
+-                                    : Icons.radio_button_unchecked,
++                            const SizedBox(width: AppDimensions.sm),
++                            Text(
++                              _formatLabel(f),
++                              style: AppTextStyles.bodyMedium.copyWith(
+                                 color: selected
+                                     ? AppColors.primary
+-                                    : AppColors.textMuted,
+-                                size: 20,
++                                    : AppColors.textPrimary,
+                               ),
+-                              const SizedBox(width: AppDimensions.sm),
+-                              Text(_formatLabel(f),
+-                                  style: AppTextStyles.bodyMedium.copyWith(
+-                                    color: selected
+-                                        ? AppColors.primary
+-                                        : AppColors.textPrimary,
+-                                  )),
+-                            ],
+-                          ),
++                            ),
++                          ],
+                         ),
+-                      );
+-                    }).toList(),
+-                  )),
++                      ),
++                    );
++                  }).toList(),
++                ),
++              ),
+               const SizedBox(height: AppDimensions.md),
+ 
+               // عدد الفرق
+-              Row(
+-                children: [
+-                  Expanded(
+-                    child: TextFormField(
+-                      controller: controller.maxTeamsController,
+-                      validator: controller.validateMaxTeams,
+-                      keyboardType: TextInputType.number,
+-                      decoration: const InputDecoration(
+-                        labelText: 'عدد الفرق',
+-                        prefixIcon: Icon(Icons.groups_outlined,
+-                            color: AppColors.textMuted),
+-                      ),
+-                    ),
++              TextFormField(
++                controller: controller.maxTeamsController,
++                validator: controller.validateMaxTeams,
++                keyboardType: TextInputType.number,
++                decoration: const InputDecoration(
++                  labelText: 'عدد الفرق',
++                  prefixIcon: Icon(
++                    Icons.groups_outlined,
++                    color: AppColors.textMuted,
+                   ),
+-                  const SizedBox(width: AppDimensions.md),
+-                  // تفعيل الفانتازي
+-                  Obx(() => Column(
+-                        children: [
+-                          Switch(
+-                            value: controller.isFantasyEnabled.value,
+-                            onChanged: (v) =>
+-                                controller.isFantasyEnabled.value = v,
+-                            thumbColor:
+-                                WidgetStateProperty.resolveWith((states) {
+-                              if (states.contains(WidgetState.selected)) {
+-                                return AppColors.secondary;
+-                              }
+-                              return AppColors.textMuted;
+-                            }),
+-                            trackColor:
+-                                WidgetStateProperty.resolveWith((states) {
+-                              if (states.contains(WidgetState.selected)) {
+-                                return AppColors.secondary
+-                                    .withValues(alpha: 0.4);
+-                              }
+-                              return AppColors.surfaceBorder;
+-                            }),
+-                          ),
+-                          Text('فانتازي', style: AppTextStyles.labelSmall),
+-                        ],
+-                      )),
+-                ],
++                ),
+               ),
+               const SizedBox(height: AppDimensions.xl),
+ 
+-              Obx(() => El7reefButton(
+-                    text: 'إنشاء الدورة',
+-                    icon: Icons.check_circle_outline,
+-                    isLoading: controller.isLoading.value,
+-                    onPressed: controller.createTournament,
+-                  )),
++              Obx(
++                () => El7reefButton(
++                  text: 'إنشاء الدورة',
++                  icon: Icons.check_circle_outline,
++                  isLoading: controller.isLoading.value,
++                  onPressed: controller.createTournament,
++                ),
++              ),
+             ],
+           ),
+         ),
+@@ -454,8 +453,10 @@ class _StatusBadge extends StatelessWidget {
+         borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+         border: Border.all(color: color.withValues(alpha: 0.4)),
+       ),
+-      child: Text(label,
+-          style: AppTextStyles.labelSmall.copyWith(color: color)),
++      child: Text(
++        label,
++        style: AppTextStyles.labelSmall.copyWith(color: color),
++      ),
+     );
+   }
+ }
+@@ -475,9 +476,11 @@ class _InfoChip extends StatelessWidget {
+         const SizedBox(width: 4),
+         ConstrainedBox(
+           constraints: BoxConstraints(maxWidth: maxWidth ?? 120),
+-          child: Text(label,
+-              style: AppTextStyles.labelSmall,
+-              overflow: TextOverflow.ellipsis),
++          child: Text(
++            label,
++            style: AppTextStyles.labelSmall,
++            overflow: TextOverflow.ellipsis,
++          ),
+         ),
+       ],
+     );
+@@ -496,9 +499,10 @@ class _CountBadge extends StatelessWidget {
+         color: AppColors.primary.withValues(alpha: 0.15),
+         borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+       ),
+-      child: Text('$count دورة',
+-          style:
+-              AppTextStyles.labelSmall.copyWith(color: AppColors.primary)),
++      child: Text(
++        '$count دورة',
++        style: AppTextStyles.labelSmall.copyWith(color: AppColors.primary),
++      ),
+     );
+   }
+ }

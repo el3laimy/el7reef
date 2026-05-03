@@ -8,6 +8,7 @@ abstract class FirebasePaths {
   static const String teamFormationTemplates = 'teamFormationTemplates';
   static const String teamRosterSnapshots = 'teamRosterSnapshots';
   static const String matches = 'matches';
+  static const String matchEvents = 'matchEvents';
   static const String matchSides = 'matchSides';
   static const String matchSidePlayers = 'matchSidePlayers';
   static const String matchCheckIns = 'matchCheckIns';

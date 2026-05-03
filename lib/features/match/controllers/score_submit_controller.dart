@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/enums/match_status.dart';
+import '../../../core/services/match_event_service.dart';
 import '../../../core/services/match_settlement_service.dart';
 import '../../../core/services/official_match_roster_service.dart';
 import '../../../data/repositories/match_repository_impl.dart';
@@ -9,8 +10,10 @@ import '../../../data/repositories/match_side_player_repository_impl.dart';
 import '../../../data/repositories/match_side_repository_impl.dart';
 import '../../../data/repositories/team_repository_impl.dart';
 import '../../../domain/entities/match.dart';
+import '../../../domain/entities/match_participant_roster.dart';
 import '../../../domain/entities/match_side.dart';
 import '../../../domain/entities/match_side_player.dart';
+import '../../../domain/entities/participant_ref.dart';
 import '../../../domain/entities/player.dart';
 import '../../../domain/entities/player_match_stats.dart';
 import '../../../domain/entities/team.dart';
@@ -18,19 +21,53 @@ import '../../../services/auth_service.dart';
 import '../models/friendly_match_side_view.dart';
 import 'match_controller.dart';
 
+class ScoreSubmitGoalDraft {
+  final ParticipantRef actor;
+  final String sideKey;
+  final int goals;
+  final int? minute;
+
+  const ScoreSubmitGoalDraft({
+    required this.actor,
+    required this.sideKey,
+    required this.goals,
+    this.minute,
+  });
+}
+
 class ScoreSubmitController extends GetxController {
   final String matchId;
-  final MatchRepositoryImpl _matchRepo = MatchRepositoryImpl();
-  final MatchSettlementService _settlementService = MatchSettlementService();
-  final OfficialMatchRosterService _officialRosterService =
-      OfficialMatchRosterService();
-  final MatchSideRepositoryImpl _sideRepository = MatchSideRepositoryImpl();
-  final MatchSidePlayerRepositoryImpl _sidePlayerRepository =
-      MatchSidePlayerRepositoryImpl();
-  final TeamRepositoryImpl _teamRepository = TeamRepositoryImpl();
-  final AuthService _authService = Get.find<AuthService>();
+  final MatchRepositoryImpl _matchRepo;
+  final MatchSettlementService _settlementService;
+  final MatchEventService _matchEventService;
+  final OfficialMatchRosterService _officialRosterService;
+  final MatchSideRepositoryImpl _sideRepository;
+  final MatchSidePlayerRepositoryImpl _sidePlayerRepository;
+  final TeamRepositoryImpl _teamRepository;
+  final String? Function() _currentUserIdProvider;
 
-  ScoreSubmitController({required this.matchId});
+  ScoreSubmitController({
+    required this.matchId,
+    MatchRepositoryImpl? matchRepository,
+    MatchSettlementService? settlementService,
+    MatchEventService? matchEventService,
+    OfficialMatchRosterService? officialRosterService,
+    MatchSideRepositoryImpl? sideRepository,
+    MatchSidePlayerRepositoryImpl? sidePlayerRepository,
+    TeamRepositoryImpl? teamRepository,
+    String? Function()? currentUserIdProvider,
+  }) : _matchRepo = matchRepository ?? MatchRepositoryImpl(),
+       _settlementService = settlementService ?? MatchSettlementService(),
+       _matchEventService = matchEventService ?? MatchEventService(),
+       _officialRosterService =
+           officialRosterService ?? OfficialMatchRosterService(),
+       _sideRepository = sideRepository ?? MatchSideRepositoryImpl(),
+       _sidePlayerRepository =
+           sidePlayerRepository ?? MatchSidePlayerRepositoryImpl(),
+       _teamRepository = teamRepository ?? TeamRepositoryImpl(),
+       _currentUserIdProvider =
+           currentUserIdProvider ??
+           (() => Get.find<AuthService>().currentUserId);
 
   final Rx<Match?> match = Rx<Match?>(null);
   final RxBool isLoading = true.obs;
@@ -38,9 +75,13 @@ class ScoreSubmitController extends GetxController {
 
   final RxList<Player> teamAPlayers = <Player>[].obs;
   final RxList<Player> teamBPlayers = <Player>[].obs;
+  final Rx<MatchParticipantRoster?> fullParticipantRoster =
+      Rx<MatchParticipantRoster?>(null);
+  final RxString fullRosterErrorMessage = ''.obs;
   final RxString teamASideName = 'فريق A'.obs;
   final RxString teamBSideName = 'فريق B'.obs;
   final Map<String, RxMap<String, dynamic>> playerStats = {};
+  final RxList<ScoreSubmitGoalDraft> goalDrafts = <ScoreSubmitGoalDraft>[].obs;
   final RxString selectedMvpId = ''.obs;
   final RxBool teamACleanSheet = false.obs;
   final RxBool teamBCleanSheet = false.obs;
@@ -48,17 +89,26 @@ class ScoreSubmitController extends GetxController {
   final TextEditingController teamBScoreController = TextEditingController();
 
   bool get isFriendlyMatch => match.value?.tournamentId == null;
+  List<ParticipantRef> get teamAParticipants =>
+      fullParticipantRoster.value?.sideA ?? const <ParticipantRef>[];
+  List<ParticipantRef> get teamBParticipants =>
+      fullParticipantRoster.value?.sideB ?? const <ParticipantRef>[];
+  List<ParticipantRef> get allParticipants =>
+      fullParticipantRoster.value?.allParticipants ?? const <ParticipantRef>[];
+  List<ScoreSubmitGoalDraft> get allGoalDrafts =>
+      goalDrafts.toList(growable: false);
 
   @override
   void onInit() {
     super.onInit();
-    _loadMatchAndPlayers();
+    loadMatchAndPlayers();
   }
 
-  Future<void> _loadMatchAndPlayers() async {
+  Future<void> loadMatchAndPlayers() async {
     try {
       isLoading.value = true;
       errorMessage.value = '';
+      fullRosterErrorMessage.value = '';
 
       final loadedMatch = await _matchRepo.getMatch(matchId);
       if (loadedMatch == null) {
@@ -82,6 +132,7 @@ class ScoreSubmitController extends GetxController {
       );
       teamAPlayers.value = roster.teamAPlayers;
       teamBPlayers.value = roster.teamBPlayers;
+      await _loadFullParticipantRoster(loadedMatch);
 
       for (final player in [...teamAPlayers, ...teamBPlayers]) {
         playerStats[player.id] = <String, dynamic>{
@@ -105,6 +156,82 @@ class ScoreSubmitController extends GetxController {
     teamAScoreController.dispose();
     teamBScoreController.dispose();
     super.onClose();
+  }
+
+  void selectMvp(String participantId) {
+    selectedMvpId.value = participantId.trim();
+  }
+
+  bool isParticipantOnSide(ParticipantRef participant, String sideKey) {
+    return fullParticipantRoster.value?.isParticipantOnSide(
+          participant: participant,
+          sideKey: sideKey,
+        ) ??
+        false;
+  }
+
+  String? sideKeyForParticipant(ParticipantRef participant) {
+    return fullParticipantRoster.value?.sideKeyFor(participant);
+  }
+
+  void setParticipantGoals(ParticipantRef participant, int goals) {
+    if (goals <= 0) {
+      clearParticipantGoals(participant);
+      return;
+    }
+    final sideKey = sideKeyForParticipant(participant);
+    if (sideKey == null) return;
+
+    final key = participantRosterKey(participant);
+    final existingIndex = goalDrafts.indexWhere(
+      (draft) => participantRosterKey(draft.actor) == key,
+    );
+    final draft = ScoreSubmitGoalDraft(
+      actor: _rosterParticipantFor(participant, sideKey) ?? participant,
+      sideKey: sideKey,
+      goals: goals,
+    );
+    if (existingIndex == -1) {
+      goalDrafts.add(draft);
+    } else {
+      goalDrafts[existingIndex] = draft;
+    }
+  }
+
+  void clearParticipantGoals(ParticipantRef participant) {
+    final key = participantRosterKey(participant);
+    goalDrafts.removeWhere((draft) => participantRosterKey(draft.actor) == key);
+  }
+
+  void clearGoalDrafts() {
+    goalDrafts.clear();
+  }
+
+  List<ScoreSubmitGoalDraft> goalDraftsForSide(String sideKey) {
+    final normalizedSideKey = sideKey.trim().toUpperCase();
+    if (normalizedSideKey != 'A' && normalizedSideKey != 'B') {
+      return const <ScoreSubmitGoalDraft>[];
+    }
+    return goalDrafts
+        .where((draft) => draft.sideKey == normalizedSideKey)
+        .toList(growable: false);
+  }
+
+  int totalDraftGoalsForSide(String sideKey) {
+    return goalDraftsForSide(
+      sideKey,
+    ).fold(0, (total, draft) => total + draft.goals);
+  }
+
+  bool goalDraftMismatchForSide(String sideKey) {
+    final normalizedSideKey = sideKey.trim().toUpperCase();
+    final score = normalizedSideKey == 'A'
+        ? totalTeamAGoals
+        : normalizedSideKey == 'B'
+        ? totalTeamBGoals
+        : null;
+    if (score == null) return false;
+    return totalDraftGoalsForSide(normalizedSideKey) != score;
   }
 
   void incrementStat(String playerId, String key) {
@@ -137,7 +264,7 @@ class ScoreSubmitController extends GetxController {
   Future<Match?> submit() async {
     final currentMatch = match.value;
     if (currentMatch == null) return null;
-    final actorId = _authService.currentUserId;
+    final actorId = _currentUserIdProvider();
     if (actorId == null || actorId.isEmpty) {
       errorMessage.value = 'يجب تسجيل الدخول أولاً لتسجيل النتيجة.';
       Get.snackbar(
@@ -147,6 +274,7 @@ class ScoreSubmitController extends GetxController {
       );
       return null;
     }
+    final normalizedSelectedMvpId = selectedMvpId.value.trim();
 
     final scoreA = isFriendlyMatch
         ? _validatedFriendlyScore(
@@ -166,6 +294,8 @@ class ScoreSubmitController extends GetxController {
     teamACleanSheet.value = scoreB == 0;
     teamBCleanSheet.value = scoreA == 0;
 
+    // goalDrafts are ParticipantRef-based pride data written best-effort below;
+    // detailedStats stays registered-player-only for the current rating path.
     final detailedStats = <PlayerMatchStats>[
       ...teamAPlayers.map(
         (player) => _buildDetailedStats(
@@ -190,7 +320,9 @@ class ScoreSubmitController extends GetxController {
         actorId: actorId,
         scoreA: scoreA,
         scoreB: scoreB,
-        mvpPlayerId: selectedMvpId.value.isEmpty ? null : selectedMvpId.value,
+        mvpPlayerId: normalizedSelectedMvpId.isEmpty
+            ? null
+            : normalizedSelectedMvpId,
         detailedStats: detailedStats,
       );
 
@@ -204,12 +336,21 @@ class ScoreSubmitController extends GetxController {
           currentMatch.copyWith(
             scoreTeamA: scoreA,
             scoreTeamB: scoreB,
-            mvpPlayerId: selectedMvpId.value.isEmpty
+            mvpPlayerId: normalizedSelectedMvpId.isEmpty
                 ? null
-                : selectedMvpId.value,
+                : normalizedSelectedMvpId,
             status: result.status,
           );
       match.value = updatedMatch;
+      await _recordMvpMatchEventIfPossible(
+        submittedMatch: updatedMatch,
+        selectedMvpId: normalizedSelectedMvpId,
+        actorId: actorId,
+      );
+      await _recordGoalMatchEventsIfPossible(
+        submittedMatch: updatedMatch,
+        actorId: actorId,
+      );
 
       if (result.status == MatchStatus.pendingReview) {
         Get.snackbar(
@@ -236,6 +377,143 @@ class ScoreSubmitController extends GetxController {
       return null;
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> _recordGoalMatchEventsIfPossible({
+    required Match submittedMatch,
+    required String actorId,
+  }) async {
+    final drafts = allGoalDrafts.where((draft) => draft.goals > 0).toList();
+    if (drafts.isEmpty) return;
+
+    try {
+      final activeEvents = await _matchEventService.getMatchEvents(
+        submittedMatch.id,
+      );
+      for (final event in activeEvents) {
+        if (event.isGoal) {
+          await _matchEventService.voidEvent(event.id);
+        }
+      }
+
+      for (final draft in drafts) {
+        for (var index = 1; index <= draft.goals; index += 1) {
+          await _matchEventService.recordGoal(
+            eventId: _goalEventId(
+              matchId: submittedMatch.id,
+              draft: draft,
+              index: index,
+            ),
+            matchId: submittedMatch.id,
+            tournamentId: submittedMatch.tournamentId,
+            sideKey: draft.sideKey,
+            actor: draft.actor,
+            createdBy: actorId,
+          );
+        }
+      }
+    } catch (_) {
+      // Score submission has already succeeded; goal event persistence can be
+      // retried by a later integration without breaking the existing result.
+    }
+  }
+
+  Future<void> _recordMvpMatchEventIfPossible({
+    required Match submittedMatch,
+    required String selectedMvpId,
+    required String actorId,
+  }) async {
+    if (selectedMvpId.isEmpty) return;
+    final resolved = _resolveMvpParticipant(selectedMvpId);
+    if (resolved == null) return;
+
+    try {
+      final eventId = _mvpEventId(submittedMatch.id);
+      final activeEvents = await _matchEventService.getMatchEvents(
+        submittedMatch.id,
+      );
+      for (final event in activeEvents) {
+        if (event.isMvp && event.id != eventId) {
+          await _matchEventService.voidEvent(event.id);
+        }
+      }
+      await _matchEventService.recordMvp(
+        eventId: eventId,
+        matchId: submittedMatch.id,
+        tournamentId: submittedMatch.tournamentId,
+        sideKey: resolved.sideKey,
+        actor: resolved.actor,
+        createdBy: actorId,
+      );
+    } catch (_) {
+      // Score submission has already succeeded; MVP event persistence can be
+      // retried by a later integration without breaking the existing result.
+    }
+  }
+
+  ({ParticipantRef actor, String sideKey})? _resolveMvpParticipant(
+    String selectedMvpId,
+  ) {
+    final roster = fullParticipantRoster.value;
+    if (roster == null) return null;
+
+    final matches = <({ParticipantRef actor, String sideKey})>[
+      for (final participant in roster.sideA)
+        if (participant.id == selectedMvpId) (actor: participant, sideKey: 'A'),
+      for (final participant in roster.sideB)
+        if (participant.id == selectedMvpId) (actor: participant, sideKey: 'B'),
+    ];
+    if (matches.length != 1) return null;
+    return matches.single;
+  }
+
+  String _mvpEventId(String matchId) => 'mvp-$matchId';
+
+  String _goalEventId({
+    required String matchId,
+    required ScoreSubmitGoalDraft draft,
+    required int index,
+  }) {
+    return [
+      'goal',
+      _safeEventIdSegment(matchId),
+      draft.sideKey,
+      draft.actor.kind.name,
+      _safeEventIdSegment(draft.actor.id),
+      index.toString(),
+    ].join('-');
+  }
+
+  String _safeEventIdSegment(String value) {
+    final encoded = Uri.encodeComponent(value.trim());
+    return encoded.isEmpty ? 'unknown' : encoded;
+  }
+
+  ParticipantRef? _rosterParticipantFor(
+    ParticipantRef participant,
+    String sideKey,
+  ) {
+    final key = participantRosterKey(participant);
+    return fullParticipantRoster.value
+        ?.participantsForSide(sideKey)
+        .firstWhereOrNull(
+          (candidate) => participantRosterKey(candidate) == key,
+        );
+  }
+
+  Future<void> _loadFullParticipantRoster(Match loadedMatch) async {
+    try {
+      final roster = await _officialRosterService.loadParticipantRoster(
+        matchId: loadedMatch.id,
+        match: loadedMatch,
+      );
+      fullParticipantRoster.value = roster;
+      fullRosterErrorMessage.value = '';
+    } catch (error) {
+      fullParticipantRoster.value = null;
+      fullRosterErrorMessage.value =
+          'تعذر تحميل قائمة المشاركين الكاملة: ${_readableError(error)}';
     }
   }
 

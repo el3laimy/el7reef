@@ -6,6 +6,7 @@ import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/constants/feature_flags.dart';
 import '../../../core/services/photo_upload_service.dart';
 import '../../../core/widgets/dynamic_frame_widget.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
@@ -36,9 +37,7 @@ class ProfileScreen extends GetView<ProfileController> {
           return CustomScrollView(
             slivers: [
               // ── Hero Header ──
-              SliverToBoxAdapter(
-                child: _buildHeroCard(player, context),
-              ),
+              SliverToBoxAdapter(child: _buildHeroCard(player, context)),
 
               // ── Quick Actions ──
               SliverToBoxAdapter(
@@ -122,15 +121,23 @@ class ProfileScreen extends GetView<ProfileController> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new,
-                    color: AppColors.textMuted, size: 20),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new,
+                  color: AppColors.textMuted,
+                  size: 20,
+                ),
                 onPressed: () => Get.back(),
               ),
-              IconButton(
-                icon: const Icon(Icons.settings_outlined,
-                    color: AppColors.textMuted),
-                onPressed: () {},
-              ),
+              if (FeatureFlags.profileSettingsUiEnabled)
+                IconButton(
+                  icon: const Icon(
+                    Icons.settings_outlined,
+                    color: AppColors.textMuted,
+                  ),
+                  onPressed: () {},
+                )
+              else
+                const SizedBox(width: 48),
             ],
           ),
 
@@ -163,11 +170,13 @@ class ProfileScreen extends GetView<ProfileController> {
                     decoration: BoxDecoration(
                       color: AppColors.primary,
                       shape: BoxShape.circle,
-                      border: Border.all(
-                          color: AppColors.background, width: 2),
+                      border: Border.all(color: AppColors.background, width: 2),
                     ),
-                    child: const Icon(Icons.camera_alt,
-                        color: Colors.white, size: 16),
+                    child: const Icon(
+                      Icons.camera_alt,
+                      color: Colors.white,
+                      size: 16,
+                    ),
                   ),
                 ),
               ],
@@ -203,12 +212,16 @@ class ProfileScreen extends GetView<ProfileController> {
                   )
                 : Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 4),
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.5)),
+                        color: AppColors.primary.withValues(alpha: 0.5),
+                      ),
                       borderRadius: BorderRadius.circular(
-                          AppDimensions.radiusFull),
+                        AppDimensions.radiusFull,
+                      ),
                     ),
                     child: Text(
                       '+ اختار Username',
@@ -222,9 +235,10 @@ class ProfileScreen extends GetView<ProfileController> {
           const SizedBox(height: AppDimensions.sm),
 
           // ── الرتبة ──
-          RankTierBadge(rating: player.rating, size: 28)
-              .animate()
-              .fadeIn(delay: 300.ms),
+          RankTierBadge(
+            rating: player.rating,
+            size: 28,
+          ).animate().fadeIn(delay: 300.ms),
 
           const SizedBox(height: AppDimensions.md),
 
@@ -237,14 +251,8 @@ class ProfileScreen extends GetView<ProfileController> {
             borderRadius: AppDimensions.radiusXl,
             child: Column(
               children: [
-                Text(
-                  '${player.rating}',
-                  style: AppTextStyles.ratingLarge,
-                ),
-                Text(
-                  'نقاط التقييم',
-                  style: AppTextStyles.labelMedium,
-                ),
+                Text('${player.rating}', style: AppTextStyles.ratingLarge),
+                Text('نقاط التقييم', style: AppTextStyles.labelMedium),
               ],
             ),
           ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.2),
@@ -255,8 +263,7 @@ class ProfileScreen extends GetView<ProfileController> {
 
   /// ── Avatar Placeholder ──
   Widget _avatarPlaceholder(Player player) {
-    final initial =
-        player.name.isNotEmpty ? player.name[0].toUpperCase() : '?';
+    final initial = player.name.isNotEmpty ? player.name[0].toUpperCase() : '?';
     return Container(
       color: AppColors.primarySurface,
       child: Center(
@@ -274,49 +281,49 @@ class ProfileScreen extends GetView<ProfileController> {
 
   /// ── Quick Actions (QR + Friends + Teams) — Task 6.2.5 ──
   Widget _buildQuickActions(Player player, BuildContext context) {
-    return Row(
-      children: [
-        _actionButton(
-          icon: Icons.qr_code_2,
-          label: 'الباركود',
-          color: AppColors.accent,
-          onTap: () {
-            QrCodeDialog.show(
-              context,
-              qrData: player.qrCode ?? '7reef://player/${player.id}',
-              playerName: player.name,
-              username: player.username,
-            );
-          },
-        ),
-        const SizedBox(width: AppDimensions.sm),
-        _actionButton(
-          icon: Icons.qr_code_scanner,
-          label: 'مسح QR',
-          color: AppColors.primary,
-          onTap: () => Get.toNamed(AppRoutes.qrScanner),
-        ),
-        const SizedBox(width: AppDimensions.sm),
+    final actions = <Widget>[
+      _actionButton(
+        icon: Icons.qr_code_2,
+        label: 'الباركود',
+        color: AppColors.accent,
+        onTap: () {
+          QrCodeDialog.show(
+            context,
+            qrData: player.qrCode ?? '7reef://player/${player.id}',
+            playerName: player.name,
+            username: player.username,
+          );
+        },
+      ),
+      _actionButton(
+        icon: Icons.qr_code_scanner,
+        label: 'مسح QR',
+        color: AppColors.primary,
+        onTap: () => Get.toNamed(AppRoutes.qrScanner),
+      ),
+      if (FeatureFlags.socialUiEnabled)
         _actionButton(
           icon: Icons.people_outline,
           label: 'أصدقاء',
           color: AppColors.secondary,
           badge: player.friendIds.length,
-          onTap: () {
-            // سيُفتح لاحقاً (Phase 6.4)
-            Get.snackbar('قريباً', 'الأصدقاء — قيد التطوير 🔧',
-                snackPosition: SnackPosition.BOTTOM);
-          },
+          onTap: () => Get.toNamed(AppRoutes.friends),
         ),
-        const SizedBox(width: AppDimensions.sm),
+      if (FeatureFlags.profileSharingUiEnabled)
         _actionButton(
           icon: Icons.share_outlined,
           label: 'مشاركة',
           color: AppColors.success,
-          onTap: () {
-            // Share profile link
-          },
+          onTap: () {},
         ),
+    ];
+
+    return Row(
+      children: [
+        for (var i = 0; i < actions.length; i++) ...[
+          if (i > 0) const SizedBox(width: AppDimensions.sm),
+          actions[i],
+        ],
       ],
     ).animate().fadeIn(delay: 450.ms).slideY(begin: 0.1);
   }
@@ -353,7 +360,9 @@ class ProfileScreen extends GetView<ProfileController> {
                         child: Text(
                           '$badge',
                           style: const TextStyle(
-                              color: Colors.white, fontSize: 10),
+                            color: Colors.white,
+                            fontSize: 10,
+                          ),
                         ),
                       ),
                     ),
@@ -377,9 +386,12 @@ class ProfileScreen extends GetView<ProfileController> {
     final player = controller.currentPlayer;
     if (player == null) return;
 
-    Get.snackbar('جارٍ الرفع...', 'يتم رفع صورتك الشخصية',
-        snackPosition: SnackPosition.BOTTOM,
-        showProgressIndicator: true);
+    Get.snackbar(
+      'جارٍ الرفع...',
+      'يتم رفع صورتك الشخصية',
+      snackPosition: SnackPosition.BOTTOM,
+      showProgressIndicator: true,
+    );
 
     final result = await service.uploadProfilePhoto(
       userId: player.id,
@@ -395,11 +407,17 @@ class ProfileScreen extends GetView<ProfileController> {
       await repo.updatePlayer(updated);
       await controller.refreshProfile();
 
-      Get.snackbar('تم ✅', 'تم تحديث صورتك الشخصية',
-          snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'تم ✅',
+        'تم تحديث صورتك الشخصية',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     } else {
-      Get.snackbar('خطأ', 'فشل رفع الصورة، حاول مجدداً',
-          snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'خطأ',
+        'فشل رفع الصورة، حاول مجدداً',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     }
   }
 
@@ -415,16 +433,41 @@ class ProfileScreen extends GetView<ProfileController> {
           const SizedBox(height: AppDimensions.md),
           Row(
             children: [
-              _statItem('المباريات', '${player.totalMatches}', Icons.sports_soccer, AppColors.accent),
-              _statItem('الفوز', '${player.wins}', Icons.emoji_events, AppColors.success),
-              _statItem('التعادل', '${player.draws}', Icons.handshake, AppColors.secondary),
-              _statItem('الخسارة', '${player.losses}', Icons.trending_down, AppColors.error),
+              _statItem(
+                'المباريات',
+                '${player.totalMatches}',
+                Icons.sports_soccer,
+                AppColors.accent,
+              ),
+              _statItem(
+                'الفوز',
+                '${player.wins}',
+                Icons.emoji_events,
+                AppColors.success,
+              ),
+              _statItem(
+                'التعادل',
+                '${player.draws}',
+                Icons.handshake,
+                AppColors.secondary,
+              ),
+              _statItem(
+                'الخسارة',
+                '${player.losses}',
+                Icons.trending_down,
+                AppColors.error,
+              ),
             ],
           ),
           const SizedBox(height: AppDimensions.md),
           Row(
             children: [
-              _statItem('MVP', '${player.mvpCount}', Icons.star, AppColors.secondary),
+              _statItem(
+                'MVP',
+                '${player.mvpCount}',
+                Icons.star,
+                AppColors.secondary,
+              ),
               _statItem(
                 'نسبة الفوز',
                 '${player.winRate.toStringAsFixed(0)}%',
@@ -436,8 +479,8 @@ class ProfileScreen extends GetView<ProfileController> {
                 player.trustLevel.name == 'veteran'
                     ? 'مخضرم'
                     : player.trustLevel.name == 'active'
-                        ? 'نشط'
-                        : 'جديد',
+                    ? 'نشط'
+                    : 'جديد',
                 Icons.verified,
                 player.trustLevel.name == 'veteran'
                     ? AppColors.secondary
@@ -457,10 +500,7 @@ class ProfileScreen extends GetView<ProfileController> {
         children: [
           Icon(icon, color: color, size: 22),
           const SizedBox(height: 6),
-          Text(
-            value,
-            style: AppTextStyles.titleLarge.copyWith(color: color),
-          ),
+          Text(value, style: AppTextStyles.titleLarge.copyWith(color: color)),
           Text(label, style: AppTextStyles.labelSmall),
         ],
       ),
@@ -477,39 +517,47 @@ class ProfileScreen extends GetView<ProfileController> {
         children: [
           Text('المركز الأساسي', style: AppTextStyles.titleLarge),
           const SizedBox(height: AppDimensions.sm),
-          Obx(() => Wrap(
-                spacing: AppDimensions.sm,
-                runSpacing: AppDimensions.sm,
-                children: controller.positions.map((pos) {
-                  final isSelected = controller.selectedPosition.value == pos;
-                  return GestureDetector(
-                    onTap: () => controller.updatePosition(pos),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppDimensions.md,
-                        vertical: AppDimensions.sm,
+          Obx(
+            () => Wrap(
+              spacing: AppDimensions.sm,
+              runSpacing: AppDimensions.sm,
+              children: controller.positions.map((pos) {
+                final isSelected = controller.selectedPosition.value == pos;
+                return GestureDetector(
+                  onTap: () => controller.updatePosition(pos),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimensions.md,
+                      vertical: AppDimensions.sm,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.primarySurface
+                          : AppColors.surface,
+                      borderRadius: BorderRadius.circular(
+                        AppDimensions.radiusFull,
                       ),
-                      decoration: BoxDecoration(
+                      border: Border.all(
                         color: isSelected
-                            ? AppColors.primarySurface
-                            : AppColors.surface,
-                        borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-                        border: Border.all(
-                          color: isSelected ? AppColors.primary : AppColors.surfaceBorder,
-                          width: isSelected ? 2 : 1,
-                        ),
-                      ),
-                      child: Text(
-                        controller.positionLabels[pos] ?? pos,
-                        style: AppTextStyles.labelLarge.copyWith(
-                          color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                        ),
+                            ? AppColors.primary
+                            : AppColors.surfaceBorder,
+                        width: isSelected ? 2 : 1,
                       ),
                     ),
-                  );
-                }).toList(),
-              )),
+                    child: Text(
+                      controller.positionLabels[pos] ?? pos,
+                      style: AppTextStyles.labelLarge.copyWith(
+                        color: isSelected
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
         ],
       ),
     ).animate().fadeIn(delay: 600.ms, duration: 500.ms).slideY(begin: 0.1);
@@ -522,20 +570,27 @@ class ProfileScreen extends GetView<ProfileController> {
       borderRadius: AppDimensions.radiusLg,
       child: Column(
         children: [
-          _infoRow(Icons.calendar_today, 'تاريخ الانضمام',
-              _formatDate(player.createdAt)),
+          _infoRow(
+            Icons.calendar_today,
+            'تاريخ الانضمام',
+            _formatDate(player.createdAt),
+          ),
           const Divider(color: AppColors.surfaceBorder, height: 24),
-          _infoRow(Icons.access_time, 'آخر نشاط',
-              _formatDate(player.lastActiveAt)),
+          _infoRow(
+            Icons.access_time,
+            'آخر نشاط',
+            _formatDate(player.lastActiveAt),
+          ),
           const Divider(color: AppColors.surfaceBorder, height: 24),
-          _infoRow(Icons.group, 'الفرق',
-              '${player.teamIds.length} فريق'),
+          _infoRow(Icons.group, 'الفرق', '${player.teamIds.length} فريق'),
           const Divider(color: AppColors.surfaceBorder, height: 24),
-          _infoRow(Icons.people, 'الأصدقاء',
-              '${player.friendIds.length} صديق'),
+          _infoRow(Icons.people, 'الأصدقاء', '${player.friendIds.length} صديق'),
           const Divider(color: AppColors.surfaceBorder, height: 24),
-          _infoRow(Icons.military_tech, 'الإنجازات',
-              '${player.achievementIds.length} إنجاز'),
+          _infoRow(
+            Icons.military_tech,
+            'الإنجازات',
+            '${player.achievementIds.length} إنجاز',
+          ),
         ],
       ),
     ).animate().fadeIn(delay: 700.ms, duration: 500.ms).slideY(begin: 0.1);
