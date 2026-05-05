@@ -25,9 +25,6 @@ import '../widgets/professional_pitch_card.dart';
 class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
   const MatchResultLineupScreen({super.key});
 
-  static final GlobalKey _shareBoundaryKey = GlobalKey();
-  static final GlobalKey _mvpShareBoundaryKey = GlobalKey();
-  static final GlobalKey _lineupShareBoundaryKey = GlobalKey();
   static const _shareBuilder = MatchResultShareController();
   static const _mvpShareBuilder = MvpShareController();
   static const _captureService = ShareCardCaptureService();
@@ -213,46 +210,16 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
     }
 
     final shareData = _buildShareData(match);
-    final entry = OverlayEntry(
-      builder: (_) => Positioned(
-        left: 0,
-        top: 0,
-        child: IgnorePointer(
-          child: Opacity(
-            opacity: 0.01,
-            child: RepaintBoundary(
-              key: _shareBoundaryKey,
-              child: MatchResultShareCard(data: shareData, exportMode: true),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    var inserted = false;
     try {
-      await _precacheShareLogos(context, shareData);
-      if (!context.mounted) return;
-
-      final overlay = Overlay.maybeOf(context, rootOverlay: true);
-      if (overlay == null) {
-        Get.snackbar('تعذر المشاركة', 'تعذر تجهيز نافذة المشاركة.');
-        return;
-      }
-
-      overlay.insert(entry);
-      inserted = true;
-      await WidgetsBinding.instance.endOfFrame;
-      await _captureService.captureAndShare(
-        boundaryKey: _shareBoundaryKey,
+      await _captureService.captureAndShareWidget(
+        context: context,
+        widget: MatchResultShareCard(data: shareData, exportMode: true),
         fileName: 'el7reef_match_${match.id}',
         text: 'نتيجة المباراة على الحريف',
-        pixelRatio: matchResultShareExportPixelRatio,
+        onBeforeCapture: () => _precacheShareLogos(context, shareData),
       );
     } catch (error) {
       Get.snackbar('تعذر المشاركة', _readableShareError(error));
-    } finally {
-      if (inserted) entry.remove();
     }
   }
 
@@ -269,43 +236,15 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
       return;
     }
 
-    final entry = OverlayEntry(
-      builder: (_) => Positioned(
-        left: 0,
-        top: 0,
-        child: IgnorePointer(
-          child: Opacity(
-            opacity: 0.01,
-            child: RepaintBoundary(
-              key: _mvpShareBoundaryKey,
-              child: MvpShareCard(data: shareData, exportMode: true),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    var inserted = false;
     try {
-      final overlay = Overlay.maybeOf(context, rootOverlay: true);
-      if (overlay == null) {
-        Get.snackbar('تعذر المشاركة', 'تعذر تجهيز نافذة المشاركة.');
-        return;
-      }
-
-      overlay.insert(entry);
-      inserted = true;
-      await WidgetsBinding.instance.endOfFrame;
-      await _captureService.captureAndShare(
-        boundaryKey: _mvpShareBoundaryKey,
+      await _captureService.captureAndShareWidget(
+        context: context,
+        widget: MvpShareCard(data: shareData, exportMode: true),
         fileName: 'el7reef_mvp_${match.id}',
         text: 'نجم المباراة على الحريف',
-        pixelRatio: matchResultShareExportPixelRatio,
       );
     } catch (error) {
       Get.snackbar('تعذر المشاركة', _readableShareError(error));
-    } finally {
-      if (inserted) entry.remove();
     }
   }
 
@@ -328,46 +267,17 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
       matchLabel: _lineupMatchLabel(),
       accentColor: accentColor,
     );
-    await _captureAndShareLineup(context, shareData);
-  }
 
-  Future<void> _captureAndShareLineup(
-    BuildContext context,
-    LineupShareData shareData,
-  ) async {
-    final overlay = Overlay.of(context);
-    final entry = OverlayEntry(
-      builder: (_) => Positioned(
-        left: 0,
-        top: 0,
-        child: IgnorePointer(
-          child: Opacity(
-            opacity: 0.01,
-            child: RepaintBoundary(
-              key: _lineupShareBoundaryKey,
-              child: LineupShareCard(data: shareData, exportMode: true),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    var inserted = false;
     try {
-      await _precacheLineupLogo(context, shareData);
-      overlay.insert(entry);
-      inserted = true;
-      await WidgetsBinding.instance.endOfFrame;
-      await _captureService.captureAndShare(
-        boundaryKey: _lineupShareBoundaryKey,
+      await _captureService.captureAndShareWidget(
+        context: context,
+        widget: LineupShareCard(data: shareData, exportMode: true),
         fileName: 'el7reef_lineup_${shareData.matchId}_${shareData.ownerId}',
         text: 'تشكيلة ${shareData.teamName} على الحريف',
-        pixelRatio: matchResultShareExportPixelRatio,
+        onBeforeCapture: () => _precacheLineupLogo(context, shareData),
       );
     } catch (error) {
       Get.snackbar('تعذر المشاركة', _readableShareError(error));
-    } finally {
-      if (inserted) entry.remove();
     }
   }
 

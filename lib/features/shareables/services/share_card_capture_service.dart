@@ -40,4 +40,68 @@ class ShareCardCaptureService {
 
     await Share.shareXFiles([XFile(file.path)], text: text);
   }
+
+  /// التقاط أي ودجت ومشاركتها عبر إدارتها في الـ Overlay
+  Future<void> captureAndShareWidget({
+    required BuildContext context,
+    required Widget widget,
+    required String fileName,
+    String? text,
+    Future<void> Function()? onBeforeCapture,
+  }) async {
+    final boundaryKey = GlobalKey();
+    final entry = OverlayEntry(
+      builder: (_) => Positioned(
+        left: 0,
+        top: 0,
+        child: IgnorePointer(
+          child: Opacity(
+            opacity: 0.01,
+            child: RepaintBoundary(
+              key: boundaryKey,
+              child: widget,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // إظهار مؤشر تحميل
+    final loadingDialog = showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      ),
+    );
+
+    var inserted = false;
+    try {
+      if (onBeforeCapture != null) {
+        await onBeforeCapture();
+      }
+
+      final overlay = Overlay.maybeOf(context, rootOverlay: true);
+      if (overlay == null) throw Exception('تعذر تجهيز نافذة المشاركة.');
+
+      overlay.insert(entry);
+      inserted = true;
+      
+      await WidgetsBinding.instance.endOfFrame;
+      // تأخير بسيط لضمان اكتمال الريندر في بعض الحالات المعقدة
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      await captureAndShare(
+        boundaryKey: boundaryKey,
+        fileName: fileName,
+        text: text,
+      );
+    } finally {
+      if (inserted) entry.remove();
+      // إغلاق ديالوج التحميل
+      if (Navigator.canPop(context)) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    }
+  }
 }
