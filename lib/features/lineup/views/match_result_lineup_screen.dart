@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
@@ -8,11 +9,14 @@ import '../../../domain/entities/match.dart';
 import '../../../domain/entities/match_lineup_snapshot.dart';
 import '../../shareables/controllers/lineup_share_controller.dart';
 import '../../shareables/controllers/match_result_share_controller.dart';
+import '../../shareables/controllers/mvp_share_controller.dart';
 import '../../shareables/models/lineup_share_data.dart';
 import '../../shareables/models/match_result_share_data.dart';
+import '../../shareables/models/mvp_share_data.dart';
 import '../../shareables/services/share_card_capture_service.dart';
 import '../../shareables/widgets/lineup_share_card.dart';
 import '../../shareables/widgets/match_result_share_card.dart';
+import '../../shareables/widgets/mvp_share_card.dart';
 import '../controllers/match_result_lineup_controller.dart';
 import '../widgets/bench_bar.dart';
 import '../widgets/professional_match_header.dart';
@@ -22,8 +26,10 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
   const MatchResultLineupScreen({super.key});
 
   static final GlobalKey _shareBoundaryKey = GlobalKey();
+  static final GlobalKey _mvpShareBoundaryKey = GlobalKey();
   static final GlobalKey _lineupShareBoundaryKey = GlobalKey();
   static const _shareBuilder = MatchResultShareController();
+  static const _mvpShareBuilder = MvpShareController();
   static const _captureService = ShareCardCaptureService();
 
   @override
@@ -97,6 +103,28 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
                       ),
                     ),
                   ],
+                  if (_hasShareableMvp) ...[
+                    const SizedBox(height: AppDimensions.sm),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _shareMvp(context),
+                        icon: const Icon(Icons.workspace_premium_rounded),
+                        label: const Text('شارك نجم المباراة'),
+                      ),
+                    ),
+                  ],
+                  if (_mvpProfileTarget != null) ...[
+                    const SizedBox(height: AppDimensions.xs),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton.icon(
+                        onPressed: _openMvpProfile,
+                        icon: const Icon(Icons.person_search_rounded),
+                        label: const Text('افتح بروفايل النجم'),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: AppDimensions.lg),
                   _SnapshotWarning(
                     hasHome: home.snapshot != null,
@@ -165,6 +193,18 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
     return match?.scoreTeamA != null && match?.scoreTeamB != null;
   }
 
+  bool get _hasShareableMvp => controller.hasShareableMvp;
+
+  MvpPublicProfileTarget? get _mvpProfileTarget => controller.mvpProfileTarget;
+
+  void _openMvpProfile() {
+    final target = controller.mvpProfileTarget;
+    if (target == null) return;
+    Get.toNamed(
+      AppRoutes.playerProfileByKindAndId(kind: target.kind.name, id: target.id),
+    );
+  }
+
   Future<void> _shareResult(BuildContext context) async {
     final match = controller.match.value;
     if (match == null || match.scoreTeamA == null || match.scoreTeamB == null) {
@@ -207,6 +247,59 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
         boundaryKey: _shareBoundaryKey,
         fileName: 'el7reef_match_${match.id}',
         text: 'نتيجة المباراة على الحريف',
+        pixelRatio: matchResultShareExportPixelRatio,
+      );
+    } catch (error) {
+      Get.snackbar('تعذر المشاركة', _readableShareError(error));
+    } finally {
+      if (inserted) entry.remove();
+    }
+  }
+
+  Future<void> _shareMvp(BuildContext context) async {
+    final match = controller.match.value;
+    if (match == null) {
+      Get.snackbar('تعذر المشاركة', 'لا توجد بيانات مباراة لمشاركتها.');
+      return;
+    }
+
+    final shareData = _buildMvpShareData(match);
+    if (shareData == null) {
+      Get.snackbar('تعذر المشاركة', 'لا يوجد نجم مباراة لمشاركته بعد.');
+      return;
+    }
+
+    final entry = OverlayEntry(
+      builder: (_) => Positioned(
+        left: 0,
+        top: 0,
+        child: IgnorePointer(
+          child: Opacity(
+            opacity: 0.01,
+            child: RepaintBoundary(
+              key: _mvpShareBoundaryKey,
+              child: MvpShareCard(data: shareData, exportMode: true),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    var inserted = false;
+    try {
+      final overlay = Overlay.maybeOf(context, rootOverlay: true);
+      if (overlay == null) {
+        Get.snackbar('تعذر المشاركة', 'تعذر تجهيز نافذة المشاركة.');
+        return;
+      }
+
+      overlay.insert(entry);
+      inserted = true;
+      await WidgetsBinding.instance.endOfFrame;
+      await _captureService.captureAndShare(
+        boundaryKey: _mvpShareBoundaryKey,
+        fileName: 'el7reef_mvp_${match.id}',
+        text: 'نجم المباراة على الحريف',
         pixelRatio: matchResultShareExportPixelRatio,
       );
     } catch (error) {
@@ -290,6 +383,34 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
     );
   }
 
+  MvpShareData? _buildMvpShareData(Match match) {
+    final home = controller.homeSide;
+    final away = controller.awaySide;
+    final event = controller.mvpEvent.value;
+    if (event != null) {
+      return _mvpShareBuilder.buildFromEvent(
+        match: match,
+        event: event,
+        tournamentName: controller.tournamentName.value,
+        teamALabel: home.label,
+        teamBLabel: away.label,
+      );
+    }
+
+    final mvpPlayerId = match.mvpPlayerId?.trim();
+    if (mvpPlayerId == null || mvpPlayerId.isEmpty) return null;
+    return _mvpShareBuilder.buildFallback(
+      match: match,
+      mvpPlayerId: mvpPlayerId,
+      displayName: controller.displayNameForParticipantId(mvpPlayerId),
+      isGuest: controller.isGuestParticipantId(mvpPlayerId),
+      sideKey: controller.sideKeyForParticipantId(mvpPlayerId),
+      tournamentName: controller.tournamentName.value,
+      teamALabel: home.label,
+      teamBLabel: away.label,
+    );
+  }
+
   Future<void> _precacheShareLogos(
     BuildContext context,
     MatchResultShareData shareData,
@@ -342,7 +463,7 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
     if (raw.startsWith('Exception: ')) {
       return raw.substring('Exception: '.length);
     }
-    return raw;
+    return 'تعذر تجهيز بطاقة المشاركة.';
   }
 }
 

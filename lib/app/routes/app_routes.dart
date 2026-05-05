@@ -7,7 +7,7 @@ abstract class AppRoutes {
   static const String home = '/home';
   static const String profile = '/profile';
   static const String editProfile = '/profile/edit';
-  static const String playerProfile = '/player/:id';
+  static const String playerProfile = '/player/:kind/:id';
   static const String teamProfile = '/team/:id';
   static const String createTeam = '/team/create';
   static const String findMatch = '/match/find';
@@ -63,6 +63,10 @@ abstract class AppRoutes {
   static const String disputeViewer = '/organizer/disputes/:matchId';
 
   static String teamProfileById(String id) => '/team/$id';
+  static String playerProfileByKindAndId({
+    required String kind,
+    required String id,
+  }) => '/player/$kind/$id';
   static String tournamentDetailById(String id) => '/tournament/$id';
   static String tournamentBracketById(String id) => '/tournament/$id/bracket';
   static String tournamentParticipantsById(String id) =>

@@ -309,6 +309,7 @@ void main() {
       find.text('ستظهر هنا أهداف اللاعبين بعد تسجيل نتائج المباريات.'),
       findsOneWidget,
     );
+    expect(find.text('شارك الهدافين'), findsNothing);
     expect(find.text('Blue Sharks'), findsWidgets);
     expect(find.text('الترتيب'), findsOneWidget);
     expect(find.text('لوحة تشغيل البطولة'), findsOneWidget);
@@ -330,7 +331,46 @@ void main() {
     expect(find.text('2 أهداف'), findsOneWidget);
     expect(find.text('1 هدف'), findsOneWidget);
     expect(find.text('ضيف'), findsOneWidget);
+    expect(find.text('شارك الهدافين'), findsOneWidget);
     expect(find.text('Temporary Scorer'), findsNothing);
+  });
+
+  testWidgets('registered top scorer row opens public player profile', (
+    tester,
+  ) async {
+    await _seedTopScorerGoals(firestore);
+
+    await tester.pumpWidget(
+      _buildOpsApp(AppRoutes.tournamentDetailById('tournament-1')),
+    );
+    await tester.pumpAndSettle();
+
+    final registeredScorer = find.text('Ali Scorer');
+    await tester.ensureVisible(registeredScorer);
+    await tester.pumpAndSettle();
+    await tester.tap(registeredScorer);
+    await tester.pumpAndSettle();
+
+    expect(find.text('profile:player:player-scorer'), findsOneWidget);
+  });
+
+  testWidgets('guest top scorer row opens public guest profile', (
+    tester,
+  ) async {
+    await _seedTopScorerGoals(firestore);
+
+    await tester.pumpWidget(
+      _buildOpsApp(AppRoutes.tournamentDetailById('tournament-1')),
+    );
+    await tester.pumpAndSettle();
+
+    final guestScorer = find.text('ضيف هداف');
+    await tester.ensureVisible(guestScorer);
+    await tester.pumpAndSettle();
+    await tester.tap(guestScorer);
+    await tester.pumpAndSettle();
+
+    expect(find.text('profile:guestPlayer:guest-scorer'), findsOneWidget);
   });
 
   testWidgets('tournament detail shows safe top scorers error state', (
@@ -697,6 +737,14 @@ Widget _buildOpsApp(String initialRoute) {
         name: AppRoutes.tournamentDetail,
         page: () => const TournamentDetailScreen(),
         binding: _TestTournamentDetailBinding(),
+      ),
+      GetPage(
+        name: AppRoutes.playerProfile,
+        page: () => Scaffold(
+          body: Text(
+            'profile:${Get.parameters['kind']}:${Get.parameters['id']}',
+          ),
+        ),
       ),
       GetPage(
         name: AppRoutes.organizerDashboard,

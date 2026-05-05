@@ -4,16 +4,20 @@ import '../../../core/lineup/formation_engine.dart';
 import '../../../core/lineup/formation_library.dart';
 import '../../../core/lineup/lineup_types.dart';
 import '../../../core/lineup/lineup_utils.dart';
+import '../../../core/services/match_event_service.dart';
 import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
 import '../../../data/repositories/match_repository_impl.dart';
 import '../../../data/repositories/match_side_player_repository_impl.dart';
 import '../../../data/repositories/match_side_repository_impl.dart';
 import '../../../data/repositories/team_repository_impl.dart';
+import '../../../data/repositories/tournament_repository_impl.dart';
 import '../../../domain/entities/match.dart';
+import '../../../domain/entities/match_event.dart';
 import '../../../domain/entities/match_lineup_entry.dart';
 import '../../../domain/entities/match_lineup_snapshot.dart';
 import '../../../domain/entities/match_side.dart';
 import '../../../domain/entities/match_side_player.dart';
+import '../../../domain/entities/participant_ref.dart';
 import '../../../domain/entities/team.dart';
 import '../../match/models/friendly_match_side_view.dart';
 
@@ -25,12 +29,21 @@ class ResultLineupSide {
   const ResultLineupSide({required this.label, this.logoUrl, this.snapshot});
 }
 
+class MvpPublicProfileTarget {
+  final ParticipantRefKind kind;
+  final String id;
+
+  const MvpPublicProfileTarget({required this.kind, required this.id});
+}
+
 class MatchResultLineupController extends GetxController {
   final MatchRepositoryImpl _matchRepository;
   final TeamRepositoryImpl _teamRepository;
   final MatchLineupSnapshotRepositoryImpl _snapshotRepository;
   final MatchSideRepositoryImpl _matchSideRepository;
   final MatchSidePlayerRepositoryImpl _matchSidePlayerRepository;
+  final MatchEventService _matchEventService;
+  final TournamentRepositoryImpl _tournamentRepository;
 
   MatchResultLineupController({
     required MatchRepositoryImpl matchRepository,
@@ -38,11 +51,15 @@ class MatchResultLineupController extends GetxController {
     required MatchLineupSnapshotRepositoryImpl snapshotRepository,
     required MatchSideRepositoryImpl matchSideRepository,
     required MatchSidePlayerRepositoryImpl matchSidePlayerRepository,
+    required MatchEventService matchEventService,
+    required TournamentRepositoryImpl tournamentRepository,
   }) : _matchRepository = matchRepository,
        _teamRepository = teamRepository,
        _snapshotRepository = snapshotRepository,
        _matchSideRepository = matchSideRepository,
-       _matchSidePlayerRepository = matchSidePlayerRepository;
+       _matchSidePlayerRepository = matchSidePlayerRepository,
+       _matchEventService = matchEventService,
+       _tournamentRepository = tournamentRepository;
 
   final RxBool isLoading = true.obs;
   final RxString errorMessage = ''.obs;
@@ -51,6 +68,8 @@ class MatchResultLineupController extends GetxController {
   final RxList<MatchSide> matchSides = <MatchSide>[].obs;
   final RxList<MatchSidePlayer> matchSidePlayers = <MatchSidePlayer>[].obs;
   final RxList<MatchLineupSnapshot> snapshots = <MatchLineupSnapshot>[].obs;
+  final Rx<MatchEvent?> mvpEvent = Rx<MatchEvent?>(null);
+  final RxString tournamentName = ''.obs;
 
   String get matchId => Get.parameters['matchId'] ?? Get.parameters['id'] ?? '';
 
@@ -114,17 +133,99 @@ class MatchResultLineupController extends GetxController {
       final loadedSidePlayers = loadedMatch.tournamentId == null
           ? await _matchSidePlayerRepository.getMatchPlayers(loadedMatch.id)
           : <MatchSidePlayer>[];
+      final loadedMvpEvent = await _loadMvpEventSafely(loadedMatch.id);
+      final loadedTournamentName = await _loadTournamentNameSafely(
+        loadedMatch.tournamentId,
+      );
 
       match.value = loadedMatch;
       snapshots.assignAll(loadedSnapshots);
       teams.assignAll({for (final team in loadedTeams) team.id: team});
       matchSides.assignAll(loadedSides);
       matchSidePlayers.assignAll(loadedSidePlayers);
+      mvpEvent.value = loadedMvpEvent;
+      tournamentName.value = loadedTournamentName;
     } catch (error) {
       errorMessage.value = _readableError(error);
     } finally {
       isLoading.value = false;
     }
+  }
+
+  bool get hasShareableMvp {
+    if (mvpEvent.value != null) return true;
+    final mvpPlayerId = match.value?.mvpPlayerId?.trim();
+    return mvpPlayerId != null && mvpPlayerId.isNotEmpty;
+  }
+
+  MvpPublicProfileTarget? get mvpProfileTarget {
+    final event = mvpEvent.value;
+    if (event != null) {
+      return _profileTargetForKindAndId(event.actor.kind, event.actor.id);
+    }
+
+    final mvpPlayerId = match.value?.mvpPlayerId?.trim();
+    if (mvpPlayerId == null || mvpPlayerId.isEmpty) return null;
+    final entry = _lineupEntryForParticipantId(mvpPlayerId);
+    if (entry?.playerId != null) {
+      return _profileTargetForKindAndId(
+        ParticipantRefKind.player,
+        entry!.playerId!,
+      );
+    }
+    if (entry?.guestPlayerId != null) {
+      return _profileTargetForKindAndId(
+        ParticipantRefKind.guestPlayer,
+        entry!.guestPlayerId!,
+      );
+    }
+    return null;
+  }
+
+  String? displayNameForParticipantId(String participantId) {
+    final entry = _lineupEntryForParticipantId(participantId);
+    final entryName = entry?.displayName.trim();
+    if (entryName != null && entryName.isNotEmpty) return entryName;
+
+    final sidePlayer = matchSidePlayers.firstWhereOrNull(
+      (player) => player.id == participantId,
+    );
+    final sidePlayerName = sidePlayer?.displayName.trim();
+    if (sidePlayerName != null && sidePlayerName.isNotEmpty) {
+      return sidePlayerName;
+    }
+    return null;
+  }
+
+  bool isGuestParticipantId(String participantId) {
+    return _lineupEntryForParticipantId(participantId)?.isGuest ?? false;
+  }
+
+  String? sideKeyForParticipantId(String participantId) {
+    for (final snapshot in snapshots) {
+      final hasEntry = [
+        ...snapshot.starters,
+        ...snapshot.bench,
+      ].any((entry) => entry.participantId == participantId);
+      if (!hasEntry) continue;
+      final sideKey = snapshot.sideKey?.trim().toUpperCase();
+      if (sideKey == 'A' || sideKey == 'B') return sideKey;
+      final currentMatch = match.value;
+      if (currentMatch?.teamAId != null &&
+          snapshot.teamId == currentMatch!.teamAId) {
+        return 'A';
+      }
+      if (currentMatch?.teamBId != null &&
+          snapshot.teamId == currentMatch!.teamBId) {
+        return 'B';
+      }
+      final matchId = currentMatch?.id;
+      if (matchId != null) {
+        if (snapshot.matchSideId == '${matchId}_A') return 'A';
+        if (snapshot.matchSideId == '${matchId}_B') return 'B';
+      }
+    }
+    return null;
   }
 
   String formationForSnapshot(MatchLineupSnapshot? snapshot) {
@@ -288,6 +389,49 @@ class MatchResultLineupController extends GetxController {
     );
     for (final side in views) {
       if (side.sideKey == sideKey) return side;
+    }
+    return null;
+  }
+
+  Future<MatchEvent?> _loadMvpEventSafely(String matchId) async {
+    try {
+      return await _matchEventService.getMvpEvent(matchId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String> _loadTournamentNameSafely(String? tournamentId) async {
+    final normalized = tournamentId?.trim();
+    if (normalized == null || normalized.isEmpty) return '';
+    try {
+      return (await _tournamentRepository.getTournament(
+            normalized,
+          ))?.name.trim() ??
+          '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  MatchLineupEntry? _lineupEntryForParticipantId(String participantId) {
+    for (final snapshot in snapshots) {
+      for (final entry in [...snapshot.starters, ...snapshot.bench]) {
+        if (entry.participantId == participantId) return entry;
+      }
+    }
+    return null;
+  }
+
+  MvpPublicProfileTarget? _profileTargetForKindAndId(
+    ParticipantRefKind kind,
+    String id,
+  ) {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) return null;
+    if (kind == ParticipantRefKind.player ||
+        kind == ParticipantRefKind.guestPlayer) {
+      return MvpPublicProfileTarget(kind: kind, id: normalizedId);
     }
     return null;
   }

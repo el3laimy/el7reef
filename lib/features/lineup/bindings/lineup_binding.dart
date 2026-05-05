@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 
 import '../../../core/auth/auth_service_session.dart';
 import '../../../core/auth/auth_session.dart';
+import '../../../core/services/match_event_service.dart';
 import '../../../core/services/matchday_service.dart';
 import '../../../core/services/team_roster_service.dart';
 import '../../../data/repositories/guest_player_repository_impl.dart';
@@ -70,6 +71,8 @@ class MatchResultLineupBinding extends Bindings {
         snapshotRepository: Get.find<MatchLineupSnapshotRepositoryImpl>(),
         matchSideRepository: Get.find<MatchSideRepositoryImpl>(),
         matchSidePlayerRepository: Get.find<MatchSidePlayerRepositoryImpl>(),
+        matchEventService: Get.find<MatchEventService>(),
+        tournamentRepository: Get.find<TournamentRepositoryImpl>(),
       ),
     );
   }
@@ -119,6 +122,9 @@ void _putSharedLineupDependencies() {
   }
   if (!Get.isRegistered<MatchdayService>()) {
     Get.lazyPut<MatchdayService>(() => MatchdayService());
+  }
+  if (!Get.isRegistered<MatchEventService>()) {
+    Get.lazyPut<MatchEventService>(() => MatchEventService());
   }
   if (!Get.isRegistered<TeamRosterService>()) {
     Get.lazyPut<TeamRosterService>(

@@ -13,10 +13,16 @@ import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../core/services/tournament_top_scorers_resolver.dart';
 import '../../../domain/entities/participant_ref.dart';
 import '../../../domain/entities/tournament.dart';
+import '../../shareables/controllers/top_scorers_share_controller.dart';
+import '../../shareables/services/share_card_capture_service.dart';
+import '../../shareables/widgets/top_scorers_share_card.dart';
 import '../../../services/auth_service.dart';
 import '../controllers/tournament_detail_controller.dart';
 
 class TournamentDetailScreen extends GetView<TournamentDetailController> {
+  static const _shareBuilder = TopScorersShareController();
+  static const _captureService = ShareCardCaptureService();
+
   const TournamentDetailScreen({super.key});
 
   @override
@@ -117,6 +123,7 @@ class TournamentDetailScreen extends GetView<TournamentDetailController> {
                         isLoading: controller.isLoadingTopScorers.value,
                         errorMessage: controller.topScorersErrorMessage.value,
                         scorers: controller.topScorers,
+                        onShare: () => _shareTopScorers(context, tournament),
                       ).animate().fadeIn(delay: 220.ms),
                       const SizedBox(height: AppDimensions.md),
                       if (!isOrganizer &&
@@ -143,17 +150,75 @@ class TournamentDetailScreen extends GetView<TournamentDetailController> {
       ),
     );
   }
+
+  Future<void> _shareTopScorers(
+    BuildContext context,
+    Tournament tournament,
+  ) async {
+    final scorers = controller.topScorers.toList(growable: false);
+    if (scorers.isEmpty) {
+      Get.snackbar('تعذر المشاركة', 'لا يوجد هدافون لمشاركتهم بعد.');
+      return;
+    }
+
+    final shareData = _shareBuilder.build(
+      tournamentName: tournament.name,
+      scorers: scorers,
+      limit: 5,
+    );
+    final boundaryKey = GlobalKey();
+    final entry = OverlayEntry(
+      builder: (_) => Positioned(
+        left: 0,
+        top: 0,
+        child: IgnorePointer(
+          child: Opacity(
+            opacity: 0.01,
+            child: RepaintBoundary(
+              key: boundaryKey,
+              child: TopScorersShareCard(data: shareData, exportMode: true),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    var inserted = false;
+    try {
+      final overlay = Overlay.maybeOf(context, rootOverlay: true);
+      if (overlay == null) {
+        Get.snackbar('تعذر المشاركة', 'تعذر تجهيز نافذة المشاركة.');
+        return;
+      }
+
+      overlay.insert(entry);
+      inserted = true;
+      await WidgetsBinding.instance.endOfFrame;
+      await _captureService.captureAndShare(
+        boundaryKey: boundaryKey,
+        fileName: 'el7reef_top_scorers_${tournament.id}',
+        text: 'هدافو ${tournament.name} على الحريف',
+        pixelRatio: matchResultShareExportPixelRatio,
+      );
+    } catch (error) {
+      Get.snackbar('تعذر المشاركة', _readableShareError(error));
+    } finally {
+      if (inserted) entry.remove();
+    }
+  }
 }
 
 class _TopScorersSection extends StatelessWidget {
   final bool isLoading;
   final String errorMessage;
   final List<TournamentTopScorerEntry> scorers;
+  final VoidCallback? onShare;
 
   const _TopScorersSection({
     required this.isLoading,
     required this.errorMessage,
     required this.scorers,
+    this.onShare,
   });
 
   @override
@@ -203,12 +268,22 @@ class _TopScorersSection extends StatelessWidget {
                 ),
               ],
             )
-          else
+          else ...[
             ...scorers.indexed.map((item) {
               final rank = item.$1 + 1;
               final scorer = item.$2;
               return _TopScorerRow(rank: rank, scorer: scorer);
             }),
+            const SizedBox(height: AppDimensions.sm),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: OutlinedButton.icon(
+                onPressed: onShare,
+                icon: const Icon(Icons.ios_share_rounded),
+                label: const Text('شارك الهدافين'),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -226,67 +301,106 @@ class _TopScorerRow extends StatelessWidget {
     final actor = scorer.actor;
     final goals = scorer.goals;
     final isGuest = actor.kind == ParticipantRefKind.guestPlayer;
+    final canOpenProfile = _canOpenPublicProfile(actor);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.primarySurface,
-              borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-            ),
-            child: Text(
-              '$rank',
-              style: AppTextStyles.labelLarge.copyWith(
-                color: AppColors.primary,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+          onTap: canOpenProfile ? () => _openPublicProfile(actor) : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
             child: Row(
               children: [
-                Flexible(
+                Container(
+                  width: 28,
+                  height: 28,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySurface,
+                    borderRadius: BorderRadius.circular(
+                      AppDimensions.radiusFull,
+                    ),
+                  ),
                   child: Text(
-                    actor.displayName,
-                    style: AppTextStyles.bodyLarge,
-                    overflow: TextOverflow.ellipsis,
+                    '$rank',
+                    style: AppTextStyles.labelLarge.copyWith(
+                      color: AppColors.primary,
+                    ),
                   ),
                 ),
-                if (isGuest) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.secondary.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(
-                        AppDimensions.radiusFull,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          actor.displayName,
+                          style: AppTextStyles.bodyLarge,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      'ضيف',
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: AppColors.secondary,
-                      ),
-                    ),
+                      if (isGuest) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondary.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(
+                              AppDimensions.radiusFull,
+                            ),
+                          ),
+                          child: Text(
+                            'ضيف',
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColors.secondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  _goalCountLabel(goals),
+                  style: AppTextStyles.labelLarge.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+                if (canOpenProfile) ...[
+                  const SizedBox(width: 6),
+                  Icon(
+                    Icons.chevron_left_rounded,
+                    size: 20,
+                    color: AppColors.textSecondary.withValues(alpha: 0.72),
                   ),
                 ],
               ],
             ),
           ),
-          const SizedBox(width: 10),
-          Text(
-            _goalCountLabel(goals),
-            style: AppTextStyles.labelLarge.copyWith(color: AppColors.primary),
-          ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  bool _canOpenPublicProfile(ParticipantRef actor) {
+    if (actor.id.trim().isEmpty) return false;
+    return actor.kind == ParticipantRefKind.player ||
+        actor.kind == ParticipantRefKind.guestPlayer;
+  }
+
+  void _openPublicProfile(ParticipantRef actor) {
+    if (!_canOpenPublicProfile(actor)) return;
+    Get.toNamed(
+      AppRoutes.playerProfileByKindAndId(
+        kind: actor.kind.name,
+        id: actor.id.trim(),
       ),
     );
   }
@@ -294,6 +408,14 @@ class _TopScorerRow extends StatelessWidget {
 
 String _goalCountLabel(int goals) {
   return goals == 1 ? '1 هدف' : '$goals أهداف';
+}
+
+String _readableShareError(Object error) {
+  final raw = error.toString();
+  if (raw.startsWith('Exception: ')) {
+    return raw.substring('Exception: '.length);
+  }
+  return 'تعذر تجهيز بطاقة المشاركة.';
 }
 
 class _InfoCard extends StatelessWidget {

@@ -12,6 +12,8 @@ import '../../features/home/views/home_screen.dart';
 import '../../features/home/bindings/home_binding.dart';
 import '../../features/profile/views/profile_screen.dart';
 import '../../features/profile/bindings/profile_binding.dart';
+import '../../features/profile/views/public_player_profile_screen.dart';
+import '../../features/profile/bindings/public_player_profile_binding.dart';
 import '../../features/team/views/my_teams_screen.dart';
 import '../../features/team/bindings/team_binding.dart';
 import '../../features/team/views/team_roster_screen.dart';
@@ -124,6 +126,14 @@ class AppPages {
       name: AppRoutes.profile,
       page: () => const ProfileScreen(),
       binding: ProfileBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    // ── Public player pride profile ──
+    GetPage(
+      name: AppRoutes.playerProfile,
+      page: () => const PublicPlayerProfileScreen(),
+      binding: PublicPlayerProfileBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 

@@ -114,6 +114,16 @@ class MatchEventService {
     return _repository.getEventsByMatchId(_required(matchId, 'matchId'));
   }
 
+  Future<List<MatchEvent>> getEventsForActor({
+    required ParticipantRefKind actorKind,
+    required String actorId,
+  }) {
+    return _repository.getEventsByActor(
+      actorKind: actorKind.name,
+      actorId: _required(actorId, 'actorId'),
+    );
+  }
+
   Future<List<MatchEvent>> getTournamentGoalEvents(String tournamentId) {
     return _repository.getGoalEventsByTournamentId(
       _required(tournamentId, 'tournamentId'),

@@ -34,6 +34,23 @@ class MatchEventRepositoryImpl implements MatchEventRepository {
   }
 
   @override
+  Future<List<MatchEvent>> getEventsByActor({
+    required String actorKind,
+    required String actorId,
+  }) async {
+    final snapshot = await _eventsRef
+        .where('actor.kind', isEqualTo: actorKind)
+        .where('actor.id', isEqualTo: actorId)
+        .where('status', isEqualTo: MatchEventStatus.active.name)
+        .get();
+    final events = snapshot.docs
+        .map((doc) => MatchEventModel.fromJson(doc.data(), doc.id).toEntity())
+        .toList(growable: true);
+    events.sort(_compareEvents);
+    return events;
+  }
+
+  @override
   Future<List<MatchEvent>> getGoalEventsByTournamentId(
     String tournamentId,
   ) async {
