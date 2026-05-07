@@ -10,8 +10,8 @@ class ActivityFeedController extends GetxController {
   ActivityFeedController({
     ActivityFeedService? activityFeedService,
     AuthService? authService,
-  })  : _activityFeedService = activityFeedService ?? ActivityFeedService(),
-        _authService = authService ?? Get.find<AuthService>();
+  }) : _activityFeedService = activityFeedService ?? ActivityFeedService(),
+       _authService = authService ?? Get.find<AuthService>();
 
   final RxList<ActivityFeedEntry> items = <ActivityFeedEntry>[].obs;
   final RxBool isLoading = false.obs;
@@ -35,21 +35,27 @@ class ActivityFeedController extends GetxController {
   Future<void> loadFeed() async {
     final currentPlayer = _authService.currentPlayer.value;
     if (currentPlayer == null) {
-      items.clear();
-      errorMessage.value = '';
+      resetSessionState();
       return;
     }
 
     try {
       isLoading.value = true;
       errorMessage.value = '';
-      final loadedItems =
-          await _activityFeedService.buildFeedForPlayer(currentPlayer);
+      final loadedItems = await _activityFeedService.buildFeedForPlayer(
+        currentPlayer,
+      );
       items.assignAll(loadedItems);
     } catch (error) {
       errorMessage.value = 'تعذر تحميل آخر الأنشطة حالياً.';
     } finally {
       isLoading.value = false;
     }
+  }
+
+  void resetSessionState() {
+    items.clear();
+    isLoading.value = false;
+    errorMessage.value = '';
   }
 }

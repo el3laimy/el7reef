@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -57,21 +58,23 @@ class ShareCardCaptureService {
         child: IgnorePointer(
           child: Opacity(
             opacity: 0.01,
-            child: RepaintBoundary(
-              key: boundaryKey,
-              child: widget,
-            ),
+            child: RepaintBoundary(key: boundaryKey, child: widget),
           ),
         ),
       ),
     );
 
+    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    if (overlay == null) throw Exception('تعذر تجهيز نافذة المشاركة.');
+    final navigator = Navigator.of(context, rootNavigator: true);
+
     // إظهار مؤشر تحميل
-    final loadingDialog = showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(
-        child: CircularProgressIndicator(color: Colors.white),
+    unawaited(
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) =>
+            const Center(child: CircularProgressIndicator(color: Colors.white)),
       ),
     );
 
@@ -81,12 +84,9 @@ class ShareCardCaptureService {
         await onBeforeCapture();
       }
 
-      final overlay = Overlay.maybeOf(context, rootOverlay: true);
-      if (overlay == null) throw Exception('تعذر تجهيز نافذة المشاركة.');
-
       overlay.insert(entry);
       inserted = true;
-      
+
       await WidgetsBinding.instance.endOfFrame;
       // تأخير بسيط لضمان اكتمال الريندر في بعض الحالات المعقدة
       await Future.delayed(const Duration(milliseconds: 100));
@@ -99,8 +99,8 @@ class ShareCardCaptureService {
     } finally {
       if (inserted) entry.remove();
       // إغلاق ديالوج التحميل
-      if (Navigator.canPop(context)) {
-        Navigator.of(context, rootNavigator: true).pop();
+      if (navigator.mounted && navigator.canPop()) {
+        navigator.pop();
       }
     }
   }

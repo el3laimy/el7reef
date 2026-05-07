@@ -35,7 +35,10 @@ class PublicPlayerProfileScreen extends GetView<PublicPlayerProfileController> {
                     : controller.errorMessage.value,
               );
             }
-            return _PublicPlayerProfileContent(profile: profile);
+            return _PublicPlayerProfileContent(
+              profile: profile,
+              controller: controller,
+            );
           }),
         ),
       ),
@@ -45,8 +48,12 @@ class PublicPlayerProfileScreen extends GetView<PublicPlayerProfileController> {
 
 class _PublicPlayerProfileContent extends StatelessWidget {
   final PublicPlayerProfileData profile;
+  final PublicPlayerProfileController controller;
 
-  const _PublicPlayerProfileContent({required this.profile});
+  const _PublicPlayerProfileContent({
+    required this.profile,
+    required this.controller,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -118,7 +125,12 @@ class _PublicPlayerProfileContent extends StatelessWidget {
         ],
         if (profile.showClaimPlaceholder) ...[
           const SizedBox(height: AppDimensions.md),
-          _ClaimPlaceholder(),
+          if (controller.hasValidGuestClaimPayload)
+            _ClaimAction(onPressed: controller.openGuestClaim)
+          else if (controller.guestClaimWarningMessage != null)
+            _InfoPanel(message: controller.guestClaimWarningMessage!)
+          else
+            _ClaimPlaceholder(),
         ],
       ],
     );
@@ -192,8 +204,38 @@ class _ClaimPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _InfoPanel(
-      message:
-          'ده أنت؟ اطلب ربط البروفايل\nميزة الربط الكاملة ستفتح من رابط الدعوة أو QR المخصص للضيف.',
+      message: 'ده أنت؟ اطلب رابط الدعوة من منظم البطولة أو قائد الفريق.',
+    );
+  }
+}
+
+class _ClaimAction extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const _ClaimAction({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassmorphicContainer(
+      padding: const EdgeInsets.all(AppDimensions.md),
+      borderRadius: AppDimensions.radiusMd,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'رابط الدعوة جاهز لهذا البروفايل.',
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textPrimary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppDimensions.md),
+          ElevatedButton(
+            onPressed: onPressed,
+            child: const Text('استلم البروفايل'),
+          ),
+        ],
+      ),
     );
   }
 }

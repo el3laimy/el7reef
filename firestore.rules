@@ -593,7 +593,13 @@ service cloud.firestore {
     }
 
     match /claimCodes/{claimCodeId} {
-      allow read: if isAuthenticated();
+      // V1 claim links treat the exact claim code document id as
+      // proof-of-possession for client claim entry. Listing/querying all claim
+      // codes would expose active invite tokens, so list access is limited to
+      // creator-scoped reuse queries.
+      allow get: if isAuthenticated();
+      allow list: if isAuthenticated() &&
+        resource.data.createdBy == request.auth.uid;
       allow create: if canCreateClaimCode(request.resource.data);
       allow update: if canUpdateClaimCode(resource.data) ||
         canFinalizeGuestPlayerClaimCode() ||

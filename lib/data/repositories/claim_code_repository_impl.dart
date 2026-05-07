@@ -10,7 +10,7 @@ class ClaimCodeRepositoryImpl implements ClaimCodeRepository {
   final FirebaseFirestore _firestore;
 
   ClaimCodeRepositoryImpl({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _claimCodesRef =>
       _firestore.collection(FirebasePaths.claimCodes);
@@ -40,6 +40,7 @@ class ClaimCodeRepositoryImpl implements ClaimCodeRepository {
   Future<ClaimCode?> getActiveClaimCodeForTarget({
     required ClaimTargetType targetType,
     required String targetId,
+    String? createdBy,
     String? tournamentId,
   }) async {
     Query<Map<String, dynamic>> query = _claimCodesRef
@@ -47,11 +48,18 @@ class ClaimCodeRepositoryImpl implements ClaimCodeRepository {
         .where('targetId', isEqualTo: targetId)
         .where('status', isEqualTo: 'active');
 
+    if (createdBy != null && createdBy.isNotEmpty) {
+      query = query.where('createdBy', isEqualTo: createdBy);
+    }
+
     if (tournamentId != null && tournamentId.isNotEmpty) {
       query = query.where('tournamentId', isEqualTo: tournamentId);
     }
 
-    final snapshot = await query.orderBy('createdAt', descending: true).limit(1).get();
+    final snapshot = await query
+        .orderBy('createdAt', descending: true)
+        .limit(1)
+        .get();
     if (snapshot.docs.isEmpty) {
       return null;
     }

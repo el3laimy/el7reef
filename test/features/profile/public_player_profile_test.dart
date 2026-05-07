@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 
+import 'package:el7reef/app/routes/app_routes.dart';
 import 'package:el7reef/core/enums/guest_claim_status.dart';
 import 'package:el7reef/core/enums/player_trust_level.dart';
 import 'package:el7reef/core/enums/user_role.dart';
@@ -179,28 +180,16 @@ void main() {
   testWidgets('screen shows Arabic labels and guest claim placeholder', (
     tester,
   ) async {
-    Get.testMode = true;
-    addTearDown(Get.reset);
-    Get.put(
-      PublicPlayerProfileController(
-        kind: 'guestPlayer',
+    await _pumpProfileRoute(
+      tester,
+      const PublicPlayerProfileData(
+        kind: ParticipantRefKind.guestPlayer,
         id: 'guest-1',
-        resolver: _FakeResolver(
-          const PublicPlayerProfileData(
-            kind: ParticipantRefKind.guestPlayer,
-            id: 'guest-1',
-            displayName: 'ضيف هداف',
-            totalGoals: 3,
-            totalMvps: 2,
-          ),
-        ),
+        displayName: 'ضيف هداف',
+        totalGoals: 3,
+        totalMvps: 2,
       ),
     );
-
-    await tester.pumpWidget(
-      const GetMaterialApp(home: PublicPlayerProfileScreen()),
-    );
-    await tester.pumpAndSettle();
 
     expect(find.text('بروفايل اللاعب'), findsOneWidget);
     expect(find.text('ضيف هداف'), findsOneWidget);
@@ -209,39 +198,289 @@ void main() {
     expect(find.text('نجومية المباراة'), findsOneWidget);
     expect(find.text('3'), findsOneWidget);
     expect(find.text('2'), findsOneWidget);
-    expect(find.textContaining('ده أنت؟ اطلب ربط البروفايل'), findsOneWidget);
+    expect(find.textContaining('ده أنت؟ اطلب رابط الدعوة'), findsOneWidget);
+    expect(find.text('استلم البروفايل'), findsNothing);
   });
 
-  testWidgets('screen shows linked guest info panel', (tester) async {
-    Get.testMode = true;
-    addTearDown(Get.reset);
-    Get.put(
-      PublicPlayerProfileController(
-        kind: 'guestPlayer',
+  testWidgets('guest profile with valid matching token shows claim CTA', (
+    tester,
+  ) async {
+    await _pumpProfileRoute(
+      tester,
+      const PublicPlayerProfileData(
+        kind: ParticipantRefKind.guestPlayer,
         id: 'guest-1',
-        resolver: _FakeResolver(
-          const PublicPlayerProfileData(
-            kind: ParticipantRefKind.guestPlayer,
-            id: 'guest-1',
-            displayName: 'ضيف مربوط',
-            totalGoals: 1,
-            totalMvps: 0,
-            linkedPlayerId: 'player-1',
-            isClaimed: true,
-          ),
-        ),
+        displayName: 'ضيف هداف',
+        totalGoals: 3,
+        totalMvps: 2,
+      ),
+      queryParameters: _validClaimQuery(),
+    );
+
+    expect(find.text('استلم البروفايل'), findsOneWidget);
+    expect(find.textContaining('ده أنت؟ اطلب رابط الدعوة'), findsNothing);
+    expect(find.textContaining('CLAIM-CODE-1'), findsNothing);
+  });
+
+  testWidgets('claim CTA routes to guest claim screen and preserves code', (
+    tester,
+  ) async {
+    await _pumpProfileRoute(
+      tester,
+      const PublicPlayerProfileData(
+        kind: ParticipantRefKind.guestPlayer,
+        id: 'guest-1',
+        displayName: 'ضيف هداف',
+        totalGoals: 3,
+        totalMvps: 2,
+      ),
+      queryParameters: _validClaimQuery(),
+      includeClaimRoute: true,
+    );
+
+    await tester.tap(find.text('استلم البروفايل'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('claim-route:guest-1:CLAIM-CODE-1'), findsOneWidget);
+  });
+
+  testWidgets('wrong target token shows safe warning and no claim CTA', (
+    tester,
+  ) async {
+    await _pumpProfileRoute(
+      tester,
+      const PublicPlayerProfileData(
+        kind: ParticipantRefKind.guestPlayer,
+        id: 'guest-1',
+        displayName: 'ضيف هداف',
+        totalGoals: 3,
+        totalMvps: 2,
+      ),
+      queryParameters: _validClaimQuery(targetId: 'guest-2'),
+    );
+
+    expect(find.text('استلم البروفايل'), findsNothing);
+    expect(find.text('رابط الدعوة لا يطابق هذا البروفايل.'), findsOneWidget);
+  });
+
+  testWidgets('missing code does not show claim CTA', (tester) async {
+    await _pumpProfileRoute(
+      tester,
+      const PublicPlayerProfileData(
+        kind: ParticipantRefKind.guestPlayer,
+        id: 'guest-1',
+        displayName: 'ضيف هداف',
+        totalGoals: 3,
+        totalMvps: 2,
+      ),
+      queryParameters: _validClaimQuery(code: ''),
+    );
+
+    expect(find.text('استلم البروفايل'), findsNothing);
+    expect(find.textContaining('رابط الدعوة غير مكتمل'), findsOneWidget);
+  });
+
+  testWidgets('type mismatch does not show claim CTA', (tester) async {
+    await _pumpProfileRoute(
+      tester,
+      const PublicPlayerProfileData(
+        kind: ParticipantRefKind.guestPlayer,
+        id: 'guest-1',
+        displayName: 'ضيف هداف',
+        totalGoals: 3,
+        totalMvps: 2,
+      ),
+      queryParameters: _validClaimQuery(type: 'guestTeam'),
+    );
+
+    expect(find.text('استلم البروفايل'), findsNothing);
+    expect(find.text('رابط الدعوة لا يخص بروفايل لاعب ضيف.'), findsOneWidget);
+  });
+
+  testWidgets('expired token does not show claim CTA', (tester) async {
+    await _pumpProfileRoute(
+      tester,
+      const PublicPlayerProfileData(
+        kind: ParticipantRefKind.guestPlayer,
+        id: 'guest-1',
+        displayName: 'ضيف هداف',
+        totalGoals: 3,
+        totalMvps: 2,
+      ),
+      queryParameters: _validClaimQuery(
+        expiresAt: DateTime(2020).millisecondsSinceEpoch.toString(),
       ),
     );
 
-    await tester.pumpWidget(
-      const GetMaterialApp(home: PublicPlayerProfileScreen()),
+    expect(find.text('استلم البروفايل'), findsNothing);
+    expect(find.textContaining('انتهت صلاحية رابط الدعوة'), findsOneWidget);
+  });
+
+  testWidgets('inactive status does not show claim CTA', (tester) async {
+    await _pumpProfileRoute(
+      tester,
+      const PublicPlayerProfileData(
+        kind: ParticipantRefKind.guestPlayer,
+        id: 'guest-1',
+        displayName: 'ضيف هداف',
+        totalGoals: 3,
+        totalMvps: 2,
+      ),
+      queryParameters: _validClaimQuery(status: 'claimed'),
     );
-    await tester.pumpAndSettle();
+
+    expect(find.text('استلم البروفايل'), findsNothing);
+    expect(find.textContaining('رابط الدعوة لم يعد نشطًا'), findsOneWidget);
+  });
+
+  testWidgets('claimed or linked guest profile does not show claim CTA', (
+    tester,
+  ) async {
+    await _pumpProfileRoute(
+      tester,
+      const PublicPlayerProfileData(
+        kind: ParticipantRefKind.guestPlayer,
+        id: 'guest-1',
+        displayName: 'ضيف مربوط',
+        totalGoals: 1,
+        totalMvps: 0,
+        linkedPlayerId: 'player-1',
+        isClaimed: true,
+      ),
+      queryParameters: _validClaimQuery(),
+    );
 
     expect(find.text('ضيف مربوط'), findsOneWidget);
     expect(find.text('هذا الضيف مربوط ببروفايل لاعب مسجل.'), findsOneWidget);
-    expect(find.textContaining('ده أنت؟ اطلب ربط البروفايل'), findsNothing);
+    expect(find.text('استلم البروفايل'), findsNothing);
+    expect(find.textContaining('ده أنت؟ اطلب رابط الدعوة'), findsNothing);
   });
+
+  testWidgets('registered player profile never shows guest claim CTA', (
+    tester,
+  ) async {
+    await _pumpProfileRoute(
+      tester,
+      const PublicPlayerProfileData(
+        kind: ParticipantRefKind.player,
+        id: 'player-1',
+        displayName: 'لاعب مسجل',
+        totalGoals: 4,
+        totalMvps: 1,
+      ),
+      routeKind: 'player',
+      routeId: 'player-1',
+      queryParameters: _validClaimQuery(targetId: 'player-1'),
+    );
+
+    expect(find.text('لاعب مسجل'), findsOneWidget);
+    expect(find.text('استلم البروفايل'), findsNothing);
+    expect(find.textContaining('ده أنت؟ اطلب رابط الدعوة'), findsNothing);
+  });
+
+  testWidgets('screen shows linked guest info panel', (tester) async {
+    await _pumpProfileRoute(
+      tester,
+      const PublicPlayerProfileData(
+        kind: ParticipantRefKind.guestPlayer,
+        id: 'guest-1',
+        displayName: 'ضيف مربوط',
+        totalGoals: 1,
+        totalMvps: 0,
+        linkedPlayerId: 'player-1',
+        isClaimed: true,
+      ),
+    );
+
+    expect(find.text('ضيف مربوط'), findsOneWidget);
+    expect(find.text('هذا الضيف مربوط ببروفايل لاعب مسجل.'), findsOneWidget);
+    expect(find.textContaining('ده أنت؟ اطلب رابط الدعوة'), findsNothing);
+  });
+}
+
+Future<void> _pumpProfileRoute(
+  WidgetTester tester,
+  PublicPlayerProfileData data, {
+  String routeKind = 'guestPlayer',
+  String routeId = 'guest-1',
+  Map<String, String?> queryParameters = const {},
+  bool includeClaimRoute = false,
+}) async {
+  Get.testMode = true;
+  Get.reset();
+  addTearDown(Get.reset);
+
+  final route = _withQuery(
+    AppRoutes.playerProfileByKindAndId(kind: routeKind, id: routeId),
+    queryParameters,
+  );
+  await tester.pumpWidget(
+    GetMaterialApp(
+      initialRoute: route,
+      getPages: [
+        GetPage(
+          name: AppRoutes.playerProfile,
+          page: () => const PublicPlayerProfileScreen(),
+          binding: BindingsBuilder(() {
+            Get.put(
+              PublicPlayerProfileController(
+                kind: Get.parameters['kind'] ?? routeKind,
+                id: Get.parameters['id'] ?? routeId,
+                resolver: _FakeResolver(data),
+              ),
+            );
+          }),
+        ),
+        if (includeClaimRoute)
+          GetPage(
+            name: AppRoutes.guestPlayerClaim,
+            page: () => Scaffold(
+              body: Text(
+                'claim-route:${Get.parameters['guestPlayerId']}:${Get.parameters['code']}',
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Map<String, String?> _validClaimQuery({
+  String code = 'CLAIM-CODE-1',
+  String type = 'guestPlayer',
+  String targetId = 'guest-1',
+  String status = 'active',
+  String? expiresAt,
+}) {
+  return {
+    'code': code,
+    'type': type,
+    'targetId': targetId,
+    'scope': 'team',
+    'teamId': 'team-1',
+    'tournamentId': 'tournament-1',
+    'requiresApproval': '0',
+    'expiresAt':
+        expiresAt ??
+        DateTime.now()
+            .add(const Duration(days: 1))
+            .millisecondsSinceEpoch
+            .toString(),
+    'status': status,
+  };
+}
+
+String _withQuery(String path, Map<String, String?> queryParameters) {
+  final filtered = <String, String>{};
+  for (final entry in queryParameters.entries) {
+    final value = entry.value;
+    if (value != null && value.isNotEmpty) {
+      filtered[entry.key] = value;
+    }
+  }
+  if (filtered.isEmpty) return path;
+  return Uri(path: path, queryParameters: filtered).toString();
 }
 
 class _ResolverFixture {

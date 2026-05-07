@@ -89,6 +89,81 @@ void main() {
     );
 
     test(
+      'getOrganizerTournaments only returns tournaments for the requested organizer',
+      () async {
+        await repository.createTournament(
+          Tournament(
+            id: 'account-a-cup',
+            organizerId: 'account-a',
+            name: 'Account A Cup',
+            format: TournamentFormat.groupsOnly,
+            teamSize: TournamentTeamSize.fiveVsFive,
+            maxTeams: 8,
+            status: TournamentStatus.registration,
+            createdAt: now,
+          ),
+        );
+        await repository.createTournament(
+          Tournament(
+            id: 'account-b-cup',
+            organizerId: 'account-b',
+            name: 'Account B Cup',
+            format: TournamentFormat.groupsOnly,
+            teamSize: TournamentTeamSize.fiveVsFive,
+            maxTeams: 8,
+            status: TournamentStatus.registration,
+            createdAt: now.add(const Duration(minutes: 1)),
+          ),
+        );
+
+        final accountBTournaments = await repository.getOrganizerTournaments(
+          'account-b',
+        );
+
+        expect(accountBTournaments.map((tournament) => tournament.id), [
+          'account-b-cup',
+        ]);
+      },
+    );
+
+    test(
+      'getLiveTournaments remains public discovery and can include other organizers',
+      () async {
+        await repository.createTournament(
+          Tournament(
+            id: 'account-a-public-cup',
+            organizerId: 'account-a',
+            name: 'Account A Public Cup',
+            format: TournamentFormat.groupsOnly,
+            teamSize: TournamentTeamSize.fiveVsFive,
+            maxTeams: 8,
+            status: TournamentStatus.registration,
+            createdAt: now,
+          ),
+        );
+        await repository.createTournament(
+          Tournament(
+            id: 'account-b-public-cup',
+            organizerId: 'account-b',
+            name: 'Account B Public Cup',
+            format: TournamentFormat.groupsOnly,
+            teamSize: TournamentTeamSize.fiveVsFive,
+            maxTeams: 8,
+            status: TournamentStatus.registration,
+            createdAt: now.add(const Duration(minutes: 1)),
+          ),
+        );
+
+        final liveTournaments = await repository.getLiveTournaments();
+
+        expect(
+          liveTournaments.map((tournament) => tournament.id),
+          containsAll(['account-a-public-cup', 'account-b-public-cup']),
+        );
+      },
+    );
+
+    test(
       'getPlayerTournaments falls back to legacy registeredTeamIds',
       () async {
         await repository.createTournament(

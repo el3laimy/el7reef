@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 
+import '../../../app/routes/app_routes.dart';
 import '../models/public_player_profile_data.dart';
 import '../services/public_player_profile_resolver.dart';
 
@@ -19,6 +20,18 @@ class PublicPlayerProfileController extends GetxController {
   final Rx<PublicPlayerProfileData?> profile = Rx<PublicPlayerProfileData?>(
     null,
   );
+
+  static const Set<String> _claimPayloadKeys = {
+    'code',
+    'type',
+    'targetId',
+    'scope',
+    'teamId',
+    'tournamentId',
+    'requiresApproval',
+    'expiresAt',
+    'status',
+  };
 
   @override
   void onInit() {
@@ -43,5 +56,95 @@ class PublicPlayerProfileController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  bool get hasValidGuestClaimPayload {
+    final data = profile.value;
+    if (!_canEvaluateGuestClaim(data)) return false;
+    if (!_hasAnyClaimPayload) return false;
+    return guestClaimWarningMessage == null;
+  }
+
+  String? get guestClaimWarningMessage {
+    final data = profile.value;
+    if (!_canEvaluateGuestClaim(data)) return null;
+    final guestProfile = data!;
+    if (!_hasAnyClaimPayload) return null;
+
+    final code = _queryValue('code');
+    final type = _queryValue('type');
+    final targetId = _queryValue('targetId');
+    if (!_hasText(code) || !_hasText(targetId)) {
+      return 'رابط الدعوة غير مكتمل. اطلب رابطًا جديدًا من منظم البطولة أو قائد الفريق.';
+    }
+    if (type != 'guestPlayer') {
+      return 'رابط الدعوة لا يخص بروفايل لاعب ضيف.';
+    }
+    if (targetId != guestProfile.id) {
+      return 'رابط الدعوة لا يطابق هذا البروفايل.';
+    }
+
+    final status = _queryValue('status');
+    if (_hasText(status) && status != 'active') {
+      return 'رابط الدعوة لم يعد نشطًا. اطلب رابطًا جديدًا من منظم البطولة أو قائد الفريق.';
+    }
+
+    final expiresAt = _queryValue('expiresAt');
+    if (_hasText(expiresAt)) {
+      final expiresAtMillis = int.tryParse(expiresAt!);
+      if (expiresAtMillis == null) {
+        return 'رابط الدعوة غير صالح. اطلب رابطًا جديدًا من منظم البطولة أو قائد الفريق.';
+      }
+      final expiresAtDate = DateTime.fromMillisecondsSinceEpoch(
+        expiresAtMillis,
+      );
+      if (expiresAtDate.isBefore(DateTime.now())) {
+        return 'انتهت صلاحية رابط الدعوة. اطلب رابطًا جديدًا من منظم البطولة أو قائد الفريق.';
+      }
+    }
+
+    return null;
+  }
+
+  Map<String, String?> get guestClaimQueryParameters {
+    if (!hasValidGuestClaimPayload) return const {};
+
+    return {
+      for (final key in _claimPayloadKeys)
+        if (_hasText(Get.parameters[key])) key: Get.parameters[key]!.trim(),
+    };
+  }
+
+  String? get guestClaimRoute {
+    final data = profile.value;
+    if (data == null || !hasValidGuestClaimPayload) return null;
+    return AppRoutes.guestPlayerClaimById(
+      data.id,
+      queryParameters: guestClaimQueryParameters,
+    );
+  }
+
+  void openGuestClaim() {
+    final route = guestClaimRoute;
+    if (route == null) return;
+    Get.toNamed(route);
+  }
+
+  String? _queryValue(String key) {
+    final value = Get.parameters[key]?.trim();
+    return value == null || value.isEmpty ? null : value;
+  }
+
+  bool _hasText(String? value) => value != null && value.trim().isNotEmpty;
+
+  bool get _hasAnyClaimPayload =>
+      _claimPayloadKeys.any((key) => _hasText(Get.parameters[key]));
+
+  bool _canEvaluateGuestClaim(PublicPlayerProfileData? data) {
+    if (data == null) return false;
+    if (!data.isGuest) return false;
+    if (data.id.trim().isEmpty) return false;
+    if (data.isClaimed || _hasText(data.linkedPlayerId)) return false;
+    return true;
   }
 }

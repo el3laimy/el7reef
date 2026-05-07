@@ -22,6 +22,8 @@ import '../../../domain/repositories/team_repository.dart';
 import '../../../core/services/share_link_service.dart';
 import 'package:share_plus/share_plus.dart';
 
+typedef TeamRosterShareText = Future<void> Function(String text);
+
 class TeamRosterMemberViewData {
   final TeamMembership membership;
   final String displayName;
@@ -29,6 +31,7 @@ class TeamRosterMemberViewData {
   final String? position;
   final String? avatarUrl;
   final bool isGuest;
+  final bool isGuestClaimedOrLinked;
 
   const TeamRosterMemberViewData({
     required this.membership,
@@ -37,6 +40,7 @@ class TeamRosterMemberViewData {
     this.position,
     this.avatarUrl,
     required this.isGuest,
+    this.isGuestClaimedOrLinked = false,
   });
 }
 
@@ -48,6 +52,7 @@ class TeamRosterController extends GetxController {
   final PlayerRepository _playerRepository;
   final GuestPlayerRepository _guestPlayerRepository;
   final ShareLinkService _shareLinkService;
+  final TeamRosterShareText _shareText;
   final Uuid _uuid;
 
   TeamRosterController({
@@ -58,15 +63,21 @@ class TeamRosterController extends GetxController {
     required PlayerRepository playerRepository,
     required GuestPlayerRepository guestPlayerRepository,
     required ShareLinkService shareLinkService,
+    TeamRosterShareText? shareText,
     Uuid? uuid,
-  })  : _authSession = authSession,
-        _teamRepository = teamRepository,
-        _teamRosterService = teamRosterService,
-        _teamFormationService = teamFormationService,
-        _playerRepository = playerRepository,
-        _guestPlayerRepository = guestPlayerRepository,
-        _shareLinkService = shareLinkService,
-        _uuid = uuid ?? const Uuid();
+  }) : _authSession = authSession,
+       _teamRepository = teamRepository,
+       _teamRosterService = teamRosterService,
+       _teamFormationService = teamFormationService,
+       _playerRepository = playerRepository,
+       _guestPlayerRepository = guestPlayerRepository,
+       _shareLinkService = shareLinkService,
+       _shareText =
+           shareText ??
+           ((text) async {
+             await Share.share(text);
+           }),
+       _uuid = uuid ?? const Uuid();
 
   final Rxn<Team> team = Rxn<Team>();
   final RxList<TeamRosterMemberViewData> rosterMembers =
@@ -74,8 +85,7 @@ class TeamRosterController extends GetxController {
   final RxList<Player> playerSearchResults = <Player>[].obs;
   final RxList<TeamFormationTemplate> formationTemplates =
       <TeamFormationTemplate>[].obs;
-  final RxList<TeamRosterSnapshot> rosterSnapshots =
-      <TeamRosterSnapshot>[].obs;
+  final RxList<TeamRosterSnapshot> rosterSnapshots = <TeamRosterSnapshot>[].obs;
 
   final RxBool isLoading = false.obs;
   final RxBool isSubmitting = false.obs;
@@ -170,12 +180,16 @@ class TeamRosterController extends GetxController {
         targetTeamId,
         includeInactive: true,
       );
-      final templates = await _teamFormationService.getTeamTemplates(targetTeamId);
-      final snapshots =
-          await _teamFormationService.getRecentSnapshots(targetTeamId);
+      final templates = await _teamFormationService.getTeamTemplates(
+        targetTeamId,
+      );
+      final snapshots = await _teamFormationService.getRecentSnapshots(
+        targetTeamId,
+      );
 
-      final resolvedMembers =
-          await Future.wait(memberships.map(_buildViewDataForMembership));
+      final resolvedMembers = await Future.wait(
+        memberships.map(_buildViewDataForMembership),
+      );
       rosterMembers.assignAll(_sortedMembers(resolvedMembers));
       formationTemplates.assignAll(templates);
       rosterSnapshots.assignAll(snapshots);
@@ -522,14 +536,18 @@ class TeamRosterController extends GetxController {
       );
     }
 
-    final guestPlayer =
-        await _guestPlayerRepository.getGuestPlayer(membership.guestPlayerId!);
+    final guestPlayer = await _guestPlayerRepository.getGuestPlayer(
+      membership.guestPlayerId!,
+    );
+    final isClaimedOrLinked =
+        guestPlayer?.isClaimed == true || guestPlayer?.hasLinkedPlayer == true;
     return TeamRosterMemberViewData(
       membership: membership,
       displayName: guestPlayer?.displayName ?? membership.guestPlayerId!,
       secondaryText: guestPlayer?.phoneNumber,
       position: guestPlayer?.preferredPosition,
       isGuest: true,
+      isGuestClaimedOrLinked: isClaimedOrLinked,
     );
   }
 
@@ -592,8 +610,9 @@ class TeamRosterController extends GetxController {
           return statusCompare;
         }
 
-        final roleCompare = (roleOrder[a.membership.role] ?? 99)
-            .compareTo(roleOrder[b.membership.role] ?? 99);
+        final roleCompare = (roleOrder[a.membership.role] ?? 99).compareTo(
+          roleOrder[b.membership.role] ?? 99,
+        );
         if (roleCompare != 0) {
           return roleCompare;
         }
@@ -635,7 +654,7 @@ class TeamRosterController extends GetxController {
         teamId: targetTeamId,
         actorId: actorId,
       );
-      await Share.share(shareLink.shareText);
+      await _shareText(shareLink.shareText);
     } catch (e) {
       Get.snackbar('خطأ', _readableError(e));
     } finally {
@@ -643,22 +662,42 @@ class TeamRosterController extends GetxController {
     }
   }
 
-  Future<void> shareGuestPlayerClaimLink(String guestPlayerId) async {
+  Future<bool> shareGuestPlayerClaimLink(String guestPlayerId) async {
     final actorId = currentUserId;
     if (actorId == null) {
       Get.snackbar('خطأ', 'يجب تسجيل الدخول أولاً.');
-      return;
+      return false;
+    }
+    if (!canManageRoster) {
+      Get.snackbar('خطأ', 'لا تملك صلاحية إرسال رابط الاستلام لهذا الضيف.');
+      return false;
     }
 
     try {
       isSubmitting.value = true;
+      final guestPlayer = await _guestPlayerRepository.getGuestPlayer(
+        guestPlayerId,
+      );
+      if (guestPlayer == null) {
+        Get.snackbar('خطأ', 'اللاعب الضيف المطلوب غير موجود.');
+        return false;
+      }
+      if (guestPlayer.isClaimed || guestPlayer.hasLinkedPlayer) {
+        Get.snackbar('تم الربط', 'تم ربط هذا الضيف بالفعل ببروفايل لاعب مسجل.');
+        return false;
+      }
       final shareLink = await _shareLinkService.createGuestPlayerClaimLink(
         guestPlayerId: guestPlayerId,
         actorId: actorId,
       );
-      await Share.share(shareLink.shareText);
+      await _shareText(shareLink.shareText);
+      return true;
     } catch (e) {
-      Get.snackbar('خطأ', _readableError(e));
+      Get.snackbar(
+        'خطأ',
+        'تعذر إنشاء رابط الاستلام الآن. تأكد من الصلاحيات وحاول مرة أخرى.',
+      );
+      return false;
     } finally {
       isSubmitting.value = false;
     }

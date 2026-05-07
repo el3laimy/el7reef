@@ -102,6 +102,15 @@ class TournamentOperationsController extends GetxController {
   bool get shouldShowMaintenanceTools =>
       isBlockedByManualMigration || migrationReport.value != null;
 
+  bool get canManageTournament {
+    final currentTournament = tournament.value;
+    final actorId = _authService.currentUserId;
+    return currentTournament != null &&
+        actorId != null &&
+        actorId.isNotEmpty &&
+        currentTournament.organizerId == actorId;
+  }
+
   bool get hasOperationalStageStarted {
     final currentTournament = tournament.value;
     if (currentTournament == null) {
@@ -118,13 +127,16 @@ class TournamentOperationsController extends GetxController {
     if (currentTournament == null) {
       return false;
     }
-    return !isBlockedByManualMigration &&
+    return canManageTournament &&
+        !isBlockedByManualMigration &&
         currentTournament.participantListFinalizedAt == null &&
         !hasOperationalStageStarted;
   }
 
   bool get canReplaceParticipants {
-    return !isBlockedByManualMigration && !hasOperationalStageStarted;
+    return canManageTournament &&
+        !isBlockedByManualMigration &&
+        !hasOperationalStageStarted;
   }
 
   bool get hasGroupStage =>
@@ -164,7 +176,7 @@ class TournamentOperationsController extends GetxController {
 
   bool get canRegenerateGroupStage {
     final currentTournament = tournament.value;
-    if (currentTournament == null) {
+    if (currentTournament == null || !canManageTournament) {
       return false;
     }
     final hasGroupStage =
@@ -181,6 +193,7 @@ class TournamentOperationsController extends GetxController {
   }
 
   bool get canPublishFixtures =>
+      canManageTournament &&
       fixtures.isNotEmpty &&
       fixtures.any(
         (fixture) => fixture.fixtureStatus != FixtureStatus.published,
@@ -188,7 +201,7 @@ class TournamentOperationsController extends GetxController {
 
   bool get canFinalizeParticipantsAction {
     final currentTournament = tournament.value;
-    if (currentTournament == null) {
+    if (currentTournament == null || !canManageTournament) {
       return false;
     }
     return !isBlockedByManualMigration &&
@@ -199,7 +212,7 @@ class TournamentOperationsController extends GetxController {
 
   bool get canStartGroupStageAction {
     final currentTournament = tournament.value;
-    if (currentTournament == null) {
+    if (currentTournament == null || !canManageTournament) {
       return false;
     }
     if (currentTournament.format == TournamentFormat.knockoutOnly) {
@@ -214,6 +227,7 @@ class TournamentOperationsController extends GetxController {
   bool get canStartKnockoutAction {
     final currentTournament = tournament.value;
     if (currentTournament == null ||
+        !canManageTournament ||
         isBlockedByManualMigration ||
         hasKnockoutStage) {
       return false;
@@ -238,6 +252,7 @@ class TournamentOperationsController extends GetxController {
   bool get canCompleteTournamentAction {
     final currentTournament = tournament.value;
     if (currentTournament == null ||
+        !canManageTournament ||
         currentTournament.status == TournamentStatus.completed) {
       return false;
     }
@@ -259,7 +274,8 @@ class TournamentOperationsController extends GetxController {
   }
 
   bool canStartFixture(Match fixture) {
-    return !isBlockedByManualMigration &&
+    return canManageTournament &&
+        !isBlockedByManualMigration &&
         fixture.fixtureStatus == FixtureStatus.published &&
         fixture.status == MatchStatus.open &&
         !fixture.isFrozen;
@@ -267,12 +283,14 @@ class TournamentOperationsController extends GetxController {
 
   bool canReactivateParticipant(TournamentParticipant participant) {
     return !participant.isActive &&
+        canManageTournament &&
         !isBlockedByManualMigration &&
         !hasOperationalStageStarted;
   }
 
   bool canEditParticipantSeed(TournamentParticipant participant) {
     return participant.isActive &&
+        canManageTournament &&
         !isBlockedByManualMigration &&
         !hasOperationalStageStarted;
   }
@@ -533,6 +551,9 @@ class TournamentOperationsController extends GetxController {
     if (id == null || id.isEmpty) {
       return;
     }
+    if (!_ensureCanManageTournament()) {
+      return;
+    }
     await _runAction(
       message: 'تمت مزامنة التسجيلات المعتمدة مع participants.',
       action: () => _migrationService.backfillTournament(tournamentId: id),
@@ -545,11 +566,13 @@ class TournamentOperationsController extends GetxController {
     if (id == null || id.isEmpty) {
       return;
     }
+    final actorId = _currentTournamentManagerActorId();
+    if (actorId == null) return;
     await _runAction(
       message: 'تم قفل قائمة المشاركين بنجاح.',
       action: () => _lifecycleService.finalizeParticipants(
         tournamentId: id,
-        actorId: tournament.value?.organizerId ?? 'system',
+        actorId: actorId,
       ),
       onSuccess: (finalizedParticipants) async {
         _applyParticipants(finalizedParticipants);
@@ -563,12 +586,12 @@ class TournamentOperationsController extends GetxController {
     if (id == null || id.isEmpty) {
       return;
     }
+    final actorId = _currentTournamentManagerActorId();
+    if (actorId == null) return;
     await _runAction(
       message: 'تم إنشاء المجموعات وجدولها بنجاح.',
-      action: () => _lifecycleService.startGroupStage(
-        tournamentId: id,
-        actorId: tournament.value?.organizerId ?? 'system',
-      ),
+      action: () =>
+          _lifecycleService.startGroupStage(tournamentId: id, actorId: actorId),
       onSuccess: (result) async {
         _applyGroups(result.groups);
         standings.assignAll(result.standings);
@@ -591,12 +614,12 @@ class TournamentOperationsController extends GetxController {
     if (id == null || id.isEmpty) {
       return;
     }
+    final actorId = _currentTournamentManagerActorId();
+    if (actorId == null) return;
     await _runAction(
       message: 'تم نشر fixtures البطولة.',
-      action: () => _lifecycleService.publishFixtures(
-        tournamentId: id,
-        actorId: tournament.value?.organizerId ?? 'system',
-      ),
+      action: () =>
+          _lifecycleService.publishFixtures(tournamentId: id, actorId: actorId),
       onSuccess: (publishedFixtures) async {
         fixtures.assignAll(publishedFixtures);
       },
@@ -608,11 +631,13 @@ class TournamentOperationsController extends GetxController {
     if (id == null || id.isEmpty) {
       return;
     }
+    final actorId = _currentTournamentManagerActorId();
+    if (actorId == null) return;
     await _runAction(
       message: 'تمت إعادة توليد المجموعات والـ fixtures بنجاح.',
       action: () => _fixtureService.regenerateGroupStage(
         tournamentId: id,
-        actorId: tournament.value?.organizerId ?? 'system',
+        actorId: actorId,
       ),
       onSuccess: (result) async {
         _applyGroups(result.groups);
@@ -627,12 +652,12 @@ class TournamentOperationsController extends GetxController {
     if (id == null || id.isEmpty) {
       return;
     }
+    final actorId = _currentTournamentManagerActorId();
+    if (actorId == null) return;
     await _runAction(
       message: 'تم إنشاء bracket الإقصاء.',
-      action: () => _lifecycleService.startKnockout(
-        tournamentId: id,
-        actorId: tournament.value?.organizerId ?? 'system',
-      ),
+      action: () =>
+          _lifecycleService.startKnockout(tournamentId: id, actorId: actorId),
       onSuccess: (result) async {
         knockoutBracket.value = result.bracket;
         knockoutTies.assignAll(result.ties);
@@ -655,11 +680,13 @@ class TournamentOperationsController extends GetxController {
     if (id == null || id.isEmpty) {
       return;
     }
+    final actorId = _currentTournamentManagerActorId();
+    if (actorId == null) return;
     await _runAction(
       message: 'تم إغلاق البطولة وتحديد البطل.',
       action: () => _lifecycleService.completeTournament(
         tournamentId: id,
-        actorId: tournament.value?.organizerId ?? 'system',
+        actorId: actorId,
       ),
       onSuccess: (updatedTournament) async {
         tournament.value = updatedTournament;
@@ -668,11 +695,13 @@ class TournamentOperationsController extends GetxController {
   }
 
   Future<void> withdrawParticipant(String participantId) async {
+    final actorId = _currentTournamentManagerActorId();
+    if (actorId == null) return;
     await _runAction(
       message: 'تم سحب المشارك من البطولة.',
       action: () => _participantService.withdrawParticipant(
         participantId: participantId,
-        actorId: tournament.value?.organizerId ?? 'system',
+        actorId: actorId,
       ),
       onSuccess: (updatedParticipant) async {
         _upsertParticipant(updatedParticipant);
@@ -681,11 +710,13 @@ class TournamentOperationsController extends GetxController {
   }
 
   Future<void> reactivateParticipant(String participantId) async {
+    final actorId = _currentTournamentManagerActorId();
+    if (actorId == null) return;
     await _runAction(
       message: 'تمت إعادة تفعيل المشارك بنجاح.',
       action: () => _participantService.reactivateParticipant(
         participantId: participantId,
-        actorId: tournament.value?.organizerId ?? 'system',
+        actorId: actorId,
       ),
       onSuccess: (result) async {
         _upsertParticipants(<TournamentParticipant>[
@@ -707,13 +738,15 @@ class TournamentOperationsController extends GetxController {
     if (id == null || id.isEmpty) {
       return;
     }
+    final actorId = _currentTournamentManagerActorId();
+    if (actorId == null) return;
     await _runAction(
       message: 'تمت إضافة participant يدويًا إلى البطولة.',
       action: () => _participantService.addManualParticipant(
         tournamentId: id,
         sourceType: sourceType,
         sourceEntityId: sourceEntityId,
-        actorId: tournament.value?.organizerId ?? 'system',
+        actorId: actorId,
       ),
       onSuccess: (participant) async {
         _upsertParticipant(participant);
@@ -726,13 +759,15 @@ class TournamentOperationsController extends GetxController {
     required TournamentParticipantSourceType replacementSourceType,
     required String replacementSourceEntityId,
   }) async {
+    final actorId = _currentTournamentManagerActorId();
+    if (actorId == null) return;
     await _runAction(
       message: 'تم استبدال participant بنجاح.',
       action: () => _participantService.replaceParticipant(
         participantId: participantId,
         replacementSourceType: replacementSourceType,
         replacementSourceEntityId: replacementSourceEntityId,
-        actorId: tournament.value?.organizerId ?? 'system',
+        actorId: actorId,
       ),
       onSuccess: (result) async {
         _upsertParticipants(<TournamentParticipant>[
@@ -750,13 +785,15 @@ class TournamentOperationsController extends GetxController {
     required String participantId,
     int? seed,
   }) async {
+    final actorId = _currentTournamentManagerActorId();
+    if (actorId == null) return;
     await _runAction(
       message: seed == null
           ? 'تم حذف seed الخاصة بالمشارك.'
           : 'تم تحديث seed الخاصة بالمشارك.',
       action: () => _participantService.updateParticipantSeed(
         participantId: participantId,
-        actorId: tournament.value?.organizerId ?? 'system',
+        actorId: actorId,
         seed: seed,
       ),
       onSuccess: (updatedParticipant) async {
@@ -856,11 +893,13 @@ class TournamentOperationsController extends GetxController {
     required DateTime scheduledAt,
     String? venueId,
   }) async {
+    final actorId = _currentTournamentManagerActorId();
+    if (actorId == null) return;
     await _runAction(
       message: 'تم تحديث موعد الـ fixture.',
       action: () => _fixtureService.scheduleFixture(
         matchId: fixtureId,
-        actorId: tournament.value?.organizerId ?? 'system',
+        actorId: actorId,
         scheduledAt: scheduledAt,
         venueId: venueId,
       ),
@@ -900,6 +939,27 @@ class TournamentOperationsController extends GetxController {
       return null;
     }
     return actorId;
+  }
+
+  bool _ensureCanManageTournament() {
+    final actorId = _currentActorId();
+    if (actorId == null) {
+      return false;
+    }
+    final currentTournament = tournament.value;
+    if (currentTournament == null || currentTournament.organizerId != actorId) {
+      errorMessage.value = 'لا تملك صلاحية إدارة هذه البطولة.';
+      _showSnackbar('غير مسموح', errorMessage.value);
+      return false;
+    }
+    return true;
+  }
+
+  String? _currentTournamentManagerActorId() {
+    if (!_ensureCanManageTournament()) {
+      return null;
+    }
+    return _authService.currentUserId;
   }
 
   Future<void> _runAction<T>({

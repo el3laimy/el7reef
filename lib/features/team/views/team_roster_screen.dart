@@ -286,12 +286,16 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
         children: [
           Row(
             children: [
-              const Icon(Icons.dashboard_customize_rounded,
-                  color: AppColors.primary),
+              const Icon(
+                Icons.dashboard_customize_rounded,
+                color: AppColors.primary,
+              ),
               const SizedBox(width: AppDimensions.sm),
               Expanded(
-                child: Text('القوالب والنسخ الجاهزة',
-                    style: AppTextStyles.headlineSmall),
+                child: Text(
+                  'القوالب والنسخ الجاهزة',
+                  style: AppTextStyles.headlineSmall,
+                ),
               ),
             ],
           ),
@@ -441,7 +445,10 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
             children: [
               _buildTag('أساسي ${template.starterCount}', AppColors.primary),
               _buildTag('احتياط ${template.benchCount}', AppColors.secondary),
-              _buildTag('غير نشط ${template.inactiveCount}', AppColors.textMuted),
+              _buildTag(
+                'غير نشط ${template.inactiveCount}',
+                AppColors.textMuted,
+              ),
             ],
           ),
         ],
@@ -598,11 +605,24 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
                     ),
                   ],
                 ),
+                if (entry.isGuestClaimedOrLinked) ...[
+                  const SizedBox(height: AppDimensions.sm),
+                  Text(
+                    'تم ربط هذا الضيف بالفعل ببروفايل لاعب مسجل.',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.accentLight,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
           if (canShowActions)
             PopupMenuButton<_RosterAction>(
+              key: ValueKey(
+                'team-roster-member-actions-'
+                '${membership.guestPlayerId ?? membership.playerId ?? membership.id}',
+              ),
               icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
               color: AppColors.surfaceLight,
               onSelected: (action) => _handleAction(action, entry),
@@ -638,71 +658,91 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
     final items = <PopupMenuEntry<_RosterAction>>[];
 
     if (membership.status != TeamMembershipStatus.starter) {
-      items.add(const PopupMenuItem(
-        value: _RosterAction.moveToStarter,
-        child: Text('نقله إلى الأساسيين'),
-      ));
+      items.add(
+        const PopupMenuItem(
+          value: _RosterAction.moveToStarter,
+          child: Text('نقله إلى الأساسيين'),
+        ),
+      );
     }
     if (membership.status != TeamMembershipStatus.bench) {
-      items.add(const PopupMenuItem(
-        value: _RosterAction.moveToBench,
-        child: Text('نقله إلى الاحتياط'),
-      ));
+      items.add(
+        const PopupMenuItem(
+          value: _RosterAction.moveToBench,
+          child: Text('نقله إلى الاحتياط'),
+        ),
+      );
     }
     if (membership.status != TeamMembershipStatus.inactive) {
-      items.add(const PopupMenuItem(
-        value: _RosterAction.makeInactive,
-        child: Text('جعله غير نشط'),
-      ));
+      items.add(
+        const PopupMenuItem(
+          value: _RosterAction.makeInactive,
+          child: Text('جعله غير نشط'),
+        ),
+      );
     }
 
     if (!entry.isGuest && membership.role != TeamMembershipRole.owner) {
       if (membership.role != TeamMembershipRole.viceCaptain) {
-        items.add(const PopupMenuItem(
-          value: _RosterAction.promoteViceCaptain,
-          child: Text('ترقية إلى نائب قائد'),
-        ));
+        items.add(
+          const PopupMenuItem(
+            value: _RosterAction.promoteViceCaptain,
+            child: Text('ترقية إلى نائب قائد'),
+          ),
+        );
       } else {
-        items.add(const PopupMenuItem(
-          value: _RosterAction.demoteToPlayer,
-          child: Text('إلغاء منصب نائب القائد'),
-        ));
+        items.add(
+          const PopupMenuItem(
+            value: _RosterAction.demoteToPlayer,
+            child: Text('إلغاء منصب نائب القائد'),
+          ),
+        );
       }
     }
 
     if (membership.availability != TeamMemberAvailability.available) {
-      items.add(const PopupMenuItem(
-        value: _RosterAction.markAvailable,
-        child: Text('متاح'),
-      ));
+      items.add(
+        const PopupMenuItem(
+          value: _RosterAction.markAvailable,
+          child: Text('متاح'),
+        ),
+      );
     }
     if (membership.availability != TeamMemberAvailability.unavailable) {
-      items.add(const PopupMenuItem(
-        value: _RosterAction.markUnavailable,
-        child: Text('غير متاح'),
-      ));
+      items.add(
+        const PopupMenuItem(
+          value: _RosterAction.markUnavailable,
+          child: Text('غير متاح'),
+        ),
+      );
     }
     if (membership.availability != TeamMemberAvailability.injured) {
-      items.add(const PopupMenuItem(
-        value: _RosterAction.markInjured,
-        child: Text('مصاب'),
-      ));
+      items.add(
+        const PopupMenuItem(
+          value: _RosterAction.markInjured,
+          child: Text('مصاب'),
+        ),
+      );
     }
 
     if (membership.role != TeamMembershipRole.owner) {
       items.add(const PopupMenuDivider());
-      items.add(const PopupMenuItem(
-        value: _RosterAction.remove,
-        child: Text('إزالة من القائمة'),
-      ));
+      items.add(
+        const PopupMenuItem(
+          value: _RosterAction.remove,
+          child: Text('إزالة من القائمة'),
+        ),
+      );
     }
 
-    if (entry.isGuest) {
+    if (entry.isGuest && !entry.isGuestClaimedOrLinked) {
       items.add(const PopupMenuDivider());
-      items.add(const PopupMenuItem(
-        value: _RosterAction.shareGuestClaim,
-        child: Text('إرسال رابط استلام الملف'),
-      ));
+      items.add(
+        const PopupMenuItem(
+          value: _RosterAction.shareGuestClaim,
+          child: Text('مشاركة رابط الاستلام'),
+        ),
+      );
     }
 
     return items;
@@ -730,15 +770,9 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
           TeamMembershipStatus.inactive,
         );
       case _RosterAction.promoteViceCaptain:
-        await controller.changeRole(
-          membership,
-          TeamMembershipRole.viceCaptain,
-        );
+        await controller.changeRole(membership, TeamMembershipRole.viceCaptain);
       case _RosterAction.demoteToPlayer:
-        await controller.changeRole(
-          membership,
-          TeamMembershipRole.player,
-        );
+        await controller.changeRole(membership, TeamMembershipRole.player);
       case _RosterAction.markAvailable:
         await controller.changeAvailability(
           membership,
@@ -758,7 +792,9 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
         final confirmed = await Get.dialog<bool>(
           AlertDialog(
             title: const Text('إزالة من القائمة'),
-            content: Text('هل تريد إزالة ${entry.displayName} من القائمة النشطة؟'),
+            content: Text(
+              'هل تريد إزالة ${entry.displayName} من القائمة النشطة؟',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Get.back(result: false),
@@ -937,10 +973,9 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
                 const SizedBox(height: AppDimensions.md),
                 TextFormField(
                   controller: controller.guestNameController,
-                  validator: (value) =>
-                      value == null || value.trim().isEmpty
-                          ? 'اسم اللاعب مطلوب'
-                          : null,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'اسم اللاعب مطلوب'
+                      : null,
                   decoration: const InputDecoration(
                     labelText: 'اسم اللاعب',
                     prefixIcon: Icon(Icons.person_outline),
@@ -964,7 +999,10 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
                   ),
                 ),
                 const SizedBox(height: AppDimensions.md),
-                Text('بداية اللاعب داخل القائمة', style: AppTextStyles.titleMedium),
+                Text(
+                  'بداية اللاعب داخل القائمة',
+                  style: AppTextStyles.titleMedium,
+                ),
                 const SizedBox(height: AppDimensions.sm),
                 Wrap(
                   spacing: AppDimensions.sm,
@@ -985,8 +1023,7 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
                     ),
                     ChoiceChip(
                       label: const Text('غير نشط'),
-                      selected:
-                          selectedStatus == TeamMembershipStatus.inactive,
+                      selected: selectedStatus == TeamMembershipStatus.inactive,
                       onSelected: (_) => setModalState(
                         () => selectedStatus = TeamMembershipStatus.inactive,
                       ),
@@ -1022,7 +1059,8 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
   Future<void> _showTemplateSheet(BuildContext context) async {
     final formKey = GlobalKey<FormState>();
     controller.clearTemplateForm();
-    controller.templateFormationController.text = controller.currentFormationSummary;
+    controller.templateFormationController.text =
+        controller.currentFormationSummary;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -1078,7 +1116,8 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
                     }
                     final success = await controller.saveFormationTemplate(
                       name: controller.templateNameController.text,
-                      formationLabel: controller.templateFormationController.text,
+                      formationLabel:
+                          controller.templateFormationController.text,
                     );
                     if (success) {
                       Get.back();
@@ -1097,7 +1136,8 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
   Future<void> _showSnapshotSheet(BuildContext context) async {
     final formKey = GlobalKey<FormState>();
     controller.clearSnapshotForm();
-    controller.snapshotFormationController.text = controller.currentFormationSummary;
+    controller.snapshotFormationController.text =
+        controller.currentFormationSummary;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -1220,7 +1260,4 @@ enum _RosterAction {
   shareGuestClaim,
 }
 
-enum _TemplateAction {
-  apply,
-  delete,
-}
+enum _TemplateAction { apply, delete }

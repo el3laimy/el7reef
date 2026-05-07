@@ -21,16 +21,19 @@ class ChallengeController extends GetxController {
     required ChallengeRepository challengeRepo,
     required MatchRepository matchRepo,
     required AuthService authService,
+    PlayerRepository? playerRepository,
   }) : _challengeRepo = challengeRepo,
        _matchRepo = matchRepo,
-       _authService = authService;
+       _authService = authService,
+       _playerRepo = playerRepository ?? PlayerRepositoryImpl();
 
   final RxList<Challenge> sentChallenges = <Challenge>[].obs;
   final RxList<Challenge> receivedChallenges = <Challenge>[].obs;
   final RxBool isLoading = false.obs;
   final RxMap<String, String> playerNames = <String, String>{}.obs;
+  Worker? _authWorker;
 
-  final PlayerRepository _playerRepo = PlayerRepositoryImpl();
+  final PlayerRepository _playerRepo;
 
   String? get currentUserId => _authService.currentUserId;
 
@@ -40,14 +43,26 @@ class ChallengeController extends GetxController {
     if (currentUserId != null) {
       loadChallenges();
     }
-    ever(_authService.currentPlayer, (player) {
+    _authWorker = ever(_authService.currentPlayer, (player) {
       if (player != null) {
         loadChallenges();
       } else {
-        sentChallenges.clear();
-        receivedChallenges.clear();
+        resetSessionState();
       }
     });
+  }
+
+  void resetSessionState() {
+    sentChallenges.clear();
+    receivedChallenges.clear();
+    playerNames.clear();
+    isLoading.value = false;
+  }
+
+  @override
+  void onClose() {
+    _authWorker?.dispose();
+    super.onClose();
   }
 
   Future<void> loadChallenges() async {

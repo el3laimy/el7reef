@@ -10,27 +10,79 @@ import '../../../data/repositories/challenge_repository_impl.dart';
 import '../../../domain/repositories/match_repository.dart';
 import '../../../data/repositories/match_repository_impl.dart';
 import '../../../services/auth_service.dart';
+import '../../../core/auth/session_reset_coordinator.dart';
 
 /// HomeBinding — يسجل جميع Controllers المطلوبة لشاشة Home
 /// بدلاً من تسجيلها يدوياً في HomeScreen.initState()
 class HomeBinding extends Bindings {
   @override
   void dependencies() {
-    Get.put(ProfileController(), permanent: true);
-    Get.put(TeamController(), permanent: true);
-    Get.put(MatchController(), permanent: true);
-    Get.put(TournamentController(), permanent: true);
-    Get.put(ActivityFeedController(), permanent: true);
+    final sessionResetCoordinator = Get.isRegistered<SessionResetCoordinator>()
+        ? Get.find<SessionResetCoordinator>()
+        : Get.put(SessionResetCoordinator(), permanent: true);
+
+    final profileController = _putPermanentIfAbsent<ProfileController>(
+      () => ProfileController(),
+    );
+    final teamController = _putPermanentIfAbsent<TeamController>(
+      () => TeamController(),
+    );
+    final matchController = _putPermanentIfAbsent<MatchController>(
+      () => MatchController(),
+    );
+    final tournamentController = _putPermanentIfAbsent<TournamentController>(
+      () => TournamentController(),
+    );
+    final activityFeedController =
+        _putPermanentIfAbsent<ActivityFeedController>(
+          () => ActivityFeedController(),
+        );
+
+    sessionResetCoordinator
+      ..register(
+        key: 'ProfileController',
+        onReset: profileController.resetSessionState,
+      )
+      ..register(
+        key: 'TeamController',
+        onReset: teamController.resetSessionState,
+      )
+      ..register(
+        key: 'MatchController',
+        onReset: matchController.resetSessionState,
+      )
+      ..register(
+        key: 'TournamentController',
+        onReset: tournamentController.resetSessionState,
+      )
+      ..register(
+        key: 'ActivityFeedController',
+        onReset: activityFeedController.resetSessionState,
+      );
+
     if (!Get.isRegistered<ChallengeRepository>()) {
       Get.put<ChallengeRepository>(ChallengeRepositoryImpl(), permanent: true);
     }
     if (!Get.isRegistered<MatchRepository>()) {
       Get.put<MatchRepository>(MatchRepositoryImpl(), permanent: true);
     }
-    Get.put(ChallengeController(
-      challengeRepo: Get.find<ChallengeRepository>(),
-      matchRepo: Get.find<MatchRepository>(),
-      authService: Get.find<AuthService>(),
-    ), permanent: true);
+    final challengeController = _putPermanentIfAbsent<ChallengeController>(
+      () => ChallengeController(
+        challengeRepo: Get.find<ChallengeRepository>(),
+        matchRepo: Get.find<MatchRepository>(),
+        authService: Get.find<AuthService>(),
+      ),
+    );
+    sessionResetCoordinator.register(
+      key: 'ChallengeController',
+      onReset: challengeController.resetSessionState,
+    );
+  }
+
+  T _putPermanentIfAbsent<T extends Object>(T Function() builder) {
+    if (Get.isRegistered<T>()) {
+      return Get.find<T>();
+    }
+    return Get.put<T>(builder(), permanent: true);
   }
 }

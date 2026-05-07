@@ -10,8 +10,14 @@ import '../../../services/auth_service.dart';
 
 /// كونترولر الدورة — يدير دورة حياة البطولة الكاملة
 class TournamentController extends GetxController {
-  final AuthService _authService = Get.find<AuthService>();
-  final TournamentRepositoryImpl _repo = TournamentRepositoryImpl();
+  final AuthService _authService;
+  final TournamentRepositoryImpl _repo;
+
+  TournamentController({
+    AuthService? authService,
+    TournamentRepositoryImpl? tournamentRepository,
+  }) : _authService = authService ?? Get.find<AuthService>(),
+       _repo = tournamentRepository ?? TournamentRepositoryImpl();
 
   // ── State ──
   final RxList<Tournament> liveTournaments = <Tournament>[].obs;
@@ -31,12 +37,27 @@ class TournamentController extends GetxController {
   final Rx<TournamentTeamSize> selectedTeamSize =
       TournamentTeamSize.fiveVsFive.obs;
   final RxBool isFantasyEnabled = false.obs;
+  Worker? _authWorker;
 
   @override
   void onInit() {
     super.onInit();
+    _authWorker = ever(_authService.currentPlayer, (player) {
+      if (player == null) {
+        resetSessionState();
+      } else {
+        loadMyTournaments();
+      }
+    });
     loadLiveTournaments();
     loadMyTournaments();
+  }
+
+  void resetSessionState() {
+    myOrganizedTournaments.clear();
+    isLoading.value = false;
+    errorMessage.value = '';
+    _clearForm();
   }
 
   /// تحميل الدورات الجارية
@@ -137,6 +158,7 @@ class TournamentController extends GetxController {
 
   @override
   void onClose() {
+    _authWorker?.dispose();
     nameController.dispose();
     descriptionController.dispose();
     locationController.dispose();

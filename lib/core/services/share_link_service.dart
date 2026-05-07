@@ -264,6 +264,7 @@ class ShareLinkService {
     final existing = await _claimCodeRepository.getActiveClaimCodeForTarget(
       targetType: targetType,
       targetId: targetId,
+      createdBy: actorId,
       tournamentId: tournamentId,
     );
 

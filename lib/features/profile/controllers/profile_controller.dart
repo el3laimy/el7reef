@@ -5,8 +5,14 @@ import '../../../data/repositories/player_repository_impl.dart';
 
 /// كونترولر البروفايل — يدير عرض وتعديل بيانات اللاعب
 class ProfileController extends GetxController {
-  final AuthService _authService = Get.find<AuthService>();
-  final PlayerRepositoryImpl _playerRepo = PlayerRepositoryImpl();
+  final AuthService _authService;
+  final PlayerRepositoryImpl _playerRepo;
+
+  ProfileController({
+    AuthService? authService,
+    PlayerRepositoryImpl? playerRepository,
+  }) : _authService = authService ?? Get.find<AuthService>(),
+       _playerRepo = playerRepository ?? PlayerRepositoryImpl();
 
   /// اللاعب الحالي (reactive)
   Rx<Player?> get player => _authService.currentPlayer;
@@ -28,11 +34,24 @@ class ProfileController extends GetxController {
     'MID': 'وسط ⚙️',
     'FWD': 'مهاجم ⚡',
   };
+  Worker? _authWorker;
 
   @override
   void onInit() {
     super.onInit();
+    _authWorker = ever(player, (value) {
+      if (value == null) {
+        resetSessionState();
+      } else {
+        selectedPosition.value = value.position ?? '';
+      }
+    });
     selectedPosition.value = player.value?.position ?? '';
+  }
+
+  void resetSessionState() {
+    isLoading.value = false;
+    selectedPosition.value = '';
   }
 
   /// تحديث المركز
@@ -61,5 +80,11 @@ class ProfileController extends GetxController {
   Future<void> signOut() async {
     await _authService.signOut();
     Get.offAllNamed('/login');
+  }
+
+  @override
+  void onClose() {
+    _authWorker?.dispose();
+    super.onClose();
   }
 }

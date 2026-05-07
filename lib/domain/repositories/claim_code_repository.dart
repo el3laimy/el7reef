@@ -8,6 +8,7 @@ abstract class ClaimCodeRepository {
   Future<ClaimCode?> getActiveClaimCodeForTarget({
     required ClaimTargetType targetType,
     required String targetId,
+    String? createdBy,
     String? tournamentId,
   });
 }

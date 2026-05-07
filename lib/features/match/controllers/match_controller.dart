@@ -28,18 +28,34 @@ class MatchTemporaryParticipantCounts {
 
 /// كونترولر المباراة — يدير دورة حياة المباراة الكاملة
 class MatchController extends GetxController {
-  final AuthService _authService = Get.find<AuthService>();
-  final MatchRepositoryImpl _matchRepo = MatchRepositoryImpl();
-  final MatchSidePlayerRepositoryImpl _sidePlayerRepo =
-      MatchSidePlayerRepositoryImpl();
-  final MatchCancellationService _cancellationService =
-      MatchCancellationService();
-  final MatchSettlementService _settlementService = MatchSettlementService();
-  late final MatchStartService _matchStartService = MatchStartService(
-    matchRepo: _matchRepo,
-    snapshotRepo: MatchLineupSnapshotRepositoryImpl(),
-    sidePlayerRepo: _sidePlayerRepo,
-  );
+  final AuthService _authService;
+  final MatchRepositoryImpl _matchRepo;
+  final MatchSidePlayerRepositoryImpl _sidePlayerRepo;
+  final MatchCancellationService _cancellationService;
+  final MatchSettlementService _settlementService;
+  late final MatchStartService _matchStartService;
+
+  MatchController({
+    AuthService? authService,
+    MatchRepositoryImpl? matchRepository,
+    MatchSidePlayerRepositoryImpl? sidePlayerRepository,
+    MatchCancellationService? cancellationService,
+    MatchSettlementService? settlementService,
+    MatchStartService? matchStartService,
+  }) : _authService = authService ?? Get.find<AuthService>(),
+       _matchRepo = matchRepository ?? MatchRepositoryImpl(),
+       _sidePlayerRepo =
+           sidePlayerRepository ?? MatchSidePlayerRepositoryImpl(),
+       _cancellationService = cancellationService ?? MatchCancellationService(),
+       _settlementService = settlementService ?? MatchSettlementService() {
+    _matchStartService =
+        matchStartService ??
+        MatchStartService(
+          matchRepo: _matchRepo,
+          snapshotRepo: MatchLineupSnapshotRepositoryImpl(),
+          sidePlayerRepo: _sidePlayerRepo,
+        );
+  }
 
   /// المستخدم الحالي — للتحقق من صلاحيات المنظم في الـ Views
   AuthService get authService => _authService;
@@ -53,12 +69,28 @@ class MatchController extends GetxController {
       <String, MatchTemporaryParticipantCounts>{}.obs;
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
+  Worker? _authWorker;
 
   @override
   void onInit() {
     super.onInit();
+    _authWorker = ever(_authService.currentPlayer, (player) {
+      if (player == null) {
+        resetSessionState();
+      } else {
+        loadMyMatches();
+      }
+    });
     loadLiveMatches();
     loadMyMatches();
+  }
+
+  void resetSessionState() {
+    myMatches.clear();
+    currentMatch.value = null;
+    temporaryParticipantCountsByMatch.clear();
+    isLoading.value = false;
+    errorMessage.value = '';
   }
 
   /// تحميل المباريات المتاحة
@@ -241,6 +273,12 @@ class MatchController extends GetxController {
 
   bool _isFriendlyMatch(Match match) {
     return match.tournamentId == null || match.tournamentId!.isEmpty;
+  }
+
+  @override
+  void onClose() {
+    _authWorker?.dispose();
+    super.onClose();
   }
 
   /// ── صلاحيات المنظم ──

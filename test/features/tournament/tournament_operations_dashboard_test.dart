@@ -569,6 +569,50 @@ void main() {
     },
   );
 
+  test(
+    'non-organizer sees account A tournament as read-only operations state',
+    () async {
+      final lifecycleService = TournamentLifecycleService(firestore: firestore);
+      final controller = _TestTournamentOperationsController(
+        fixedTournamentId: 'tournament-1',
+        tournamentRepository: tournamentRepository,
+        groupRepository: TournamentGroupRepositoryImpl(firestore: firestore),
+        matchRepository: MatchRepositoryImpl(db: firestore),
+        teamRepository: teamRepository,
+        guestTeamRepository: GuestTeamRepositoryImpl(firestore: firestore),
+        standingRepository: GroupStandingSnapshotRepositoryImpl(
+          firestore: firestore,
+        ),
+        bracketRepository: KnockoutBracketRepositoryImpl(firestore: firestore),
+        tieRepository: KnockoutTieRepositoryImpl(firestore: firestore),
+        participantService: TournamentParticipantService(firestore: firestore),
+        migrationService: TournamentOpsMigrationService(firestore: firestore),
+        lifecycleService: lifecycleService,
+        fixtureService: TournamentFixtureService(firestore: firestore),
+        authService: _FakeAuthService(currentUserId: 'account-b'),
+        settlementService: MatchSettlementService(
+          firestore: firestore,
+          tournamentLifecycleService: lifecycleService,
+        ),
+      );
+
+      await controller.refreshAll();
+
+      expect(controller.tournament.value?.organizerId, 'organizer-1');
+      expect(controller.canManageTournament, isFalse);
+      expect(controller.canManualAddParticipants, isFalse);
+      expect(controller.canFinalizeParticipantsAction, isFalse);
+      expect(controller.canPublishFixtures, isFalse);
+
+      await controller.syncApprovedRegistrations();
+
+      expect(
+        controller.errorMessage.value,
+        'لا تملك صلاحية إدارة هذه البطولة.',
+      );
+    },
+  );
+
   test('scheduleFixture updates local state without full refresh', () async {
     final controller = _buildTrackingController();
     final lifecycleService = TournamentLifecycleService(firestore: firestore);

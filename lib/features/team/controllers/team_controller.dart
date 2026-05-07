@@ -7,12 +7,17 @@ import '../../../domain/entities/team.dart';
 
 /// كونترولر الفريق — إنشاء فرق وإدارتها
 class TeamController extends GetxController {
-  final AuthService _authService = Get.find<AuthService>();
-  final TeamRepositoryImpl _teamRepo = TeamRepositoryImpl();
+  final AuthService _authService;
+  final TeamRepositoryImpl _teamRepo;
+
+  TeamController({AuthService? authService, TeamRepositoryImpl? teamRepository})
+    : _authService = authService ?? Get.find<AuthService>(),
+      _teamRepo = teamRepository ?? TeamRepositoryImpl();
 
   final RxList<Team> myTeams = <Team>[].obs;
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
+  Worker? _authWorker;
 
   // ── Form ──
   final teamNameController = TextEditingController();
@@ -21,7 +26,21 @@ class TeamController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    _authWorker = ever(_authService.currentPlayer, (player) {
+      if (player == null) {
+        resetSessionState();
+      } else {
+        loadMyTeams();
+      }
+    });
     loadMyTeams();
+  }
+
+  void resetSessionState() {
+    myTeams.clear();
+    isLoading.value = false;
+    errorMessage.value = '';
+    teamNameController.clear();
   }
 
   /// تحميل فرقي
@@ -60,8 +79,11 @@ class TeamController extends GetxController {
       myTeams.add(team);
       teamNameController.clear();
       Get.back();
-      Get.snackbar('تم ✅', 'تم إنشاء الفريق "${team.name}" بنجاح',
-          snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'تم ✅',
+        'تم إنشاء الفريق "${team.name}" بنجاح',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     } catch (e) {
       errorMessage.value = 'فشل إنشاء الفريق';
     } finally {
@@ -77,6 +99,7 @@ class TeamController extends GetxController {
 
   @override
   void onClose() {
+    _authWorker?.dispose();
     teamNameController.dispose();
     super.onClose();
   }

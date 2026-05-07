@@ -72,56 +72,86 @@ void main() {
       );
     });
 
-    test('creates a guest player claim link and marks player as invited', () async {
-      final generated = await service.createGuestPlayerClaimLink(
-        guestPlayerId: 'guest-player-1',
-        actorId: 'owner-1',
-      );
+    test(
+      'creates a guest player claim link and marks player as invited',
+      () async {
+        final generated = await service.createGuestPlayerClaimLink(
+          guestPlayerId: 'guest-player-1',
+          actorId: 'owner-1',
+        );
 
-      final updatedGuest =
-          await guestPlayerRepository.getGuestPlayer('guest-player-1');
-      final claimCode =
-          await claimCodeRepository.getClaimCode(generated.claimCode.code);
+        final updatedGuest = await guestPlayerRepository.getGuestPlayer(
+          'guest-player-1',
+        );
+        final claimCode = await claimCodeRepository.getClaimCode(
+          generated.claimCode.code,
+        );
 
-      expect(generated.claimCode.targetType, ClaimTargetType.guestPlayer);
-      expect(generated.payload.scope, ClaimPayloadScope.team);
-      expect(generated.appUri.scheme, ShareLinkService.appScheme);
-      expect(generated.webUri.host, ShareLinkService.webHost);
-      expect(generated.qrData, generated.webUri.toString());
-      expect(updatedGuest?.claimStatus, GuestClaimStatus.invited);
-      expect(updatedGuest?.claimCode, generated.claimCode.code);
-      expect(claimCode?.status, ClaimCodeStatus.active);
-    });
+        expect(generated.claimCode.targetType, ClaimTargetType.guestPlayer);
+        expect(generated.payload.scope, ClaimPayloadScope.team);
+        expect(generated.appUri.scheme, ShareLinkService.appScheme);
+        expect(generated.webUri.host, ShareLinkService.webHost);
+        expect(generated.qrData, generated.webUri.toString());
+        expect(updatedGuest?.claimStatus, GuestClaimStatus.invited);
+        expect(updatedGuest?.claimCode, generated.claimCode.code);
+        expect(claimCode?.status, ClaimCodeStatus.active);
+      },
+    );
 
-    test('reuses the active guest player claim link instead of minting a new code',
-        () async {
-      final first = await service.createGuestPlayerClaimLink(
-        guestPlayerId: 'guest-player-1',
-        actorId: 'owner-1',
-      );
-      final second = await service.createGuestPlayerClaimLink(
-        guestPlayerId: 'guest-player-1',
-        actorId: 'owner-1',
-      );
+    test(
+      'reuses the active guest player claim link instead of minting a new code',
+      () async {
+        final first = await service.createGuestPlayerClaimLink(
+          guestPlayerId: 'guest-player-1',
+          actorId: 'owner-1',
+        );
+        final second = await service.createGuestPlayerClaimLink(
+          guestPlayerId: 'guest-player-1',
+          actorId: 'owner-1',
+        );
 
-      expect(second.claimCode.code, first.claimCode.code);
-      expect(second.payload.code, first.payload.code);
-    });
+        expect(second.claimCode.code, first.claimCode.code);
+        expect(second.payload.code, first.payload.code);
+      },
+    );
 
-    test('creates a guest team claim link and persists invited state', () async {
-      final generated = await service.createGuestTeamClaimLink(
-        guestTeamId: 'guest-team-1',
-        actorId: 'organizer-1',
-      );
+    test(
+      'scopes guest player claim link reuse to the requesting actor',
+      () async {
+        final ownerLink = await service.createGuestPlayerClaimLink(
+          guestPlayerId: 'guest-player-1',
+          actorId: 'owner-1',
+        );
+        final viceLink = await service.createGuestPlayerClaimLink(
+          guestPlayerId: 'guest-player-1',
+          actorId: 'vice-1',
+        );
 
-      final updatedGuestTeam =
-          await guestTeamRepository.getGuestTeam('guest-team-1');
+        expect(viceLink.claimCode.code, isNot(ownerLink.claimCode.code));
+        expect(viceLink.claimCode.createdBy, 'vice-1');
+        expect(viceLink.claimCode.targetId, ownerLink.claimCode.targetId);
+        expect(viceLink.claimCode.status, ClaimCodeStatus.active);
+      },
+    );
 
-      expect(generated.claimCode.targetType, ClaimTargetType.guestTeam);
-      expect(generated.claimCode.requiresApproval, isTrue);
-      expect(updatedGuestTeam?.claimStatus, GuestClaimStatus.invited);
-      expect(updatedGuestTeam?.claimCode, generated.claimCode.code);
-    });
+    test(
+      'creates a guest team claim link and persists invited state',
+      () async {
+        final generated = await service.createGuestTeamClaimLink(
+          guestTeamId: 'guest-team-1',
+          actorId: 'organizer-1',
+        );
+
+        final updatedGuestTeam = await guestTeamRepository.getGuestTeam(
+          'guest-team-1',
+        );
+
+        expect(generated.claimCode.targetType, ClaimTargetType.guestTeam);
+        expect(generated.claimCode.requiresApproval, isTrue);
+        expect(updatedGuestTeam?.claimStatus, GuestClaimStatus.invited);
+        expect(updatedGuestTeam?.claimCode, generated.claimCode.code);
+      },
+    );
 
     test('creates a team invite link with a round-trippable payload', () async {
       final generated = await service.createTeamInviteLink(

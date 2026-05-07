@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:get/get.dart';
+import '../core/auth/session_reset_coordinator.dart';
 import '../core/constants/app_constants.dart';
 import '../data/repositories/player_repository_impl.dart';
 import '../domain/entities/player.dart';
@@ -10,6 +11,7 @@ class AuthService extends GetxService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final PlayerRepositoryImpl _playerRepo = PlayerRepositoryImpl();
+  late final SessionResetCoordinator _sessionResetCoordinator;
 
   /// اللاعب الحالي
   final Rx<Player?> currentPlayer = Rx<Player?>(null);
@@ -25,6 +27,9 @@ class AuthService extends GetxService {
 
   /// تهيئة الخدمة
   Future<AuthService> init() async {
+    _sessionResetCoordinator = Get.isRegistered<SessionResetCoordinator>()
+        ? Get.find<SessionResetCoordinator>()
+        : Get.put(SessionResetCoordinator(), permanent: true);
     _auth.authStateChanges().listen(_onAuthStateChanged);
     return this;
   }
@@ -32,9 +37,15 @@ class AuthService extends GetxService {
   /// عند تغيير حالة المصادقة
   Future<void> _onAuthStateChanged(User? firebaseUser) async {
     if (firebaseUser != null) {
+      if (currentPlayer.value != null &&
+          currentPlayer.value!.id != firebaseUser.uid) {
+        currentPlayer.value = null;
+      }
+      await _sessionResetCoordinator.handleAuthUidChanged(firebaseUser.uid);
       await _loadPlayerProfile(firebaseUser.uid);
     } else {
       currentPlayer.value = null;
+      await _sessionResetCoordinator.handleAuthUidChanged(null);
     }
   }
 
@@ -43,6 +54,9 @@ class AuthService extends GetxService {
     try {
       final player = await _playerRepo.getPlayer(uid);
       currentPlayer.value = player;
+      if (player != null) {
+        await _sessionResetCoordinator.handleSessionStarted(uid);
+      }
     } catch (e) {
       currentPlayer.value = null;
     }
@@ -76,6 +90,12 @@ class AuthService extends GetxService {
 
       if (firebaseUser == null) return null;
 
+      if (currentPlayer.value != null &&
+          currentPlayer.value!.id != firebaseUser.uid) {
+        currentPlayer.value = null;
+      }
+      await _sessionResetCoordinator.handleAuthUidChanged(firebaseUser.uid);
+
       // التحقق: هل اللاعب موجود في Firestore؟
       Player? player = await _playerRepo.getPlayer(firebaseUser.uid);
 
@@ -97,6 +117,7 @@ class AuthService extends GetxService {
       }
 
       currentPlayer.value = player;
+      await _sessionResetCoordinator.handleSessionStarted(firebaseUser.uid);
       return player;
     } on FirebaseAuthException catch (e) {
       throw _mapAuthError(e);
@@ -109,6 +130,8 @@ class AuthService extends GetxService {
 
   /// تسجيل الخروج
   Future<void> signOut() async {
+    currentPlayer.value = null;
+    await _sessionResetCoordinator.resetForSignOut();
     await _googleSignIn.signOut();
     await _auth.signOut();
     currentPlayer.value = null;
