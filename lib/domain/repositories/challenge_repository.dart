@@ -1,4 +1,5 @@
 import '../../domain/entities/challenge.dart';
+import '../../domain/entities/match.dart';
 import '../../core/enums/challenge_status.dart';
 
 abstract class ChallengeRepository {
@@ -8,4 +9,5 @@ abstract class ChallengeRepository {
   Future<List<Challenge>> getSentChallenges(String userId);
   Future<List<Challenge>> getReceivedChallenges(String userId);
   Future<void> cancelChallenge(String id);
+  Future<void> acceptChallengeWithMatch(Match match);
 }

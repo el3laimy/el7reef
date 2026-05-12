@@ -498,6 +498,138 @@ void main() {
     );
 
     test(
+      'non-organizer lifecycle mutations fail before writing operation state',
+      () async {
+        expect(
+          () => lifecycleService.finalizeParticipants(
+            tournamentId: 'tournament-1',
+            actorId: 'account-b',
+            now: now.add(const Duration(minutes: 10)),
+          ),
+          _throwsTournamentUnauthorized,
+        );
+        var participants = await participantService.getTournamentParticipants(
+          'tournament-1',
+        );
+        expect(
+          participants.any((participant) => participant.isFinalized),
+          false,
+        );
+
+        await lifecycleService.finalizeParticipants(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 11)),
+        );
+
+        expect(
+          () => lifecycleService.startGroupStage(
+            tournamentId: 'tournament-1',
+            actorId: 'account-b',
+            now: now.add(const Duration(minutes: 12)),
+          ),
+          _throwsTournamentUnauthorized,
+        );
+        final groupsAfterDeniedStart = await firestore
+            .collection(FirebasePaths.tournamentGroups)
+            .get();
+        expect(groupsAfterDeniedStart.docs, isEmpty);
+
+        final groupStage = await lifecycleService.startGroupStage(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 13)),
+        );
+
+        expect(
+          () => lifecycleService.publishFixtures(
+            tournamentId: 'tournament-1',
+            actorId: 'account-b',
+            now: now.add(const Duration(minutes: 14)),
+          ),
+          _throwsTournamentUnauthorized,
+        );
+        final draftFixtures = await matchRepository.getTournamentMatches(
+          tournamentId: 'tournament-1',
+        );
+        expect(
+          draftFixtures.every(
+            (fixture) => fixture.fixtureStatus == FixtureStatus.draft,
+          ),
+          isTrue,
+        );
+
+        for (final fixture in groupStage.fixtures) {
+          final score = _groupScoreFor(fixture.teamAId!, fixture.teamBId!);
+          await matchRepository.updateMatch(
+            fixture.copyWith(
+              scoreTeamA: score.$1,
+              scoreTeamB: score.$2,
+              status: MatchStatus.settled,
+            ),
+          );
+        }
+        await lifecycleService.refreshGroupStandings(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 15)),
+        );
+
+        expect(
+          () => lifecycleService.startKnockout(
+            tournamentId: 'tournament-1',
+            actorId: 'account-b',
+            now: now.add(const Duration(minutes: 16)),
+          ),
+          _throwsTournamentUnauthorized,
+        );
+        final bracketsAfterDeniedStart = await firestore
+            .collection(FirebasePaths.knockoutBrackets)
+            .get();
+        expect(bracketsAfterDeniedStart.docs, isEmpty);
+
+        final knockout = await lifecycleService.startKnockout(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 17)),
+        );
+        await matchRepository.updateMatch(
+          knockout.matches.single.copyWith(
+            scoreTeamA: 2,
+            scoreTeamB: 0,
+            status: MatchStatus.settled,
+          ),
+        );
+        await lifecycleService.refreshKnockoutProgress(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 18)),
+        );
+
+        expect(
+          () => lifecycleService.completeTournament(
+            tournamentId: 'tournament-1',
+            actorId: 'account-b',
+            now: now.add(const Duration(minutes: 19)),
+          ),
+          _throwsTournamentUnauthorized,
+        );
+        final tournament = await tournamentRepository.getTournament(
+          'tournament-1',
+        );
+        expect(tournament?.status, isNot(TournamentStatus.completed));
+
+        participants = await participantService.getTournamentParticipants(
+          'tournament-1',
+        );
+        expect(
+          participants.every((participant) => participant.isFinalized),
+          true,
+        );
+      },
+    );
+
+    test(
       'approved registrations sync into participants during registration flow',
       () async {
         final participants = await participantService.getTournamentParticipants(
@@ -515,6 +647,12 @@ void main() {
     );
   });
 }
+
+Matcher get _throwsTournamentUnauthorized => throwsA(
+  predicate(
+    (error) => error.toString().contains('لا تملك صلاحية إدارة هذه البطولة'),
+  ),
+);
 
 (int, int) _groupScoreFor(String teamAId, String teamBId) {
   const matrix = <String, (int, int)>{

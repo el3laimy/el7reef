@@ -1,141 +1,162 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../../core/constants/firebase_paths.dart';
 import '../../core/enums/tournament_enums.dart';
+import '../../core/errors/firebase_error_handler.dart';
 import '../../domain/entities/tournament.dart';
 import '../../domain/repositories/tournament_repository.dart';
 import '../models/tournament_model.dart';
 
 /// تنفيذ مستودع الدورة مع Firestore
 class TournamentRepositoryImpl implements TournamentRepository {
-  final FirebaseFirestore _db;
+  final FirebaseFirestore _firestore;
 
-  TournamentRepositoryImpl({FirebaseFirestore? db})
-    : _db = db ?? FirebaseFirestore.instance;
+  TournamentRepositoryImpl({
+    FirebaseFirestore? db,
+    FirebaseFirestore? firestore,
+  }) : _firestore = firestore ?? db ?? FirebaseFirestore.instance;
 
-  CollectionReference get _col => _db.collection(FirebasePaths.tournaments);
+  CollectionReference get _col =>
+      _firestore.collection(FirebasePaths.tournaments);
   CollectionReference<Map<String, dynamic>> get _participantsRef =>
-      _db.collection(FirebasePaths.tournamentParticipants);
+      _firestore.collection(FirebasePaths.tournamentParticipants);
 
   @override
   Future<Tournament?> getTournament(String tournamentId) async {
-    final doc = await _col.doc(tournamentId).get();
-    if (!doc.exists || doc.data() == null) return null;
-    return TournamentModel.fromJson(
-      doc.data()! as Map<String, dynamic>,
-      doc.id,
-    ).toEntity();
+    return FirebaseErrorHandler.guard(() async {
+      final doc = await _col.doc(tournamentId).get();
+      if (!doc.exists || doc.data() == null) return null;
+      return TournamentModel.fromJson(
+        doc.data()! as Map<String, dynamic>,
+        doc.id,
+      ).toEntity();
+    });
   }
 
   @override
   Future<void> createTournament(Tournament tournament) async {
-    final model = TournamentModel.fromEntity(tournament);
-    await _col.doc(tournament.id).set(model.toJson());
+    return FirebaseErrorHandler.guard(() async {
+      final model = TournamentModel.fromEntity(tournament);
+      await _col.doc(tournament.id).set(model.toJson());
+    });
   }
 
   @override
   Future<void> updateTournament(Tournament tournament) async {
-    final model = TournamentModel.fromEntity(tournament);
-    await _col.doc(tournament.id).update(model.toJson());
+    return FirebaseErrorHandler.guard(() async {
+      final model = TournamentModel.fromEntity(tournament);
+      await _col.doc(tournament.id).update(model.toJson());
+    });
   }
 
   @override
   Future<List<Tournament>> getLiveTournaments({int limit = 20}) async {
-    final snap = await _col
-        .where(
-          'status',
-          whereIn: [
-            TournamentStatus.registration.name,
-            TournamentStatus.groupStage.name,
-            TournamentStatus.knockoutStage.name,
-          ],
-        )
-        .orderBy('createdAt', descending: true)
-        .limit(limit)
-        .get();
+    return FirebaseErrorHandler.guard(() async {
+      final snap = await _col
+          .where(
+            'status',
+            whereIn: [
+              TournamentStatus.registration.name,
+              TournamentStatus.groupStage.name,
+              TournamentStatus.knockoutStage.name,
+            ],
+          )
+          .orderBy('createdAt', descending: true)
+          .limit(limit)
+          .get();
 
-    return snap.docs
-        .map(
-          (d) => TournamentModel.fromJson(
-            d.data()! as Map<String, dynamic>,
-            d.id,
-          ).toEntity(),
-        )
-        .toList();
+      return snap.docs
+          .map(
+            (d) => TournamentModel.fromJson(
+              d.data()! as Map<String, dynamic>,
+              d.id,
+            ).toEntity(),
+          )
+          .toList();
+    });
   }
 
   @override
   Future<List<Tournament>> getOrganizerTournaments(String organizerId) async {
-    final snap = await _col
-        .where('organizerId', isEqualTo: organizerId)
-        .orderBy('createdAt', descending: true)
-        .get();
+    return FirebaseErrorHandler.guard(() async {
+      final snap = await _col
+          .where('organizerId', isEqualTo: organizerId)
+          .orderBy('createdAt', descending: true)
+          .get();
 
-    return snap.docs
-        .map(
-          (d) => TournamentModel.fromJson(
-            d.data()! as Map<String, dynamic>,
-            d.id,
-          ).toEntity(),
-        )
-        .toList();
+      return snap.docs
+          .map(
+            (d) => TournamentModel.fromJson(
+              d.data()! as Map<String, dynamic>,
+              d.id,
+            ).toEntity(),
+          )
+          .toList();
+    });
   }
 
   @override
   Future<List<Tournament>> getPlayerTournaments(String teamId) async {
-    final participantSnap = await _participantsRef
-        .where('sourceType', isEqualTo: 'registeredTeam')
-        .where('sourceEntityId', isEqualTo: teamId)
-        .get();
-    final tournamentIds = participantSnap.docs
-        .map((doc) => doc.data()['tournamentId'] as String?)
-        .whereType<String>()
-        .toSet()
-        .toList(growable: false);
+    return FirebaseErrorHandler.guard(() async {
+      final participantSnap = await _participantsRef
+          .where('sourceType', isEqualTo: 'registeredTeam')
+          .where('sourceEntityId', isEqualTo: teamId)
+          .get();
+      final tournamentIds = participantSnap.docs
+          .map((doc) => doc.data()['tournamentId'] as String?)
+          .whereType<String>()
+          .toSet()
+          .toList(growable: false);
 
-    if (tournamentIds.isNotEmpty) {
-      final docs = await Future.wait(
-        tournamentIds.map((id) => _col.doc(id).get()),
-      );
-      final tournaments = docs
-          .where((doc) => doc.exists && doc.data() != null)
+      if (tournamentIds.isNotEmpty) {
+        final docs = await Future.wait(
+          tournamentIds.map((id) => _col.doc(id).get()),
+        );
+        final tournaments = docs
+            .where((doc) => doc.exists && doc.data() != null)
+            .map(
+              (doc) => TournamentModel.fromJson(
+                doc.data()! as Map<String, dynamic>,
+                doc.id,
+              ).toEntity(),
+            )
+            .toList(growable: true);
+        tournaments.sort(
+          (left, right) => right.createdAt.compareTo(left.createdAt),
+        );
+        return tournaments;
+      }
+
+      final legacySnap = await _col
+          .where('registeredTeamIds', arrayContains: teamId)
+          .orderBy('createdAt', descending: true)
+          .get();
+      return legacySnap.docs
           .map(
-            (doc) => TournamentModel.fromJson(
-              doc.data()! as Map<String, dynamic>,
-              doc.id,
+            (d) => TournamentModel.fromJson(
+              d.data()! as Map<String, dynamic>,
+              d.id,
             ).toEntity(),
           )
-          .toList(growable: true);
-      tournaments.sort(
-        (left, right) => right.createdAt.compareTo(left.createdAt),
-      );
-      return tournaments;
-    }
-
-    final legacySnap = await _col
-        .where('registeredTeamIds', arrayContains: teamId)
-        .orderBy('createdAt', descending: true)
-        .get();
-    return legacySnap.docs
-        .map(
-          (d) => TournamentModel.fromJson(
-            d.data()! as Map<String, dynamic>,
-            d.id,
-          ).toEntity(),
-        )
-        .toList(growable: false);
+          .toList(growable: false);
+    });
   }
 
   @override
   Future<void> registerTeam(String tournamentId, String teamId) async {
-    await _col.doc(tournamentId).update({
-      'registeredTeamIds': FieldValue.arrayUnion([teamId]),
+    return FirebaseErrorHandler.guard(() async {
+      await _col.doc(tournamentId).update({
+        'registeredTeamIds': FieldValue.arrayUnion([teamId]),
+      });
     });
   }
 
   @override
   Future<void> unregisterTeam(String tournamentId, String teamId) async {
-    await _col.doc(tournamentId).update({
-      'registeredTeamIds': FieldValue.arrayRemove([teamId]),
+    return FirebaseErrorHandler.guard(() async {
+      await _col.doc(tournamentId).update({
+        'registeredTeamIds': FieldValue.arrayRemove([teamId]),
+      });
     });
   }
 }

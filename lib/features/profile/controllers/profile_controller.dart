@@ -1,5 +1,5 @@
 import 'package:get/get.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 import '../../../domain/entities/player.dart';
 import '../../../data/repositories/player_repository_impl.dart';
 

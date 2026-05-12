@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 import '../../../data/repositories/team_repository_impl.dart';
 import '../../../domain/entities/team.dart';
 

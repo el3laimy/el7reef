@@ -20,29 +20,25 @@ import '../../domain/entities/tournament_participant.dart';
 import 'group_stage_builder.dart';
 import 'tournament_audit_emitter.dart';
 import 'tournament_participant_service.dart';
-import 'tournament_permission_service.dart';
 
 class TournamentFixtureService {
   final FirebaseFirestore _firestore;
   final TournamentParticipantService _participantService;
   final GroupStageBuilder _groupStageBuilder;
   final TournamentAuditEmitter _auditEmitter;
-  final TournamentPermissionService _permissionService;
 
   TournamentFixtureService({
     FirebaseFirestore? firestore,
     TournamentParticipantService? participantService,
     GroupStageBuilder? groupStageBuilder,
     TournamentAuditEmitter? auditEmitter,
-    TournamentPermissionService? permissionService,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _participantService =
            participantService ??
            TournamentParticipantService(firestore: firestore),
        _groupStageBuilder = groupStageBuilder ?? const GroupStageBuilder(),
        _auditEmitter =
-           auditEmitter ?? TournamentAuditEmitter(firestore: firestore),
-       _permissionService = permissionService ?? TournamentPermissionService();
+           auditEmitter ?? TournamentAuditEmitter(firestore: firestore);
 
   CollectionReference<Map<String, dynamic>> get _tournamentsRef =>
       _firestore.collection(FirebasePaths.tournaments);
@@ -66,6 +62,7 @@ class TournamentFixtureService {
     String? venueId,
   }) async {
     final match = await _loadMatch(matchId);
+    _assertMatchOrganizer(match: match, actorId: actorId);
     final tournamentId = match.tournamentId;
     if (tournamentId == null || tournamentId.isEmpty) {
       throw Exception('لا يمكن جدولة مباراة ليست جزءًا من بطولة.');
@@ -109,14 +106,12 @@ class TournamentFixtureService {
     }
     final effectiveNow = now ?? DateTime.now();
     final match = await _loadMatch(matchId);
+    _assertMatchOrganizer(match: match, actorId: actorId);
     final tournamentId = match.tournamentId;
     if (tournamentId == null || tournamentId.isEmpty) {
       throw Exception('لا يمكن بدء مباراة ليست جزءًا من بطولة.');
     }
     final tournament = await _loadTournament(tournamentId);
-    if (!_permissionService.canManageTeams(tournament, actorId)) {
-      throw Exception('لا تملك صلاحية بدء مباريات هذه البطولة.');
-    }
     if (match.isFrozen || match.status == MatchStatus.frozen) {
       throw Exception('لا يمكن بدء مباراة مجمدة.');
     }
@@ -176,6 +171,7 @@ class TournamentFixtureService {
   }) async {
     final effectiveNow = now ?? DateTime.now();
     final tournament = await _loadTournament(tournamentId);
+    _assertTournamentOrganizer(tournament: tournament, actorId: actorId);
     final groupStageId = tournament.currentGroupStageId;
     if (tournament.needsManualOpsMigration) {
       throw Exception(
@@ -285,6 +281,29 @@ class TournamentFixtureService {
       throw Exception('تعذر العثور على fixture المطلوبة.');
     }
     return MatchModel.fromJson(snapshot.data()!, snapshot.id).toEntity();
+  }
+
+  void _assertTournamentOrganizer({
+    required Tournament tournament,
+    required String actorId,
+  }) {
+    final normalizedActorId = actorId.trim();
+    if (normalizedActorId.isEmpty) {
+      throw Exception('يجب تسجيل الدخول أولاً.');
+    }
+    if (tournament.organizerId != normalizedActorId) {
+      throw Exception('لا تملك صلاحية إدارة هذه البطولة.');
+    }
+  }
+
+  void _assertMatchOrganizer({required Match match, required String actorId}) {
+    final normalizedActorId = actorId.trim();
+    if (normalizedActorId.isEmpty) {
+      throw Exception('يجب تسجيل الدخول أولاً.');
+    }
+    if (match.organizerId != normalizedActorId) {
+      throw Exception('لا تملك صلاحية إدارة هذه المباراة.');
+    }
   }
 
   Future<_FixtureStartSide> _loadStartSide({

@@ -8,7 +8,7 @@ import '../../../app/theme/app_text_styles.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../core/widgets/el7reef_button.dart';
 import '../../../domain/entities/match.dart';
-import '../../../domain/entities/player.dart';
+import '../../../domain/entities/participant_ref.dart';
 import '../controllers/score_submit_controller.dart';
 
 class ScoreSubmitScreen extends StatelessWidget {
@@ -33,7 +33,7 @@ class ScoreSubmitScreen extends StatelessWidget {
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
         child: Obx(() {
-          if (controller.isLoading.value && controller.teamAPlayers.isEmpty) {
+          if (controller.isLoading.value && controller.match.value == null) {
             return const Center(
               child: CircularProgressIndicator(color: AppColors.primary),
             );
@@ -58,9 +58,13 @@ class ScoreSubmitScreen extends StatelessWidget {
               SizedBox(
                 height: Get.mediaQuery.padding.top + kToolbarHeight + 10,
               ),
-              controller.isFriendlyMatch
-                  ? _buildFriendlyScoreInput(controller)
-                  : _buildRegisteredScoreHeader(controller),
+              _buildScoreInput(controller),
+              if (controller.fullRosterErrorMessage.value.isNotEmpty) ...[
+                const SizedBox(height: AppDimensions.sm),
+                _buildRosterErrorBanner(
+                  controller.fullRosterErrorMessage.value,
+                ),
+              ],
               const SizedBox(height: AppDimensions.lg),
 
               Expanded(
@@ -78,11 +82,14 @@ class ScoreSubmitScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: AppDimensions.sm),
-                    if (controller.teamAPlayers.isEmpty)
-                      _buildNoRegisteredPlayersNote()
+                    if (controller.teamAScoringParticipants.isEmpty)
+                      _buildNoScoringParticipantsNote()
                     else
-                      ...controller.teamAPlayers.map(
-                        (p) => _buildPlayerStatRow(p, controller),
+                      ...controller.teamAScoringParticipants.map(
+                        (participant) => _buildParticipantScoringRow(
+                          participant,
+                          controller,
+                        ),
                       ),
 
                     const SizedBox(height: AppDimensions.xl),
@@ -94,16 +101,18 @@ class ScoreSubmitScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: AppDimensions.sm),
-                    if (controller.teamBPlayers.isEmpty)
-                      _buildNoRegisteredPlayersNote()
+                    if (controller.teamBScoringParticipants.isEmpty)
+                      _buildNoScoringParticipantsNote()
                     else
-                      ...controller.teamBPlayers.map(
-                        (p) => _buildPlayerStatRow(p, controller),
+                      ...controller.teamBScoringParticipants.map(
+                        (participant) => _buildParticipantScoringRow(
+                          participant,
+                          controller,
+                        ),
                       ),
 
                     const SizedBox(height: AppDimensions.xl),
-                    if (controller.teamAPlayers.isNotEmpty ||
-                        controller.teamBPlayers.isNotEmpty) ...[
+                    if (controller.allParticipants.isNotEmpty) ...[
                       Text(
                         'أفضل لاعب (MVP)',
                         style: AppTextStyles.headlineMedium,
@@ -157,6 +166,8 @@ class ScoreSubmitScreen extends StatelessWidget {
           Get.back();
           Get.back(result: updatedMatch);
         },
+        hasAttributedGoals: controller.hasAnyAttributedGoals,
+        hasUnattributedGoals: controller.hasAnyUnattributedGoals,
       ),
       isScrollControlled: true,
     );
@@ -169,7 +180,7 @@ class ScoreSubmitScreen extends StatelessWidget {
     return '${controller.teamASideName.value} $scoreA - $scoreB ${controller.teamBSideName.value}';
   }
 
-  Widget _buildFriendlyScoreInput(ScoreSubmitController controller) {
+  Widget _buildScoreInput(ScoreSubmitController controller) {
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppDimensions.pagePadding,
@@ -183,7 +194,7 @@ class ScoreSubmitScreen extends StatelessWidget {
             Text('النتيجة النهائية', style: AppTextStyles.titleLarge),
             const SizedBox(height: AppDimensions.xs),
             Text(
-              'أدخل نتيجة الفريقين مباشرة. إحصائيات اللاعبين اختيارية للمسجلين فقط.',
+              'أدخل النتيجة مباشرة، ووزّع الأهداف على اللاعبين المتاحين عند الحاجة.',
               style: AppTextStyles.bodySmall.copyWith(
                 color: AppColors.textMuted,
               ),
@@ -213,53 +224,102 @@ class ScoreSubmitScreen extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: AppDimensions.md),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _buildGoalSummary(
+                    controller.teamAGoalSummary,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: AppDimensions.sm),
+                Expanded(
+                  child: _buildGoalSummary(
+                    controller.teamBGoalSummary,
+                    color: AppColors.error,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildRegisteredScoreHeader(ScoreSubmitController controller) {
+  Widget _buildGoalSummary(
+    ScoreSideGoalSummary summary, {
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(AppDimensions.sm),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'نتيجة الفريق: ${summary.teamScore}',
+            style: AppTextStyles.labelMedium.copyWith(color: color),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'الأهداف المنسوبة: ${summary.attributedGoals}',
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          if (summary.hasUnattributedGoals) ...[
+            const SizedBox(height: 4),
+            Text(
+              'أهداف غير منسوبة: ${summary.unattributedGoals}',
+              style: AppTextStyles.bodySmall.copyWith(color: AppColors.warning),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'لن تظهر في الهدافين.',
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.textMuted,
+              ),
+            ),
+          ],
+          if (summary.isOverAttributed) ...[
+            const SizedBox(height: 4),
+            Text(
+              ScoreSubmitController.attributionOverScoreMessage,
+              style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRosterErrorBanner(String message) {
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppDimensions.pagePadding,
       ),
       child: GlassmorphicContainer(
         padding: const EdgeInsets.all(AppDimensions.md),
-        borderRadius: AppDimensions.radiusLg,
+        borderRadius: AppDimensions.radiusMd,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              children: [
-                Text(
-                  controller.teamASideName.value,
-                  style: AppTextStyles.titleMedium,
+            const Icon(Icons.info_outline_rounded, color: AppColors.warning),
+            const SizedBox(width: AppDimensions.sm),
+            Expanded(
+              child: Text(
+                '$message يمكنك حفظ النتيجة فقط، لكن اختيارات الهدافين وMVP قد تكون غير مكتملة.',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.textSecondary,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  '${controller.totalTeamAGoals}',
-                  style: AppTextStyles.displayLarge.copyWith(
-                    color: AppColors.primary,
-                  ),
-                ),
-              ],
-            ),
-            Text('VS', style: AppTextStyles.headlineMedium),
-            Column(
-              children: [
-                Text(
-                  controller.teamBSideName.value,
-                  style: AppTextStyles.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${controller.totalTeamBGoals}',
-                  style: AppTextStyles.displayLarge.copyWith(
-                    color: AppColors.error,
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         ),
@@ -284,19 +344,26 @@ class ScoreSubmitScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildNoRegisteredPlayersNote() {
+  Widget _buildNoScoringParticipantsNote() {
     return GlassmorphicContainer(
       margin: const EdgeInsets.only(bottom: AppDimensions.sm),
       padding: const EdgeInsets.all(AppDimensions.md),
       borderRadius: AppDimensions.radiusMd,
       child: Text(
-        'لا يوجد لاعبون مسجلون لهذا الطرف. اللاعبون المؤقتون لا تُسجل لهم إحصائيات.',
+        'لا يوجد لاعبون متاحون لهذا الطرف. أضف لاعبين للفريق أو لقائمة المباراة قبل تسجيل الأهداف.',
         style: AppTextStyles.bodySmall.copyWith(color: AppColors.textMuted),
       ),
     );
   }
 
-  Widget _buildPlayerStatRow(Player player, ScoreSubmitController controller) {
+  Widget _buildParticipantScoringRow(
+    ParticipantRef participant,
+    ScoreSubmitController controller,
+  ) {
+    final isRegisteredPlayer =
+        participant.kind == ParticipantRefKind.player &&
+        controller.playerStats.containsKey(participant.id);
+
     return GlassmorphicContainer(
       margin: const EdgeInsets.only(bottom: AppDimensions.sm),
       padding: const EdgeInsets.all(AppDimensions.sm),
@@ -306,59 +373,153 @@ class ScoreSubmitScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(player.name, style: AppTextStyles.titleMedium),
-              const Spacer(),
-              // Cards indicator
-              Obx(() {
-                final st = controller.playerStats[player.id]!;
-                return Row(
+              Expanded(
+                child: Wrap(
+                  spacing: AppDimensions.xs,
+                  runSpacing: AppDimensions.xs,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    GestureDetector(
-                      onTap: () =>
-                          controller.toggleCard(player.id, 'yellowCard'),
-                      child: Container(
-                        width: 16,
-                        height: 24,
-                        margin: const EdgeInsets.only(left: 4),
-                        decoration: BoxDecoration(
-                          color: st['yellowCard'] == true
-                              ? Colors.yellow
-                              : AppColors.surfaceBorder,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
+                    Text(
+                      participant.displayName,
+                      style: AppTextStyles.titleMedium,
                     ),
-                    GestureDetector(
-                      onTap: () => controller.toggleCard(player.id, 'redCard'),
-                      child: Container(
-                        width: 16,
-                        height: 24,
-                        margin: const EdgeInsets.only(left: 8),
-                        decoration: BoxDecoration(
-                          color: st['redCard'] == true
-                              ? Colors.red
-                              : AppColors.surfaceBorder,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
+                    if (participant.kind != ParticipantRefKind.player)
+                      _buildParticipantBadge(participant),
                   ],
-                );
-              }),
+                ),
+              ),
+              if (isRegisteredPlayer)
+                _buildCardIndicators(participant.id, controller),
             ],
           ),
           const SizedBox(height: AppDimensions.sm),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: AppDimensions.lg,
+            runSpacing: AppDimensions.sm,
             children: [
-              _buildStatCounter('أهداف', 'goals', player.id, controller),
-              _buildStatCounter('أسيست', 'assists', player.id, controller),
-              _buildStatCounter('تصدي', 'saves', player.id, controller),
+              _buildParticipantGoalCounter(participant, controller),
+              if (isRegisteredPlayer) ...[
+                _buildStatCounter(
+                  'أسيست',
+                  'assists',
+                  participant.id,
+                  controller,
+                ),
+                _buildStatCounter('تصدي', 'saves', participant.id, controller),
+              ],
             ],
           ),
         ],
       ),
     ).animate().fadeIn().slideY(begin: 0.05);
+  }
+
+  Widget _buildParticipantBadge(ParticipantRef participant) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimensions.sm,
+        vertical: 2,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.28)),
+      ),
+      child: Text(
+        _participantKindLabel(participant),
+        style: AppTextStyles.labelSmall.copyWith(color: AppColors.primary),
+      ),
+    );
+  }
+
+  String _participantKindLabel(ParticipantRef participant) {
+    switch (participant.kind) {
+      case ParticipantRefKind.player:
+        return 'لاعب';
+      case ParticipantRefKind.guestPlayer:
+        return 'ضيف';
+      case ParticipantRefKind.matchSidePlayer:
+        return 'قائمة المباراة';
+    }
+  }
+
+  Widget _buildCardIndicators(
+    String playerId,
+    ScoreSubmitController controller,
+  ) {
+    return Obx(() {
+      final st = controller.playerStats[playerId]!;
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: () => controller.toggleCard(playerId, 'yellowCard'),
+            child: Container(
+              width: 16,
+              height: 24,
+              margin: const EdgeInsets.only(left: 4),
+              decoration: BoxDecoration(
+                color: st['yellowCard'] == true
+                    ? Colors.yellow
+                    : AppColors.surfaceBorder,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => controller.toggleCard(playerId, 'redCard'),
+            child: Container(
+              width: 16,
+              height: 24,
+              margin: const EdgeInsets.only(left: 8),
+              decoration: BoxDecoration(
+                color: st['redCard'] == true
+                    ? Colors.red
+                    : AppColors.surfaceBorder,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+        ],
+      );
+    });
+  }
+
+  Widget _buildParticipantGoalCounter(
+    ParticipantRef participant,
+    ScoreSubmitController controller,
+  ) {
+    return Obx(() {
+      final val = controller.goalsForParticipant(participant);
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'أهداف',
+            style: AppTextStyles.labelSmall.copyWith(
+              color: AppColors.textMuted,
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _btn(
+                Icons.remove,
+                () => controller.decrementParticipantGoals(participant),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text('$val', style: AppTextStyles.titleLarge),
+              ),
+              _btn(
+                Icons.add,
+                () => controller.incrementParticipantGoals(participant),
+              ),
+            ],
+          ),
+        ],
+      );
+    });
   }
 
   Widget _buildStatCounter(
@@ -378,6 +539,7 @@ class ScoreSubmitScreen extends StatelessWidget {
             ),
           ),
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               _btn(Icons.remove, () => controller.decrementStat(playerId, key)),
               Padding(
@@ -408,17 +570,17 @@ class ScoreSubmitScreen extends StatelessWidget {
   }
 
   Widget _buildMvpSelector(ScoreSubmitController controller) {
-    final allPlayers = [...controller.teamAPlayers, ...controller.teamBPlayers];
     return Wrap(
       spacing: AppDimensions.sm,
       runSpacing: AppDimensions.sm,
-      children: allPlayers.map((p) {
-        final isSelected = controller.selectedMvpId.value == p.id;
+      children: controller.allParticipants.map((participant) {
+        final participantKey = controller.participantKey(participant);
+        final isSelected = controller.selectedMvpKey.value == participantKey;
         return ChoiceChip(
-          label: Text(p.name),
+          label: Text(_mvpChoiceLabel(participant)),
           selected: isSelected,
           onSelected: (_) =>
-              controller.selectedMvpId.value = isSelected ? '' : p.id,
+              controller.selectMvp(isSelected ? '' : participantKey),
           selectedColor: AppColors.primarySurface,
           backgroundColor: AppColors.surface,
           labelStyle: TextStyle(
@@ -428,17 +590,28 @@ class ScoreSubmitScreen extends StatelessWidget {
       }).toList(),
     );
   }
+
+  String _mvpChoiceLabel(ParticipantRef participant) {
+    if (participant.kind == ParticipantRefKind.player) {
+      return participant.displayName;
+    }
+    return '${participant.displayName} (${_participantKindLabel(participant)})';
+  }
 }
 
 class _ResultSubmitSuccessSheet extends StatelessWidget {
   final String? scoreLine;
   final VoidCallback onShareResult;
   final VoidCallback onReturnToMatch;
+  final bool hasAttributedGoals;
+  final bool hasUnattributedGoals;
 
   const _ResultSubmitSuccessSheet({
     required this.scoreLine,
     required this.onShareResult,
     required this.onReturnToMatch,
+    required this.hasAttributedGoals,
+    required this.hasUnattributedGoals,
   });
 
   @override
@@ -461,7 +634,7 @@ class _ResultSubmitSuccessSheet extends StatelessWidget {
               Text('تم تسجيل النتيجة ✅', style: AppTextStyles.headlineSmall),
               const SizedBox(height: AppDimensions.sm),
               Text(
-                'النتيجة جاهزة للمشاركة مع اللاعبين.',
+                _successMessage,
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -505,5 +678,15 @@ class _ResultSubmitSuccessSheet extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String get _successMessage {
+    if (!hasAttributedGoals) {
+      return 'تم حفظ النتيجة بدون أهداف منسوبة؛ لن تُضاف أهداف للهدافين من هذه المباراة.';
+    }
+    if (hasUnattributedGoals) {
+      return 'تم حفظ النتيجة وتسجيل الأهداف المنسوبة. الأهداف غير المنسوبة لن تظهر في الهدافين.';
+    }
+    return 'تم حفظ النتيجة وتسجيل الأهداف المنسوبة للمشاركة مع اللاعبين.';
   }
 }

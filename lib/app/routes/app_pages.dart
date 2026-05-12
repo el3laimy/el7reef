@@ -39,6 +39,7 @@ import '../../features/tournament/views/tournament_guest_team_create_screen.dart
 import '../../features/tournament/views/tournament_registration_review_screen.dart';
 import '../../features/tournament/views/tournament_assistants_screen.dart';
 import '../../features/tournament/views/tournament_operations_screens.dart';
+import '../../features/tournament/views/tournament_organizer_guard.dart';
 import '../../features/tournament/bindings/tournament_binding.dart';
 import '../../features/tournament/bindings/tournament_detail_binding.dart';
 import '../../features/tournament/bindings/tournament_registration_binding.dart';
@@ -257,35 +258,40 @@ class AppPages {
 
     GetPage(
       name: AppRoutes.tournamentParticipants,
-      page: () => const TournamentParticipantsScreen(),
+      page: () =>
+          const TournamentOrganizerGuard(child: TournamentParticipantsScreen()),
       binding: TournamentOperationsBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 
     GetPage(
       name: AppRoutes.tournamentGroups,
-      page: () => const TournamentGroupsScreen(),
+      page: () =>
+          const TournamentOrganizerGuard(child: TournamentGroupsScreen()),
       binding: TournamentOperationsBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 
     GetPage(
       name: AppRoutes.tournamentFixtures,
-      page: () => const TournamentFixturesScreen(),
+      page: () =>
+          const TournamentOrganizerGuard(child: TournamentFixturesScreen()),
       binding: TournamentOperationsBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 
     GetPage(
       name: AppRoutes.tournamentStandings,
-      page: () => const TournamentStandingsScreen(),
+      page: () =>
+          const TournamentOrganizerGuard(child: TournamentStandingsScreen()),
       binding: TournamentOperationsBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 
     GetPage(
       name: AppRoutes.tournamentBracket,
-      page: () => const TournamentBracketScreen(),
+      page: () =>
+          const TournamentOrganizerGuard(child: TournamentBracketScreen()),
       binding: TournamentOperationsBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
@@ -335,14 +341,17 @@ class AppPages {
     // ── Tournament Assistants ──
     GetPage(
       name: AppRoutes.organizerDashboard,
-      page: () => const TournamentOperationsDashboardScreen(),
+      page: () => const TournamentOrganizerGuard(
+        child: TournamentOperationsDashboardScreen(),
+      ),
       binding: TournamentOperationsBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 
     GetPage(
       name: AppRoutes.tournamentAssistants,
-      page: () => const TournamentAssistantsScreen(),
+      page: () =>
+          const TournamentOrganizerGuard(child: TournamentAssistantsScreen()),
       binding: TournamentAssistantsBinding(),
       transition: Transition.rightToLeftWithFade,
     ),

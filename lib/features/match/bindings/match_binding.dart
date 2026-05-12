@@ -3,7 +3,7 @@ import '../controllers/match_controller.dart';
 import '../controllers/challenge_controller.dart';
 import '../../../domain/repositories/challenge_repository.dart';
 import '../../../data/repositories/challenge_repository_impl.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 import '../../../domain/repositories/match_repository.dart';
 import '../../../data/repositories/match_repository_impl.dart';
 
@@ -20,7 +20,6 @@ class MatchBinding extends Bindings {
     Get.lazyPut<ChallengeController>(
       () => ChallengeController(
         challengeRepo: Get.find<ChallengeRepository>(),
-        matchRepo: Get.find<MatchRepository>(),
         authService: Get.find<AuthService>(),
       ),
     );

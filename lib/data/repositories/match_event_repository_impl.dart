@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../core/errors/firebase_error_handler.dart';
 import '../../core/constants/firebase_paths.dart';
 import '../../domain/entities/match_event.dart';
 import '../../domain/repositories/match_event_repository.dart';
@@ -16,21 +17,25 @@ class MatchEventRepositoryImpl implements MatchEventRepository {
 
   @override
   Future<void> createEvent(MatchEvent event) async {
-    final model = MatchEventModel.fromEntity(event);
-    await _eventsRef.doc(event.id).set(model.toJson());
+    return FirebaseErrorHandler.guard(() async {
+      final model = MatchEventModel.fromEntity(event);
+      await _eventsRef.doc(event.id).set(model.toJson());
+    });
   }
 
   @override
   Future<List<MatchEvent>> getEventsByMatchId(String matchId) async {
-    final snapshot = await _eventsRef
-        .where('matchId', isEqualTo: matchId)
-        .where('status', isEqualTo: MatchEventStatus.active.name)
-        .get();
-    final events = snapshot.docs
-        .map((doc) => MatchEventModel.fromJson(doc.data(), doc.id).toEntity())
-        .toList(growable: true);
-    events.sort(_compareEvents);
-    return events;
+    return FirebaseErrorHandler.guard(() async {
+      final snapshot = await _eventsRef
+          .where('matchId', isEqualTo: matchId)
+          .where('status', isEqualTo: MatchEventStatus.active.name)
+          .get();
+      final events = snapshot.docs
+          .map((doc) => MatchEventModel.fromJson(doc.data(), doc.id).toEntity())
+          .toList(growable: true);
+      events.sort(_compareEvents);
+      return events;
+    });
   }
 
   @override
@@ -38,55 +43,63 @@ class MatchEventRepositoryImpl implements MatchEventRepository {
     required String actorKind,
     required String actorId,
   }) async {
-    final snapshot = await _eventsRef
-        .where('actor.kind', isEqualTo: actorKind)
-        .where('actor.id', isEqualTo: actorId)
-        .where('status', isEqualTo: MatchEventStatus.active.name)
-        .get();
-    final events = snapshot.docs
-        .map((doc) => MatchEventModel.fromJson(doc.data(), doc.id).toEntity())
-        .toList(growable: true);
-    events.sort(_compareEvents);
-    return events;
+    return FirebaseErrorHandler.guard(() async {
+      final snapshot = await _eventsRef
+          .where('actor.kind', isEqualTo: actorKind)
+          .where('actor.id', isEqualTo: actorId)
+          .where('status', isEqualTo: MatchEventStatus.active.name)
+          .get();
+      final events = snapshot.docs
+          .map((doc) => MatchEventModel.fromJson(doc.data(), doc.id).toEntity())
+          .toList(growable: true);
+      events.sort(_compareEvents);
+      return events;
+    });
   }
 
   @override
   Future<List<MatchEvent>> getGoalEventsByTournamentId(
     String tournamentId,
   ) async {
-    final snapshot = await _eventsRef
-        .where('tournamentId', isEqualTo: tournamentId)
-        .where('eventType', isEqualTo: MatchEventType.goal.name)
-        .where('status', isEqualTo: MatchEventStatus.active.name)
-        .get();
-    final events = snapshot.docs
-        .map((doc) => MatchEventModel.fromJson(doc.data(), doc.id).toEntity())
-        .toList(growable: true);
-    events.sort(_compareEvents);
-    return events;
+    return FirebaseErrorHandler.guard(() async {
+      final snapshot = await _eventsRef
+          .where('tournamentId', isEqualTo: tournamentId)
+          .where('eventType', isEqualTo: MatchEventType.goal.name)
+          .where('status', isEqualTo: MatchEventStatus.active.name)
+          .get();
+      final events = snapshot.docs
+          .map((doc) => MatchEventModel.fromJson(doc.data(), doc.id).toEntity())
+          .toList(growable: true);
+      events.sort(_compareEvents);
+      return events;
+    });
   }
 
   @override
   Future<MatchEvent?> getMvpEventByMatchId(String matchId) async {
-    final snapshot = await _eventsRef
-        .where('matchId', isEqualTo: matchId)
-        .where('eventType', isEqualTo: MatchEventType.mvp.name)
-        .where('status', isEqualTo: MatchEventStatus.active.name)
-        .get();
-    if (snapshot.docs.isEmpty) {
-      return null;
-    }
-    final events = snapshot.docs
-        .map((doc) => MatchEventModel.fromJson(doc.data(), doc.id).toEntity())
-        .toList(growable: true);
-    events.sort(_compareEvents);
-    return events.last;
+    return FirebaseErrorHandler.guard(() async {
+      final snapshot = await _eventsRef
+          .where('matchId', isEqualTo: matchId)
+          .where('eventType', isEqualTo: MatchEventType.mvp.name)
+          .where('status', isEqualTo: MatchEventStatus.active.name)
+          .get();
+      if (snapshot.docs.isEmpty) {
+        return null;
+      }
+      final events = snapshot.docs
+          .map((doc) => MatchEventModel.fromJson(doc.data(), doc.id).toEntity())
+          .toList(growable: true);
+      events.sort(_compareEvents);
+      return events.last;
+    });
   }
 
   @override
   Future<void> voidEvent(String eventId) async {
-    await _eventsRef.doc(eventId).update({
-      'status': MatchEventStatus.voided.name,
+    return FirebaseErrorHandler.guard(() async {
+      await _eventsRef.doc(eventId).update({
+        'status': MatchEventStatus.voided.name,
+      });
     });
   }
 

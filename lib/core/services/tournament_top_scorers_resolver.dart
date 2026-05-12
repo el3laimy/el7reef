@@ -1,3 +1,5 @@
+import '../../data/repositories/match_repository_impl.dart';
+import '../../domain/entities/match.dart';
 import '../../domain/entities/participant_ref.dart';
 import 'match_event_service.dart';
 
@@ -15,9 +17,13 @@ class TournamentTopScorerEntry {
 
 class TournamentTopScorersResolver {
   final MatchEventService _matchEventService;
+  final MatchRepositoryImpl? _matchRepository;
 
-  TournamentTopScorersResolver({MatchEventService? matchEventService})
-    : _matchEventService = matchEventService ?? MatchEventService();
+  TournamentTopScorersResolver({
+    MatchEventService? matchEventService,
+    MatchRepositoryImpl? matchRepository,
+  }) : _matchEventService = matchEventService ?? MatchEventService(),
+       _matchRepository = matchRepository;
 
   Future<List<TournamentTopScorerEntry>> getTopScorers(
     String tournamentId, {
@@ -31,9 +37,17 @@ class TournamentTopScorersResolver {
     final events = await _matchEventService.getTournamentGoalEvents(
       normalizedTournamentId,
     );
+    final officialMatches = await _loadOfficialTournamentMatches(
+      normalizedTournamentId,
+    );
     final totals = <String, _ScorerAccumulator>{};
 
     for (final event in events) {
+      final match = officialMatches[event.matchId];
+      if (match == null) {
+        continue;
+      }
+
       final actor = event.actor;
       if (!_isTournamentLeaderboardActor(actor)) {
         continue;
@@ -57,6 +71,17 @@ class TournamentTopScorersResolver {
         .toList(growable: false);
     entries.sort(_compareEntries);
     return entries.take(limit).toList(growable: false);
+  }
+
+  Future<Map<String, Match>> _loadOfficialTournamentMatches(
+    String tournamentId,
+  ) async {
+    final matches = await (_matchRepository ?? MatchRepositoryImpl())
+        .getTournamentMatches(tournamentId: tournamentId);
+    return {
+      for (final match in matches)
+        if (match.isOfficialTournamentResult) match.id: match,
+    };
   }
 
   bool _isTournamentLeaderboardActor(ParticipantRef actor) {

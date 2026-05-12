@@ -142,6 +142,29 @@ void main() {
       expect(auditAfter.docs, hasLength(auditBefore.docs.length));
     });
 
+    test('non-organizer cannot schedule a tournament fixture', () async {
+      final groupStage = await lifecycleService.startGroupStage(
+        tournamentId: 'tournament-1',
+        actorId: 'organizer-1',
+        now: now.add(const Duration(minutes: 15)),
+      );
+      final fixture = groupStage.fixtures.first;
+
+      expect(
+        () => fixtureService.scheduleFixture(
+          matchId: fixture.id,
+          actorId: 'account-b',
+          scheduledAt: now.add(const Duration(days: 1, hours: 2)),
+          venueId: 'Pitch-1',
+        ),
+        _throwsMatchUnauthorized,
+      );
+
+      final savedFixture = await matchRepository.getMatch(fixture.id);
+      expect(savedFixture?.scheduledAt, isNull);
+      expect(savedFixture?.venueId, isNull);
+    });
+
     test(
       'regenerateGroupStage rebuilds draft fixtures before publish',
       () async {
@@ -173,6 +196,28 @@ void main() {
         expect(refreshedFixture.venueId, isNull);
       },
     );
+
+    test('non-organizer cannot regenerate group stage fixtures', () async {
+      await lifecycleService.startGroupStage(
+        tournamentId: 'tournament-1',
+        actorId: 'organizer-1',
+        now: now.add(const Duration(minutes: 15)),
+      );
+
+      expect(
+        () => fixtureService.regenerateGroupStage(
+          tournamentId: 'tournament-1',
+          actorId: 'account-b',
+          now: now.add(const Duration(minutes: 20)),
+        ),
+        _throwsTournamentUnauthorized,
+      );
+
+      final fixtures = await matchRepository.getTournamentMatches(
+        tournamentId: 'tournament-1',
+      );
+      expect(fixtures, hasLength(6));
+    });
 
     test('regenerateGroupStage is blocked after publish', () async {
       await lifecycleService.startGroupStage(
@@ -317,6 +362,33 @@ void main() {
       );
     });
 
+    test('non-organizer cannot start a published fixture', () async {
+      await lifecycleService.startGroupStage(
+        tournamentId: 'tournament-1',
+        actorId: 'organizer-1',
+        now: now.add(const Duration(minutes: 15)),
+      );
+      final publishedFixtures = await lifecycleService.publishFixtures(
+        tournamentId: 'tournament-1',
+        actorId: 'organizer-1',
+        now: now.add(const Duration(minutes: 16)),
+      );
+      final fixture = publishedFixtures.first;
+
+      expect(
+        () => fixtureService.startMatch(
+          matchId: fixture.id,
+          actorId: 'account-b',
+          now: now.add(const Duration(minutes: 18)),
+        ),
+        _throwsMatchUnauthorized,
+      );
+
+      final savedFixture = await matchRepository.getMatch(fixture.id);
+      expect(savedFixture?.status, MatchStatus.open);
+      expect(savedFixture?.startedAt, isNull);
+    });
+
     test('startMatch is idempotent once fixture is already live', () async {
       await lifecycleService.startGroupStage(
         tournamentId: 'tournament-1',
@@ -363,6 +435,18 @@ void main() {
     });
   });
 }
+
+Matcher get _throwsTournamentUnauthorized => throwsA(
+  predicate(
+    (error) => error.toString().contains('لا تملك صلاحية إدارة هذه البطولة'),
+  ),
+);
+
+Matcher get _throwsMatchUnauthorized => throwsA(
+  predicate(
+    (error) => error.toString().contains('لا تملك صلاحية إدارة هذه المباراة'),
+  ),
+);
 
 Future<void> _seedRegisteredFixtureReadyState({
   required FakeFirebaseFirestore firestore,

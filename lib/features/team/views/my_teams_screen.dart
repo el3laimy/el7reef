@@ -8,7 +8,7 @@ import '../../../app/theme/app_text_styles.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../core/widgets/el7reef_button.dart';
 import '../../../domain/entities/team.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 import '../controllers/team_controller.dart';
 
 /// شاشة فرقي — عرض الفرق + إنشاء فريق جديد

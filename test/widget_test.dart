@@ -6,8 +6,8 @@ import 'package:get/get.dart';
 import 'package:el7reef/app/routes/app_pages.dart';
 import 'package:el7reef/app/routes/app_routes.dart';
 import 'package:el7reef/core/enums/fantasy_league_phase.dart';
-import 'package:el7reef/core/services/fantasy_lifecycle_service.dart';
-import 'package:el7reef/core/services/fantasy_market_service.dart';
+import 'package:el7reef/features/fantasy/services/fantasy_lifecycle_service.dart';
+import 'package:el7reef/features/fantasy/services/fantasy_market_service.dart';
 import 'package:el7reef/core/widgets/feature_unavailable_screen.dart';
 import 'package:el7reef/domain/entities/fantasy_league_lifecycle.dart';
 import 'package:el7reef/data/repositories/fantasy_lifecycle_repository_impl.dart';
@@ -20,7 +20,7 @@ void main() {
 
   setUp(() {
     firestore = FakeFirebaseFirestore();
-    Get.put(FantasyLifecycleRepositoryImpl(db: firestore));
+    Get.put(FantasyLifecycleRepositoryImpl(firestore: firestore));
     Get.put(FantasyRepositoryImpl(db: firestore));
     Get.put(PlayerRepositoryImpl(firestore: firestore));
     Get.put(TournamentRepositoryImpl(db: firestore));

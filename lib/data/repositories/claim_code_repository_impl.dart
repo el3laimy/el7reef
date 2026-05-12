@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../core/errors/firebase_error_handler.dart';
 import '../../core/constants/firebase_paths.dart';
 import '../../core/enums/claim_target_type.dart';
 import '../../domain/entities/claim_code.dart';
@@ -17,23 +18,29 @@ class ClaimCodeRepositoryImpl implements ClaimCodeRepository {
 
   @override
   Future<ClaimCode?> getClaimCode(String code) async {
-    final doc = await _claimCodesRef.doc(code).get();
-    if (!doc.exists || doc.data() == null) {
-      return null;
-    }
-    return ClaimCodeModel.fromJson(doc.data()!, doc.id).toEntity();
+    return FirebaseErrorHandler.guard(() async {
+      final doc = await _claimCodesRef.doc(code).get();
+      if (!doc.exists || doc.data() == null) {
+        return null;
+      }
+      return ClaimCodeModel.fromJson(doc.data()!, doc.id).toEntity();
+    });
   }
 
   @override
   Future<void> createClaimCode(ClaimCode claimCode) async {
-    final model = ClaimCodeModel.fromEntity(claimCode);
-    await _claimCodesRef.doc(claimCode.code).set(model.toJson());
+    return FirebaseErrorHandler.guard(() async {
+      final model = ClaimCodeModel.fromEntity(claimCode);
+      await _claimCodesRef.doc(claimCode.code).set(model.toJson());
+    });
   }
 
   @override
   Future<void> updateClaimCode(ClaimCode claimCode) async {
-    final model = ClaimCodeModel.fromEntity(claimCode);
-    await _claimCodesRef.doc(claimCode.code).update(model.toJson());
+    return FirebaseErrorHandler.guard(() async {
+      final model = ClaimCodeModel.fromEntity(claimCode);
+      await _claimCodesRef.doc(claimCode.code).update(model.toJson());
+    });
   }
 
   @override
@@ -43,27 +50,29 @@ class ClaimCodeRepositoryImpl implements ClaimCodeRepository {
     String? createdBy,
     String? tournamentId,
   }) async {
-    Query<Map<String, dynamic>> query = _claimCodesRef
-        .where('targetType', isEqualTo: targetType.name)
-        .where('targetId', isEqualTo: targetId)
-        .where('status', isEqualTo: 'active');
+    return FirebaseErrorHandler.guard(() async {
+      Query<Map<String, dynamic>> query = _claimCodesRef
+          .where('targetType', isEqualTo: targetType.name)
+          .where('targetId', isEqualTo: targetId)
+          .where('status', isEqualTo: 'active');
 
-    if (createdBy != null && createdBy.isNotEmpty) {
-      query = query.where('createdBy', isEqualTo: createdBy);
-    }
+      if (createdBy != null && createdBy.isNotEmpty) {
+        query = query.where('createdBy', isEqualTo: createdBy);
+      }
 
-    if (tournamentId != null && tournamentId.isNotEmpty) {
-      query = query.where('tournamentId', isEqualTo: tournamentId);
-    }
+      if (tournamentId != null && tournamentId.isNotEmpty) {
+        query = query.where('tournamentId', isEqualTo: tournamentId);
+      }
 
-    final snapshot = await query
-        .orderBy('createdAt', descending: true)
-        .limit(1)
-        .get();
-    if (snapshot.docs.isEmpty) {
-      return null;
-    }
-    final doc = snapshot.docs.first;
-    return ClaimCodeModel.fromJson(doc.data(), doc.id).toEntity();
+      final snapshot = await query
+          .orderBy('createdAt', descending: true)
+          .limit(1)
+          .get();
+      if (snapshot.docs.isEmpty) {
+        return null;
+      }
+      final doc = snapshot.docs.first;
+      return ClaimCodeModel.fromJson(doc.data(), doc.id).toEntity();
+    });
   }
 }

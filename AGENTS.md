@@ -107,7 +107,7 @@ At the end of every task, report:
 - Firestore rules exist but may need updates for new collections like matchEvents.
 - Lineups are optional, not required.
 - If a user starts a match without a lineup, show encouragement/nudge, not a hard block.
-- The immediate roadmap follows the Sprint Plan in docs/05_Project_Roadmap_and_Sprint_Plan.md.
+- The immediate roadmap follows the Sprint Plan in docs/core/05_Project_Roadmap_and_Sprint_Plan.md.
 - Score submission must support guest players as goal scorers and MVP — the old message "temporary players don't get stats" must be removed.
 
 ## Do not do this
@@ -122,8 +122,8 @@ At the end of every task, report:
 
 ## Reference documentation
 See `docs/` for the full V1 documentation pack:
-- `docs/01_PRD_Product_Requirements_Document.md`
-- `docs/02_SRS_Software_Requirements_Specification.md`
-- `docs/03_SAD_System_Architecture_Document.md`
-- `docs/04_UI_UX_Designs.md`
-- `docs/05_Project_Roadmap_and_Sprint_Plan.md`
+- `docs/core/01_PRD_Product_Requirements_Document.md`
+- `docs/core/02_SRS_Software_Requirements_Specification.md`
+- `docs/core/03_SAD_System_Architecture_Document.md`
+- `docs/core/04_UI_UX_Designs.md`
+- `docs/core/05_Project_Roadmap_and_Sprint_Plan.md`

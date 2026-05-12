@@ -9,18 +9,16 @@ import '../../../core/constants/feature_flags.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../core/widgets/rank_tier_badge.dart';
 import '../../../core/widgets/loading_shimmer.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 import '../../match/views/match_discover_screen.dart';
 import '../../match/controllers/match_controller.dart';
 import '../../tournament/views/tournament_list_screen.dart';
-import '../../../domain/entities/match.dart';
-import '../../../core/enums/match_status.dart';
 import '../../profile/views/profile_screen.dart';
 import '../../team/views/my_teams_screen.dart';
-
 import '../../social/widgets/activity_feed_widget.dart';
+import '../widgets/home_live_match_card.dart';
+import '../widgets/home_my_match_card.dart';
 
-/// الشاشة الرئيسية — V1 Tournament-first hub with secondary loops preserved.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -34,7 +32,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Controllers مسجلة عبر HomeBinding في app_pages.dart
   }
 
   late final List<Widget> _pages = [
@@ -105,7 +102,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-/// ── تاب الرئيسية ──
 class _HomeTab extends StatelessWidget {
   final void Function(int index) onNavigateToTab;
   const _HomeTab({required this.onNavigateToTab});
@@ -131,7 +127,6 @@ class _HomeTab extends StatelessWidget {
             color: AppColors.primary,
             child: CustomScrollView(
               slivers: [
-                // ── Header ──
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.all(AppDimensions.pagePadding),
@@ -188,7 +183,6 @@ class _HomeTab extends StatelessWidget {
                   ),
                 ),
 
-                // ── بطاقة Rating السريعة ──
                 if (player != null)
                   SliverToBoxAdapter(
                     child: Padding(
@@ -200,7 +194,6 @@ class _HomeTab extends StatelessWidget {
                         borderRadius: AppDimensions.radiusLg,
                         child: Row(
                           children: [
-                            // Rating
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -218,7 +211,6 @@ class _HomeTab extends StatelessWidget {
                               ],
                             ),
                             const Spacer(),
-                            // Stats مصغرة
                             Column(
                               children: [
                                 _miniStat('${player.totalMatches}', 'مباراة'),
@@ -243,7 +235,6 @@ class _HomeTab extends StatelessWidget {
                     ),
                   ),
 
-                // ── Quick Actions ──
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.all(AppDimensions.pagePadding),
@@ -326,7 +317,6 @@ class _HomeTab extends StatelessWidget {
                   child: SizedBox(height: AppDimensions.sm),
                 ),
 
-                // ── Activity Feed ──
                 if (FeatureFlags.activityFeedEnabled)
                   const SliverToBoxAdapter(child: ActivityFeedWidget()),
 
@@ -334,7 +324,6 @@ class _HomeTab extends StatelessWidget {
                   child: SizedBox(height: AppDimensions.lg),
                 ),
 
-                // ── المباريات الجارية ──
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(
@@ -364,7 +353,6 @@ class _HomeTab extends StatelessWidget {
                   ),
                 ),
 
-                // ── قائمة المباريات الحية ──
                 SliverToBoxAdapter(
                   child: Obx(() {
                     final matchCtrl = Get.find<MatchController>();
@@ -425,7 +413,7 @@ class _HomeTab extends StatelessWidget {
                           return GestureDetector(
                             onTap: () =>
                                 Get.toNamed('/match/lobby/${match.id}'),
-                            child: _LiveMatchCard(match: match, index: index),
+                            child: HomeLiveMatchCard(match: match, index: index),
                           );
                         },
                       ),
@@ -437,7 +425,6 @@ class _HomeTab extends StatelessWidget {
                   child: SizedBox(height: AppDimensions.md),
                 ),
 
-                // ── آخر مباراياتي ──
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -514,7 +501,7 @@ class _HomeTab extends StatelessWidget {
                           child: GestureDetector(
                             onTap: () =>
                                 Get.toNamed('/match/lobby/${e.value.id}'),
-                            child: _MyMatchCard(match: e.value, index: e.key),
+                            child: HomeMyMatchCard(match: e.value, index: e.key),
                           ),
                         );
                       }).toList(),
@@ -522,8 +509,8 @@ class _HomeTab extends StatelessWidget {
                   }),
                 ),
               ],
-            ), // CustomScrollView
-          ); // RefreshIndicator
+            ),
+          );
         }),
       ),
     );
@@ -571,246 +558,5 @@ class _HomeTab extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-// ── بطاقة المباراة الجارية (أفقية - Carousel) ──
-class _LiveMatchCard extends StatelessWidget {
-  final Match match;
-  final int index;
-
-  const _LiveMatchCard({required this.match, required this.index});
-
-  @override
-  Widget build(BuildContext context) {
-    final Color statusColor = match.status == MatchStatus.live
-        ? AppColors.primary
-        : match.status == MatchStatus.open
-        ? AppColors.success
-        : AppColors.textMuted;
-    final matchController = Get.find<MatchController>();
-
-    return Container(
-          width: 200,
-          margin: const EdgeInsetsDirectional.only(end: AppDimensions.sm),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-            border: Border.all(
-              color: statusColor.withValues(alpha: 0.35),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: statusColor.withValues(alpha: 0.12),
-                blurRadius: 10,
-                spreadRadius: 1,
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppDimensions.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // حالة المباراة
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: statusColor,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      match.status == MatchStatus.live
-                          ? 'جارية الآن'
-                          : match.status == MatchStatus.open
-                          ? 'مفتوحة'
-                          : 'منتهية',
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: statusColor,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (match.isGoldenRating)
-                      const Icon(
-                        Icons.star_rounded,
-                        color: AppColors.secondary,
-                        size: 16,
-                      ),
-                  ],
-                ),
-
-                // الفريقان والنتيجة
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('🔵', style: const TextStyle(fontSize: 22)),
-                    const SizedBox(width: 6),
-                    match.isCompleted && match.scoreTeamA != null
-                        ? Text(
-                            '${match.scoreTeamA} - ${match.scoreTeamB}',
-                            style: AppTextStyles.titleLarge.copyWith(
-                              color: AppColors.textPrimary,
-                            ),
-                          )
-                        : Text('vs', style: AppTextStyles.titleMedium),
-                    const SizedBox(width: 6),
-                    Text('🔴', style: const TextStyle(fontSize: 22)),
-                  ],
-                ),
-
-                // تفاصيل
-                Row(
-                  children: [
-                    Icon(
-                      Icons.people_outline,
-                      size: 14,
-                      color: AppColors.textMuted,
-                    ),
-                    const SizedBox(width: 4),
-                    Obx(
-                      () => Text(
-                        matchController.totalParticipantCountLabel(match),
-                        style: AppTextStyles.labelSmall,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (match.isFrozen)
-                      const Icon(Icons.lock, size: 14, color: AppColors.error),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        )
-        .animate(delay: (100 * index).ms)
-        .fadeIn(duration: 400.ms)
-        .slideX(begin: 0.2);
-  }
-}
-
-// ── بطاقة مبارياتي الأخيرة ──
-class _MyMatchCard extends StatelessWidget {
-  final Match match;
-  final int index;
-
-  const _MyMatchCard({required this.match, required this.index});
-
-  @override
-  Widget build(BuildContext context) {
-    final authService = Get.find<AuthService>();
-    final uid = authService.currentUserId ?? '';
-
-    // هل أنا في فريق A أو B؟
-    final bool isTeamA = match.teamAPlayerIds.contains(uid);
-    final int? myScore = isTeamA ? match.scoreTeamA : match.scoreTeamB;
-    final int? oppScore = isTeamA ? match.scoreTeamB : match.scoreTeamA;
-
-    // هل فزنا؟
-    Color resultColor = AppColors.textMuted;
-    String resultLabel = '—';
-    if (myScore != null && oppScore != null) {
-      if (myScore > oppScore) {
-        resultColor = AppColors.success;
-        resultLabel = 'فوز';
-      } else if (myScore < oppScore) {
-        resultColor = AppColors.error;
-        resultLabel = 'خسارة';
-      } else {
-        resultColor = AppColors.secondary;
-        resultLabel = 'تعادل';
-      }
-    }
-
-    return GlassmorphicContainer(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppDimensions.md,
-            vertical: AppDimensions.sm,
-          ),
-          borderRadius: AppDimensions.radiusMd,
-          child: Row(
-            children: [
-              // أيقونة النتيجة
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: resultColor.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: resultColor.withValues(alpha: 0.4)),
-                ),
-                child: Center(
-                  child: Text(
-                    resultLabel == 'فوز'
-                        ? '🏆'
-                        : resultLabel == 'خسارة'
-                        ? '😤'
-                        : '🤝',
-                    style: const TextStyle(fontSize: 20),
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppDimensions.md),
-
-              // معلومات المباراة
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      match.status == MatchStatus.settled
-                          ? 'مباراة منتهية'
-                          : match.status == MatchStatus.live
-                          ? 'مباراة جارية'
-                          : 'قيد التسوية',
-                      style: AppTextStyles.titleMedium,
-                    ),
-                    Text(
-                      _formatDate(match.createdAt),
-                      style: AppTextStyles.labelSmall,
-                    ),
-                  ],
-                ),
-              ),
-
-              // النتيجة
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (myScore != null)
-                    Text(
-                      '$myScore - $oppScore',
-                      style: AppTextStyles.titleLarge.copyWith(
-                        color: resultColor,
-                      ),
-                    ),
-                  Text(
-                    resultLabel,
-                    style: AppTextStyles.labelSmall.copyWith(
-                      color: resultColor,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        )
-        .animate(delay: (120 * index).ms)
-        .fadeIn(duration: 400.ms)
-        .slideY(begin: 0.1);
-  }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final diff = now.difference(date);
-    if (diff.inDays == 0) return 'النهارده';
-    if (diff.inDays == 1) return 'امبارح';
-    return '${diff.inDays} يوم';
   }
 }

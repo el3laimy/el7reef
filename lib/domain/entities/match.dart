@@ -22,6 +22,7 @@ class Match {
   final int teamSize;
   final bool isOrganized; // هل جزء من دورة؟
   final String? tournamentId;
+  final String? challengeId;
   final bool isGoldenRating; // منظم فعّل التقييم المميز
   final bool isAnomaly; // اكتشف كشذوذ
   final bool isFrozen; // مجمّد من المنظم
@@ -62,6 +63,7 @@ class Match {
     this.teamSize = 5,
     this.isOrganized = false,
     this.tournamentId,
+    this.challengeId,
     this.isGoldenRating = false,
     this.isAnomaly = false,
     this.isFrozen = false,
@@ -128,6 +130,7 @@ class Match {
     int? teamSize,
     bool? isOrganized,
     String? tournamentId,
+    String? challengeId,
     bool? isGoldenRating,
     bool? isAnomaly,
     bool? isFrozen,
@@ -168,6 +171,7 @@ class Match {
       teamSize: teamSize ?? this.teamSize,
       isOrganized: isOrganized ?? this.isOrganized,
       tournamentId: tournamentId ?? this.tournamentId,
+      challengeId: challengeId ?? this.challengeId,
       isGoldenRating: isGoldenRating ?? this.isGoldenRating,
       isAnomaly: isAnomaly ?? this.isAnomaly,
       isFrozen: isFrozen ?? this.isFrozen,

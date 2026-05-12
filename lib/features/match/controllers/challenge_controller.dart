@@ -7,23 +7,19 @@ import '../../../core/utils/app_logger.dart';
 import '../../../domain/entities/challenge.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/repositories/challenge_repository.dart';
-import '../../../domain/repositories/match_repository.dart';
 import '../../../domain/repositories/player_repository.dart';
 import '../../../data/repositories/player_repository_impl.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 
 class ChallengeController extends GetxController {
   final ChallengeRepository _challengeRepo;
-  final MatchRepository _matchRepo;
   final AuthService _authService;
 
   ChallengeController({
     required ChallengeRepository challengeRepo,
-    required MatchRepository matchRepo,
     required AuthService authService,
     PlayerRepository? playerRepository,
   }) : _challengeRepo = challengeRepo,
-       _matchRepo = matchRepo,
        _authService = authService,
        _playerRepo = playerRepository ?? PlayerRepositoryImpl();
 
@@ -177,7 +173,7 @@ class ChallengeController extends GetxController {
 
     try {
       // 1. Create a Match
-      final matchId = const Uuid().v4();
+      final matchId = challenge.id;
       final match = Match(
         id: matchId,
         organizerId: challenge.challengerId,
@@ -189,17 +185,11 @@ class ChallengeController extends GetxController {
         teamBPlayerIds: [challenge.challengedId],
         teamAId: challenge.challengerTeamId,
         teamBId: challenge.challengedTeamId,
+        challengeId: challenge.id,
         isOrganized: false,
       );
 
-      await _matchRepo.createMatch(match);
-
-      // 2. Update Challenge
-      await _challengeRepo.updateChallengeStatus(
-        challenge.id,
-        ChallengeStatus.accepted,
-        matchId: matchId,
-      );
+      await _challengeRepo.acceptChallengeWithMatch(match);
 
       await loadChallenges();
 

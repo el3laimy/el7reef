@@ -1,7 +1,7 @@
 import 'package:get/get.dart';
 
 import '../../../core/services/activity_feed_service.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 
 class ActivityFeedController extends GetxController {
   final ActivityFeedService _activityFeedService;

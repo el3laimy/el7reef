@@ -56,10 +56,12 @@ class TeamInviteEntryController extends GetxController {
         teamId: teamId,
       );
       team.value = preview.team;
-      _analyticsService.trackClaimOpen(
-        type: 'team_invite',
-        targetId: teamId,
-      );
+      if (isLoggedIn) {
+        _analyticsService.trackClaimOpen(
+          type: 'team_invite',
+          targetId: teamId,
+        );
+      }
     } catch (e) {
       errorMessage.value = e.toString().replaceFirst('Exception: ', '');
     } finally {

@@ -167,6 +167,7 @@ class TournamentParticipantService {
   }) async {
     final effectiveNow = now ?? DateTime.now();
     final tournament = await _loadTournament(tournamentId);
+    _assertTournamentOrganizer(tournament: tournament, actorId: actorId);
     _assertCanAddManualParticipant(tournament);
     final source = await _loadSource(
       sourceType: sourceType,
@@ -223,13 +224,14 @@ class TournamentParticipantService {
     bool refreshTournamentSummary = true,
   }) async {
     final participant = await _loadParticipant(participantId);
+    final tournament = await _loadTournament(participant.tournamentId);
+    _assertTournamentOrganizer(tournament: tournament, actorId: actorId);
     if (participant.status == TournamentParticipantStatus.finalized) {
       throw Exception(
         'لا يمكن حذف participant finalized. استخدم withdraw أو replace.',
       );
     }
     await _participantsRef.doc(participantId).delete();
-    final tournament = await _loadTournament(participant.tournamentId);
     await _auditEmitter.participantWithdrawn(
       tournament: tournament,
       actorId: actorId,
@@ -253,6 +255,8 @@ class TournamentParticipantService {
   }) async {
     final effectiveNow = now ?? DateTime.now();
     final participant = await _loadParticipant(participantId);
+    final tournament = await _loadTournament(participant.tournamentId);
+    _assertTournamentOrganizer(tournament: tournament, actorId: actorId);
     if (participant.status == TournamentParticipantStatus.withdrawn) {
       return participant;
     }
@@ -264,7 +268,6 @@ class TournamentParticipantService {
     await _participantsRef
         .doc(participantId)
         .update(TournamentParticipantModel.fromEntity(updated).toJson());
-    final tournament = await _loadTournament(participant.tournamentId);
     await _auditEmitter.participantWithdrawn(
       tournament: tournament,
       actorId: actorId,
@@ -290,6 +293,7 @@ class TournamentParticipantService {
     final effectiveNow = now ?? DateTime.now();
     final participant = await _loadParticipant(participantId);
     final tournament = await _loadTournament(participant.tournamentId);
+    _assertTournamentOrganizer(tournament: tournament, actorId: actorId);
     _assertCanReactivateParticipant(tournament);
     if (participant.isActive) {
       return TournamentParticipantReactivationResult(
@@ -384,6 +388,7 @@ class TournamentParticipantService {
     final effectiveNow = now ?? DateTime.now();
     final current = await _loadParticipant(participantId);
     final tournament = await _loadTournament(current.tournamentId);
+    _assertTournamentOrganizer(tournament: tournament, actorId: actorId);
     _assertCanReplaceParticipant(tournament);
     if (!current.isActive) {
       throw Exception('لا يمكن استبدال participant غير نشط.');
@@ -490,6 +495,7 @@ class TournamentParticipantService {
     final effectiveNow = now ?? DateTime.now();
     final participant = await _loadParticipant(participantId);
     final tournament = await _loadTournament(participant.tournamentId);
+    _assertTournamentOrganizer(tournament: tournament, actorId: actorId);
     _assertCanEditParticipantSeed(tournament);
     if (!participant.isActive) {
       throw Exception('لا يمكن تعديل seed لمشارك غير نشط.');
@@ -591,6 +597,19 @@ class TournamentParticipantService {
       throw Exception('تعذر العثور على البطولة المرتبطة بالمشارك.');
     }
     return TournamentModel.fromJson(snapshot.data()!, snapshot.id).toEntity();
+  }
+
+  void _assertTournamentOrganizer({
+    required Tournament tournament,
+    required String actorId,
+  }) {
+    final normalizedActorId = actorId.trim();
+    if (normalizedActorId.isEmpty) {
+      throw Exception('يجب تسجيل الدخول أولاً.');
+    }
+    if (tournament.organizerId != normalizedActorId) {
+      throw Exception('لا تملك صلاحية إدارة هذه البطولة.');
+    }
   }
 
   Future<TournamentParticipant> _loadParticipant(String participantId) async {

@@ -29,7 +29,7 @@ import 'package:el7reef/features/profile/controllers/profile_controller.dart';
 import 'package:el7reef/features/social/controllers/activity_feed_controller.dart';
 import 'package:el7reef/features/team/controllers/team_controller.dart';
 import 'package:el7reef/features/tournament/controllers/tournament_controller.dart';
-import 'package:el7reef/services/auth_service.dart';
+import 'package:el7reef/core/auth/auth_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -145,7 +145,6 @@ void main() {
     () {
       final controller = ChallengeController(
         challengeRepo: _UnusedChallengeRepository(),
-        matchRepo: _UnusedMatchRepository(),
         authService: authService,
         playerRepository: PlayerRepositoryImpl(firestore: firestore),
       );
@@ -362,11 +361,6 @@ class _FakeAuthService extends GetxService implements AuthService {
 }
 
 class _UnusedChallengeRepository implements ChallengeRepository {
-  @override
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class _UnusedMatchRepository implements MatchRepository {
   @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

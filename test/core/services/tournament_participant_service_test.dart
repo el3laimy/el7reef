@@ -418,6 +418,115 @@ void main() {
     });
 
     test(
+      'non-organizer participant mutations fail before writing operation state',
+      () async {
+        final teamOneParticipantId = participantService.participantIdFor(
+          tournamentId: 'tournament-1',
+          sourceType: TournamentParticipantSourceType.registeredTeam,
+          sourceEntityId: 'team-1',
+        );
+        final teamTwoParticipantId = participantService.participantIdFor(
+          tournamentId: 'tournament-1',
+          sourceType: TournamentParticipantSourceType.registeredTeam,
+          sourceEntityId: 'team-2',
+        );
+
+        expect(
+          () => participantService.addManualParticipant(
+            tournamentId: 'tournament-1',
+            sourceType: TournamentParticipantSourceType.guestTeam,
+            sourceEntityId: 'guest-team-1',
+            actorId: 'account-b',
+            now: now.add(const Duration(minutes: 6)),
+          ),
+          _throwsTournamentUnauthorized,
+        );
+        var participants = await participantService.getTournamentParticipants(
+          'tournament-1',
+        );
+        expect(participants, hasLength(2));
+
+        expect(
+          () => participantService.withdrawParticipant(
+            participantId: teamOneParticipantId,
+            actorId: 'account-b',
+            now: now.add(const Duration(minutes: 7)),
+          ),
+          _throwsTournamentUnauthorized,
+        );
+        var teamOne = await participantService.getParticipantById(
+          teamOneParticipantId,
+        );
+        expect(teamOne?.status, TournamentParticipantStatus.approved);
+
+        await participantService.withdrawParticipant(
+          participantId: teamOneParticipantId,
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 8)),
+        );
+        expect(
+          () => participantService.reactivateParticipant(
+            participantId: teamOneParticipantId,
+            actorId: 'account-b',
+            now: now.add(const Duration(minutes: 9)),
+          ),
+          _throwsTournamentUnauthorized,
+        );
+        teamOne = await participantService.getParticipantById(
+          teamOneParticipantId,
+        );
+        expect(teamOne?.status, TournamentParticipantStatus.withdrawn);
+
+        expect(
+          () => participantService.replaceParticipant(
+            participantId: teamTwoParticipantId,
+            replacementSourceType:
+                TournamentParticipantSourceType.registeredTeam,
+            replacementSourceEntityId: 'team-3',
+            actorId: 'account-b',
+            now: now.add(const Duration(minutes: 10)),
+          ),
+          _throwsTournamentUnauthorized,
+        );
+        participants = await participantService.getTournamentParticipants(
+          'tournament-1',
+        );
+        expect(
+          participants.any(
+            (participant) => participant.sourceEntityId == 'team-3',
+          ),
+          isFalse,
+        );
+
+        expect(
+          () => participantService.updateParticipantSeed(
+            participantId: teamTwoParticipantId,
+            actorId: 'account-b',
+            seed: 9,
+            now: now.add(const Duration(minutes: 11)),
+          ),
+          _throwsTournamentUnauthorized,
+        );
+        final teamTwo = await participantService.getParticipantById(
+          teamTwoParticipantId,
+        );
+        expect(teamTwo?.seed, isNull);
+
+        expect(
+          () => participantService.removeParticipant(
+            participantId: teamTwoParticipantId,
+            actorId: 'account-b',
+          ),
+          _throwsTournamentUnauthorized,
+        );
+        final stillPresent = await participantService.getParticipantById(
+          teamTwoParticipantId,
+        );
+        expect(stillPresent, isNotNull);
+      },
+    );
+
+    test(
       'syncApprovedRegistration is a no-op when participant state is unchanged',
       () async {
         final registrationSnapshot = await firestore
@@ -487,3 +596,9 @@ void main() {
     );
   });
 }
+
+Matcher get _throwsTournamentUnauthorized => throwsA(
+  predicate(
+    (error) => error.toString().contains('لا تملك صلاحية إدارة هذه البطولة'),
+  ),
+);

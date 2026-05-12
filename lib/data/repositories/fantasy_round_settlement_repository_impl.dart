@@ -7,13 +7,15 @@ import '../models/fantasy_round_settlement_marker_model.dart';
 
 class FantasyRoundSettlementRepositoryImpl
     implements FantasyRoundSettlementRepository {
-  final FirebaseFirestore _db;
+  final FirebaseFirestore _firestore;
 
-  FantasyRoundSettlementRepositoryImpl({FirebaseFirestore? db})
-      : _db = db ?? FirebaseFirestore.instance;
+  FantasyRoundSettlementRepositoryImpl({
+    FirebaseFirestore? db,
+    FirebaseFirestore? firestore,
+  }) : _firestore = firestore ?? db ?? FirebaseFirestore.instance;
 
   CollectionReference get _markersRef =>
-      _db.collection(FirebasePaths.fantasyRoundSettlements);
+      _firestore.collection(FirebasePaths.fantasyRoundSettlements);
 
   @override
   Future<FantasyRoundSettlementMarker?> getSettlementMarker({

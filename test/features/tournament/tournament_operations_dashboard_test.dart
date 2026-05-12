@@ -42,14 +42,16 @@ import 'package:el7reef/domain/entities/participant_ref.dart';
 import 'package:el7reef/features/tournament/controllers/tournament_detail_controller.dart';
 import 'package:el7reef/features/tournament/controllers/tournament_operations_controller.dart';
 import 'package:el7reef/features/tournament/views/tournament_detail_screen.dart';
+import 'package:el7reef/features/tournament/views/tournament_organizer_guard.dart';
 import 'package:el7reef/features/tournament/views/tournament_operations_screens.dart';
-import 'package:el7reef/services/auth_service.dart';
+import 'package:el7reef/core/auth/auth_service.dart';
 
 void main() {
   late FakeFirebaseFirestore firestore;
   late TournamentRepositoryImpl tournamentRepository;
   late TeamRepositoryImpl teamRepository;
   late TournamentRegistrationService registrationService;
+  late _FakeAuthService authService;
 
   setUp(() async {
     Get.testMode = true;
@@ -80,7 +82,9 @@ void main() {
       TournamentTopScorersResolver(
         matchEventService: MatchEventService(
           repository: MatchEventRepositoryImpl(firestore: firestore),
+          firestore: firestore,
         ),
+        matchRepository: MatchRepositoryImpl(db: firestore),
       ),
       permanent: true,
     );
@@ -115,10 +119,8 @@ void main() {
       ),
       permanent: true,
     );
-    Get.put<AuthService>(
-      _FakeAuthService(currentUserId: 'organizer-1'),
-      permanent: true,
-    );
+    authService = _FakeAuthService(currentUserId: 'organizer-1');
+    Get.put<AuthService>(authService, permanent: true);
 
     final now = DateTime(2026, 4, 19, 22);
     await tournamentRepository.createTournament(
@@ -214,6 +216,45 @@ void main() {
     expect(find.text('Red Wolves'), findsOneWidget);
   });
 
+  testWidgets('direct operations route is blocked for non-organizer', (
+    tester,
+  ) async {
+    authService.setCurrentUserId('account-b');
+
+    await tester.pumpWidget(
+      _buildOpsApp(AppRoutes.organizerDashboardForTournament('tournament-1')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tournament Operations Dashboard'), findsNothing);
+    expect(find.text('Manual Add Participant'), findsNothing);
+    expect(find.text('Street Cup'), findsWidgets);
+    expect(find.text('إدارة البطولة'), findsNothing);
+  });
+
+  testWidgets('operations route closes when account changes to non-organizer', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildOpsApp(AppRoutes.organizerDashboardForTournament('tournament-1')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tournament Operations Dashboard'), findsWidgets);
+    final controller = Get.find<TournamentOperationsController>();
+
+    authService.setCurrentUserId('account-b');
+    await controller.refreshAll();
+    await tester.pumpAndSettle();
+
+    expect(controller.canManageTournament, isFalse);
+    expect(controller.tournament.value, isNull);
+    expect(find.text('Tournament Operations Dashboard'), findsNothing);
+    expect(find.text('Manual Add Participant'), findsNothing);
+    expect(find.text('Street Cup'), findsWidgets);
+    expect(find.text('إدارة البطولة'), findsNothing);
+  });
+
   testWidgets('fixtures screen exposes operator filters and match actions', (
     tester,
   ) async {
@@ -283,7 +324,7 @@ void main() {
     expect(find.text('Matchday'), findsWidgets);
   });
 
-  testWidgets('tournament detail screen shows champion label and ops links', (
+  testWidgets('organizer sees one clear management CTA on tournament detail', (
     tester,
   ) async {
     await _seedOfficialGroupStandings(firestore);
@@ -302,7 +343,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('حالة التشغيل'), findsOneWidget);
+    expect(find.text('Street Cup'), findsWidgets);
+    expect(find.text('إدارة البطولة'), findsOneWidget);
+    expect(find.text('حالة التشغيل'), findsNothing);
+    expect(find.text('لوحة تشغيل البطولة'), findsNothing);
     expect(find.text('هدافو البطولة'), findsOneWidget);
     expect(find.text('لم يتم تسجيل هدافين بعد'), findsOneWidget);
     expect(
@@ -310,9 +354,47 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('شارك الهدافين'), findsNothing);
-    expect(find.text('Blue Sharks'), findsWidgets);
-    expect(find.text('الترتيب'), findsOneWidget);
-    expect(find.text('لوحة تشغيل البطولة'), findsOneWidget);
+  });
+
+  testWidgets(
+    'non-organizer sees public tournament detail without admin operations',
+    (tester) async {
+      authService.setCurrentUserId('account-b');
+
+      await tester.pumpWidget(
+        _buildOpsApp(AppRoutes.tournamentDetailById('tournament-1')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Street Cup'), findsWidgets);
+      expect(find.text('حجم الفريق'), findsOneWidget);
+      expect(find.text('التسجيلات'), findsOneWidget);
+      expect(find.text('هدافو البطولة'), findsOneWidget);
+      expect(find.text('إدارة البطولة'), findsNothing);
+      expect(find.text('حالة التشغيل'), findsNothing);
+      expect(find.text('لوحة تشغيل البطولة'), findsNothing);
+      expect(find.text('المشاركون'), findsNothing);
+      expect(find.text('المجموعات'), findsNothing);
+      expect(find.text('المباريات'), findsNothing);
+      expect(find.text('الإقصاء'), findsNothing);
+    },
+  );
+
+  testWidgets('organizer management CTA navigates to operations dashboard', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildOpsApp(AppRoutes.tournamentDetailById('tournament-1')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('إدارة البطولة'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('إدارة البطولة'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tournament Operations Dashboard'), findsWidgets);
+    expect(find.text('Manual Add Participant'), findsOneWidget);
   });
 
   testWidgets('tournament detail shows registered and guest top scorers', (
@@ -417,18 +499,33 @@ void main() {
 
     Get.back();
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Fixtures'),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('Fixtures'));
     await tester.pumpAndSettle();
     expect(find.text('إدارة fixtures'), findsOneWidget);
 
     Get.back();
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Standings'),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('Standings'));
     await tester.pumpAndSettle();
     expect(find.text('ترتيب المجموعات'), findsOneWidget);
 
     Get.back();
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Bracket'),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('Bracket'));
     await tester.pumpAndSettle();
     expect(find.text('ملخص الإقصاء'), findsOneWidget);
@@ -569,49 +666,42 @@ void main() {
     },
   );
 
-  test(
-    'non-organizer sees account A tournament as read-only operations state',
-    () async {
-      final lifecycleService = TournamentLifecycleService(firestore: firestore);
-      final controller = _TestTournamentOperationsController(
-        fixedTournamentId: 'tournament-1',
-        tournamentRepository: tournamentRepository,
-        groupRepository: TournamentGroupRepositoryImpl(firestore: firestore),
-        matchRepository: MatchRepositoryImpl(db: firestore),
-        teamRepository: teamRepository,
-        guestTeamRepository: GuestTeamRepositoryImpl(firestore: firestore),
-        standingRepository: GroupStandingSnapshotRepositoryImpl(
-          firestore: firestore,
-        ),
-        bracketRepository: KnockoutBracketRepositoryImpl(firestore: firestore),
-        tieRepository: KnockoutTieRepositoryImpl(firestore: firestore),
-        participantService: TournamentParticipantService(firestore: firestore),
-        migrationService: TournamentOpsMigrationService(firestore: firestore),
-        lifecycleService: lifecycleService,
-        fixtureService: TournamentFixtureService(firestore: firestore),
-        authService: _FakeAuthService(currentUserId: 'account-b'),
-        settlementService: MatchSettlementService(
-          firestore: firestore,
-          tournamentLifecycleService: lifecycleService,
-        ),
-      );
+  test('operations controller fails closed for non-organizer', () async {
+    final lifecycleService = TournamentLifecycleService(firestore: firestore);
+    final controller = _TestTournamentOperationsController(
+      fixedTournamentId: 'tournament-1',
+      tournamentRepository: tournamentRepository,
+      groupRepository: TournamentGroupRepositoryImpl(firestore: firestore),
+      matchRepository: MatchRepositoryImpl(db: firestore),
+      teamRepository: teamRepository,
+      guestTeamRepository: GuestTeamRepositoryImpl(firestore: firestore),
+      standingRepository: GroupStandingSnapshotRepositoryImpl(
+        firestore: firestore,
+      ),
+      bracketRepository: KnockoutBracketRepositoryImpl(firestore: firestore),
+      tieRepository: KnockoutTieRepositoryImpl(firestore: firestore),
+      participantService: TournamentParticipantService(firestore: firestore),
+      migrationService: TournamentOpsMigrationService(firestore: firestore),
+      lifecycleService: lifecycleService,
+      fixtureService: TournamentFixtureService(firestore: firestore),
+      authService: _FakeAuthService(currentUserId: 'account-b'),
+      settlementService: MatchSettlementService(
+        firestore: firestore,
+        tournamentLifecycleService: lifecycleService,
+      ),
+    );
 
-      await controller.refreshAll();
+    await controller.refreshAll();
 
-      expect(controller.tournament.value?.organizerId, 'organizer-1');
-      expect(controller.canManageTournament, isFalse);
-      expect(controller.canManualAddParticipants, isFalse);
-      expect(controller.canFinalizeParticipantsAction, isFalse);
-      expect(controller.canPublishFixtures, isFalse);
-
-      await controller.syncApprovedRegistrations();
-
-      expect(
-        controller.errorMessage.value,
-        'لا تملك صلاحية إدارة هذه البطولة.',
-      );
-    },
-  );
+    expect(controller.tournament.value, isNull);
+    expect(controller.canManageTournament, isFalse);
+    expect(controller.canManualAddParticipants, isFalse);
+    expect(controller.canFinalizeParticipantsAction, isFalse);
+    expect(controller.canPublishFixtures, isFalse);
+    expect(controller.errorMessage.value, 'لا تملك صلاحية إدارة هذه البطولة.');
+    expect(controller.participants, isEmpty);
+    expect(controller.fixtures, isEmpty);
+  });
 
   test('scheduleFixture updates local state without full refresh', () async {
     final controller = _buildTrackingController();
@@ -792,32 +882,40 @@ Widget _buildOpsApp(String initialRoute) {
       ),
       GetPage(
         name: AppRoutes.organizerDashboard,
-        page: () => const TournamentOperationsDashboardScreen(),
+        page: () => const TournamentOrganizerGuard(
+          child: TournamentOperationsDashboardScreen(),
+        ),
         binding: _TestTournamentOperationsBinding(),
       ),
       GetPage(
         name: AppRoutes.tournamentParticipants,
-        page: () => const TournamentParticipantsScreen(),
+        page: () => const TournamentOrganizerGuard(
+          child: TournamentParticipantsScreen(),
+        ),
         binding: _TestTournamentOperationsBinding(),
       ),
       GetPage(
         name: AppRoutes.tournamentGroups,
-        page: () => const TournamentGroupsScreen(),
+        page: () =>
+            const TournamentOrganizerGuard(child: TournamentGroupsScreen()),
         binding: _TestTournamentOperationsBinding(),
       ),
       GetPage(
         name: AppRoutes.tournamentFixtures,
-        page: () => const TournamentFixturesScreen(),
+        page: () =>
+            const TournamentOrganizerGuard(child: TournamentFixturesScreen()),
         binding: _TestTournamentOperationsBinding(),
       ),
       GetPage(
         name: AppRoutes.tournamentStandings,
-        page: () => const TournamentStandingsScreen(),
+        page: () =>
+            const TournamentOrganizerGuard(child: TournamentStandingsScreen()),
         binding: _TestTournamentOperationsBinding(),
       ),
       GetPage(
         name: AppRoutes.tournamentBracket,
-        page: () => const TournamentBracketScreen(),
+        page: () =>
+            const TournamentOrganizerGuard(child: TournamentBracketScreen()),
         binding: _TestTournamentOperationsBinding(),
       ),
     ],
@@ -1074,6 +1172,7 @@ Future<void> _seedRegisteredSnapshotForOps({
 Future<void> _seedTopScorerGoals(FakeFirebaseFirestore firestore) async {
   final service = MatchEventService(
     repository: MatchEventRepositoryImpl(firestore: firestore),
+    firestore: firestore,
   );
   final now = DateTime(2026, 4, 20, 20);
   const registeredScorer = ParticipantRef(
@@ -1092,6 +1191,19 @@ Future<void> _seedTopScorerGoals(FakeFirebaseFirestore firestore) async {
     id: 'temporary-scorer',
     displayName: 'Temporary Scorer',
   );
+
+  await firestore
+      .collection(FirebasePaths.matches)
+      .doc('match-top-scorers')
+      .set({
+        'organizerId': 'organizer-1',
+        'tournamentId': 'tournament-1',
+        'status': MatchStatus.settled.name,
+        'scoreTeamA': 2,
+        'scoreTeamB': 1,
+        'isOrganized': true,
+        'createdAt': now.millisecondsSinceEpoch,
+      });
 
   await service.recordGoal(
     eventId: 'goal-tournament-1-player-1',
@@ -1138,10 +1250,24 @@ class _FakeAuthService extends GetxService implements AuthService {
   @override
   final RxBool isLoading = false.obs;
 
-  final String? _currentUserId;
+  String? _currentUserId;
 
-  _FakeAuthService({required String? currentUserId})
-    : _currentUserId = currentUserId;
+  _FakeAuthService({required String? currentUserId}) {
+    setCurrentUserId(currentUserId);
+  }
+
+  void setCurrentUserId(String? userId) {
+    _currentUserId = userId;
+    final now = DateTime(2026, 4, 19, 22);
+    currentPlayer.value = userId == null
+        ? null
+        : Player(
+            id: userId,
+            name: 'Test User $userId',
+            createdAt: now,
+            lastActiveAt: now,
+          );
+  }
 
   @override
   bool get isLoggedIn => _currentUserId != null;
@@ -1167,6 +1293,7 @@ class _ThrowingTopScorersResolver extends TournamentTopScorersResolver {
     : super(
         matchEventService: MatchEventService(
           repository: MatchEventRepositoryImpl(firestore: firestore),
+          firestore: firestore,
         ),
       );
 

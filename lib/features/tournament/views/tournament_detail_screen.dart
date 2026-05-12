@@ -16,7 +16,7 @@ import '../../../domain/entities/tournament.dart';
 import '../../shareables/controllers/top_scorers_share_controller.dart';
 import '../../shareables/services/share_card_capture_service.dart';
 import '../../shareables/widgets/top_scorers_share_card.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 import '../controllers/tournament_detail_controller.dart';
 
 class TournamentDetailScreen extends GetView<TournamentDetailController> {
@@ -114,32 +114,27 @@ class TournamentDetailScreen extends GetView<TournamentDetailController> {
                         tournament: tournament,
                       ).animate().fadeIn(delay: 100.ms),
                       const SizedBox(height: AppDimensions.md),
-                      _OperationsSnapshot(
-                        tournament: tournament,
-                        championLabel: controller.winnerDisplayName.value,
-                      ).animate().fadeIn(delay: 180.ms),
-                      const SizedBox(height: AppDimensions.md),
                       _TopScorersSection(
                         isLoading: controller.isLoadingTopScorers.value,
                         errorMessage: controller.topScorersErrorMessage.value,
                         scorers: controller.topScorers,
                         onShare: () => _shareTopScorers(context, tournament),
-                      ).animate().fadeIn(delay: 220.ms),
+                      ).animate().fadeIn(delay: 180.ms),
                       const SizedBox(height: AppDimensions.md),
                       if (!isOrganizer &&
                           tournament.status == TournamentStatus.registration)
                         _RegisterTeamButton(
                           tournament: tournament,
-                        ).animate().fadeIn(delay: 260.ms),
+                        ).animate().fadeIn(delay: 220.ms),
                       if (FeatureFlags.fantasyUiEnabled &&
                           tournament.isFantasyEnabled)
                         _FantasyLeagueButton(
                           tournament: tournament,
-                        ).animate().fadeIn(delay: 300.ms),
+                        ).animate().fadeIn(delay: 260.ms),
                       if (isOrganizer)
-                        _OrganizerPanel(
+                        _OrganizerDashboardCta(
                           tournament: tournament,
-                        ).animate().fadeIn(delay: 340.ms),
+                        ).animate().fadeIn(delay: 300.ms),
                     ],
                   ),
                 ),
@@ -524,120 +519,6 @@ class _RegistrationProgress extends StatelessWidget {
   }
 }
 
-class _OperationsSnapshot extends StatelessWidget {
-  final Tournament tournament;
-  final String championLabel;
-
-  const _OperationsSnapshot({
-    required this.tournament,
-    required this.championLabel,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassmorphicContainer(
-      padding: const EdgeInsets.all(AppDimensions.md),
-      borderRadius: AppDimensions.radiusLg,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('حالة التشغيل', style: AppTextStyles.titleMedium),
-          const SizedBox(height: AppDimensions.sm),
-          _Row(
-            icon: Icons.groups_2_rounded,
-            label: 'قائمة المشاركين',
-            value: tournament.participantListFinalizedAt == null
-                ? 'غير مقفلة بعد'
-                : 'تم قفلها',
-          ),
-          _Row(
-            icon: Icons.grid_view_rounded,
-            label: 'المجموعات',
-            value: tournament.currentGroupStageId == null
-                ? 'غير منشأة'
-                : 'جاهزة',
-          ),
-          _Row(
-            icon: Icons.account_tree_rounded,
-            label: 'الإقصاء',
-            value: tournament.currentKnockoutBracketId == null
-                ? 'غير منشأ'
-                : 'جاهز',
-          ),
-          if (tournament.winnerParticipantId != null)
-            _Row(
-              icon: Icons.emoji_events_rounded,
-              label: 'البطل',
-              value: championLabel.isEmpty
-                  ? tournament.winnerParticipantId!
-                  : championLabel,
-            ),
-          if (tournament.needsManualOpsMigration)
-            Padding(
-              padding: const EdgeInsets.only(top: AppDimensions.sm),
-              child: Text(
-                'هذه البطولة تحتاج manual ops migration قبل التشغيل الكامل.',
-                style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
-              ),
-            ),
-          const SizedBox(height: AppDimensions.sm),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () => Get.toNamed(
-                  AppRoutes.tournamentParticipantsById(tournament.id),
-                ),
-                icon: const Icon(Icons.groups_2_outlined),
-                label: const Text('المشاركون'),
-              ),
-              OutlinedButton.icon(
-                onPressed: tournament.currentGroupStageId == null
-                    ? null
-                    : () => Get.toNamed(
-                        AppRoutes.tournamentGroupsById(tournament.id),
-                      ),
-                icon: const Icon(Icons.grid_view_rounded),
-                label: const Text('المجموعات'),
-              ),
-              OutlinedButton.icon(
-                onPressed:
-                    tournament.currentGroupStageId == null &&
-                        tournament.currentKnockoutBracketId == null
-                    ? null
-                    : () => Get.toNamed(
-                        AppRoutes.tournamentFixturesById(tournament.id),
-                      ),
-                icon: const Icon(Icons.calendar_month_rounded),
-                label: const Text('المباريات'),
-              ),
-              OutlinedButton.icon(
-                onPressed: tournament.currentGroupStageId == null
-                    ? null
-                    : () => Get.toNamed(
-                        AppRoutes.tournamentStandingsById(tournament.id),
-                      ),
-                icon: const Icon(Icons.leaderboard_rounded),
-                label: const Text('الترتيب'),
-              ),
-              OutlinedButton.icon(
-                onPressed: tournament.currentKnockoutBracketId == null
-                    ? null
-                    : () => Get.toNamed(
-                        AppRoutes.tournamentBracketById(tournament.id),
-                      ),
-                icon: const Icon(Icons.account_tree_outlined),
-                label: const Text('الإقصاء'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _FantasyLeagueButton extends StatelessWidget {
   final Tournament tournament;
 
@@ -691,61 +572,22 @@ class _RegisterTeamButton extends StatelessWidget {
   }
 }
 
-class _OrganizerPanel extends StatelessWidget {
+class _OrganizerDashboardCta extends StatelessWidget {
   final Tournament tournament;
 
-  const _OrganizerPanel({required this.tournament});
+  const _OrganizerDashboardCta({required this.tournament});
 
   @override
   Widget build(BuildContext context) {
     return GlassmorphicContainer(
       padding: const EdgeInsets.all(AppDimensions.md),
       borderRadius: AppDimensions.radiusLg,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.admin_panel_settings,
-                color: AppColors.secondary,
-              ),
-              const SizedBox(width: 8),
-              Text('لوحة التشغيل', style: AppTextStyles.titleMedium),
-            ],
-          ),
-          const SizedBox(height: AppDimensions.md),
-          OutlinedButton.icon(
-            onPressed: () => Get.toNamed(
-              AppRoutes.organizerDashboardForTournament(tournament.id),
-            ),
-            icon: const Icon(Icons.dashboard_customize_rounded),
-            label: const Text('لوحة تشغيل البطولة'),
-          ),
-          const SizedBox(height: AppDimensions.sm),
-          OutlinedButton.icon(
-            onPressed: () => Get.toNamed(
-              AppRoutes.teamRegistrationForTournament(tournament.id),
-            ),
-            icon: const Icon(Icons.app_registration_rounded),
-            label: const Text('إدارة التسجيلات'),
-          ),
-          const SizedBox(height: AppDimensions.sm),
-          if (FeatureFlags.organizerAdvancedOpsEnabled) ...[
-            OutlinedButton.icon(
-              onPressed: () => Get.toNamed(
-                AppRoutes.tournamentAssistantsById(tournament.id),
-              ),
-              icon: const Icon(Icons.manage_accounts_rounded),
-              label: const Text('إدارة المساعدين'),
-            ),
-            const SizedBox(height: AppDimensions.sm),
-          ],
-          Text(
-            'عمليات المراحل والتوليد والنشر والإغلاق أصبحت من dashboard التشغيلية فقط لتفادي status flips غير آمنة.',
-            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textMuted),
-          ),
-        ],
+      child: El7reefButton(
+        text: 'إدارة البطولة',
+        icon: Icons.dashboard_customize_rounded,
+        onPressed: () => Get.toNamed(
+          AppRoutes.organizerDashboardForTournament(tournament.id),
+        ),
       ),
     );
   }

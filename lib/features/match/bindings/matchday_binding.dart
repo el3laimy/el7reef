@@ -17,7 +17,7 @@ import '../../../data/repositories/team_membership_repository_impl.dart';
 import '../../../data/repositories/team_repository_impl.dart';
 import '../../../data/repositories/tournament_registration_repository_impl.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 import '../controllers/matchday_controller.dart';
 
 class MatchdayBinding extends Bindings {

@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
 import '../../../app/routes/app_routes.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 
 /// كونترولر المصادقة — Google Sign-In
 class AuthController extends GetxController {

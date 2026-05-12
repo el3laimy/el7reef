@@ -9,7 +9,7 @@ import '../../../domain/repositories/challenge_repository.dart';
 import '../../../data/repositories/challenge_repository_impl.dart';
 import '../../../domain/repositories/match_repository.dart';
 import '../../../data/repositories/match_repository_impl.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/session_reset_coordinator.dart';
 
 /// HomeBinding — يسجل جميع Controllers المطلوبة لشاشة Home
@@ -69,7 +69,6 @@ class HomeBinding extends Bindings {
     final challengeController = _putPermanentIfAbsent<ChallengeController>(
       () => ChallengeController(
         challengeRepo: Get.find<ChallengeRepository>(),
-        matchRepo: Get.find<MatchRepository>(),
         authService: Get.find<AuthService>(),
       ),
     );

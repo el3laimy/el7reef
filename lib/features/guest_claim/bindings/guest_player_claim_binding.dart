@@ -5,7 +5,7 @@ import '../../../core/auth/auth_session.dart';
 import '../../../core/services/guest_claim_service.dart';
 import '../../../data/repositories/guest_player_repository_impl.dart';
 import '../../../data/repositories/team_repository_impl.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 import '../controllers/guest_player_claim_controller.dart';
 
 class GuestPlayerClaimBinding extends Bindings {

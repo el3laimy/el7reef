@@ -4,8 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 
 import 'package:el7reef/core/enums/fantasy_league_phase.dart';
-import 'package:el7reef/core/services/fantasy_lifecycle_service.dart';
-import 'package:el7reef/core/services/fantasy_market_service.dart';
+import 'package:el7reef/features/fantasy/services/fantasy_lifecycle_service.dart';
+import 'package:el7reef/features/fantasy/services/fantasy_market_service.dart';
 import 'package:el7reef/data/repositories/fantasy_lifecycle_repository_impl.dart';
 import 'package:el7reef/data/repositories/fantasy_repository_impl.dart';
 import 'package:el7reef/data/repositories/tournament_repository_impl.dart';
@@ -38,7 +38,7 @@ void main() {
 
     final firestore = FakeFirebaseFirestore();
     final repository = _RecordingFantasyRepository(firestore);
-    final lifecycleRepository = FantasyLifecycleRepositoryImpl(db: firestore);
+    final lifecycleRepository = FantasyLifecycleRepositoryImpl(firestore: firestore);
     final lifecycleService = FantasyLifecycleService(
       lifecycleRepository: lifecycleRepository,
       tournamentRepository: TournamentRepositoryImpl(db: firestore),
@@ -96,7 +96,7 @@ void main() {
 
     final firestore = FakeFirebaseFirestore();
     final repository = _RecordingFantasyRepository(firestore);
-    final lifecycleRepository = FantasyLifecycleRepositoryImpl(db: firestore);
+    final lifecycleRepository = FantasyLifecycleRepositoryImpl(firestore: firestore);
     final lifecycleService = FantasyLifecycleService(
       lifecycleRepository: lifecycleRepository,
       tournamentRepository: TournamentRepositoryImpl(db: firestore),
@@ -161,7 +161,7 @@ void main() {
 
     final firestore = FakeFirebaseFirestore();
     final repository = _RecordingFantasyRepository(firestore);
-    final lifecycleRepository = FantasyLifecycleRepositoryImpl(db: firestore);
+    final lifecycleRepository = FantasyLifecycleRepositoryImpl(firestore: firestore);
     final lifecycleService = FantasyLifecycleService(
       lifecycleRepository: lifecycleRepository,
       tournamentRepository: TournamentRepositoryImpl(db: firestore),

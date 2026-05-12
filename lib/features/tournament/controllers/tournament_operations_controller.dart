@@ -23,10 +23,56 @@ import '../../../domain/repositories/match_repository.dart';
 import '../../../domain/repositories/team_repository.dart';
 import '../../../domain/repositories/tournament_group_repository.dart';
 import '../../../domain/repositories/tournament_repository.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
+
+part 'tournament_participant_ops.dart';
+part 'tournament_stage_ops.dart';
+part 'tournament_fixture_ops.dart';
+
+class TournamentParticipantCandidate {
+  final TournamentParticipantSourceType sourceType;
+  final String sourceEntityId;
+  final String displayName;
+
+  const TournamentParticipantCandidate({
+    required this.sourceType,
+    required this.sourceEntityId,
+    required this.displayName,
+  });
+}
+
+class TournamentOpsChecklistItem {
+  final String label;
+  final bool isReady;
+  final String detail;
+
+  const TournamentOpsChecklistItem({
+    required this.label,
+    required this.isReady,
+    required this.detail,
+  });
+}
+
+class TournamentOpsPendingAction {
+  final String title;
+  final String detail;
+
+  const TournamentOpsPendingAction({required this.title, required this.detail});
+}
+
+class _ParticipantCandidateCacheEntry {
+  final DateTime cachedAt;
+  final List<TournamentParticipantCandidate> candidates;
+
+  const _ParticipantCandidateCacheEntry({
+    required this.cachedAt,
+    required this.candidates,
+  });
+}
 
 class TournamentOperationsController extends GetxController {
   static const Duration _participantSearchCacheTtl = Duration(seconds: 30);
+  static const String accessDeniedMessage = 'لا تملك صلاحية إدارة هذه البطولة.';
 
   final TournamentRepository _tournamentRepository;
   final TournamentGroupRepository _groupRepository;
@@ -339,8 +385,8 @@ class TournamentOperationsController extends GetxController {
         detail: currentTournament.participantListFinalizedAt != null
             ? 'تم قفل القائمة وجاهزة للتشغيل.'
             : activeParticipantsCount >= 2
-            ? 'يمكن قفل القائمة الآن.'
-            : 'تحتاج على الأقل مشاركين نشطين.',
+                ? 'يمكن قفل القائمة الآن.'
+                : 'تحتاج على الأقل مشاركين نشطين.',
       ),
       TournamentOpsChecklistItem(
         label: 'مرحلة المجموعات',
@@ -348,10 +394,10 @@ class TournamentOperationsController extends GetxController {
         detail: hasGroupStage
             ? 'تم إنشاء المجموعات والـ fixtures الخاصة بها.'
             : canStartGroupStageAction
-            ? 'جاهزة للبدء من لوحة التشغيل.'
-            : currentTournament.format == TournamentFormat.knockoutOnly
-            ? 'غير مطلوبة في هذا النوع من البطولات.'
-            : 'تنتظر قفل قائمة المشاركين أولًا.',
+                ? 'جاهزة للبدء من لوحة التشغيل.'
+                : currentTournament.format == TournamentFormat.knockoutOnly
+                    ? 'غير مطلوبة في هذا النوع من البطولات.'
+                    : 'تنتظر قفل قائمة المشاركين أولًا.',
       ),
       TournamentOpsChecklistItem(
         label: 'نشر fixtures',
@@ -359,23 +405,23 @@ class TournamentOperationsController extends GetxController {
         detail: hasPublishedFixtures
             ? 'تم نشر جزء من fixtures بالفعل.'
             : canPublishFixtures
-            ? 'توجد fixtures draft جاهزة للنشر.'
-            : fixtures.isEmpty
-            ? 'لم تُولد fixtures بعد.'
-            : 'كل fixtures الحالية منشورة بالفعل.',
+                ? 'توجد fixtures draft جاهزة للنشر.'
+                : fixtures.isEmpty
+                    ? 'لم تُولد fixtures بعد.'
+                    : 'كل fixtures الحالية منشورة بالفعل.',
       ),
       TournamentOpsChecklistItem(
         label: 'مرحلة الإقصاء',
         isReady: hasKnockoutStage,
         detail: hasKnockoutStage
             ? knockoutBracket.value?.championParticipantId == null
-                  ? 'تم إنشاء bracket الإقصاء.'
-                  : 'تم تحديد بطل الإقصاء.'
+                ? 'تم إنشاء bracket الإقصاء.'
+                : 'تم تحديد بطل الإقصاء.'
             : canStartKnockoutAction
-            ? 'جاهزة للبدء الآن.'
-            : currentTournament.format == TournamentFormat.groupsOnly
-            ? 'غير مطلوبة في هذا النوع من البطولات.'
-            : 'تنتظر اكتمال المؤهلين ونتائج المراحل السابقة.',
+                ? 'جاهزة للبدء الآن.'
+                : currentTournament.format == TournamentFormat.groupsOnly
+                    ? 'غير مطلوبة في هذا النوع من البطولات.'
+                    : 'تنتظر اكتمال المؤهلين ونتائج المراحل السابقة.',
       ),
     ];
   }
@@ -444,7 +490,10 @@ class TournamentOperationsController extends GetxController {
     return _groupNameById[groupId] ?? groupId;
   }
 
-  String participantLabelFor(String? participantId, {String fallback = 'TBD'}) {
+  String participantLabelFor(
+    String? participantId, {
+    String fallback = 'TBD',
+  }) {
     if (participantId == null || participantId.isEmpty) {
       return fallback;
     }
@@ -482,23 +531,20 @@ class TournamentOperationsController extends GetxController {
       final currentTournament = await _tournamentRepository.getTournament(id);
       if (currentTournament == null) {
         errorMessage.value = 'تعذر العثور على البطولة المطلوبة.';
-        tournament.value = null;
-        _clearDerivedState();
-        participants.clear();
-        groups.clear();
-        standings.clear();
-        fixtures.clear();
-        knockoutBracket.value = null;
-        knockoutTies.clear();
+        _clearOperationalState();
+        return;
+      }
+      if (!_canCurrentUserManage(currentTournament)) {
+        errorMessage.value = accessDeniedMessage;
+        _clearOperationalState();
         return;
       }
       tournament.value = currentTournament;
       final groupStageId = currentTournament.currentGroupStageId;
       final bracketId = currentTournament.currentKnockoutBracketId;
 
-      final participantsFuture = _participantService.getTournamentParticipants(
-        id,
-      );
+      final participantsFuture =
+          _participantService.getTournamentParticipants(id);
       final groupsFuture = groupStageId != null && groupStageId.isNotEmpty
           ? _groupRepository.getTournamentGroups(id, groupStageId: groupStageId)
           : Future.value(const <TournamentGroup>[]);
@@ -546,392 +592,6 @@ class TournamentOperationsController extends GetxController {
     }
   }
 
-  Future<void> syncApprovedRegistrations() async {
-    final id = tournamentId;
-    if (id == null || id.isEmpty) {
-      return;
-    }
-    if (!_ensureCanManageTournament()) {
-      return;
-    }
-    await _runAction(
-      message: 'تمت مزامنة التسجيلات المعتمدة مع participants.',
-      action: () => _migrationService.backfillTournament(tournamentId: id),
-      onSuccess: (_) => _refreshParticipantsOnly(refreshTournament: true),
-    );
-  }
-
-  Future<void> finalizeParticipantList() async {
-    final id = tournamentId;
-    if (id == null || id.isEmpty) {
-      return;
-    }
-    final actorId = _currentTournamentManagerActorId();
-    if (actorId == null) return;
-    await _runAction(
-      message: 'تم قفل قائمة المشاركين بنجاح.',
-      action: () => _lifecycleService.finalizeParticipants(
-        tournamentId: id,
-        actorId: actorId,
-      ),
-      onSuccess: (finalizedParticipants) async {
-        _applyParticipants(finalizedParticipants);
-        await _refreshTournamentOnly();
-      },
-    );
-  }
-
-  Future<void> startGroupStage() async {
-    final id = tournamentId;
-    if (id == null || id.isEmpty) {
-      return;
-    }
-    final actorId = _currentTournamentManagerActorId();
-    if (actorId == null) return;
-    await _runAction(
-      message: 'تم إنشاء المجموعات وجدولها بنجاح.',
-      action: () =>
-          _lifecycleService.startGroupStage(tournamentId: id, actorId: actorId),
-      onSuccess: (result) async {
-        _applyGroups(result.groups);
-        standings.assignAll(result.standings);
-        _mergeFixtures(result.fixtures);
-        final currentTournament = tournament.value;
-        if (currentTournament != null) {
-          tournament.value = currentTournament.copyWith(
-            status: TournamentStatus.groupStage,
-            currentGroupStageId: result.groupStageId,
-          );
-        } else {
-          await _refreshTournamentOnly();
-        }
-      },
-    );
-  }
-
-  Future<void> publishFixtures() async {
-    final id = tournamentId;
-    if (id == null || id.isEmpty) {
-      return;
-    }
-    final actorId = _currentTournamentManagerActorId();
-    if (actorId == null) return;
-    await _runAction(
-      message: 'تم نشر fixtures البطولة.',
-      action: () =>
-          _lifecycleService.publishFixtures(tournamentId: id, actorId: actorId),
-      onSuccess: (publishedFixtures) async {
-        fixtures.assignAll(publishedFixtures);
-      },
-    );
-  }
-
-  Future<void> regenerateGroupStage() async {
-    final id = tournamentId;
-    if (id == null || id.isEmpty) {
-      return;
-    }
-    final actorId = _currentTournamentManagerActorId();
-    if (actorId == null) return;
-    await _runAction(
-      message: 'تمت إعادة توليد المجموعات والـ fixtures بنجاح.',
-      action: () => _fixtureService.regenerateGroupStage(
-        tournamentId: id,
-        actorId: actorId,
-      ),
-      onSuccess: (result) async {
-        _applyGroups(result.groups);
-        standings.assignAll(result.standings);
-        _replaceGroupStageFixtures(result.fixtures);
-      },
-    );
-  }
-
-  Future<void> startKnockout() async {
-    final id = tournamentId;
-    if (id == null || id.isEmpty) {
-      return;
-    }
-    final actorId = _currentTournamentManagerActorId();
-    if (actorId == null) return;
-    await _runAction(
-      message: 'تم إنشاء bracket الإقصاء.',
-      action: () =>
-          _lifecycleService.startKnockout(tournamentId: id, actorId: actorId),
-      onSuccess: (result) async {
-        knockoutBracket.value = result.bracket;
-        knockoutTies.assignAll(result.ties);
-        _mergeFixtures(result.matches);
-        final currentTournament = tournament.value;
-        if (currentTournament != null) {
-          tournament.value = currentTournament.copyWith(
-            status: TournamentStatus.knockoutStage,
-            currentKnockoutBracketId: result.bracket.id,
-          );
-        } else {
-          await _refreshTournamentOnly();
-        }
-      },
-    );
-  }
-
-  Future<void> completeTournament() async {
-    final id = tournamentId;
-    if (id == null || id.isEmpty) {
-      return;
-    }
-    final actorId = _currentTournamentManagerActorId();
-    if (actorId == null) return;
-    await _runAction(
-      message: 'تم إغلاق البطولة وتحديد البطل.',
-      action: () => _lifecycleService.completeTournament(
-        tournamentId: id,
-        actorId: actorId,
-      ),
-      onSuccess: (updatedTournament) async {
-        tournament.value = updatedTournament;
-      },
-    );
-  }
-
-  Future<void> withdrawParticipant(String participantId) async {
-    final actorId = _currentTournamentManagerActorId();
-    if (actorId == null) return;
-    await _runAction(
-      message: 'تم سحب المشارك من البطولة.',
-      action: () => _participantService.withdrawParticipant(
-        participantId: participantId,
-        actorId: actorId,
-      ),
-      onSuccess: (updatedParticipant) async {
-        _upsertParticipant(updatedParticipant);
-      },
-    );
-  }
-
-  Future<void> reactivateParticipant(String participantId) async {
-    final actorId = _currentTournamentManagerActorId();
-    if (actorId == null) return;
-    await _runAction(
-      message: 'تمت إعادة تفعيل المشارك بنجاح.',
-      action: () => _participantService.reactivateParticipant(
-        participantId: participantId,
-        actorId: actorId,
-      ),
-      onSuccess: (result) async {
-        _upsertParticipants(<TournamentParticipant>[
-          result.reactivatedParticipant,
-          if (result.withdrawnReplacement != null) result.withdrawnReplacement!,
-        ]);
-        _syncTournamentParticipantCountLocal(
-          overrideCount: result.activeParticipantCount,
-        );
-      },
-    );
-  }
-
-  Future<void> addManualParticipant({
-    required TournamentParticipantSourceType sourceType,
-    required String sourceEntityId,
-  }) async {
-    final id = tournamentId;
-    if (id == null || id.isEmpty) {
-      return;
-    }
-    final actorId = _currentTournamentManagerActorId();
-    if (actorId == null) return;
-    await _runAction(
-      message: 'تمت إضافة participant يدويًا إلى البطولة.',
-      action: () => _participantService.addManualParticipant(
-        tournamentId: id,
-        sourceType: sourceType,
-        sourceEntityId: sourceEntityId,
-        actorId: actorId,
-      ),
-      onSuccess: (participant) async {
-        _upsertParticipant(participant);
-      },
-    );
-  }
-
-  Future<void> replaceParticipant({
-    required String participantId,
-    required TournamentParticipantSourceType replacementSourceType,
-    required String replacementSourceEntityId,
-  }) async {
-    final actorId = _currentTournamentManagerActorId();
-    if (actorId == null) return;
-    await _runAction(
-      message: 'تم استبدال participant بنجاح.',
-      action: () => _participantService.replaceParticipant(
-        participantId: participantId,
-        replacementSourceType: replacementSourceType,
-        replacementSourceEntityId: replacementSourceEntityId,
-        actorId: actorId,
-      ),
-      onSuccess: (result) async {
-        _upsertParticipants(<TournamentParticipant>[
-          result.replacedParticipant,
-          result.replacementParticipant,
-        ]);
-        _syncTournamentParticipantCountLocal(
-          overrideCount: result.activeParticipantCount,
-        );
-      },
-    );
-  }
-
-  Future<void> updateParticipantSeed({
-    required String participantId,
-    int? seed,
-  }) async {
-    final actorId = _currentTournamentManagerActorId();
-    if (actorId == null) return;
-    await _runAction(
-      message: seed == null
-          ? 'تم حذف seed الخاصة بالمشارك.'
-          : 'تم تحديث seed الخاصة بالمشارك.',
-      action: () => _participantService.updateParticipantSeed(
-        participantId: participantId,
-        actorId: actorId,
-        seed: seed,
-      ),
-      onSuccess: (updatedParticipant) async {
-        _upsertParticipant(updatedParticipant);
-      },
-    );
-  }
-
-  Future<List<TournamentParticipantCandidate>> searchParticipantCandidates({
-    required String query,
-    required TournamentParticipantSourceType sourceType,
-    TournamentParticipant? replacingParticipant,
-  }) async {
-    final normalizedQuery = query.trim();
-    if (normalizedQuery.isEmpty) {
-      return const <TournamentParticipantCandidate>[];
-    }
-
-    final blockedKeys = participants
-        .where((participant) => participant.id != replacingParticipant?.id)
-        .map(
-          (participant) =>
-              '${participant.sourceType.name}::${participant.sourceEntityId}',
-        )
-        .toSet();
-
-    final cacheKey = '${sourceType.name}::${normalizedQuery.toLowerCase()}';
-    final now = DateTime.now();
-    final cached = _participantSearchCache[cacheKey];
-    final baseCandidates =
-        cached != null &&
-            now.difference(cached.cachedAt) <= _participantSearchCacheTtl
-        ? cached.candidates
-        : await _loadParticipantCandidates(
-            normalizedQuery: normalizedQuery,
-            sourceType: sourceType,
-          );
-
-    if (cached == null ||
-        now.difference(cached.cachedAt) > _participantSearchCacheTtl) {
-      _participantSearchCache[cacheKey] = _ParticipantCandidateCacheEntry(
-        cachedAt: now,
-        candidates: baseCandidates,
-      );
-    }
-
-    return baseCandidates
-        .where((candidate) {
-          final key =
-              '${candidate.sourceType.name}::${candidate.sourceEntityId}';
-          if (blockedKeys.contains(key)) {
-            return false;
-          }
-          if (replacingParticipant == null) {
-            return true;
-          }
-          return !(candidate.sourceType == replacingParticipant.sourceType &&
-              candidate.sourceEntityId == replacingParticipant.sourceEntityId);
-        })
-        .toList(growable: false);
-  }
-
-  Future<List<TournamentParticipantCandidate>> _loadParticipantCandidates({
-    required String normalizedQuery,
-    required TournamentParticipantSourceType sourceType,
-  }) async {
-    switch (sourceType) {
-      case TournamentParticipantSourceType.registeredTeam:
-        final teams = await _teamRepository.searchTeams(normalizedQuery);
-        return teams
-            .map(
-              (team) => TournamentParticipantCandidate(
-                sourceType: sourceType,
-                sourceEntityId: team.id,
-                displayName: team.name,
-              ),
-            )
-            .toList(growable: false);
-      case TournamentParticipantSourceType.guestTeam:
-        final guestTeams = await _guestTeamRepository.searchGuestTeams(
-          normalizedQuery,
-        );
-        return guestTeams
-            .map(
-              (guestTeam) => TournamentParticipantCandidate(
-                sourceType: sourceType,
-                sourceEntityId: guestTeam.id,
-                displayName: guestTeam.name,
-              ),
-            )
-            .toList(growable: false);
-    }
-  }
-
-  Future<void> scheduleFixture({
-    required String fixtureId,
-    required DateTime scheduledAt,
-    String? venueId,
-  }) async {
-    final actorId = _currentTournamentManagerActorId();
-    if (actorId == null) return;
-    await _runAction(
-      message: 'تم تحديث موعد الـ fixture.',
-      action: () => _fixtureService.scheduleFixture(
-        matchId: fixtureId,
-        actorId: actorId,
-        scheduledAt: scheduledAt,
-        venueId: venueId,
-      ),
-      onSuccess: (updatedFixture) async {
-        _upsertFixture(updatedFixture);
-      },
-    );
-  }
-
-  Future<void> startFixture(String fixtureId) async {
-    final actorId = _currentActorId();
-    if (actorId == null) return;
-    await _runAction(
-      message: 'تم بدء المباراة وأصبحت جارية الآن.',
-      action: () =>
-          _fixtureService.startMatch(matchId: fixtureId, actorId: actorId),
-      onSuccess: (updatedFixture) async {
-        _upsertFixture(updatedFixture);
-      },
-    );
-  }
-
-  Future<void> approveFixtureScore(String fixtureId) async {
-    final actorId = _currentActorId();
-    if (actorId == null) return;
-    await _runAction(
-      message: 'تم اعتماد نتيجة المباراة وتحديث البطولة.',
-      action: () =>
-          _settlementService.approveScore(matchId: fixtureId, actorId: actorId),
-    );
-  }
-
   String? _currentActorId() {
     final actorId = _authService.currentUserId;
     if (actorId == null || actorId.isEmpty) {
@@ -947,8 +607,9 @@ class TournamentOperationsController extends GetxController {
       return false;
     }
     final currentTournament = tournament.value;
-    if (currentTournament == null || currentTournament.organizerId != actorId) {
-      errorMessage.value = 'لا تملك صلاحية إدارة هذه البطولة.';
+    if (currentTournament == null ||
+        currentTournament.organizerId != actorId) {
+      errorMessage.value = accessDeniedMessage;
       _showSnackbar('غير مسموح', errorMessage.value);
       return false;
     }
@@ -1014,8 +675,8 @@ class TournamentOperationsController extends GetxController {
     if (id == null || id.isEmpty) {
       return;
     }
-    final participantsResult = await _participantService
-        .getTournamentParticipants(id);
+    final participantsResult =
+        await _participantService.getTournamentParticipants(id);
     _applyParticipants(participantsResult);
     if (refreshTournament) {
       await _refreshTournamentOnly();
@@ -1043,7 +704,9 @@ class TournamentOperationsController extends GetxController {
     _upsertParticipants(<TournamentParticipant>[participant]);
   }
 
-  void _upsertParticipants(List<TournamentParticipant> updatedParticipants) {
+  void _upsertParticipants(
+    List<TournamentParticipant> updatedParticipants,
+  ) {
     final nextParticipants = participants.toList(growable: true);
     for (final participant in updatedParticipants) {
       final index = nextParticipants.indexWhere(
@@ -1092,9 +755,13 @@ class TournamentOperationsController extends GetxController {
     fixtures.assignAll(nextFixtures);
   }
 
-  void _replaceGroupStageFixtures(List<Match> nextGroupStageFixtures) {
+  void _replaceGroupStageFixtures(
+    List<Match> nextGroupStageFixtures,
+  ) {
     final preservedFixtures = fixtures
-        .where((fixture) => fixture.stageType != TournamentStageType.groupStage)
+        .where(
+          (fixture) => fixture.stageType != TournamentStageType.groupStage,
+        )
         .toList(growable: true);
     preservedFixtures.addAll(nextGroupStageFixtures);
     _sortFixtures(preservedFixtures);
@@ -1114,12 +781,14 @@ class TournamentOperationsController extends GetxController {
     required List<TournamentGroup> groupsResult,
   }) {
     final participantById = {
-      for (final participant in participantsResult) participant.id: participant,
+      for (final participant in participantsResult)
+        participant.id: participant,
     };
     final groupNameById = {
       for (final group in groupsResult) group.id: group.name,
     };
-    final participantsByGroupId = <String, List<TournamentParticipant>>{};
+    final participantsByGroupId =
+        <String, List<TournamentParticipant>>{};
     for (final group in groupsResult) {
       participantsByGroupId[group.id] = group.participantIds
           .map((participantId) => participantById[participantId])
@@ -1138,6 +807,24 @@ class TournamentOperationsController extends GetxController {
     _participantsByGroupId = const <String, List<TournamentParticipant>>{};
   }
 
+  bool _canCurrentUserManage(Tournament currentTournament) {
+    final actorId = _authService.currentUserId;
+    return actorId != null &&
+        actorId.isNotEmpty &&
+        currentTournament.organizerId == actorId;
+  }
+
+  void _clearOperationalState() {
+    tournament.value = null;
+    _clearDerivedState();
+    participants.clear();
+    groups.clear();
+    standings.clear();
+    fixtures.clear();
+    knockoutBracket.value = null;
+    knockoutTies.clear();
+  }
+
   void _syncTournamentParticipantCountLocal({int? overrideCount}) {
     final currentTournament = tournament.value;
     if (currentTournament == null) {
@@ -1153,45 +840,4 @@ class TournamentOperationsController extends GetxController {
       activeParticipantCount: nextCount,
     );
   }
-}
-
-class TournamentParticipantCandidate {
-  final TournamentParticipantSourceType sourceType;
-  final String sourceEntityId;
-  final String displayName;
-
-  const TournamentParticipantCandidate({
-    required this.sourceType,
-    required this.sourceEntityId,
-    required this.displayName,
-  });
-}
-
-class TournamentOpsChecklistItem {
-  final String label;
-  final bool isReady;
-  final String detail;
-
-  const TournamentOpsChecklistItem({
-    required this.label,
-    required this.isReady,
-    required this.detail,
-  });
-}
-
-class TournamentOpsPendingAction {
-  final String title;
-  final String detail;
-
-  const TournamentOpsPendingAction({required this.title, required this.detail});
-}
-
-class _ParticipantCandidateCacheEntry {
-  final DateTime cachedAt;
-  final List<TournamentParticipantCandidate> candidates;
-
-  const _ParticipantCandidateCacheEntry({
-    required this.cachedAt,
-    required this.candidates,
-  });
 }

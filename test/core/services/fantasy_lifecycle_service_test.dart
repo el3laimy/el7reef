@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:el7reef/core/constants/firebase_paths.dart';
 import 'package:el7reef/core/enums/fantasy_league_phase.dart';
 import 'package:el7reef/core/enums/tournament_enums.dart';
-import 'package:el7reef/core/services/fantasy_lifecycle_service.dart';
+import 'package:el7reef/features/fantasy/services/fantasy_lifecycle_service.dart';
 import 'package:el7reef/data/repositories/fantasy_lifecycle_repository_impl.dart';
 import 'package:el7reef/data/repositories/tournament_repository_impl.dart';
 import 'package:el7reef/domain/entities/fantasy_league_lifecycle.dart';
@@ -19,7 +19,7 @@ void main() {
 
     setUp(() {
       firestore = FakeFirebaseFirestore();
-      lifecycleRepository = FantasyLifecycleRepositoryImpl(db: firestore);
+      lifecycleRepository = FantasyLifecycleRepositoryImpl(firestore: firestore);
       tournamentRepository = TournamentRepositoryImpl(db: firestore);
       service = FantasyLifecycleService(
         lifecycleRepository: lifecycleRepository,
@@ -93,7 +93,7 @@ void main() {
     test('stores and reloads a lifecycle document from fantasyLeagues',
         () async {
       final firestore = FakeFirebaseFirestore();
-      final repository = FantasyLifecycleRepositoryImpl(db: firestore);
+      final repository = FantasyLifecycleRepositoryImpl(firestore: firestore);
       final lifecycle = FantasyLeagueLifecycle(
         leagueId: 'league-2',
         currentGameweek: 2,

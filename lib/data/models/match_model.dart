@@ -25,6 +25,7 @@ class MatchModel {
   final int teamSize;
   final bool isOrganized;
   final String? tournamentId;
+  final String? challengeId;
   final bool isGoldenRating;
   final bool isAnomaly;
   final bool isFrozen;
@@ -65,6 +66,7 @@ class MatchModel {
     this.teamSize = 5,
     this.isOrganized = false,
     this.tournamentId,
+    this.challengeId,
     this.isGoldenRating = false,
     this.isAnomaly = false,
     this.isFrozen = false,
@@ -123,6 +125,7 @@ class MatchModel {
       teamSize: normalizedTeamSize,
       isOrganized: json['isOrganized'] as bool? ?? false,
       tournamentId: json['tournamentId'] as String?,
+      challengeId: json['challengeId'] as String?,
       isGoldenRating: json['isGoldenRating'] as bool? ?? false,
       isAnomaly: json['isAnomaly'] as bool? ?? false,
       isFrozen: json['isFrozen'] as bool? ?? false,
@@ -189,6 +192,7 @@ class MatchModel {
     'teamSize': normalizeMatchTeamSize(teamSize),
     'isOrganized': isOrganized,
     'tournamentId': tournamentId,
+    'challengeId': challengeId,
     'isGoldenRating': isGoldenRating,
     'isAnomaly': isAnomaly,
     'isFrozen': isFrozen,
@@ -230,6 +234,7 @@ class MatchModel {
     teamSize: normalizeMatchTeamSize(teamSize),
     isOrganized: isOrganized,
     tournamentId: tournamentId,
+    challengeId: challengeId,
     isGoldenRating: isGoldenRating,
     isAnomaly: isAnomaly,
     isFrozen: isFrozen,
@@ -282,6 +287,7 @@ class MatchModel {
     teamSize: normalizeMatchTeamSize(m.teamSize),
     isOrganized: m.isOrganized,
     tournamentId: m.tournamentId,
+    challengeId: m.challengeId,
     isGoldenRating: m.isGoldenRating,
     isAnomaly: m.isAnomaly,
     isFrozen: m.isFrozen,

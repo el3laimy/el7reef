@@ -3,8 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:el7reef/core/constants/firebase_paths.dart';
 import 'package:el7reef/core/enums/fantasy_league_phase.dart';
-import 'package:el7reef/core/services/fantasy_lifecycle_service.dart';
-import 'package:el7reef/core/services/fantasy_round_settlement_service.dart';
+import 'package:el7reef/features/fantasy/services/fantasy_lifecycle_service.dart';
+import 'package:el7reef/features/fantasy/services/fantasy_round_settlement_service.dart';
 import 'package:el7reef/data/repositories/fantasy_lifecycle_repository_impl.dart';
 import 'package:el7reef/data/repositories/fantasy_round_settlement_repository_impl.dart';
 import 'package:el7reef/data/repositories/tournament_repository_impl.dart';
@@ -23,7 +23,7 @@ void main() {
     setUp(() {
       firestore = FakeFirebaseFirestore();
       lifecycleService = FantasyLifecycleService(
-        lifecycleRepository: FantasyLifecycleRepositoryImpl(db: firestore),
+        lifecycleRepository: FantasyLifecycleRepositoryImpl(firestore: firestore),
         tournamentRepository: TournamentRepositoryImpl(db: firestore),
       );
       settlementService = FantasyRoundSettlementService(

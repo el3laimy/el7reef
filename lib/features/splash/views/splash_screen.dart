@@ -7,7 +7,7 @@ import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/app_logger.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 
 /// شاشة البداية — Splash Screen
 class SplashScreen extends StatefulWidget {

@@ -77,6 +77,7 @@ class TournamentLifecycleService {
   }) async {
     final effectiveNow = now ?? DateTime.now();
     final tournament = await _loadTournament(tournamentId);
+    _assertTournamentOrganizer(tournament: tournament, actorId: actorId);
     final participants = await _participantService.getTournamentParticipants(
       tournamentId,
     );
@@ -124,6 +125,7 @@ class TournamentLifecycleService {
   }) async {
     final effectiveNow = now ?? DateTime.now();
     final tournament = await _loadTournament(tournamentId);
+    _assertTournamentOrganizer(tournament: tournament, actorId: actorId);
     if (tournament.currentGroupStageId != null &&
         tournament.currentGroupStageId!.isNotEmpty) {
       final groups = await _loadGroups(
@@ -200,6 +202,7 @@ class TournamentLifecycleService {
   }) async {
     final effectiveNow = now ?? DateTime.now();
     final tournament = await _loadTournament(tournamentId);
+    _assertTournamentOrganizer(tournament: tournament, actorId: actorId);
     final fixtures = await _loadMatches(tournamentId: tournamentId);
     final publishedFixtures = fixtures
         .where((fixture) => fixture.fixtureStatus != FixtureStatus.published)
@@ -242,6 +245,7 @@ class TournamentLifecycleService {
   }) async {
     final effectiveNow = now ?? DateTime.now();
     final tournament = await _loadTournament(tournamentId);
+    _assertTournamentOrganizer(tournament: tournament, actorId: actorId);
     if (tournament.currentKnockoutBracketId != null &&
         tournament.currentKnockoutBracketId!.isNotEmpty) {
       final bracket = await _loadBracket(tournament.currentKnockoutBracketId!);
@@ -270,6 +274,7 @@ class TournamentLifecycleService {
         ? const <GroupStandingSnapshot>[]
         : await refreshGroupStandings(
             tournamentId: tournamentId,
+            actorId: actorId,
             now: effectiveNow,
           );
     final buildResult = _knockoutBuilder.build(
@@ -317,10 +322,15 @@ class TournamentLifecycleService {
 
   Future<List<GroupStandingSnapshot>> refreshGroupStandings({
     required String tournamentId,
+    String? actorId,
     DateTime? now,
   }) async {
     final effectiveNow = now ?? DateTime.now();
     final tournament = await _loadTournament(tournamentId);
+    _assertTournamentOrganizerIfProvided(
+      tournament: tournament,
+      actorId: actorId,
+    );
     if (tournament.currentGroupStageId == null ||
         tournament.currentGroupStageId!.isEmpty) {
       return const <GroupStandingSnapshot>[];
@@ -394,10 +404,15 @@ class TournamentLifecycleService {
 
   Future<KnockoutProgressResult?> refreshKnockoutProgress({
     required String tournamentId,
+    String? actorId,
     DateTime? now,
   }) async {
     final effectiveNow = now ?? DateTime.now();
     final tournament = await _loadTournament(tournamentId);
+    _assertTournamentOrganizerIfProvided(
+      tournament: tournament,
+      actorId: actorId,
+    );
     final bracketId = tournament.currentKnockoutBracketId;
     if (bracketId == null || bracketId.isEmpty) {
       return null;
@@ -511,9 +526,19 @@ class TournamentLifecycleService {
     DateTime? now,
   }) async {
     final effectiveNow = now ?? DateTime.now();
-    await refreshGroupStandings(tournamentId: tournamentId, now: effectiveNow);
+    final tournamentForGuard = await _loadTournament(tournamentId);
+    _assertTournamentOrganizer(
+      tournament: tournamentForGuard,
+      actorId: actorId,
+    );
+    await refreshGroupStandings(
+      tournamentId: tournamentId,
+      actorId: actorId,
+      now: effectiveNow,
+    );
     await refreshKnockoutProgress(
       tournamentId: tournamentId,
+      actorId: actorId,
       now: effectiveNow,
     );
     final tournament = await _loadTournament(tournamentId);
@@ -553,6 +578,29 @@ class TournamentLifecycleService {
       throw Exception('تعذر العثور على البطولة المطلوبة.');
     }
     return TournamentModel.fromJson(snapshot.data()!, snapshot.id).toEntity();
+  }
+
+  void _assertTournamentOrganizer({
+    required Tournament tournament,
+    required String actorId,
+  }) {
+    final normalizedActorId = actorId.trim();
+    if (normalizedActorId.isEmpty) {
+      throw Exception('يجب تسجيل الدخول أولاً.');
+    }
+    if (tournament.organizerId != normalizedActorId) {
+      throw Exception('لا تملك صلاحية إدارة هذه البطولة.');
+    }
+  }
+
+  void _assertTournamentOrganizerIfProvided({
+    required Tournament tournament,
+    required String? actorId,
+  }) {
+    if (actorId == null) {
+      return;
+    }
+    _assertTournamentOrganizer(tournament: tournament, actorId: actorId);
   }
 
   Future<List<TournamentGroup>> _loadGroups({

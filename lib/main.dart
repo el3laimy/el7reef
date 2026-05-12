@@ -2,17 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:get/get.dart';
-// تم حذف سطر استدعاء firebase_options.dart القديم
 import 'app/theme/app_theme.dart';
 import 'app/routes/app_pages.dart';
-import 'services/auth_service.dart';
+import 'firebase_options.dart';
+import 'core/auth/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ── تهيئة Firebase (بدون الاعتماد على الإعدادات القديمة) ──
   if (Firebase.apps.isEmpty) {
-    await Firebase.initializeApp(); // سطر واحد فقط نظيف
+    FirebaseOptions? options;
+    try {
+      options = DefaultFirebaseOptions.currentPlatform;
+    } catch (_) {
+      options = null;
+    }
+    await Firebase.initializeApp(options: options);
   }
 
   // ── تسجيل الخدمات الأساسية ──

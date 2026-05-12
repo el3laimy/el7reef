@@ -345,6 +345,7 @@ MatchResultLineupController _controller() {
     ),
     matchEventService: MatchEventService(
       repository: MatchEventRepositoryImpl(firestore: firestore),
+      firestore: firestore,
     ),
     tournamentRepository: TournamentRepositoryImpl(db: firestore),
   );
@@ -362,6 +363,7 @@ _NoopMatchResultLineupController _screenController() {
     ),
     matchEventService: MatchEventService(
       repository: MatchEventRepositoryImpl(firestore: firestore),
+      firestore: firestore,
     ),
     tournamentRepository: TournamentRepositoryImpl(db: firestore),
   );

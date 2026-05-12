@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:el7reef/core/enums/fantasy_league_phase.dart';
-import 'package:el7reef/core/services/chip_manager_service.dart';
+import 'package:el7reef/features/fantasy/services/chip_manager_service.dart';
 import 'package:el7reef/domain/entities/fantasy_chip.dart';
 import 'package:el7reef/domain/entities/fantasy_league_lifecycle.dart';
 import 'package:el7reef/domain/entities/fantasy_team.dart';

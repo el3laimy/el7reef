@@ -3,24 +3,36 @@ import '../../core/constants/firebase_paths.dart';
 
 /// خدمة Username — RULE-01: فريد عالمياً + حجز القديم 14 يوماً
 class UsernameService {
-  final FirebaseFirestore _db;
+  final FirebaseFirestore _firestore;
 
-  UsernameService({FirebaseFirestore? db})
-      : _db = db ?? FirebaseFirestore.instance;
+  UsernameService({FirebaseFirestore? db, FirebaseFirestore? firestore})
+    : _firestore = firestore ?? db ?? FirebaseFirestore.instance;
 
   // ── الكلمات المحجوزة من الوثيقة ──
   static const _reservedWords = {
-    'admin', 'support', '7reef', 'el7reef', 'elharif', 'الحريف',
-    'moderator', 'official', 'system', 'bot', 'help', 'info',
-    'staff', 'team', 'null', 'undefined',
+    'admin',
+    'support',
+    '7reef',
+    'el7reef',
+    'elharif',
+    'الحريف',
+    'moderator',
+    'official',
+    'system',
+    'bot',
+    'help',
+    'info',
+    'staff',
+    'team',
+    'null',
+    'undefined',
   };
 
   // ── RegExp من الوثيقة ──
   // 3-20 حرف: a-z | 0-9 | _ | .
   // لا يبدأ أو ينتهي بـ _ أو .
   // لا .. أو __ أو ._ أو _. متتاليتان
-  static final _usernameRegex =
-      RegExp(r'^[a-z0-9]([a-z0-9._]*[a-z0-9])?$');
+  static final _usernameRegex = RegExp(r'^[a-z0-9]([a-z0-9._]*[a-z0-9])?$');
   static final _consecutiveSpecialRegex = RegExp(r'[._]{2}');
 
   /// التحقق من صحة الـ Username محلياً
@@ -50,7 +62,7 @@ class UsernameService {
     final lower = username.toLowerCase().trim();
 
     // فحص 1: هل هو مستخدم حالياً؟
-    final activeSnap = await _db
+    final activeSnap = await _firestore
         .collection(FirebasePaths.players)
         .where('usernameLower', isEqualTo: lower)
         .limit(1)
@@ -62,7 +74,7 @@ class UsernameService {
     }
 
     // فحص 2: هل هو محجوز (تم تغييره مؤخراً)؟
-    final reservedSnap = await _db
+    final reservedSnap = await _firestore
         .collection(FirebasePaths.reservedUsernames)
         .doc(lower)
         .get();
@@ -99,16 +111,19 @@ class UsernameService {
     }
 
     try {
-      await _db.runTransaction((transaction) async {
+      await _firestore.runTransaction((transaction) async {
         final now = DateTime.now();
-        final playerRef = _db.collection(FirebasePaths.players).doc(playerId);
+        final playerRef = _firestore
+            .collection(FirebasePaths.players)
+            .doc(playerId);
         final playerSnapshot = await transaction.get(playerRef);
         if (!playerSnapshot.exists) {
           throw StateError('player-not-found');
         }
 
-        final usernameRef =
-            _db.collection(FirebasePaths.reservedUsernames).doc(lower);
+        final usernameRef = _firestore
+            .collection(FirebasePaths.reservedUsernames)
+            .doc(lower);
         final usernameSnapshot = await transaction.get(usernameRef);
         if (usernameSnapshot.exists) {
           final isClaimable = _canClaimUsername(
@@ -135,8 +150,9 @@ class UsernameService {
         });
 
         if (oldLower != null && oldLower.isNotEmpty) {
-          final reservedRef =
-              _db.collection(FirebasePaths.reservedUsernames).doc(oldLower);
+          final reservedRef = _firestore
+              .collection(FirebasePaths.reservedUsernames)
+              .doc(oldLower);
           transaction.set(reservedRef, {
             'username': oldLower,
             'ownerId': playerId,
@@ -200,18 +216,11 @@ enum UsernameValidationResult {
     valid => '',
     tooShort => 'الـ Username قصير جداً — ٣ أحرف على الأقل',
     tooLong => 'الـ Username طويل جداً — ٢٠ حرف كحد أقصى',
-    invalidChars =>
-      'أحرف غير مسموحة — استخدم: a-z أو 0-9 أو _ أو .',
-    consecutiveSpecial =>
-      'لا يمكن استخدام _ أو . متتاليتان',
+    invalidChars => 'أحرف غير مسموحة — استخدم: a-z أو 0-9 أو _ أو .',
+    consecutiveSpecial => 'لا يمكن استخدام _ أو . متتاليتان',
     reserved => 'هذا الـ Username محجوز ولا يمكن استخدامه',
   };
 }
 
 /// نتيجة حفظ الـ Username
-enum UsernameSetResult {
-  success,
-  validationFailed,
-  taken,
-  error;
-}
+enum UsernameSetResult { success, validationFailed, taken, error }

@@ -2,10 +2,10 @@ import 'package:get/get.dart';
 
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/enums/fantasy_league_phase.dart';
-import '../../../../core/services/fantasy_lifecycle_service.dart';
-import '../../../../core/services/fantasy_market_service.dart';
-import '../../../../core/services/fantasy_transfer_policy_service.dart';
-import '../../../../core/services/transfer_engine.dart';
+import '../../services/fantasy_lifecycle_service.dart';
+import '../../services/fantasy_market_service.dart';
+import '../../services/fantasy_transfer_policy_service.dart';
+import '../../services/transfer_engine.dart';
 import '../../../../data/repositories/fantasy_lifecycle_repository_impl.dart';
 import '../../../../data/repositories/fantasy_repository_impl.dart';
 import '../../../../data/repositories/tournament_repository_impl.dart';

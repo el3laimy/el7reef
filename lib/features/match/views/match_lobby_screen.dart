@@ -7,16 +7,14 @@ import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/enums/match_status.dart';
 import '../../../core/lineup/formation_library.dart';
-import '../../../core/services/match_start_service.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../core/widgets/qr_code_widget.dart';
 import '../../../domain/entities/match_side_player.dart';
-import '../../../domain/entities/player.dart';
 import '../controllers/match_lobby_controller.dart';
 import '../models/friendly_match_side_view.dart';
 import '../widgets/invite_friends_sheet.dart';
 import '../widgets/match_formation_section.dart';
-import '../../social/controllers/friend_controller.dart';
+import '../widgets/match_lobby_widgets.dart';
 
 /// شاشة لوبي المباراة — مركز العمليات الشامل (Match Dashboard)
 class MatchLobbyScreen extends GetView<MatchLobbyController> {
@@ -125,7 +123,7 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                               ),
                               tooltip: 'إعدادات المباراة',
                             ),
-                          _StatusChip(status: match.status),
+                          StatusChip(status: match.status),
                         ],
                       ).animate().fadeIn(duration: 400.ms),
                     ),
@@ -134,7 +132,7 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                   // ── Readiness Stepper ──
                   if (isStartableStatus && controller.isOrganizer)
                     SliverToBoxAdapter(
-                      child: _ReadinessStepper(
+                      child: ReadinessStepper(
                         readiness: readiness,
                       ).animate().fadeIn(delay: 150.ms).slideY(begin: 0.05),
                     ),
@@ -214,7 +212,7 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
 
                   // ── فريق A (Collapsible) ──
                   SliverToBoxAdapter(
-                    child: _CollapsibleTeamSection(
+                    child: CollapsibleTeamSection(
                       sideView: sideA,
                       players: controller.teamAPlayers,
                       side: 'A',
@@ -229,7 +227,7 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                           : () => _showRenameTemporarySide(context, sideA),
                       onAdd: () {
                         Get.bottomSheet(
-                          _RegisteredPlayerPickerSheet(
+                          RegisteredPlayerPickerSheet(
                             lobbyController: controller,
                             sideKey: 'A',
                           ),
@@ -262,7 +260,7 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
 
                   // ── فريق B (Collapsible) ──
                   SliverToBoxAdapter(
-                    child: _CollapsibleTeamSection(
+                    child: CollapsibleTeamSection(
                       sideView: sideB,
                       players: controller.teamBPlayers,
                       side: 'B',
@@ -277,7 +275,7 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                           : () => _showRenameTemporarySide(context, sideB),
                       onAdd: () {
                         Get.bottomSheet(
-                          _RegisteredPlayerPickerSheet(
+                          RegisteredPlayerPickerSheet(
                             lobbyController: controller,
                             sideKey: 'B',
                           ),
@@ -463,7 +461,7 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
     }
 
     Get.bottomSheet(
-      _StartWithoutLineupNudgeSheet(
+      StartWithoutLineupNudgeSheet(
         sideA: sideA,
         sideB: sideB,
         onStartWithoutLineup: () async {
@@ -662,76 +660,7 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
   }
 }
 
-class _StartWithoutLineupNudgeSheet extends StatelessWidget {
-  final FriendlyMatchSideView? sideA;
-  final FriendlyMatchSideView? sideB;
-  final Future<void> Function() onStartWithoutLineup;
-  final Future<void> Function(FriendlyMatchSideView side) onCreateLineup;
 
-  const _StartWithoutLineupNudgeSheet({
-    required this.sideA,
-    required this.sideB,
-    required this.onStartWithoutLineup,
-    required this.onCreateLineup,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final lineupSides = [sideA, sideB]
-        .whereType<FriendlyMatchSideView>()
-        .where((side) => side.playerCount > 0)
-        .toList(growable: false);
-
-    return SafeArea(
-      child: Container(
-        padding: const EdgeInsets.all(AppDimensions.lg),
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppDimensions.radiusXl),
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('تبدأ من غير تشكيلة؟', style: AppTextStyles.headlineSmall),
-            const SizedBox(height: AppDimensions.sm),
-            Text(
-              'التشكيلة اختيارية، لكنها تخلي الماتش شكله احترافي وتقدر تشاركها مع اللاعبين.',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-            if (lineupSides.isNotEmpty) ...[
-              const SizedBox(height: AppDimensions.lg),
-              ...lineupSides.map(
-                (side) => Padding(
-                  padding: const EdgeInsets.only(bottom: AppDimensions.sm),
-                  child: FilledButton.icon(
-                    onPressed: () => onCreateLineup(side),
-                    icon: const Icon(Icons.sports_soccer_rounded),
-                    label: Text('اعمل تشكيلة ${side.displayName}'),
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: AppDimensions.sm),
-            OutlinedButton.icon(
-              onPressed: onStartWithoutLineup,
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: const Text('ابدأ بدون تشكيلة'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.warning,
-                side: const BorderSide(color: AppColors.warning),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 FriendlyMatchSideView? _sideViewFor(
   Iterable<FriendlyMatchSideView> sides,
@@ -743,80 +672,7 @@ FriendlyMatchSideView? _sideViewFor(
   return null;
 }
 
-/// ── Readiness Stepper ──
-/// Shows why the match can't start yet, or confirms it's ready.
-class _ReadinessStepper extends StatelessWidget {
-  final MatchStartReadiness readiness;
 
-  const _ReadinessStepper({required this.readiness});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimensions.pagePadding,
-      ),
-      child: GlassmorphicContainer(
-        padding: const EdgeInsets.all(AppDimensions.md),
-        borderRadius: AppDimensions.radiusLg,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  readiness.canStart
-                      ? Icons.check_circle_rounded
-                      : Icons.info_outline_rounded,
-                  color: readiness.canStart
-                      ? AppColors.success
-                      : AppColors.warning,
-                  size: 20,
-                ),
-                const SizedBox(width: AppDimensions.sm),
-                Text(
-                  readiness.canStart ? 'جاهز للبدء ✅' : 'متطلبات البدء',
-                  style: AppTextStyles.titleMedium.copyWith(
-                    color: readiness.canStart
-                        ? AppColors.success
-                        : AppColors.warning,
-                  ),
-                ),
-              ],
-            ),
-            if (!readiness.canStart) ...[
-              const SizedBox(height: AppDimensions.sm),
-              ...readiness.blockedReasons.map(
-                (reason) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.block_rounded,
-                        size: 14,
-                        color: AppColors.error,
-                      ),
-                      const SizedBox(width: AppDimensions.xs),
-                      Expanded(
-                        child: Text(
-                          reason,
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 /// ── Settings Sheet ──
 class _MatchSettingsSheet extends StatelessWidget {
@@ -912,622 +768,6 @@ class _MatchSettingsSheet extends StatelessWidget {
             child: const Text('تأكيد'),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// ── Collapsible Team Section ──
-class _CollapsibleTeamSection extends StatefulWidget {
-  final FriendlyMatchSideView? sideView;
-  final RxList<Player> players;
-  final String side;
-  final bool isOrganizer;
-  final bool isOpen;
-  final String matchId;
-  final void Function(String playerId) onRemove;
-  final VoidCallback? onRename;
-  final VoidCallback onAdd;
-  final VoidCallback onAddTemporary;
-  final VoidCallback onInvite;
-  final void Function(MatchSidePlayer player) onEditTemporary;
-  final void Function(MatchSidePlayer player) onRemoveTemporary;
-  final void Function(MatchSidePlayer player) onInviteTemporary;
-
-  const _CollapsibleTeamSection({
-    required this.sideView,
-    required this.players,
-    required this.side,
-    required this.isOrganizer,
-    required this.isOpen,
-    required this.matchId,
-    required this.onRemove,
-    required this.onRename,
-    required this.onAdd,
-    required this.onAddTemporary,
-    required this.onInvite,
-    required this.onEditTemporary,
-    required this.onRemoveTemporary,
-    required this.onInviteTemporary,
-  });
-
-  @override
-  State<_CollapsibleTeamSection> createState() =>
-      _CollapsibleTeamSectionState();
-}
-
-class _CollapsibleTeamSectionState extends State<_CollapsibleTeamSection> {
-  bool _expanded = true;
-
-  @override
-  Widget build(BuildContext context) {
-    final sideView =
-        widget.sideView ??
-        FriendlyMatchSideView(
-          sideKey: widget.side,
-          displayName: 'فريق ${widget.side}',
-          officialTeamId: null,
-          playerIds: const [],
-        );
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimensions.pagePadding,
-      ),
-      child: GlassmorphicContainer(
-        padding: const EdgeInsets.all(AppDimensions.md),
-        borderRadius: AppDimensions.radiusLg,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            InkWell(
-              onTap: () => setState(() => _expanded = !_expanded),
-              borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          sideView.displayName,
-                          style: AppTextStyles.titleLarge,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: AppDimensions.sm),
-                      _SideBadge(isOfficial: sideView.isOfficialTeam),
-                      const SizedBox(width: AppDimensions.sm),
-                      Obx(
-                        () => Text(
-                          '${widget.players.length + sideView.temporaryCount} لاعب',
-                          style: AppTextStyles.labelMedium.copyWith(
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      AnimatedRotation(
-                        turns: _expanded ? 0 : -0.25,
-                        duration: const Duration(milliseconds: 200),
-                        child: const Icon(
-                          Icons.expand_more_rounded,
-                          color: AppColors.textMuted,
-                          size: 20,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (widget.isOrganizer) ...[
-                    const SizedBox(height: AppDimensions.xs),
-                    Text(
-                      'أنت منظم المباراة',
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: AppColors.primaryLight,
-                      ),
-                    ),
-                    if (sideView.temporaryCount > 0) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        '${sideView.registeredCount} مسجل • ${sideView.temporaryCount} مؤقت',
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                    ],
-                  ],
-                ],
-              ),
-            ),
-            if (widget.isOpen && widget.isOrganizer) ...[
-              const SizedBox(height: AppDimensions.sm),
-              Wrap(
-                spacing: AppDimensions.xs,
-                runSpacing: AppDimensions.xs,
-                children: [
-                  TextButton.icon(
-                    onPressed: widget.onAdd,
-                    icon: const Icon(Icons.person_add_alt_1, size: 18),
-                    label: const Text('أضف لاعب مسجل'),
-                  ),
-                  TextButton.icon(
-                    onPressed: widget.onAddTemporary,
-                    icon: const Icon(Icons.badge_outlined, size: 18),
-                    label: const Text('أضف لاعب مؤقت'),
-                  ),
-                  TextButton.icon(
-                    onPressed: widget.onInvite,
-                    icon: const Icon(Icons.ios_share_rounded, size: 18),
-                    label: const Text('ادعُ صديق'),
-                  ),
-                  if (sideView.canOpenOfficialLineup)
-                    TextButton.icon(
-                      onPressed: () => Get.toNamed(
-                        AppRoutes.teamLineupEditorForMatch(
-                          matchId: widget.matchId,
-                          teamId: sideView.officialTeamId!,
-                        ),
-                      ),
-                      icon: const Icon(Icons.sports_soccer_rounded, size: 18),
-                      label: const Text('التشكيلة'),
-                    )
-                  else if (sideView.playerCount > 0)
-                    TextButton.icon(
-                      onPressed: () => Get.toNamed(
-                        AppRoutes.matchSideLineupEditorForMatch(
-                          matchId: widget.matchId,
-                          sideKey: sideView.sideKey,
-                        ),
-                      ),
-                      icon: const Icon(Icons.sports_soccer_rounded, size: 18),
-                      label: const Text('تعديل التشكيلة'),
-                    )
-                  else
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppDimensions.sm,
-                        vertical: AppDimensions.xs,
-                      ),
-                      child: Text(
-                        'أضف لاعبين أولًا',
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                    ),
-                  if (sideView.canEditName)
-                    TextButton.icon(
-                      onPressed: widget.onRename,
-                      icon: const Icon(Icons.edit_rounded, size: 18),
-                      label: const Text('تسمية الفريق'),
-                    ),
-                ],
-              ),
-            ],
-            AnimatedCrossFade(
-              firstChild: _buildPlayerList(sideView),
-              secondChild: const SizedBox.shrink(),
-              crossFadeState: _expanded
-                  ? CrossFadeState.showFirst
-                  : CrossFadeState.showSecond,
-              duration: const Duration(milliseconds: 250),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPlayerList(FriendlyMatchSideView sideView) {
-    return Obx(() {
-      if (widget.players.isEmpty && sideView.temporaryPlayers.isEmpty) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppDimensions.md),
-          child: Center(
-            child: Text(
-              'لا يوجد لاعبين بعد',
-              style: AppTextStyles.bodySmall.copyWith(
-                color: AppColors.textMuted,
-              ),
-            ),
-          ),
-        );
-      }
-      return Column(
-        children: [
-          const SizedBox(height: AppDimensions.sm),
-          ...widget.players.map(
-            (player) => _PlayerTile(
-              player: player,
-              canRemove: widget.isOrganizer && widget.isOpen,
-              onRemove: () => widget.onRemove(player.id),
-            ),
-          ),
-          ...sideView.temporaryPlayers.map(
-            (player) => _TemporaryPlayerTile(
-              player: player,
-              canManage: widget.isOrganizer && widget.isOpen,
-              onEdit: () => widget.onEditTemporary(player),
-              onRemove: () => widget.onRemoveTemporary(player),
-              onInvite: () => widget.onInviteTemporary(player),
-            ),
-          ),
-        ],
-      );
-    });
-  }
-}
-
-class _SideBadge extends StatelessWidget {
-  final bool isOfficial;
-
-  const _SideBadge({required this.isOfficial});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isOfficial ? AppColors.primary : AppColors.warning;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
-      ),
-      child: Text(
-        isOfficial ? 'رسمي' : 'مؤقت',
-        style: AppTextStyles.labelSmall.copyWith(color: color),
-      ),
-    );
-  }
-}
-
-class _RegisteredPlayerPickerSheet extends StatelessWidget {
-  final MatchLobbyController lobbyController;
-  final String sideKey;
-
-  const _RegisteredPlayerPickerSheet({
-    required this.lobbyController,
-    required this.sideKey,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final friendController = Get.find<FriendController>();
-
-    return SafeArea(
-      child: Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        padding: const EdgeInsets.all(AppDimensions.lg),
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppDimensions.radiusXl),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceBorder,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppDimensions.lg),
-            Text(
-              'أضف لاعبًا مسجلًا لفريق $sideKey',
-              style: AppTextStyles.headlineMedium,
-            ),
-            const SizedBox(height: AppDimensions.xs),
-            Text(
-              'الإضافة هنا تخص هذه المباراة فقط ولا تعدّل عضوية أي فريق رسمي.',
-              style: AppTextStyles.bodySmall.copyWith(
-                color: AppColors.textMuted,
-              ),
-            ),
-            const SizedBox(height: AppDimensions.md),
-            Expanded(
-              child: Obx(() {
-                if (friendController.isLoading.value &&
-                    friendController.friends.isEmpty) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  );
-                }
-
-                if (friendController.friends.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'لا يوجد لديك أصدقاء بعد',
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  );
-                }
-
-                final currentUserId = friendController.currentUserId;
-                if (currentUserId == null || currentUserId.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'سجّل الدخول أولًا لإضافة لاعب مسجل.',
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  itemCount: friendController.friends.length,
-                  itemBuilder: (context, index) {
-                    final friendship = friendController.friends[index];
-                    final friendId = friendship.getOtherUserId(currentUserId);
-                    final friendProfile =
-                        friendController.friendProfiles[friendId];
-                    if (friendProfile == null) {
-                      return const SizedBox.shrink();
-                    }
-
-                    final inTeamA = lobbyController.teamAPlayers.any(
-                      (player) => player.id == friendId,
-                    );
-                    final inTeamB = lobbyController.teamBPlayers.any(
-                      (player) => player.id == friendId,
-                    );
-                    final isAlreadyInTarget = sideKey == 'A'
-                        ? inTeamA
-                        : inTeamB;
-                    final isInOpposite = sideKey == 'A' ? inTeamB : inTeamA;
-
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: CircleAvatar(
-                        backgroundColor: AppColors.primarySurface,
-                        backgroundImage: friendProfile.photoThumbUrl != null
-                            ? NetworkImage(friendProfile.photoThumbUrl!)
-                            : null,
-                        child: friendProfile.photoThumbUrl == null
-                            ? const Icon(Icons.person, color: AppColors.primary)
-                            : null,
-                      ),
-                      title: Text(
-                        friendProfile.name,
-                        style: AppTextStyles.titleMedium,
-                      ),
-                      subtitle: Text(
-                        friendProfile.username == null
-                            ? 'لاعب مسجل'
-                            : '@${friendProfile.username}',
-                        style: AppTextStyles.labelSmall,
-                      ),
-                      trailing: isAlreadyInTarget
-                          ? Text(
-                              'موجود',
-                              style: AppTextStyles.labelMedium.copyWith(
-                                color: AppColors.success,
-                              ),
-                            )
-                          : isInOpposite
-                          ? Text(
-                              'في الفريق الآخر',
-                              style: AppTextStyles.labelMedium.copyWith(
-                                color: AppColors.warning,
-                              ),
-                            )
-                          : TextButton(
-                              onPressed: () =>
-                                  lobbyController.addRegisteredPlayerToSide(
-                                    playerId: friendId,
-                                    sideKey: sideKey,
-                                  ),
-                              child: const Text('إضافة'),
-                            ),
-                    );
-                  },
-                );
-              }),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// ── بطاقة لاعب ──
-class _PlayerTile extends StatelessWidget {
-  final Player player;
-  final bool canRemove;
-  final VoidCallback onRemove;
-
-  const _PlayerTile({
-    required this.player,
-    required this.canRemove,
-    required this.onRemove,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: AppColors.primarySurface,
-            backgroundImage: player.photoThumbUrl != null
-                ? NetworkImage(player.photoThumbUrl!)
-                : null,
-            child: player.photoThumbUrl == null
-                ? const Icon(Icons.person, size: 18, color: AppColors.primary)
-                : null,
-          ),
-          const SizedBox(width: AppDimensions.sm),
-          Expanded(child: Text(player.name, style: AppTextStyles.bodyMedium)),
-          if (canRemove)
-            IconButton(
-              onPressed: onRemove,
-              icon: const Icon(
-                Icons.remove_circle_outline,
-                size: 20,
-                color: AppColors.error,
-              ),
-              tooltip: 'إزالة',
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TemporaryPlayerTile extends StatelessWidget {
-  final MatchSidePlayer player;
-  final bool canManage;
-  final VoidCallback? onEdit;
-  final VoidCallback? onRemove;
-  final VoidCallback? onInvite;
-
-  const _TemporaryPlayerTile({
-    required this.player,
-    this.canManage = false,
-    this.onEdit,
-    this.onRemove,
-    this.onInvite,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final details = <String>[
-      if (player.position != null && player.position!.isNotEmpty)
-        player.position!,
-      if (player.shirtNumber != null) '#${player.shirtNumber}',
-      'مؤقت',
-    ].join(' • ');
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: AppColors.warning.withValues(alpha: 0.16),
-            child: const Icon(
-              Icons.badge_outlined,
-              size: 18,
-              color: AppColors.warning,
-            ),
-          ),
-          const SizedBox(width: AppDimensions.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  player.displayName,
-                  style: AppTextStyles.bodyMedium,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  details,
-                  style: AppTextStyles.labelSmall.copyWith(
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (canManage)
-            PopupMenuButton<String>(
-              icon: const Icon(
-                Icons.more_vert_rounded,
-                size: 20,
-                color: AppColors.textMuted,
-              ),
-              tooltip: 'خيارات',
-              onSelected: (value) {
-                switch (value) {
-                  case 'edit':
-                    onEdit?.call();
-                  case 'remove':
-                    onRemove?.call();
-                  case 'invite':
-                    onInvite?.call();
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit_rounded, size: 18),
-                      SizedBox(width: 8),
-                      Text('تعديل'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'invite',
-                  child: Row(
-                    children: [
-                      Icon(Icons.person_add_alt_1_rounded, size: 18),
-                      SizedBox(width: 8),
-                      Text('ادعُه يسجل'),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'remove',
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.remove_circle_outline,
-                        size: 18,
-                        color: AppColors.error,
-                      ),
-                      const SizedBox(width: 8),
-                      Text('حذف', style: TextStyle(color: AppColors.error)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// ── Badge حالة المباراة ──
-class _StatusChip extends StatelessWidget {
-  final MatchStatus status;
-  const _StatusChip({required this.status});
-
-  @override
-  Widget build(BuildContext context) {
-    final (Color color, String label) = switch (status) {
-      MatchStatus.open => (AppColors.success, '🟢 مفتوحة'),
-      MatchStatus.live => (AppColors.primary, '🔵 جارية'),
-      MatchStatus.completed => (AppColors.secondary, '✅ منتهية'),
-      MatchStatus.cancelled => (AppColors.error, '❌ ملغاة'),
-      _ => (AppColors.textMuted, '⏸ أخرى'),
-    };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
-      ),
-      child: Text(
-        label,
-        style: AppTextStyles.labelSmall.copyWith(color: color),
       ),
     );
   }

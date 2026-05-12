@@ -7,7 +7,7 @@ import '../../../data/repositories/claim_code_repository_impl.dart';
 import '../../../data/repositories/player_repository_impl.dart';
 import '../../../data/repositories/team_membership_repository_impl.dart';
 import '../../../data/repositories/team_repository_impl.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 import '../controllers/team_invite_entry_controller.dart';
 
 class TeamInviteEntryBinding extends Bindings {

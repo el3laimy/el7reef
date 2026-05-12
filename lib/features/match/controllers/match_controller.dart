@@ -10,7 +10,7 @@ import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
 import '../../../data/repositories/match_repository_impl.dart';
 import '../../../data/repositories/match_side_player_repository_impl.dart';
 import '../../../domain/entities/match.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 
 class MatchTemporaryParticipantCounts {
   final int teamA;

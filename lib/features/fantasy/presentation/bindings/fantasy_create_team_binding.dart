@@ -1,12 +1,12 @@
 import 'package:get/get.dart';
 
 import '../../../../core/auth/auth_service_session.dart';
-import '../../../../core/services/fantasy_lifecycle_service.dart';
-import '../../../../core/services/fantasy_market_service.dart';
+import '../../services/fantasy_lifecycle_service.dart';
+import '../../services/fantasy_market_service.dart';
 import '../../../../data/repositories/fantasy_lifecycle_repository_impl.dart';
 import '../../../../data/repositories/fantasy_repository_impl.dart';
 import '../../../../data/repositories/tournament_repository_impl.dart';
-import '../../../../services/auth_service.dart';
+import '../../../../core/auth/auth_service.dart';
 import '../controllers/fantasy_create_team_controller.dart';
 
 class FantasyCreateTeamBinding extends Bindings {

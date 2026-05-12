@@ -6,7 +6,7 @@ import '../../../core/services/guest_claim_service.dart';
 import '../../../data/repositories/claim_code_repository_impl.dart';
 import '../../../data/repositories/guest_team_repository_impl.dart';
 import '../../../data/repositories/team_repository_impl.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 import '../controllers/guest_team_claim_controller.dart';
 
 class GuestTeamClaimBinding extends Bindings {

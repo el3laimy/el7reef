@@ -24,6 +24,7 @@ import 'package:el7reef/data/repositories/match_side_repository_impl.dart';
 import 'package:el7reef/data/repositories/team_repository_impl.dart';
 import 'package:el7reef/domain/entities/guest_player.dart';
 import 'package:el7reef/domain/entities/match.dart';
+import 'package:el7reef/domain/entities/match_event.dart';
 import 'package:el7reef/domain/entities/match_lineup_entry.dart';
 import 'package:el7reef/domain/entities/match_lineup_snapshot.dart';
 import 'package:el7reef/domain/entities/match_participant_roster.dart';
@@ -32,6 +33,7 @@ import 'package:el7reef/domain/entities/participant_ref.dart';
 import 'package:el7reef/domain/entities/player.dart';
 import 'package:el7reef/domain/entities/player_match_stats.dart';
 import 'package:el7reef/features/match/controllers/score_submit_controller.dart';
+import 'package:el7reef/features/match/views/score_submit_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -253,6 +255,9 @@ void main() {
       expect(controller.allGoalDrafts.single.goals, 2);
       expect(controller.totalDraftGoalsForSide('A'), 2);
       expect(controller.totalDraftGoalsForSide('B'), 0);
+      expect(controller.totalTeamAGoals, 2);
+      expect(controller.teamAScoreController.text, '2');
+      expect(controller.playerStats['player-a']?['goals'], 2);
       controller.onClose();
     });
 
@@ -305,6 +310,8 @@ void main() {
       );
       expect(controller.allGoalDrafts.single.sideKey, 'A');
       expect(controller.totalDraftGoalsForSide('A'), 1);
+      expect(controller.totalTeamAGoals, 1);
+      expect(controller.teamAScoreController.text, '1');
       controller.onClose();
     });
 
@@ -340,8 +347,160 @@ void main() {
       expect(controller.allGoalDrafts.single.actor.id, 'temporary-scorer');
       expect(controller.allGoalDrafts.single.sideKey, 'B');
       expect(controller.totalDraftGoalsForSide('B'), 3);
+      expect(controller.totalTeamBGoals, 3);
+      expect(controller.teamBScoreController.text, '3');
       controller.onClose();
     });
+
+    test('mixed registered and guest goals contribute to side total', () async {
+      await _saveMatch(
+        firestore,
+        _match(id: 'match-mixed-goals', teamAPlayerIds: const ['player-a']),
+      );
+      await _savePlayer(firestore, _player(id: 'player-a', name: 'أحمد'));
+      await _saveGuestPlayer(
+        firestore,
+        GuestPlayer(
+          id: 'guest-a',
+          displayName: 'ضيف الفريق',
+          normalizedName: 'ضيف الفريق',
+          createdBy: 'organizer-1',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      await _saveLineupSnapshot(
+        firestore,
+        _snapshot(
+          id: 'snapshot-mixed-goals',
+          matchId: 'match-mixed-goals',
+          sideKey: 'A',
+          entries: [
+            _entry(
+              attendanceId: 'attendance-player-a',
+              playerId: 'player-a',
+              displayName: 'أحمد',
+            ),
+            _entry(
+              attendanceId: 'attendance-guest-a',
+              guestPlayerId: 'guest-a',
+              displayName: 'ضيف الفريق',
+            ),
+          ],
+        ),
+      );
+      final controller = _controller(
+        firestore: firestore,
+        matchId: 'match-mixed-goals',
+      );
+      await controller.loadMatchAndPlayers();
+
+      final registered = controller.teamAParticipants.firstWhere(
+        (participant) => participant.id == 'player-a',
+      );
+      final guest = controller.teamAParticipants.firstWhere(
+        (participant) => participant.id == 'guest-a',
+      );
+      controller.setParticipantGoals(registered, 1);
+      controller.setParticipantGoals(guest, 2);
+
+      expect(controller.totalDraftGoalsForSide('A'), 3);
+      expect(controller.totalTeamAGoals, 3);
+      expect(controller.teamAScoreController.text, '3');
+      expect(controller.playerStats['player-a']?['goals'], 1);
+      expect(controller.goalsForParticipant(guest), 2);
+      controller.onClose();
+    });
+
+    test(
+      'registered guest and match-side goals contribute to side total',
+      () async {
+        await _saveMatch(
+          firestore,
+          _match(
+            id: 'match-all-kind-goals',
+            teamAPlayerIds: const ['player-a'],
+          ),
+        );
+        await _savePlayer(firestore, _player(id: 'player-a', name: 'أحمد'));
+        await _saveGuestPlayer(
+          firestore,
+          GuestPlayer(
+            id: 'guest-a',
+            displayName: 'ضيف الفريق',
+            normalizedName: 'ضيف الفريق',
+            createdBy: 'organizer-1',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        await _saveMatchSidePlayer(
+          firestore,
+          MatchSidePlayer(
+            id: 'temporary-a',
+            matchId: 'match-all-kind-goals',
+            sideKey: 'A',
+            sideId: 'match-all-kind-goals_A',
+            kind: 'temporary',
+            displayName: 'لاعب قائمة',
+            ratingEligible: false,
+            addedBy: 'organizer-1',
+            createdAt: now,
+          ),
+        );
+        await _saveLineupSnapshot(
+          firestore,
+          _snapshot(
+            id: 'snapshot-all-kind-goals',
+            matchId: 'match-all-kind-goals',
+            sideKey: 'A',
+            entries: [
+              _entry(
+                attendanceId: 'attendance-player-a',
+                playerId: 'player-a',
+                displayName: 'أحمد',
+              ),
+              _entry(
+                attendanceId: 'attendance-guest-a',
+                guestPlayerId: 'guest-a',
+                displayName: 'ضيف الفريق',
+              ),
+              _entry(
+                attendanceId: 'attendance-temporary-a',
+                matchSidePlayerId: 'temporary-a',
+                displayName: 'لاعب قائمة',
+              ),
+            ],
+          ),
+        );
+        final controller = _controller(
+          firestore: firestore,
+          matchId: 'match-all-kind-goals',
+        );
+        await controller.loadMatchAndPlayers();
+
+        final registered = controller.teamAParticipants.firstWhere(
+          (participant) => participant.kind == ParticipantRefKind.player,
+        );
+        final guest = controller.teamAParticipants.firstWhere(
+          (participant) => participant.kind == ParticipantRefKind.guestPlayer,
+        );
+        final temporary = controller.teamAParticipants.firstWhere(
+          (participant) =>
+              participant.kind == ParticipantRefKind.matchSidePlayer,
+        );
+        controller.setParticipantGoals(registered, 1);
+        controller.setParticipantGoals(guest, 2);
+        controller.setParticipantGoals(temporary, 3);
+
+        expect(controller.totalDraftGoalsForSide('A'), 6);
+        expect(controller.teamAGoalSummary.attributedGoals, 6);
+        expect(controller.teamAGoalSummary.unattributedGoals, 0);
+        expect(controller.totalTeamAGoals, 6);
+        expect(controller.teamAScoreController.text, '6');
+        controller.onClose();
+      },
+    );
 
     test('ignores invalid goal draft participants safely', () async {
       await _saveMatch(
@@ -557,6 +716,82 @@ void main() {
     });
 
     testWidgets(
+      'guest-only tournament match can submit score, guest goals, and guest MVP',
+      (tester) async {
+        await tester.pumpWidget(const GetMaterialApp(home: SizedBox.shrink()));
+        await _saveTournament(firestore, 'tournament-guest-score');
+        await _saveMatch(
+          firestore,
+          _match(
+            id: 'match-tournament-guest-score',
+            tournamentId: 'tournament-guest-score',
+          ),
+        );
+        await _saveGuestPlayer(
+          firestore,
+          GuestPlayer(
+            id: 'guest-tournament-scorer',
+            displayName: 'ضيف البطولة',
+            normalizedName: 'ضيف البطولة',
+            createdBy: 'organizer-1',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        await _saveLineupSnapshot(
+          firestore,
+          _snapshot(
+            id: 'snapshot-tournament-guest-score',
+            matchId: 'match-tournament-guest-score',
+            sideKey: 'A',
+            entries: [
+              _entry(
+                attendanceId: 'attendance-tournament-guest',
+                guestPlayerId: 'guest-tournament-scorer',
+                displayName: 'ضيف البطولة',
+              ),
+            ],
+          ),
+        );
+        final controller = _controller(
+          firestore: firestore,
+          matchId: 'match-tournament-guest-score',
+        );
+        await controller.loadMatchAndPlayers();
+
+        controller.setParticipantGoals(controller.teamAParticipants.single, 2);
+        controller.selectMvp('guest-tournament-scorer');
+        final updatedMatch = await controller.submit();
+
+        expect(updatedMatch?.scoreTeamA, 2);
+        expect(updatedMatch?.scoreTeamB, 0);
+        expect(updatedMatch?.mvpPlayerId, 'guest-tournament-scorer');
+        final goals = await _activeGoalEvents(
+          firestore,
+          'match-tournament-guest-score',
+        );
+        expect(goals, hasLength(2));
+        for (final goal in goals) {
+          final actor = goal['actor'] as Map<String, dynamic>;
+          expect(goal['tournamentId'], 'tournament-guest-score');
+          expect(goal['sideKey'], 'A');
+          expect(actor['kind'], 'guestPlayer');
+          expect(actor['id'], 'guest-tournament-scorer');
+        }
+        final mvpEvents = await _activeMvpEvents(
+          firestore,
+          'match-tournament-guest-score',
+        );
+        final mvpActor = mvpEvents.single['actor'] as Map<String, dynamic>;
+        expect(mvpEvents.single['tournamentId'], 'tournament-guest-score');
+        expect(mvpActor['kind'], 'guestPlayer');
+        expect(mvpActor['id'], 'guest-tournament-scorer');
+        await _drainSnackbars(tester);
+        controller.onClose();
+      },
+    );
+
+    testWidgets(
       'submit with temporary match-side goal drafts writes goal MatchEvents',
       (tester) async {
         await tester.pumpWidget(const GetMaterialApp(home: SizedBox.shrink()));
@@ -635,6 +870,7 @@ void main() {
 
         expect(updatedMatch?.scoreTeamA, 2);
         expect(updatedMatch?.scoreTeamB, 0);
+        expect(controller.teamAGoalSummary.unattributedGoals, 1);
         expect(
           await _activeGoalEvents(firestore, 'match-goal-mismatch'),
           hasLength(1),
@@ -643,6 +879,88 @@ void main() {
         controller.onClose();
       },
     );
+
+    testWidgets('score summary shows unattributed goals and still submits', (
+      tester,
+    ) async {
+      await _saveMatch(
+        firestore,
+        _match(
+          id: 'match-unattributed-summary',
+          teamAPlayerIds: const ['player-a'],
+          teamBPlayerIds: const ['player-b'],
+        ),
+      );
+      await _savePlayer(firestore, _player(id: 'player-a', name: 'أحمد'));
+      await _savePlayer(firestore, _player(id: 'player-b', name: 'باسم'));
+      final controller = _controller(
+        firestore: firestore,
+        matchId: 'match-unattributed-summary',
+      );
+      Get.put<ScoreSubmitController>(controller);
+      await controller.loadMatchAndPlayers();
+      controller.setParticipantGoals(controller.teamAParticipants.single, 2);
+      controller.teamAScoreController.text = '5';
+      controller.teamBScoreController.text = '0';
+
+      await tester.pumpWidget(const GetMaterialApp(home: ScoreSubmitScreen()));
+      await tester.pumpAndSettle();
+
+      expect(controller.teamAGoalSummary.teamScore, 5);
+      expect(controller.teamAGoalSummary.attributedGoals, 2);
+      expect(controller.teamAGoalSummary.unattributedGoals, 3);
+      expect(find.text('نتيجة الفريق: 5'), findsOneWidget);
+      expect(find.text('الأهداف المنسوبة: 2'), findsOneWidget);
+      expect(find.text('أهداف غير منسوبة: 3'), findsOneWidget);
+      expect(find.text('لن تظهر في الهدافين.'), findsOneWidget);
+
+      final updatedMatch = await controller.submit();
+
+      expect(updatedMatch?.scoreTeamA, 5);
+      expect(updatedMatch?.scoreTeamB, 0);
+      expect(
+        await _activeGoalEvents(firestore, 'match-unattributed-summary'),
+        hasLength(2),
+      );
+      await _drainSnackbars(tester);
+      controller.onClose();
+    });
+
+    testWidgets('attributed goals greater than score blocks submission', (
+      tester,
+    ) async {
+      await tester.pumpWidget(const GetMaterialApp(home: SizedBox.shrink()));
+      await _saveMatch(
+        firestore,
+        _match(
+          id: 'match-over-attributed',
+          teamAPlayerIds: const ['player-a'],
+          teamBPlayerIds: const ['player-b'],
+        ),
+      );
+      await _savePlayer(firestore, _player(id: 'player-a', name: 'أحمد'));
+      await _savePlayer(firestore, _player(id: 'player-b', name: 'باسم'));
+      final controller = _controller(
+        firestore: firestore,
+        matchId: 'match-over-attributed',
+      );
+      await controller.loadMatchAndPlayers();
+
+      controller.setParticipantGoals(controller.teamAParticipants.single, 2);
+      controller.teamAScoreController.text = '1';
+      controller.teamBScoreController.text = '0';
+      final updatedMatch = await controller.submit();
+
+      expect(updatedMatch, isNull);
+      expect(controller.teamAGoalSummary.isOverAttributed, isTrue);
+      expect(
+        controller.errorMessage.value,
+        ScoreSubmitController.attributionOverScoreMessage,
+      );
+      await _expectNoGoalEvents(firestore, 'match-over-attributed');
+      await _drainSnackbars(tester);
+      controller.onClose();
+    });
 
     testWidgets('submit with registered MVP writes one MVP MatchEvent', (
       tester,
@@ -729,6 +1047,72 @@ void main() {
       },
     );
 
+    testWidgets(
+      'MVP selection uses kind id key to avoid participant id collision',
+      (tester) async {
+        await tester.pumpWidget(const GetMaterialApp(home: SizedBox.shrink()));
+        await _saveMatch(
+          firestore,
+          _match(
+            id: 'match-mvp-key-collision',
+            teamAPlayerIds: const ['same-id'],
+          ),
+        );
+        await _savePlayer(firestore, _player(id: 'same-id', name: 'لاعب مسجل'));
+        await _saveGuestPlayer(
+          firestore,
+          GuestPlayer(
+            id: 'same-id',
+            displayName: 'ضيف بنفس المعرف',
+            normalizedName: 'ضيف بنفس المعرف',
+            createdBy: 'organizer-1',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        await _saveLineupSnapshot(
+          firestore,
+          _snapshot(
+            id: 'snapshot-mvp-key-collision',
+            matchId: 'match-mvp-key-collision',
+            sideKey: 'B',
+            entries: [
+              _entry(
+                attendanceId: 'attendance-guest-collision',
+                guestPlayerId: 'same-id',
+                displayName: 'ضيف بنفس المعرف',
+              ),
+            ],
+          ),
+        );
+        final controller = _controller(
+          firestore: firestore,
+          matchId: 'match-mvp-key-collision',
+        );
+        await controller.loadMatchAndPlayers();
+        final guest = controller.teamBParticipants.singleWhere(
+          (participant) => participant.kind == ParticipantRefKind.guestPlayer,
+        );
+
+        controller.teamAScoreController.text = '0';
+        controller.teamBScoreController.text = '1';
+        controller.selectMvp(controller.participantKey(guest));
+        await controller.submit();
+
+        final events = await _activeMvpEvents(
+          firestore,
+          'match-mvp-key-collision',
+        );
+        final actor = events.single['actor'] as Map<String, dynamic>;
+        expect(controller.participantKey(guest), 'guestPlayer:same-id');
+        expect(actor['kind'], 'guestPlayer');
+        expect(actor['id'], 'same-id');
+        expect(actor['displayName'], 'ضيف بنفس المعرف');
+        await _drainSnackbars(tester);
+        controller.onClose();
+      },
+    );
+
     testWidgets('submit with no MVP writes no MVP MatchEvent', (tester) async {
       await tester.pumpWidget(const GetMaterialApp(home: SizedBox.shrink()));
       await _saveMatch(
@@ -791,6 +1175,58 @@ void main() {
       await _drainSnackbars(tester);
       controller.onClose();
     });
+
+    testWidgets(
+      'event recording failure surfaces safe error and no success sheet',
+      (tester) async {
+        await _saveMatch(
+          firestore,
+          _match(
+            id: 'match-event-write-failure',
+            teamAPlayerIds: const ['player-a'],
+            teamBPlayerIds: const ['player-b'],
+          ),
+        );
+        await _savePlayer(firestore, _player(id: 'player-a', name: 'أحمد'));
+        await _savePlayer(firestore, _player(id: 'player-b', name: 'باسم'));
+        final controller = _controller(
+          firestore: firestore,
+          matchId: 'match-event-write-failure',
+          matchEventService: _FailingMatchEventService(firestore: firestore),
+        );
+        Get.put<ScoreSubmitController>(controller);
+        await controller.loadMatchAndPlayers();
+        controller.teamAScoreController.text = '1';
+        controller.teamBScoreController.text = '0';
+        controller.setParticipantGoals(controller.teamAParticipants.single, 1);
+
+        await tester.pumpWidget(
+          const GetMaterialApp(home: ScoreSubmitScreen()),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('حفظ النتيجة ⚽'));
+        await tester.pumpAndSettle();
+
+        expect(controller.errorMessage.value, contains('فشل تسجيل أحداث'));
+        expect(
+          controller.errorMessage.value,
+          isNot(contains('event write failed')),
+        );
+        expect(controller.pendingPrideEventRetry.value, isTrue);
+        expect(find.text('تم تسجيل النتيجة ✅'), findsNothing);
+        expect(
+          await _activeGoalEvents(firestore, 'match-event-write-failure'),
+          isEmpty,
+        );
+        final savedMatch = await firestore
+            .collection(FirebasePaths.matches)
+            .doc('match-event-write-failure')
+            .get();
+        expect(savedMatch.data()?['scoreTeamA'], 1);
+        await _drainSnackbars(tester);
+        controller.onClose();
+      },
+    );
 
     testWidgets(
       'repeated submit does not create duplicate active goal MatchEvents',
@@ -966,6 +1402,138 @@ void main() {
         controller.onClose();
       },
     );
+
+    testWidgets('guest-only match side renders scorer controls', (
+      tester,
+    ) async {
+      await _saveMatch(firestore, _match(id: 'match-guest-score-ui'));
+      await _saveGuestPlayer(
+        firestore,
+        GuestPlayer(
+          id: 'guest-ui-scorer',
+          displayName: 'ضيف الواجهة',
+          normalizedName: 'ضيف الواجهة',
+          createdBy: 'organizer-1',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      await _saveLineupSnapshot(
+        firestore,
+        _snapshot(
+          id: 'snapshot-guest-score-ui',
+          matchId: 'match-guest-score-ui',
+          sideKey: 'A',
+          entries: [
+            _entry(
+              attendanceId: 'attendance-guest-ui',
+              guestPlayerId: 'guest-ui-scorer',
+              displayName: 'ضيف الواجهة',
+            ),
+          ],
+        ),
+      );
+      final controller = _controller(
+        firestore: firestore,
+        matchId: 'match-guest-score-ui',
+      );
+      Get.put<ScoreSubmitController>(controller);
+      await controller.loadMatchAndPlayers();
+
+      await tester.pumpWidget(const GetMaterialApp(home: ScoreSubmitScreen()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ضيف الواجهة'), findsOneWidget);
+      expect(find.text('أهداف'), findsOneWidget);
+      expect(
+        find.text(
+          'لا يوجد لاعبون مسجلون لهذا الطرف. اللاعبون المؤقتون لا تُسجل لهم إحصائيات.',
+        ),
+        findsNothing,
+      );
+
+      await tester.tap(find.byIcon(Icons.add).first);
+      await tester.pump();
+
+      expect(controller.totalTeamAGoals, 1);
+      expect(controller.teamAScoreController.text, '1');
+      expect(
+        controller.allGoalDrafts.single.actor.kind,
+        ParticipantRefKind.guestPlayer,
+      );
+
+      await tester.drag(find.byType(ListView), const Offset(0, -500));
+      await tester.pumpAndSettle();
+
+      expect(find.text('أفضل لاعب (MVP)'), findsOneWidget);
+      expect(find.text('ضيف الواجهة (ضيف)'), findsOneWidget);
+    });
+
+    testWidgets('no-player side shows safe actionable empty state', (
+      tester,
+    ) async {
+      await _saveMatch(firestore, _match(id: 'match-empty-score-ui'));
+      final controller = _controller(
+        firestore: firestore,
+        matchId: 'match-empty-score-ui',
+      );
+      Get.put<ScoreSubmitController>(controller);
+      await controller.loadMatchAndPlayers();
+
+      await tester.pumpWidget(const GetMaterialApp(home: ScoreSubmitScreen()));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'لا يوجد لاعبون متاحون لهذا الطرف. أضف لاعبين للفريق أو لقائمة المباراة قبل تسجيل الأهداف.',
+        ),
+        findsNWidgets(2),
+      );
+      expect(
+        find.text(
+          'لا يوجد لاعبون مسجلون لهذا الطرف. اللاعبون المؤقتون لا تُسجل لهم إحصائيات.',
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('full roster loading error is visible in score screen', (
+      tester,
+    ) async {
+      await _saveMatch(
+        firestore,
+        _match(
+          id: 'match-roster-error-visible',
+          teamAPlayerIds: const ['player-a'],
+          teamBPlayerIds: const ['player-b'],
+        ),
+      );
+      await _savePlayer(firestore, _player(id: 'player-a', name: 'أحمد'));
+      await _savePlayer(firestore, _player(id: 'player-b', name: 'باسم'));
+      final controller = _controller(
+        firestore: firestore,
+        matchId: 'match-roster-error-visible',
+        officialRosterService: _FailingParticipantRosterService(
+          firestore: firestore,
+        ),
+      );
+      Get.put<ScoreSubmitController>(controller);
+      await controller.loadMatchAndPlayers();
+
+      await tester.pumpWidget(const GetMaterialApp(home: ScoreSubmitScreen()));
+      await tester.pumpAndSettle();
+
+      expect(controller.fullRosterErrorMessage.value, isNotEmpty);
+      expect(
+        find.textContaining('تعذر تحميل قائمة المشاركين الكاملة'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('اختيارات الهدافين وMVP قد تكون غير مكتملة'),
+        findsOneWidget,
+      );
+      controller.onClose();
+    });
   });
 }
 
@@ -991,6 +1559,7 @@ ScoreSubmitController _controller({
         matchEventService ??
         MatchEventService(
           repository: MatchEventRepositoryImpl(firestore: firestore),
+          firestore: firestore,
         ),
     officialRosterService:
         officialRosterService ??
@@ -1032,14 +1601,38 @@ class _FailingParticipantRosterService extends OfficialMatchRosterService {
   }
 }
 
+class _FailingMatchEventService extends MatchEventService {
+  _FailingMatchEventService({required FakeFirebaseFirestore firestore})
+    : super(
+        repository: MatchEventRepositoryImpl(firestore: firestore),
+        firestore: firestore,
+      );
+
+  @override
+  Future<MatchEvent> recordGoal({
+    String? eventId,
+    required String matchId,
+    String? tournamentId,
+    required String sideKey,
+    required ParticipantRef actor,
+    int? minute,
+    required String createdBy,
+    DateTime? now,
+  }) {
+    throw StateError('event write failed');
+  }
+}
+
 Match _match({
   required String id,
+  String? tournamentId,
   List<String> teamAPlayerIds = const [],
   List<String> teamBPlayerIds = const [],
 }) {
   return Match(
     id: id,
     organizerId: 'organizer-1',
+    tournamentId: tournamentId,
     teamAPlayerIds: teamAPlayerIds,
     teamBPlayerIds: teamBPlayerIds,
     status: MatchStatus.live,
@@ -1093,6 +1686,24 @@ Future<void> _saveMatch(FakeFirebaseFirestore firestore, Match match) async {
       .collection(FirebasePaths.matches)
       .doc(match.id)
       .set(MatchModel.fromEntity(match).toJson());
+}
+
+Future<void> _saveTournament(
+  FakeFirebaseFirestore firestore,
+  String tournamentId,
+) async {
+  await firestore.collection(FirebasePaths.tournaments).doc(tournamentId).set({
+    'organizerId': 'organizer-1',
+    'name': 'بطولة الضيوف',
+    'format': 'groupsOnly',
+    'teamSize': 5,
+    'maxTeams': 8,
+    'status': 'groupStage',
+    'registeredTeamIds': <String>[],
+    'assistants': <Map<String, dynamic>>[],
+    'isFantasyEnabled': false,
+    'createdAt': DateTime(2026, 5, 4, 20).millisecondsSinceEpoch,
+  });
 }
 
 Future<void> _savePlayer(FakeFirebaseFirestore firestore, Player player) async {

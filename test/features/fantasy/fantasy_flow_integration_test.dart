@@ -5,8 +5,8 @@ import 'package:get/get.dart';
 
 import 'package:el7reef/core/auth/auth_session.dart';
 import 'package:el7reef/core/enums/fantasy_league_phase.dart';
-import 'package:el7reef/core/services/fantasy_lifecycle_service.dart';
-import 'package:el7reef/core/services/fantasy_market_service.dart';
+import 'package:el7reef/features/fantasy/services/fantasy_lifecycle_service.dart';
+import 'package:el7reef/features/fantasy/services/fantasy_market_service.dart';
 import 'package:el7reef/data/repositories/fantasy_lifecycle_repository_impl.dart';
 import 'package:el7reef/data/repositories/fantasy_repository_impl.dart';
 import 'package:el7reef/data/repositories/player_repository_impl.dart';
@@ -35,7 +35,7 @@ void main() {
     await tester.pumpWidget(const GetMaterialApp(home: SizedBox.shrink()));
 
     final firestore = FakeFirebaseFirestore();
-    final lifecycleRepository = FantasyLifecycleRepositoryImpl(db: firestore);
+    final lifecycleRepository = FantasyLifecycleRepositoryImpl(firestore: firestore);
     final fantasyRepository = FantasyRepositoryImpl(db: firestore);
     final playerRepository = PlayerRepositoryImpl(firestore: firestore);
     final tournamentRepository = TournamentRepositoryImpl(db: firestore);

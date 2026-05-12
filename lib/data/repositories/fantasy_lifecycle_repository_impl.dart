@@ -6,13 +6,13 @@ import '../../domain/repositories/fantasy_lifecycle_repository.dart';
 import '../models/fantasy_league_lifecycle_model.dart';
 
 class FantasyLifecycleRepositoryImpl implements FantasyLifecycleRepository {
-  final FirebaseFirestore _db;
+  final FirebaseFirestore _firestore;
 
-  FantasyLifecycleRepositoryImpl({FirebaseFirestore? db})
-      : _db = db ?? FirebaseFirestore.instance;
+  FantasyLifecycleRepositoryImpl({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
   CollectionReference get _leaguesRef =>
-      _db.collection(FirebasePaths.fantasyLeagues);
+      _firestore.collection(FirebasePaths.fantasyLeagues);
 
   @override
   Future<FantasyLeagueLifecycle?> getLeagueLifecycle(String leagueId) async {

@@ -1,7 +1,13 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../core/constants/firebase_paths.dart';
 import '../../data/repositories/match_event_repository_impl.dart';
+import '../../data/repositories/tournament_assistant_permission_repository_impl.dart';
 import '../../domain/entities/match_event.dart';
 import '../../domain/entities/participant_ref.dart';
+import '../../domain/entities/tournament_assistant_permission.dart';
 import '../../domain/repositories/match_event_repository.dart';
+import '../../domain/repositories/tournament_assistant_permission_repository.dart';
 
 class MatchGoalDraft {
   final String sideKey;
@@ -19,9 +25,22 @@ class MatchGoalDraft {
 
 class MatchEventService {
   final MatchEventRepository _repository;
+  final TournamentAssistantPermissionRepository _assistantPermissionRepository;
+  final FirebaseFirestore _firestore;
 
-  MatchEventService({MatchEventRepository? repository})
-    : _repository = repository ?? MatchEventRepositoryImpl();
+  MatchEventService({
+    MatchEventRepository? repository,
+    TournamentAssistantPermissionRepository? assistantPermissionRepository,
+    FirebaseFirestore? firestore,
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _repository =
+           repository ?? MatchEventRepositoryImpl(firestore: firestore),
+       _assistantPermissionRepository =
+           assistantPermissionRepository ??
+           TournamentAssistantPermissionRepositoryImpl(firestore: firestore);
+
+  CollectionReference<Map<String, dynamic>> get _matchesRef =>
+      _firestore.collection(FirebasePaths.matches);
 
   Future<MatchEvent> recordGoal({
     String? eventId,
@@ -34,10 +53,15 @@ class MatchEventService {
     DateTime? now,
   }) async {
     final createdAt = now ?? DateTime.now();
+    final matchTournamentId = await _assertCanCreateMatchEvent(
+      matchId: matchId,
+      tournamentId: tournamentId,
+      actorId: createdBy,
+    );
     final event = MatchEvent(
       id: _eventId(eventId, prefix: 'goal', matchId: matchId, now: createdAt),
       matchId: _required(matchId, 'matchId'),
-      tournamentId: _normalizeOptional(tournamentId),
+      tournamentId: matchTournamentId,
       eventType: MatchEventType.goal,
       sideKey: _sideKey(sideKey),
       actor: _actor(actor),
@@ -92,10 +116,15 @@ class MatchEventService {
     DateTime? now,
   }) async {
     final createdAt = now ?? DateTime.now();
+    final matchTournamentId = await _assertCanCreateMatchEvent(
+      matchId: matchId,
+      tournamentId: tournamentId,
+      actorId: createdBy,
+    );
     final event = MatchEvent(
       id: _eventId(eventId, prefix: 'mvp', matchId: matchId, now: createdAt),
       matchId: _required(matchId, 'matchId'),
-      tournamentId: _normalizeOptional(tournamentId),
+      tournamentId: matchTournamentId,
       eventType: MatchEventType.mvp,
       sideKey: _sideKey(sideKey),
       actor: _actor(actor),
@@ -185,5 +214,52 @@ class MatchEventService {
       return null;
     }
     return trimmed;
+  }
+
+  Future<String?> _assertCanCreateMatchEvent({
+    required String matchId,
+    required String? tournamentId,
+    required String actorId,
+  }) async {
+    final normalizedMatchId = _required(matchId, 'matchId');
+    final normalizedActorId = _required(actorId, 'createdBy');
+    final normalizedTournamentId = _normalizeOptional(tournamentId);
+    final snapshot = await _matchesRef.doc(normalizedMatchId).get();
+    if (!snapshot.exists || snapshot.data() == null) {
+      throw Exception('تعذر العثور على المباراة المطلوبة.');
+    }
+    final data = snapshot.data()!;
+    final organizerId = data['organizerId'] is String
+        ? data['organizerId'] as String
+        : '';
+    final matchTournamentId = data['tournamentId'] is String
+        ? _normalizeOptional(data['tournamentId'] as String)
+        : null;
+    if (normalizedTournamentId != null &&
+        matchTournamentId != normalizedTournamentId) {
+      throw Exception('بيانات البطولة لا تطابق المباراة.');
+    }
+    if (organizerId == normalizedActorId) {
+      return matchTournamentId;
+    }
+    if (matchTournamentId == null) {
+      throw Exception('لا تملك صلاحية تسجيل أحداث هذه المباراة.');
+    }
+    final TournamentAssistantPermission? assistantPermission;
+    try {
+      assistantPermission = await _assistantPermissionRepository
+          .getAssistantPermission(matchTournamentId, normalizedActorId);
+    } catch (_) {
+      throw Exception('لا تملك صلاحية تسجيل أحداث هذه المباراة.');
+    }
+    if (assistantPermission == null || !assistantPermission.isActive) {
+      throw Exception('لا تملك صلاحية تسجيل أحداث هذه المباراة.');
+    }
+    if (!assistantPermission.hasPermission(
+      TournamentAssistantPermissionKey.canRecordGoalsAndMvp,
+    )) {
+      throw Exception('لا تملك صلاحية تسجيل أحداث هذه المباراة.');
+    }
+    return matchTournamentId;
   }
 }

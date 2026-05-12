@@ -9,7 +9,7 @@ import '../../../data/repositories/player_repository_impl.dart';
 import '../../../domain/entities/fan_voting_session.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/entities/player.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 
 class FanVotingController extends GetxController {
   final String matchId;

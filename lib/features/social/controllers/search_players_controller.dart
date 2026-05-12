@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../../domain/entities/player.dart';
 import '../../../data/repositories/player_repository_impl.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 
 class SearchPlayersController extends GetxController {
   final PlayerRepositoryImpl _playerRepo;

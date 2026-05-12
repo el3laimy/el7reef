@@ -11,7 +11,7 @@ import '../../../data/repositories/team_membership_repository_impl.dart';
 import '../../../data/repositories/team_repository_impl.dart';
 import '../../../data/repositories/team_roster_snapshot_repository_impl.dart';
 import '../../../features/team/controllers/team_roster_controller.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 import '../../../core/services/share_link_service.dart';
 
 class TeamRosterBinding extends Bindings {

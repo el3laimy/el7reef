@@ -1,10 +1,14 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:el7reef/core/constants/firebase_paths.dart';
+import 'package:el7reef/core/enums/match_status.dart';
 import 'package:el7reef/core/services/match_event_service.dart';
 import 'package:el7reef/core/services/tournament_top_scorers_resolver.dart';
+import 'package:el7reef/data/repositories/match_repository_impl.dart';
 import 'package:el7reef/data/repositories/match_event_repository_impl.dart';
 import 'package:el7reef/domain/entities/participant_ref.dart';
+import 'package:el7reef/features/shareables/controllers/top_scorers_share_controller.dart';
 
 void main() {
   group('TournamentTopScorersResolver', () {
@@ -34,9 +38,11 @@ void main() {
       firestore = FakeFirebaseFirestore();
       matchEventService = MatchEventService(
         repository: MatchEventRepositoryImpl(firestore: firestore),
+        firestore: firestore,
       );
       resolver = TournamentTopScorersResolver(
         matchEventService: matchEventService,
+        matchRepository: MatchRepositoryImpl(db: firestore),
       );
       now = DateTime(2026, 5, 4, 20);
     });
@@ -49,6 +55,7 @@ void main() {
 
     test('aggregates multiple goals for the same registered player', () async {
       await _recordGoals(
+        firestore: firestore,
         service: matchEventService,
         tournamentId: 'tournament-1',
         actor: registeredActor,
@@ -70,6 +77,7 @@ void main() {
       'aggregates guest player goals and preserves linkedPlayerId',
       () async {
         await _recordGoals(
+          firestore: firestore,
           service: matchEventService,
           tournamentId: 'tournament-1',
           actor: guestActor,
@@ -89,9 +97,89 @@ void main() {
     );
 
     test(
+      'excludes registered goals from unapproved submitted matches',
+      () async {
+        await _recordGoals(
+          firestore: firestore,
+          service: matchEventService,
+          tournamentId: 'tournament-1',
+          actor: registeredActor,
+          count: 3,
+          now: now,
+          matchStatus: MatchStatus.completed,
+        );
+
+        final scorers = await resolver.getTopScorers('tournament-1');
+
+        expect(scorers, isEmpty);
+      },
+    );
+
+    test('excludes guest goals from unapproved submitted matches', () async {
+      await _recordGoals(
+        firestore: firestore,
+        service: matchEventService,
+        tournamentId: 'tournament-1',
+        actor: guestActor,
+        count: 2,
+        now: now,
+        matchStatus: MatchStatus.pendingReview,
+      );
+
+      final scorers = await resolver.getTopScorers('tournament-1');
+
+      expect(scorers, isEmpty);
+    });
+
+    test('excludes settled matches without a valid score', () async {
+      await _recordGoals(
+        firestore: firestore,
+        service: matchEventService,
+        tournamentId: 'tournament-1',
+        actor: registeredActor,
+        count: 1,
+        now: now,
+        scoreTeamA: null,
+        scoreTeamB: null,
+      );
+
+      final scorers = await resolver.getTopScorers('tournament-1');
+
+      expect(scorers, isEmpty);
+    });
+
+    test('mixes official registered and guest scorers', () async {
+      await _recordGoals(
+        firestore: firestore,
+        service: matchEventService,
+        tournamentId: 'tournament-1',
+        actor: registeredActor,
+        count: 1,
+        now: now,
+      );
+      await _recordGoals(
+        firestore: firestore,
+        service: matchEventService,
+        tournamentId: 'tournament-1',
+        actor: guestActor,
+        count: 2,
+        now: now.add(const Duration(minutes: 1)),
+      );
+
+      final scorers = await resolver.getTopScorers('tournament-1');
+
+      expect(scorers.map((entry) => entry.actor.kind), [
+        ParticipantRefKind.guestPlayer,
+        ParticipantRefKind.player,
+      ]);
+      expect(scorers.map((entry) => entry.goals), [2, 1]);
+    });
+
+    test(
       'excludes matchSidePlayer events from tournament leaderboard',
       () async {
         await _recordGoals(
+          firestore: firestore,
           service: matchEventService,
           tournamentId: 'tournament-1',
           actor: registeredActor,
@@ -99,6 +187,7 @@ void main() {
           now: now,
         );
         await _recordGoals(
+          firestore: firestore,
           service: matchEventService,
           tournamentId: 'tournament-1',
           actor: matchSideActor,
@@ -116,6 +205,11 @@ void main() {
     );
 
     test('ignores MVP events and voided goal events', () async {
+      await _seedMatch(
+        firestore,
+        matchId: 'match-1',
+        tournamentId: 'tournament-1',
+      );
       await matchEventService.recordMvp(
         eventId: 'mvp-1',
         matchId: 'match-1',
@@ -159,6 +253,7 @@ void main() {
       );
 
       await _recordGoals(
+        firestore: firestore,
         service: matchEventService,
         tournamentId: 'tournament-1',
         actor: oneGoalActor,
@@ -166,6 +261,7 @@ void main() {
         now: now,
       );
       await _recordGoals(
+        firestore: firestore,
         service: matchEventService,
         tournamentId: 'tournament-1',
         actor: twoGoalActor,
@@ -173,6 +269,7 @@ void main() {
         now: now.add(const Duration(minutes: 1)),
       );
       await _recordGoals(
+        firestore: firestore,
         service: matchEventService,
         tournamentId: 'tournament-1',
         actor: threeGoalActor,
@@ -199,6 +296,7 @@ void main() {
       );
 
       await _recordGoals(
+        firestore: firestore,
         service: matchEventService,
         tournamentId: 'tournament-1',
         actor: tournamentOneActor,
@@ -206,6 +304,7 @@ void main() {
         now: now,
       );
       await _recordGoals(
+        firestore: firestore,
         service: matchEventService,
         tournamentId: 'tournament-2',
         actor: tournamentTwoActor,
@@ -242,6 +341,7 @@ void main() {
       );
 
       await _recordGoals(
+        firestore: firestore,
         service: matchEventService,
         tournamentId: 'tournament-1',
         actor: sameNameLaterId,
@@ -249,6 +349,7 @@ void main() {
         now: now,
       );
       await _recordGoals(
+        firestore: firestore,
         service: matchEventService,
         tournamentId: 'tournament-1',
         actor: sameNameEarlierId,
@@ -256,6 +357,7 @@ void main() {
         now: now.add(const Duration(minutes: 1)),
       );
       await _recordGoals(
+        firestore: firestore,
         service: matchEventService,
         tournamentId: 'tournament-1',
         actor: firstNameActor,
@@ -271,20 +373,67 @@ void main() {
         'player-z',
       ]);
     });
+
+    test(
+      'top scorer share data uses official-filtered resolver output',
+      () async {
+        await _recordGoals(
+          firestore: firestore,
+          service: matchEventService,
+          tournamentId: 'tournament-1',
+          actor: registeredActor,
+          count: 2,
+          now: now,
+        );
+        await _recordGoals(
+          firestore: firestore,
+          service: matchEventService,
+          tournamentId: 'tournament-1',
+          actor: guestActor,
+          count: 5,
+          now: now.add(const Duration(minutes: 1)),
+          matchStatus: MatchStatus.completed,
+        );
+
+        final scorers = await resolver.getTopScorers('tournament-1');
+        final data = const TopScorersShareController().build(
+          tournamentName: 'Official Cup',
+          scorers: scorers,
+        );
+
+        expect(data.scorers, hasLength(1));
+        expect(data.scorers.single.displayName, 'Ali');
+        expect(data.scorers.single.goals, 2);
+        expect(data.scorers.single.isGuest, isFalse);
+      },
+    );
   });
 }
 
 Future<void> _recordGoals({
+  required FakeFirebaseFirestore firestore,
   required MatchEventService service,
   required String tournamentId,
   required ParticipantRef actor,
   required int count,
   required DateTime now,
+  MatchStatus matchStatus = MatchStatus.settled,
+  int? scoreTeamA = 1,
+  int? scoreTeamB = 0,
 }) async {
+  final matchId = 'match-$tournamentId-${actor.id}';
+  await _seedMatch(
+    firestore,
+    matchId: matchId,
+    tournamentId: tournamentId,
+    status: matchStatus,
+    scoreTeamA: scoreTeamA,
+    scoreTeamB: scoreTeamB,
+  );
   for (var index = 1; index <= count; index += 1) {
     await service.recordGoal(
-      eventId: 'goal-$tournamentId-${actor.kind.name}-${actor.id}-$index',
-      matchId: 'match-$tournamentId-${actor.id}',
+      eventId: 'goal-$matchId-${actor.kind.name}-${actor.id}-$index',
+      matchId: matchId,
       tournamentId: tournamentId,
       sideKey: 'A',
       actor: actor,
@@ -292,4 +441,23 @@ Future<void> _recordGoals({
       now: now.add(Duration(seconds: index)),
     );
   }
+}
+
+Future<void> _seedMatch(
+  FakeFirebaseFirestore firestore, {
+  required String matchId,
+  required String tournamentId,
+  MatchStatus status = MatchStatus.settled,
+  int? scoreTeamA = 1,
+  int? scoreTeamB = 0,
+}) {
+  return firestore.collection(FirebasePaths.matches).doc(matchId).set({
+    'organizerId': 'organizer-1',
+    'tournamentId': tournamentId,
+    'status': status.name,
+    'scoreTeamA': scoreTeamA,
+    'scoreTeamB': scoreTeamB,
+    'isOrganized': true,
+    'createdAt': DateTime(2026, 5, 4, 20).millisecondsSinceEpoch,
+  });
 }

@@ -5,7 +5,7 @@ import '../../../core/auth/auth_session.dart';
 import '../../../core/services/tournament_registration_service.dart';
 import '../../../data/repositories/guest_team_repository_impl.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 import '../controllers/tournament_guest_team_create_controller.dart';
 
 class TournamentGuestTeamCreateBinding extends Bindings {

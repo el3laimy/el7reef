@@ -89,20 +89,118 @@ service cloud.firestore {
     function canCreateTournamentRegistration(data) {
       return isAuthenticated() &&
         data.tournamentId is string &&
+        data.createdBy == request.auth.uid &&
         (
-          organizesTournamentById(data.tournamentId) ||
-          (data.teamId is string && ownsTeamById(data.teamId)) ||
-          (data.guestTeamId is string && ownsGuestTeamById(data.guestTeamId))
+          (
+            organizesTournamentById(data.tournamentId) &&
+            data.status in ['pending', 'approved', 'rejected'] &&
+            (
+              data.status == 'pending' ||
+              hasOrganizerDecisionByCurrentUser(data)
+            )
+          ) ||
+          (
+            ownsTournamentRegistrationSource(data) &&
+            data.status == 'pending' &&
+            hasNoOrganizerDecisionValues(data)
+          )
         );
     }
 
-    function canUpdateTournamentRegistration(data) {
-      return isAuthenticated() &&
-        data.tournamentId is string &&
+    function ownsTournamentRegistrationSource(data) {
+      return isAuthenticated() && (
+        (data.teamId is string && ownsTeamById(data.teamId)) ||
+        (data.guestTeamId is string && ownsGuestTeamById(data.guestTeamId))
+      );
+    }
+
+    function hasNoOrganizerDecisionValues(data) {
+      return (
+          !data.keys().hasAny(['verifiedBy']) ||
+          data.verifiedBy == null
+        ) &&
         (
-          organizesTournamentById(data.tournamentId) ||
-          (data.teamId is string && ownsTeamById(data.teamId)) ||
-          (data.guestTeamId is string && ownsGuestTeamById(data.guestTeamId))
+          !data.keys().hasAny(['verifiedAt']) ||
+          data.verifiedAt == null
+        ) &&
+        (
+          !data.keys().hasAny(['reviewedBy']) ||
+          data.reviewedBy == null
+        ) &&
+        (
+          !data.keys().hasAny(['reviewedAt']) ||
+          data.reviewedAt == null
+        ) &&
+        (
+          !data.keys().hasAny(['reviewerId']) ||
+          data.reviewerId == null
+        ) &&
+        (
+          !data.keys().hasAny(['rejectionReason']) ||
+          data.rejectionReason == null
+        ) &&
+        (
+          !data.keys().hasAny(['organizerNote']) ||
+          data.organizerNote == null
+        );
+    }
+
+    function hasOrganizerDecisionByCurrentUser(data) {
+      return data.verifiedBy == request.auth.uid &&
+        data.verifiedAt is int;
+    }
+
+    function registrationImmutableFieldsUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny([
+          'tournamentId',
+          'teamId',
+          'guestTeamId',
+          'claimedFromGuestTeamId',
+          'createdBy',
+          'submittedBy',
+          'createdAt',
+          'sourceId',
+          'sourceType'
+        ]);
+    }
+
+    function canSubmitterUpdatePendingTournamentRegistration() {
+      return ownsTournamentRegistrationSource(resource.data) &&
+        resource.data.status == 'pending' &&
+        request.resource.data.status == resource.data.status &&
+        registrationImmutableFieldsUnchanged() &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['mode', 'notes', 'updatedAt']);
+    }
+
+    function canOrganizerDecideTournamentRegistration() {
+      return organizesTournamentById(resource.data.tournamentId) &&
+        registrationImmutableFieldsUnchanged() &&
+        request.resource.data.status in ['approved', 'rejected'] &&
+        hasOrganizerDecisionByCurrentUser(request.resource.data) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly([
+            'status',
+            'verifiedBy',
+            'verifiedAt',
+            'reviewedBy',
+            'reviewedAt',
+            'reviewerId',
+            'rejectionReason',
+            'organizerNote',
+            'notes',
+            'updatedAt'
+          ]);
+    }
+
+    function canUpdateTournamentRegistration() {
+      return isAuthenticated() &&
+        resource.data.tournamentId is string &&
+        request.resource.data.tournamentId == resource.data.tournamentId &&
+        (
+          canOrganizerDecideTournamentRegistration() ||
+          canSubmitterUpdatePendingTournamentRegistration()
         );
     }
 
@@ -407,7 +505,56 @@ service cloud.firestore {
         data.createdAt is int &&
         data.status == 'active' &&
         hasValidMatchEventActor(data) &&
-        hasValidMatchEventOptionalFields(data);
+        hasValidMatchEventOptionalFields(data) &&
+        canCreateMatchEventForMatch(data);
+    }
+
+    function canCreateMatchEventForMatch(data) {
+      return data.matchId is string &&
+        exists(/databases/$(database)/documents/matches/$(data.matchId)) &&
+        (
+          canOrganizerCreateMatchEventForMatch(data) ||
+          canAssistantCreateMatchEventForMatch(data)
+        );
+    }
+
+    function canOrganizerCreateMatchEventForMatch(data) {
+      return get(/databases/$(database)/documents/matches/$(data.matchId))
+          .data.organizerId == request.auth.uid &&
+        matchEventTournamentMatchesMatch(data);
+    }
+
+    function canAssistantCreateMatchEventForMatch(data) {
+      return get(/databases/$(database)/documents/matches/$(data.matchId))
+          .data.tournamentId is string &&
+        data.tournamentId is string &&
+        data.tournamentId ==
+          get(/databases/$(database)/documents/matches/$(data.matchId))
+            .data.tournamentId &&
+        hasActiveTournamentAssistantPermission(
+          get(/databases/$(database)/documents/matches/$(data.matchId))
+            .data.tournamentId,
+          'canRecordGoalsAndMvp'
+        );
+    }
+
+    function matchEventTournamentMatchesMatch(data) {
+      return (
+          get(/databases/$(database)/documents/matches/$(data.matchId))
+            .data.tournamentId is string &&
+          data.tournamentId is string &&
+          data.tournamentId ==
+            get(/databases/$(database)/documents/matches/$(data.matchId))
+              .data.tournamentId
+        ) ||
+        (
+          !(get(/databases/$(database)/documents/matches/$(data.matchId))
+            .data.tournamentId is string) &&
+          (
+            !data.keys().hasAny(['tournamentId']) ||
+            data.tournamentId == null
+          )
+        );
     }
 
     function canVoidMatchEvent() {
@@ -417,6 +564,709 @@ service cloud.firestore {
         request.resource.data.status == 'voided' &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['status']);
+    }
+
+    function nullableString(data, key) {
+      return data.get(key, null) == null || data.get(key, null) is string;
+    }
+
+    function nullableInt(data, key) {
+      return data.get(key, null) == null || data.get(key, null) is int;
+    }
+
+    function nullableBool(data, key) {
+      return data.get(key, null) == null || data.get(key, null) is bool;
+    }
+
+    function isAllowedAssistantPermissionName(permissionName) {
+      return permissionName in [
+        'canViewMatchday',
+        'canStartMatch',
+        'canSubmitScore',
+        'canRecordGoalsAndMvp',
+        'canApproveScore',
+        'canDeclareForfeit'
+      ];
+    }
+
+    function hasActiveTournamentAssistantPermission(tournamentId, permissionName) {
+      return isAuthenticated() &&
+        isAllowedAssistantPermissionName(permissionName) &&
+        exists(
+          /databases/$(database)/documents/tournaments/$(tournamentId)/assistants/$(request.auth.uid)
+        ) &&
+        get(
+          /databases/$(database)/documents/tournaments/$(tournamentId)/assistants/$(request.auth.uid)
+        ).data.status == 'active' &&
+        get(
+          /databases/$(database)/documents/tournaments/$(tournamentId)/assistants/$(request.auth.uid)
+        ).data.permissions is map &&
+        get(
+          /databases/$(database)/documents/tournaments/$(tournamentId)/assistants/$(request.auth.uid)
+        ).data.permissions.get(permissionName, false) == true;
+    }
+
+    function validAssistantPermissionMap(permissions) {
+      return permissions is map &&
+        permissions.keys().hasOnly([
+          'canViewMatchday',
+          'canStartMatch',
+          'canSubmitScore',
+          'canRecordGoalsAndMvp',
+          'canApproveScore',
+          'canDeclareForfeit'
+        ]) &&
+        permissions.keys().hasAll([
+          'canViewMatchday',
+          'canStartMatch',
+          'canSubmitScore',
+          'canRecordGoalsAndMvp',
+          'canApproveScore',
+          'canDeclareForfeit'
+        ]) &&
+        permissions.canViewMatchday is bool &&
+        permissions.canStartMatch is bool &&
+        permissions.canSubmitScore is bool &&
+        permissions.canRecordGoalsAndMvp is bool &&
+        permissions.canApproveScore is bool &&
+        permissions.canDeclareForfeit is bool;
+    }
+
+    function validAssistantPermissionLifecycle(data) {
+      return data.status in ['active', 'revoked'] &&
+        (
+          (
+            data.status == 'active' &&
+            data.revokedAt == null
+          ) ||
+          (
+            data.status == 'revoked' &&
+            data.revokedAt is int
+          )
+        );
+    }
+
+    function validAssistantPermissionDoc(data, tournamentId, assistantUserId) {
+      return data.keys().hasOnly([
+          'tournamentId',
+          'userId',
+          'addedBy',
+          'status',
+          'preset',
+          'permissions',
+          'createdAt',
+          'updatedAt',
+          'revokedAt'
+        ]) &&
+        data.keys().hasAll([
+          'tournamentId',
+          'userId',
+          'addedBy',
+          'status',
+          'preset',
+          'permissions',
+          'createdAt',
+          'updatedAt',
+          'revokedAt'
+        ]) &&
+        data.tournamentId == tournamentId &&
+        data.userId == assistantUserId &&
+        data.addedBy is string &&
+        data.preset in [
+          'resultsAssistant',
+          'matchdayAssistant',
+          'scoreApprover',
+          'customLimited'
+        ] &&
+        data.createdAt is int &&
+        data.updatedAt is int &&
+        validAssistantPermissionLifecycle(data) &&
+        validAssistantPermissionMap(data.permissions);
+    }
+
+    function assistantPermissionIdentityUnchanged() {
+      return request.resource.data.tournamentId == resource.data.tournamentId &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.addedBy == resource.data.addedBy &&
+        request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function canCreateAssistantPermission(tournamentId, assistantUserId) {
+      return organizesTournamentById(tournamentId) &&
+        assistantUserId != request.auth.uid &&
+        validAssistantPermissionDoc(
+          request.resource.data,
+          tournamentId,
+          assistantUserId
+        ) &&
+        request.resource.data.addedBy == request.auth.uid;
+    }
+
+    function canUpdateAssistantPermission(tournamentId, assistantUserId) {
+      return organizesTournamentById(tournamentId) &&
+        resource.data.tournamentId == tournamentId &&
+        resource.data.userId == assistantUserId &&
+        validAssistantPermissionDoc(
+          request.resource.data,
+          tournamentId,
+          assistantUserId
+        ) &&
+        assistantPermissionIdentityUnchanged() &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly([
+            'status',
+            'preset',
+            'permissions',
+            'updatedAt',
+            'revokedAt'
+          ]);
+    }
+
+    function canGetAssistantPermission(tournamentId, assistantUserId) {
+      return organizesTournamentById(tournamentId) || isOwner(assistantUserId);
+    }
+
+    function ownsTournamentOperation(data) {
+      return data.tournamentId is string &&
+        organizesTournamentById(data.tournamentId);
+    }
+
+    function ownsExistingTournamentOperation() {
+      return resource.data.tournamentId is string &&
+        organizesTournamentById(resource.data.tournamentId);
+    }
+
+    function tournamentOperationRefsUnchanged() {
+      return request.resource.data.tournamentId == resource.data.tournamentId &&
+        request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function canManageMatchOperationById(matchId) {
+      return isAuthenticated() &&
+        matchId is string &&
+        exists(/databases/$(database)/documents/matches/$(matchId)) &&
+        get(/databases/$(database)/documents/matches/$(matchId))
+          .data.organizerId == request.auth.uid;
+    }
+
+    function isOptionalString(value) {
+      return value == null || value is string;
+    }
+
+    function isOptionalTimestamp(value) {
+      return value == null || value is timestamp;
+    }
+
+    function validChallengeDoc(data) {
+      return data.keys().hasOnly([
+          'challengerId',
+          'challengedId',
+          'challengerTeamId',
+          'challengedTeamId',
+          'matchId',
+          'status',
+          'message',
+          'location',
+          'teamSize',
+          'createdAt',
+          'respondedAt',
+          'expiresAt'
+        ]) &&
+        data.keys().hasAll([
+          'challengerId',
+          'challengedId',
+          'status',
+          'teamSize',
+          'createdAt',
+          'expiresAt'
+        ]) &&
+        data.challengerId is string &&
+        data.challengedId is string &&
+        data.challengerId != data.challengedId &&
+        isOptionalString(data.challengerTeamId) &&
+        isOptionalString(data.challengedTeamId) &&
+        isOptionalString(data.matchId) &&
+        data.status in ['pending', 'accepted', 'declined', 'expired', 'cancelled'] &&
+        data.teamSize is int &&
+        data.teamSize >= 5 &&
+        data.teamSize <= 11 &&
+        data.createdAt is timestamp &&
+        isOptionalTimestamp(data.respondedAt) &&
+        data.expiresAt is timestamp &&
+        data.expiresAt > data.createdAt &&
+        isOptionalString(data.message) &&
+        isOptionalString(data.location);
+    }
+
+    function isChallengeParticipant(data) {
+      return isAuthenticated() &&
+        (
+          data.challengerId == request.auth.uid ||
+          data.challengedId == request.auth.uid
+        );
+    }
+
+    function challengeIdentityUnchanged() {
+      return request.resource.data.challengerId == resource.data.challengerId &&
+        request.resource.data.challengedId == resource.data.challengedId &&
+        request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function canCreateChallenge(data) {
+      return isAuthenticated() &&
+        validChallengeDoc(data) &&
+        data.challengerId == request.auth.uid &&
+        data.status == 'pending' &&
+        data.matchId == null &&
+        data.respondedAt == null;
+    }
+
+    function canUpdateChallenge(challengeId) {
+      return isChallengeParticipant(resource.data) &&
+        validChallengeDoc(request.resource.data) &&
+        resource.data.status == 'pending' &&
+        challengeIdentityUnchanged() &&
+        request.resource.data.respondedAt is timestamp &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'respondedAt', 'matchId']) &&
+        (
+          (
+            request.resource.data.status == 'cancelled' &&
+            resource.data.challengerId == request.auth.uid &&
+            request.resource.data.matchId == resource.data.matchId
+          ) ||
+          (
+            request.resource.data.status in ['declined', 'expired'] &&
+            resource.data.challengedId == request.auth.uid &&
+            request.resource.data.matchId == resource.data.matchId
+          ) ||
+          (
+            request.resource.data.status == 'accepted' &&
+            resource.data.challengedId == request.auth.uid &&
+            request.resource.data.matchId == challengeId &&
+            exists(/databases/$(database)/documents/matches/$(challengeId)) &&
+            get(/databases/$(database)/documents/matches/$(challengeId))
+              .data.challengeId == challengeId
+          )
+        );
+    }
+
+    function validChallengeBackedMatchDoc(data) {
+      return data.keys().hasOnly([
+          'organizerId',
+          'teamAId',
+          'teamBId',
+          'teamAPlayerIds',
+          'teamBPlayerIds',
+          'teamAParticipantId',
+          'teamBParticipantId',
+          'status',
+          'scoreTeamA',
+          'scoreTeamB',
+          'mvpPlayerId',
+          'location',
+          'latitude',
+          'longitude',
+          'teamSize',
+          'isOrganized',
+          'tournamentId',
+          'challengeId',
+          'isGoldenRating',
+          'isAnomaly',
+          'isFrozen',
+          'stageType',
+          'groupId',
+          'groupStageId',
+          'knockoutTieId',
+          'roundIndex',
+          'slotNumber',
+          'scheduledAt',
+          'publishedAt',
+          'venueId',
+          'fixtureStatus',
+          'lineupRequirement',
+          'createdAt',
+          'startedAt',
+          'completedAt',
+          'cancelledAt',
+          'cancelledBy',
+          'cancelReason'
+        ]) &&
+        data.organizerId is string &&
+        data.status is string &&
+        data.teamAPlayerIds is list &&
+        data.teamBPlayerIds is list &&
+        data.teamSize is int &&
+        data.isOrganized is bool &&
+        (
+          !data.keys().hasAny(['teamAId']) ||
+          data.teamAId is string ||
+          data.teamAId == null
+        ) &&
+        (
+          !data.keys().hasAny(['teamBId']) ||
+          data.teamBId is string ||
+          data.teamBId == null
+        );
+    }
+
+    function canCreateAcceptedChallengeMatch(data, matchId) {
+      return data.challengeId is string &&
+        data.challengeId == matchId &&
+        validChallengeBackedMatchDoc(data) &&
+        exists(/databases/$(database)/documents/challenges/$(data.challengeId)) &&
+        get(/databases/$(database)/documents/challenges/$(data.challengeId))
+          .data.status == 'pending' &&
+        get(/databases/$(database)/documents/challenges/$(data.challengeId))
+          .data.matchId == null &&
+        get(/databases/$(database)/documents/challenges/$(data.challengeId))
+          .data.expiresAt > request.time &&
+        get(/databases/$(database)/documents/challenges/$(data.challengeId))
+          .data.challengedId == request.auth.uid &&
+        get(/databases/$(database)/documents/challenges/$(data.challengeId))
+          .data.challengerId == data.organizerId &&
+        data.status == 'open' &&
+        data.isOrganized == false &&
+        data.tournamentId == null &&
+        data.teamAPlayerIds is list &&
+        data.teamBPlayerIds is list &&
+        get(/databases/$(database)/documents/challenges/$(data.challengeId))
+          .data.challengerId in data.teamAPlayerIds &&
+        request.auth.uid in data.teamBPlayerIds &&
+        (
+          !(get(/databases/$(database)/documents/challenges/$(data.challengeId))
+            .data.challengerTeamId is string) ||
+          data.teamAId == get(/databases/$(database)/documents/challenges/$(data.challengeId))
+            .data.challengerTeamId
+        ) &&
+        (
+          !(get(/databases/$(database)/documents/challenges/$(data.challengeId))
+            .data.challengedTeamId is string) ||
+          data.teamBId == get(/databases/$(database)/documents/challenges/$(data.challengeId))
+            .data.challengedTeamId
+        );
+    }
+
+    function canCreateMatch(data, matchId) {
+      return isAuthenticated() &&
+        (
+          data.organizerId == request.auth.uid ||
+          canCreateAcceptedChallengeMatch(data, matchId)
+        );
+    }
+
+    function validMatchInvitationDoc(data) {
+      return data.keys().hasOnly([
+          'matchId',
+          'senderId',
+          'receiverId',
+          'side',
+          'status',
+          'createdAt',
+          'respondedAt'
+        ]) &&
+        data.keys().hasAll([
+          'matchId',
+          'senderId',
+          'receiverId',
+          'side',
+          'status',
+          'createdAt'
+        ]) &&
+        data.matchId is string &&
+        data.senderId is string &&
+        data.receiverId is string &&
+        data.senderId != data.receiverId &&
+        data.side in ['A', 'B'] &&
+        data.status in ['pending', 'accepted', 'declined', 'cancelled'] &&
+        data.createdAt is timestamp &&
+        isOptionalTimestamp(data.respondedAt);
+    }
+
+    function matchInvitationIdentityUnchanged() {
+      return request.resource.data.matchId == resource.data.matchId &&
+        request.resource.data.senderId == resource.data.senderId &&
+        request.resource.data.receiverId == resource.data.receiverId &&
+        request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function canCreateMatchInvitation(data) {
+      return isAuthenticated() &&
+        validMatchInvitationDoc(data) &&
+        data.senderId == request.auth.uid &&
+        data.status == 'pending' &&
+        data.respondedAt == null;
+    }
+
+    function canUpdateMatchInvitation() {
+      return isAuthenticated() &&
+        validMatchInvitationDoc(request.resource.data) &&
+        resource.data.status == 'pending' &&
+        matchInvitationIdentityUnchanged() &&
+        request.resource.data.respondedAt is timestamp &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'respondedAt']) &&
+        (
+          (
+            request.resource.data.status == 'cancelled' &&
+            resource.data.senderId == request.auth.uid
+          ) ||
+          (
+            request.resource.data.status in ['accepted', 'declined'] &&
+            resource.data.receiverId == request.auth.uid
+          )
+        );
+    }
+
+    function canCreateReservedUsername(data, docId) {
+      return isAuthenticated() &&
+        data.keys().hasOnly([
+          'username',
+          'ownerId',
+          'previousOwnerId',
+          'status',
+          'claimedAt',
+          'reservedAt',
+          'expiresAt'
+        ]) &&
+        data.username is string &&
+        data.username == docId &&
+        data.ownerId is string &&
+        data.ownerId == request.auth.uid;
+    }
+
+    function canClaimExpiredReservedUsername() {
+      return resource.data.status == 'reserved' &&
+        resource.data.expiresAt is int &&
+        resource.data.expiresAt <= request.time.toMillis();
+    }
+
+    function canUpdateReservedUsername() {
+      return isAuthenticated() &&
+        (
+          resource.data.ownerId == request.auth.uid ||
+          (
+            request.resource.data.keys().hasOnly([
+              'ownerId',
+              'status',
+              'claimedAt',
+              'expiresAt'
+            ]) &&
+            request.resource.data.ownerId is string &&
+            request.resource.data.ownerId == request.auth.uid &&
+            canClaimExpiredReservedUsername()
+          )
+        );
+    }
+
+    function matchOperationRefsUnchanged() {
+      return request.resource.data.matchId == resource.data.matchId &&
+        request.resource.data.sideKey == resource.data.sideKey &&
+        request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function validTournamentParticipant(data) {
+      return data.keys().hasOnly([
+          'tournamentId',
+          'sourceType',
+          'sourceEntityId',
+          'displayName',
+          'status',
+          'seed',
+          'groupId',
+          'sourceRegistrationId',
+          'replacementForParticipantId',
+          'replacedByParticipantId',
+          'createdAt',
+          'updatedAt',
+          'approvedAt',
+          'finalizedAt',
+          'withdrawnAt',
+          'replacedAt'
+        ]) &&
+        data.tournamentId is string &&
+        data.sourceType in ['registeredTeam', 'guestTeam'] &&
+        data.sourceEntityId is string &&
+        data.displayName is string &&
+        data.status in ['approved', 'finalized', 'withdrawn', 'replaced'] &&
+        nullableInt(data, 'seed') &&
+        nullableString(data, 'groupId') &&
+        nullableString(data, 'sourceRegistrationId') &&
+        nullableString(data, 'replacementForParticipantId') &&
+        nullableString(data, 'replacedByParticipantId') &&
+        data.createdAt is int &&
+        data.updatedAt is int &&
+        nullableInt(data, 'approvedAt') &&
+        nullableInt(data, 'finalizedAt') &&
+        nullableInt(data, 'withdrawnAt') &&
+        nullableInt(data, 'replacedAt');
+    }
+
+    function participantSourceRefsUnchanged() {
+      return tournamentOperationRefsUnchanged() &&
+        request.resource.data.sourceType == resource.data.sourceType &&
+        request.resource.data.sourceEntityId == resource.data.sourceEntityId;
+    }
+
+    function validTournamentGroup(data) {
+      return data.keys().hasOnly([
+          'tournamentId',
+          'groupStageId',
+          'name',
+          'order',
+          'participantIds',
+          'qualifierParticipantIds',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.tournamentId is string &&
+        data.groupStageId is string &&
+        data.name is string &&
+        data.order is int &&
+        data.participantIds is list &&
+        data.qualifierParticipantIds is list &&
+        data.createdAt is int &&
+        data.updatedAt is int;
+    }
+
+    function groupRefsUnchanged() {
+      return tournamentOperationRefsUnchanged() &&
+        request.resource.data.groupStageId == resource.data.groupStageId;
+    }
+
+    function validGroupStandingSnapshot(data) {
+      return data.keys().hasOnly([
+          'tournamentId',
+          'groupStageId',
+          'groupId',
+          'tiebreakerOrder',
+          'entries',
+          'qualifierParticipantIds',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.tournamentId is string &&
+        data.groupStageId is string &&
+        data.groupId is string &&
+        data.tiebreakerOrder is list &&
+        data.entries is list &&
+        data.qualifierParticipantIds is list &&
+        data.createdAt is int &&
+        data.updatedAt is int;
+    }
+
+    function standingRefsUnchanged() {
+      return tournamentOperationRefsUnchanged() &&
+        request.resource.data.groupStageId == resource.data.groupStageId &&
+        request.resource.data.groupId == resource.data.groupId;
+    }
+
+    function validKnockoutBracket(data) {
+      return data.keys().hasOnly([
+          'tournamentId',
+          'format',
+          'qualifierParticipantIds',
+          'championParticipantId',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.tournamentId is string &&
+        data.format == 'singleElimination' &&
+        data.qualifierParticipantIds is list &&
+        nullableString(data, 'championParticipantId') &&
+        data.createdAt is int &&
+        data.updatedAt is int;
+    }
+
+    function validKnockoutTie(data) {
+      return data.keys().hasOnly([
+          'tournamentId',
+          'bracketId',
+          'roundIndex',
+          'slotNumber',
+          'participantAId',
+          'participantBId',
+          'winnerParticipantId',
+          'matchId',
+          'nextTieId',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.tournamentId is string &&
+        data.bracketId is string &&
+        data.roundIndex is int &&
+        data.slotNumber is int &&
+        nullableString(data, 'participantAId') &&
+        nullableString(data, 'participantBId') &&
+        nullableString(data, 'winnerParticipantId') &&
+        nullableString(data, 'matchId') &&
+        nullableString(data, 'nextTieId') &&
+        data.createdAt is int &&
+        data.updatedAt is int;
+    }
+
+    function tieRefsUnchanged() {
+      return tournamentOperationRefsUnchanged() &&
+        request.resource.data.bracketId == resource.data.bracketId;
+    }
+
+    function validMatchSide(data) {
+      return data.keys().hasOnly([
+          'matchId',
+          'sideKey',
+          'type',
+          'displayName',
+          'officialTeamId',
+          'captainUserId',
+          'managedByUserIds',
+          'createdBy',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.matchId is string &&
+        data.sideKey in ['A', 'B'] &&
+        data.type in ['temporary', 'officialTeam'] &&
+        data.displayName is string &&
+        nullableString(data, 'officialTeamId') &&
+        nullableString(data, 'captainUserId') &&
+        data.managedByUserIds is list &&
+        data.createdBy is string &&
+        data.createdAt is int &&
+        data.updatedAt is int;
+    }
+
+    function validMatchSidePlayer(data) {
+      return data.keys().hasOnly([
+          'matchId',
+          'sideKey',
+          'sideId',
+          'kind',
+          'playerId',
+          'displayName',
+          'position',
+          'shirtNumber',
+          'ratingEligible',
+          'addedBy',
+          'createdAt'
+        ]) &&
+        data.matchId is string &&
+        data.sideKey in ['A', 'B'] &&
+        data.sideId is string &&
+        data.kind in ['temporary', 'registered'] &&
+        nullableString(data, 'playerId') &&
+        data.displayName is string &&
+        nullableString(data, 'position') &&
+        nullableInt(data, 'shirtNumber') &&
+        data.ratingEligible is bool &&
+        data.addedBy is string &&
+        data.createdAt is int;
+    }
+
+    function matchSidePlayerRefsUnchanged() {
+      return matchOperationRefsUnchanged() &&
+        request.resource.data.sideId == resource.data.sideId &&
+        request.resource.data.kind == resource.data.kind &&
+        request.resource.data.addedBy == resource.data.addedBy;
     }
 
     match /players/{playerId} {
@@ -488,8 +1338,7 @@ service cloud.firestore {
 
     match /matches/{matchId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() &&
-        request.resource.data.organizerId == request.auth.uid;
+      allow create: if canCreateMatch(request.resource.data, matchId);
       allow update: if isMatchOrganizer();
       allow delete: if false;
 
@@ -549,16 +1398,102 @@ service cloud.firestore {
         request.resource.data.organizerId == request.auth.uid;
       allow update: if isTournamentOrganizer();
       allow delete: if false;
+
+      match /assistants/{assistantUserId} {
+        allow get: if canGetAssistantPermission(tournamentId, assistantUserId);
+        allow list: if organizesTournamentById(tournamentId);
+        allow create: if canCreateAssistantPermission(
+          tournamentId,
+          assistantUserId
+        );
+        allow update: if canUpdateAssistantPermission(
+          tournamentId,
+          assistantUserId
+        );
+        allow delete: if false;
+      }
     }
 
     match /tournamentRegistrations/{registrationId} {
       allow read: if isAuthenticated();
       allow create: if canCreateTournamentRegistration(request.resource.data);
-      allow update: if (
-        canUpdateTournamentRegistration(resource.data) &&
-        request.resource.data.tournamentId == resource.data.tournamentId
-      );
+      allow update: if canUpdateTournamentRegistration();
       allow delete: if false;
+    }
+
+    match /tournamentParticipants/{participantId} {
+      allow read: if isAuthenticated();
+      allow create: if ownsTournamentOperation(request.resource.data) &&
+        validTournamentParticipant(request.resource.data);
+      allow update: if ownsExistingTournamentOperation() &&
+        request.resource.data.tournamentId == resource.data.tournamentId &&
+        participantSourceRefsUnchanged() &&
+        validTournamentParticipant(request.resource.data);
+      allow delete: if ownsExistingTournamentOperation();
+    }
+
+    match /tournamentGroups/{groupId} {
+      allow read: if isAuthenticated();
+      allow create: if ownsTournamentOperation(request.resource.data) &&
+        validTournamentGroup(request.resource.data);
+      allow update: if ownsExistingTournamentOperation() &&
+        groupRefsUnchanged() &&
+        validTournamentGroup(request.resource.data);
+      allow delete: if ownsExistingTournamentOperation();
+    }
+
+    match /groupStandingSnapshots/{snapshotId} {
+      allow read: if isAuthenticated();
+      allow create: if ownsTournamentOperation(request.resource.data) &&
+        validGroupStandingSnapshot(request.resource.data);
+      allow update: if ownsExistingTournamentOperation() &&
+        standingRefsUnchanged() &&
+        validGroupStandingSnapshot(request.resource.data);
+      allow delete: if ownsExistingTournamentOperation();
+    }
+
+    match /knockoutBrackets/{bracketId} {
+      allow read: if isAuthenticated();
+      allow create: if ownsTournamentOperation(request.resource.data) &&
+        validKnockoutBracket(request.resource.data);
+      allow update: if ownsExistingTournamentOperation() &&
+        tournamentOperationRefsUnchanged() &&
+        validKnockoutBracket(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /knockoutTies/{tieId} {
+      allow read: if isAuthenticated();
+      allow create: if ownsTournamentOperation(request.resource.data) &&
+        validKnockoutTie(request.resource.data);
+      allow update: if ownsExistingTournamentOperation() &&
+        tieRefsUnchanged() &&
+        validKnockoutTie(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /matchSides/{sideId} {
+      allow read: if isAuthenticated();
+      allow create: if canManageMatchOperationById(
+          request.resource.data.matchId
+        ) &&
+        validMatchSide(request.resource.data);
+      allow update: if canManageMatchOperationById(resource.data.matchId) &&
+        matchOperationRefsUnchanged() &&
+        validMatchSide(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /matchSidePlayers/{playerId} {
+      allow read: if isAuthenticated();
+      allow create: if canManageMatchOperationById(
+          request.resource.data.matchId
+        ) &&
+        validMatchSidePlayer(request.resource.data);
+      allow update: if canManageMatchOperationById(resource.data.matchId) &&
+        matchSidePlayerRefsUnchanged() &&
+        validMatchSidePlayer(request.resource.data);
+      allow delete: if canManageMatchOperationById(resource.data.matchId);
     }
 
     match /ratingEvents/{eventId} {
@@ -573,8 +1508,31 @@ service cloud.firestore {
 
     match /organizerActions/{actionId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.data.keys().hasOnly([
+          'actorId',
+          'action',
+          'targetId',
+          'details',
+          'createdAt'
+        ]) &&
+        request.resource.data.actorId is string &&
+        request.resource.data.actorId == request.auth.uid;
       allow update, delete: if false;
+    }
+
+    match /challenges/{challengeId} {
+      allow read: if isChallengeParticipant(resource.data);
+      allow create: if canCreateChallenge(request.resource.data);
+      allow update: if canUpdateChallenge(challengeId);
+      allow delete: if false;
+    }
+
+    match /matchInvitations/{invitationId} {
+      allow read: if isAuthenticated();
+      allow create: if canCreateMatchInvitation(request.resource.data);
+      allow update: if canUpdateMatchInvitation();
+      allow delete: if false;
     }
 
     match /friendships/{friendshipId} {
@@ -585,10 +1543,8 @@ service cloud.firestore {
 
     match /reservedUsernames/{username} {
       allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated() && (
-        request.resource.data.ownerId == request.auth.uid ||
-        request.resource.data.previousOwnerId == request.auth.uid
-      );
+      allow create: if canCreateReservedUsername(request.resource.data, username);
+      allow update: if canUpdateReservedUsername();
       allow delete: if false;
     }
 
@@ -698,7 +1654,8 @@ service cloud.firestore {
 
     match /analyticsEvents/{eventId} {
       allow read: if isAuthenticated();
-      allow create: if request.resource.data.keys().hasOnly([
+      allow create: if isAuthenticated() &&
+        request.resource.data.keys().hasOnly([
           'eventName',
           'actorId',
           'parameters',

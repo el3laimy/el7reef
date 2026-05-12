@@ -6,7 +6,7 @@ import '../../../core/enums/tournament_enums.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
 import '../../../domain/entities/tournament.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 
 /// كونترولر الدورة — يدير دورة حياة البطولة الكاملة
 class TournamentController extends GetxController {

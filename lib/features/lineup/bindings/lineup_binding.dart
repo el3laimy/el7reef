@@ -16,7 +16,7 @@ import '../../../data/repositories/player_repository_impl.dart';
 import '../../../data/repositories/team_membership_repository_impl.dart';
 import '../../../data/repositories/team_repository_impl.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 import '../../shareables/controllers/lineup_share_controller.dart';
 import '../controllers/match_result_lineup_controller.dart';
 import '../controllers/match_side_lineup_editor_controller.dart';

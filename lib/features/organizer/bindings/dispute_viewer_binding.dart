@@ -2,7 +2,7 @@ import 'package:get/get.dart';
 
 import '../../../core/auth/auth_service_session.dart';
 import '../../../core/auth/auth_session.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/auth/auth_service.dart';
 import '../controllers/dispute_viewer_controller.dart';
 
 class DisputeViewerBinding extends Bindings {

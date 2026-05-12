@@ -1,30 +1,39 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../../core/constants/firebase_paths.dart';
-import '../../domain/entities/fantasy_team.dart';
 import '../../domain/entities/fantasy_slot.dart';
+import '../../domain/entities/fantasy_team.dart';
 import '../../domain/entities/player_fantasy_value.dart';
 import '../../domain/entities/transfer_record.dart';
 import '../../domain/repositories/fantasy_repository.dart';
-import '../models/fantasy_team_model.dart';
 import '../models/fantasy_slot_model.dart';
+import '../models/fantasy_team_model.dart';
 import '../models/player_fantasy_value_model.dart';
 import '../models/transfer_record_model.dart';
 
 class FantasyRepositoryImpl implements FantasyRepository {
-  final FirebaseFirestore _db;
+  final FirebaseFirestore _firestore;
 
-  FantasyRepositoryImpl({FirebaseFirestore? db}) : _db = db ?? FirebaseFirestore.instance;
+  FantasyRepositoryImpl({FirebaseFirestore? db, FirebaseFirestore? firestore})
+    : _firestore = firestore ?? db ?? FirebaseFirestore.instance;
 
-  CollectionReference get _teamsRef => _db.collection(FirebasePaths.fantasyTeams);
-  CollectionReference get _slotsRef => _db.collection(FirebasePaths.fantasySlots);
-  CollectionReference get _transfersRef => _db.collection(FirebasePaths.transferRecords);
-  CollectionReference get _valuesRef => _db.collection(FirebasePaths.playerFantasyValues);
+  CollectionReference get _teamsRef =>
+      _firestore.collection(FirebasePaths.fantasyTeams);
+  CollectionReference get _slotsRef =>
+      _firestore.collection(FirebasePaths.fantasySlots);
+  CollectionReference get _transfersRef =>
+      _firestore.collection(FirebasePaths.transferRecords);
+  CollectionReference get _valuesRef =>
+      _firestore.collection(FirebasePaths.playerFantasyValues);
 
   @override
   Future<FantasyTeam?> getFantasyTeam(String ownerPlayerId) async {
     final doc = await _teamsRef.doc(ownerPlayerId).get();
     if (!doc.exists || doc.data() == null) return null;
-    return FantasyTeamModel.fromJson(doc.data() as Map<String, dynamic>, doc.id).toEntity();
+    return FantasyTeamModel.fromJson(
+      doc.data() as Map<String, dynamic>,
+      doc.id,
+    ).toEntity();
   }
 
   @override
@@ -39,20 +48,25 @@ class FantasyRepositoryImpl implements FantasyRepository {
         .get();
 
     return snapshot.docs
-        .map((doc) => FantasyTeamModel.fromJson(
-              doc.data() as Map<String, dynamic>,
-              doc.id,
-            ).toEntity())
+        .map(
+          (doc) => FantasyTeamModel.fromJson(
+            doc.data() as Map<String, dynamic>,
+            doc.id,
+          ).toEntity(),
+        )
         .toList();
   }
 
   @override
-  Future<void> createFantasyTeam(FantasyTeam team, List<FantasySlot> slots) async {
-    await _db.runTransaction((tx) async {
+  Future<void> createFantasyTeam(
+    FantasyTeam team,
+    List<FantasySlot> slots,
+  ) async {
+    await _firestore.runTransaction((tx) async {
       final teamModel = FantasyTeamModel.fromEntity(team);
       tx.set(_teamsRef.doc(team.id), teamModel.toJson());
 
-      for (var slot in slots) {
+      for (final slot in slots) {
         final slotModel = FantasySlotModel.fromEntity(slot);
         final ref = _slotsRef.doc(slot.id);
         tx.set(ref, slotModel.toJson());
@@ -68,9 +82,16 @@ class FantasyRepositoryImpl implements FantasyRepository {
 
   @override
   Future<List<FantasySlot>> getTeamSlots(String fantasyTeamId) async {
-    final snapshot = await _slotsRef.where('fantasyTeamId', isEqualTo: fantasyTeamId).get();
+    final snapshot = await _slotsRef
+        .where('fantasyTeamId', isEqualTo: fantasyTeamId)
+        .get();
     return snapshot.docs
-        .map((doc) => FantasySlotModel.fromJson(doc.data() as Map<String, dynamic>, doc.id).toEntity())
+        .map(
+          (doc) => FantasySlotModel.fromJson(
+            doc.data() as Map<String, dynamic>,
+            doc.id,
+          ).toEntity(),
+        )
         .toList();
   }
 
@@ -81,15 +102,19 @@ class FantasyRepositoryImpl implements FantasyRepository {
   }
 
   @override
-  Future<void> processTransfer(FantasyTeam team, TransferRecord record, List<FantasySlot> updatedSlots) async {
-    await _db.runTransaction((tx) async {
+  Future<void> processTransfer(
+    FantasyTeam team,
+    TransferRecord record,
+    List<FantasySlot> updatedSlots,
+  ) async {
+    await _firestore.runTransaction((tx) async {
       final teamModel = FantasyTeamModel.fromEntity(team);
       tx.update(_teamsRef.doc(team.id), teamModel.toJson());
 
       final recordModel = TransferRecordModel.fromEntity(record);
       tx.set(_transfersRef.doc(record.id), recordModel.toJson());
 
-      for (var slot in updatedSlots) {
+      for (final slot in updatedSlots) {
         final slotModel = FantasySlotModel.fromEntity(slot);
         tx.update(_slotsRef.doc(slot.id), slotModel.toJson());
       }
@@ -100,7 +125,10 @@ class FantasyRepositoryImpl implements FantasyRepository {
   Future<PlayerFantasyValue?> getPlayerFantasyValue(String playerId) async {
     final doc = await _valuesRef.doc(playerId).get();
     if (!doc.exists || doc.data() == null) return null;
-    return PlayerFantasyValueModel.fromJson(doc.data() as Map<String, dynamic>, doc.id).toEntity();
+    return PlayerFantasyValueModel.fromJson(
+      doc.data() as Map<String, dynamic>,
+      doc.id,
+    ).toEntity();
   }
 
   @override
@@ -111,17 +139,21 @@ class FantasyRepositoryImpl implements FantasyRepository {
         .get();
 
     return snapshot.docs
-        .map((doc) => PlayerFantasyValueModel.fromJson(
-              doc.data() as Map<String, dynamic>,
-              doc.id,
-            ).toEntity())
+        .map(
+          (doc) => PlayerFantasyValueModel.fromJson(
+            doc.data() as Map<String, dynamic>,
+            doc.id,
+          ).toEntity(),
+        )
         .toList();
   }
 
   @override
   Future<void> updatePlayerFantasyValue(PlayerFantasyValue value) async {
     final model = PlayerFantasyValueModel.fromEntity(value);
-    await _valuesRef.doc(value.playerId).set(model.toJson(), SetOptions(merge: true));
+    await _valuesRef
+        .doc(value.playerId)
+        .set(model.toJson(), SetOptions(merge: true));
   }
 
   @override
@@ -130,9 +162,14 @@ class FantasyRepositoryImpl implements FantasyRepository {
         .where('fantasyTeamId', isEqualTo: fantasyTeamId)
         .orderBy('timestamp', descending: true)
         .get();
-        
+
     return snapshot.docs
-        .map((doc) => TransferRecordModel.fromJson(doc.data() as Map<String, dynamic>, doc.id).toEntity())
+        .map(
+          (doc) => TransferRecordModel.fromJson(
+            doc.data() as Map<String, dynamic>,
+            doc.id,
+          ).toEntity(),
+        )
         .toList();
   }
 }

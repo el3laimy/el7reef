@@ -327,7 +327,7 @@ class MatchSettlementService {
       final statRef = _firestore
           .collection(FirebasePaths.matches)
           .doc(matchId)
-          .collection('player_stats')
+          .collection(FirebasePaths.playerStats)
           .doc(stats.playerId);
       transaction.set(statRef, {
         'playerId': stats.playerId,

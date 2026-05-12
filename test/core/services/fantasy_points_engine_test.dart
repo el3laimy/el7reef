@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:el7reef/core/services/fantasy_points_engine.dart';
-import 'package:el7reef/core/services/auto_substitution_engine.dart';
+import 'package:el7reef/features/fantasy/services/fantasy_points_engine.dart';
+import 'package:el7reef/features/fantasy/services/auto_substitution_engine.dart';
 import 'package:el7reef/domain/entities/fantasy_chip.dart';
 import 'package:el7reef/domain/entities/player_match_stats.dart';
 import 'package:el7reef/domain/entities/fantasy_slot.dart';

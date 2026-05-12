@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:el7reef/core/enums/fantasy_league_phase.dart';
 import 'package:el7reef/domain/entities/fantasy_chip.dart';
-import 'package:el7reef/core/services/fantasy_transfer_policy_service.dart';
+import 'package:el7reef/features/fantasy/services/fantasy_transfer_policy_service.dart';
 import 'package:el7reef/domain/entities/fantasy_league_lifecycle.dart';
 import 'package:el7reef/domain/entities/fantasy_team.dart';
 

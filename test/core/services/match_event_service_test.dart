@@ -29,6 +29,7 @@ void main() {
       firestore = FakeFirebaseFirestore();
       service = MatchEventService(
         repository: MatchEventRepositoryImpl(firestore: firestore),
+        firestore: firestore,
       );
       now = DateTime(2026, 5, 3, 20);
     });
@@ -36,6 +37,7 @@ void main() {
     test(
       'records and loads active goal and MVP events for all player kinds',
       () async {
+        await _seedMatch(firestore, matchId: 'match-1');
         final goal = await service.recordGoal(
           eventId: 'goal-1',
           matchId: 'match-1',
@@ -74,8 +76,54 @@ void main() {
     );
 
     test(
+      'allows active assistant to record goal and derives tournament id',
+      () async {
+        await _seedMatch(firestore, matchId: 'match-1');
+        await _seedAssistantPermission(firestore);
+
+        final goal = await service.recordGoal(
+          eventId: 'assistant-goal-1',
+          matchId: 'match-1',
+          sideKey: 'A',
+          actor: guestActor,
+          minute: 11,
+          createdBy: 'assistant-1',
+          now: now,
+        );
+
+        expect(goal.createdBy, 'assistant-1');
+        expect(goal.tournamentId, 'tournament-1');
+        expect(goal.eventType, MatchEventType.goal);
+        final loaded = await service.getMatchEvents('match-1');
+        expect(loaded.single.id, 'assistant-goal-1');
+      },
+    );
+
+    test('allows active assistant to record MVP', () async {
+      await _seedMatch(firestore, matchId: 'match-1');
+      await _seedAssistantPermission(firestore);
+
+      final mvp = await service.recordMvp(
+        eventId: 'assistant-mvp-1',
+        matchId: 'match-1',
+        tournamentId: 'tournament-1',
+        sideKey: 'B',
+        actor: registeredActor,
+        createdBy: 'assistant-1',
+        now: now,
+      );
+
+      expect(mvp.createdBy, 'assistant-1');
+      expect(mvp.tournamentId, 'tournament-1');
+      expect(mvp.eventType, MatchEventType.mvp);
+      final loaded = await service.getMvpEvent('match-1');
+      expect(loaded?.id, 'assistant-mvp-1');
+    });
+
+    test(
       'records multiple goals and sorts by minute then created time',
       () async {
+        await _seedMatch(firestore, matchId: 'match-1');
         await service.recordGoals(
           matchId: 'match-1',
           tournamentId: 'tournament-1',
@@ -111,6 +159,7 @@ void main() {
     );
 
     test('records and loads a guest player MVP event', () async {
+      await _seedMatch(firestore, matchId: 'match-guest-mvp');
       final event = await service.recordMvp(
         eventId: 'mvp-guest-1',
         matchId: 'match-guest-mvp',
@@ -133,6 +182,7 @@ void main() {
     });
 
     test('voids an event so match and tournament queries exclude it', () async {
+      await _seedMatch(firestore, matchId: 'match-1');
       await service.recordGoal(
         eventId: 'goal-1',
         matchId: 'match-1',
@@ -159,7 +209,264 @@ void main() {
       expect(rawDoc.data()?['status'], 'voided');
     });
 
+    test('denies random user goal and MVP event creation', () async {
+      await _seedMatch(firestore, matchId: 'match-1');
+
+      expect(
+        () => service.recordGoal(
+          eventId: 'forged-goal-1',
+          matchId: 'match-1',
+          tournamentId: 'tournament-1',
+          sideKey: 'A',
+          actor: registeredActor,
+          createdBy: 'account-b',
+          now: now,
+        ),
+        throwsA(
+          predicate(
+            (error) => error.toString().contains(
+              'لا تملك صلاحية تسجيل أحداث هذه المباراة',
+            ),
+          ),
+        ),
+      );
+      expect(
+        () => service.recordMvp(
+          eventId: 'forged-mvp-1',
+          matchId: 'match-1',
+          tournamentId: 'tournament-1',
+          sideKey: 'A',
+          actor: guestActor,
+          createdBy: 'account-b',
+          now: now,
+        ),
+        throwsA(
+          predicate(
+            (error) => error.toString().contains(
+              'لا تملك صلاحية تسجيل أحداث هذه المباراة',
+            ),
+          ),
+        ),
+      );
+
+      final events = await service.getMatchEvents('match-1');
+      expect(events, isEmpty);
+    });
+
+    test('denies assistant without canRecordGoalsAndMvp', () async {
+      await _seedMatch(firestore, matchId: 'match-1');
+      await _seedAssistantPermission(firestore, canRecordGoalsAndMvp: false);
+
+      expect(
+        () => service.recordGoal(
+          eventId: 'assistant-denied-goal-1',
+          matchId: 'match-1',
+          tournamentId: 'tournament-1',
+          sideKey: 'A',
+          actor: registeredActor,
+          createdBy: 'assistant-1',
+          now: now,
+        ),
+        throwsA(
+          predicate(
+            (error) => error.toString().contains(
+              'لا تملك صلاحية تسجيل أحداث هذه المباراة',
+            ),
+          ),
+        ),
+      );
+      expect(
+        () => service.recordMvp(
+          eventId: 'assistant-denied-mvp-1',
+          matchId: 'match-1',
+          tournamentId: 'tournament-1',
+          sideKey: 'B',
+          actor: guestActor,
+          createdBy: 'assistant-1',
+          now: now,
+        ),
+        throwsA(
+          predicate(
+            (error) => error.toString().contains(
+              'لا تملك صلاحية تسجيل أحداث هذه المباراة',
+            ),
+          ),
+        ),
+      );
+      expect(await service.getMatchEvents('match-1'), isEmpty);
+    });
+
+    test('denies revoked assistant goal and MVP event creation', () async {
+      await _seedMatch(firestore, matchId: 'match-1');
+      await _seedAssistantPermission(firestore, status: 'revoked');
+
+      expect(
+        () => service.recordGoal(
+          eventId: 'revoked-goal-1',
+          matchId: 'match-1',
+          tournamentId: 'tournament-1',
+          sideKey: 'A',
+          actor: registeredActor,
+          createdBy: 'assistant-1',
+          now: now,
+        ),
+        throwsA(
+          predicate(
+            (error) => error.toString().contains(
+              'لا تملك صلاحية تسجيل أحداث هذه المباراة',
+            ),
+          ),
+        ),
+      );
+      expect(
+        () => service.recordMvp(
+          eventId: 'revoked-mvp-1',
+          matchId: 'match-1',
+          tournamentId: 'tournament-1',
+          sideKey: 'B',
+          actor: guestActor,
+          createdBy: 'assistant-1',
+          now: now,
+        ),
+        throwsA(
+          predicate(
+            (error) => error.toString().contains(
+              'لا تملك صلاحية تسجيل أحداث هذه المباراة',
+            ),
+          ),
+        ),
+      );
+      expect(await service.getMatchEvents('match-1'), isEmpty);
+    });
+
+    test('denies assistant from another tournament', () async {
+      await _seedMatch(
+        firestore,
+        matchId: 'match-2',
+        organizerId: 'organizer-2',
+        tournamentId: 'tournament-2',
+      );
+      await _seedAssistantPermission(firestore, tournamentId: 'tournament-1');
+
+      expect(
+        () => service.recordGoal(
+          eventId: 'wrong-tournament-assistant-goal-1',
+          matchId: 'match-2',
+          tournamentId: 'tournament-2',
+          sideKey: 'A',
+          actor: registeredActor,
+          createdBy: 'assistant-1',
+          now: now,
+        ),
+        throwsA(
+          predicate(
+            (error) => error.toString().contains(
+              'لا تملك صلاحية تسجيل أحداث هذه المباراة',
+            ),
+          ),
+        ),
+      );
+      expect(
+        () => service.recordMvp(
+          eventId: 'wrong-tournament-assistant-mvp-1',
+          matchId: 'match-2',
+          tournamentId: 'tournament-2',
+          sideKey: 'B',
+          actor: guestActor,
+          createdBy: 'assistant-1',
+          now: now,
+        ),
+        throwsA(
+          predicate(
+            (error) => error.toString().contains(
+              'لا تملك صلاحية تسجيل أحداث هذه المباراة',
+            ),
+          ),
+        ),
+      );
+      expect(await service.getMatchEvents('match-2'), isEmpty);
+    });
+
+    test(
+      'friendly match remains organizer-only and ignores assistant permission',
+      () async {
+        await _seedMatch(firestore, matchId: 'friendly-1', tournamentId: null);
+        await _seedAssistantPermission(firestore);
+
+        final organizerGoal = await service.recordGoal(
+          eventId: 'friendly-organizer-goal-1',
+          matchId: 'friendly-1',
+          sideKey: 'A',
+          actor: registeredActor,
+          createdBy: 'organizer-1',
+          now: now,
+        );
+        expect(organizerGoal.tournamentId, isNull);
+
+        expect(
+          () => service.recordGoal(
+            eventId: 'friendly-assistant-goal-1',
+            matchId: 'friendly-1',
+            sideKey: 'A',
+            actor: guestActor,
+            createdBy: 'assistant-1',
+            now: now,
+          ),
+          throwsA(
+            predicate(
+              (error) => error.toString().contains(
+                'لا تملك صلاحية تسجيل أحداث هذه المباراة',
+              ),
+            ),
+          ),
+        );
+        final events = await service.getMatchEvents('friendly-1');
+        expect(events.map((event) => event.id), ['friendly-organizer-goal-1']);
+      },
+    );
+
+    test(
+      'denies missing match and tournament mismatch event creation',
+      () async {
+        await _seedMatch(firestore, matchId: 'match-1');
+
+        expect(
+          () => service.recordGoal(
+            eventId: 'missing-match-goal-1',
+            matchId: 'missing-match',
+            tournamentId: 'tournament-1',
+            sideKey: 'A',
+            actor: registeredActor,
+            createdBy: 'organizer-1',
+            now: now,
+          ),
+          throwsA(
+            predicate(
+              (error) => error.toString().contains('تعذر العثور على المباراة'),
+            ),
+          ),
+        );
+        expect(
+          () => service.recordGoal(
+            eventId: 'mismatch-goal-1',
+            matchId: 'match-1',
+            tournamentId: 'other-tournament',
+            sideKey: 'A',
+            actor: registeredActor,
+            createdBy: 'organizer-1',
+            now: now,
+          ),
+          throwsA(
+            predicate(
+              (error) => error.toString().contains('لا تطابق المباراة'),
+            ),
+          ),
+        );
+      },
+    );
+
     test('validates required fields, side keys, and minutes', () async {
+      await _seedMatch(firestore, matchId: 'match-1', tournamentId: null);
       expect(
         service.recordGoal(
           matchId: ' ',
@@ -202,5 +509,52 @@ void main() {
         throwsArgumentError,
       );
     });
+  });
+}
+
+Future<void> _seedAssistantPermission(
+  FakeFirebaseFirestore firestore, {
+  String tournamentId = 'tournament-1',
+  String userId = 'assistant-1',
+  String addedBy = 'organizer-1',
+  bool canRecordGoalsAndMvp = true,
+  String status = 'active',
+}) {
+  final timestamp = DateTime(2026, 5, 3, 19).millisecondsSinceEpoch;
+  return firestore
+      .collection(FirebasePaths.tournaments)
+      .doc(tournamentId)
+      .collection('assistants')
+      .doc(userId)
+      .set({
+        'tournamentId': tournamentId,
+        'userId': userId,
+        'addedBy': addedBy,
+        'status': status,
+        'preset': 'customLimited',
+        'permissions': {
+          'canViewMatchday': true,
+          'canStartMatch': false,
+          'canSubmitScore': false,
+          'canRecordGoalsAndMvp': canRecordGoalsAndMvp,
+          'canApproveScore': false,
+          'canDeclareForfeit': false,
+        },
+        'createdAt': timestamp,
+        'updatedAt': timestamp,
+        'revokedAt': status == 'revoked' ? timestamp : null,
+      });
+}
+
+Future<void> _seedMatch(
+  FakeFirebaseFirestore firestore, {
+  required String matchId,
+  String organizerId = 'organizer-1',
+  String? tournamentId = 'tournament-1',
+}) {
+  return firestore.collection(FirebasePaths.matches).doc(matchId).set({
+    'organizerId': organizerId,
+    'tournamentId': tournamentId,
+    'createdAt': DateTime(2026, 5, 3, 20).millisecondsSinceEpoch,
   });
 }

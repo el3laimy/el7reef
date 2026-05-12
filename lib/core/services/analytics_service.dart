@@ -11,11 +11,9 @@ class AnalyticsService {
   final FirebaseFirestore? _firestore;
   final Uuid _uuid;
 
-  AnalyticsService({
-    FirebaseFirestore? firestore,
-    Uuid? uuid,
-  })  : _firestore = firestore ?? _resolveFirestoreIfAvailable(),
-        _uuid = uuid ?? const Uuid();
+  AnalyticsService({FirebaseFirestore? firestore, Uuid? uuid})
+    : _firestore = firestore ?? _resolveFirestoreIfAvailable(),
+      _uuid = uuid ?? const Uuid();
 
   void trackEvent(String eventName, {Map<String, dynamic>? parameters}) {
     developer.log(
@@ -37,25 +35,35 @@ class AnalyticsService {
     final sanitizedParameters = <String, dynamic>{};
     for (final entry in (parameters ?? const <String, dynamic>{}).entries) {
       final value = entry.value;
-      if (value == null ||
-          value is String ||
-          value is num ||
-          value is bool) {
+      if (value == null || value is String || value is num || value is bool) {
         sanitizedParameters[entry.key] = value;
       } else {
         sanitizedParameters[entry.key] = value.toString();
       }
     }
 
-    await firestore
-        .collection(FirebasePaths.analyticsEvents)
-        .doc(_uuid.v4())
-        .set({
+    final eventData = <String, dynamic>{
       'eventName': eventName,
-      'actorId': sanitizedParameters['actorId'],
       'parameters': sanitizedParameters,
       'createdAt': DateTime.now().millisecondsSinceEpoch,
-    });
+    };
+    final actorId = sanitizedParameters['actorId'];
+    if (actorId is String && actorId.isNotEmpty) {
+      eventData['actorId'] = actorId;
+    }
+
+    try {
+      await firestore
+          .collection(FirebasePaths.analyticsEvents)
+          .doc(_uuid.v4())
+          .set(eventData);
+    } on FirebaseException catch (error) {
+      developer.log(
+        'Analytics persistence skipped: ${error.code}',
+        name: 'AnalyticsService',
+        error: error,
+      );
+    }
   }
 
   static FirebaseFirestore? _resolveFirestoreIfAvailable() {
@@ -72,21 +80,14 @@ class AnalyticsService {
     required String targetId,
     required String actorId,
   }) {
-    trackEvent('invite_sent', parameters: {
-      'type': type,
-      'targetId': targetId,
-      'actorId': actorId,
-    });
+    trackEvent(
+      'invite_sent',
+      parameters: {'type': type, 'targetId': targetId, 'actorId': actorId},
+    );
   }
 
-  void trackClaimOpen({
-    required String type,
-    required String targetId,
-  }) {
-    trackEvent('claim_open', parameters: {
-      'type': type,
-      'targetId': targetId,
-    });
+  void trackClaimOpen({required String type, required String targetId}) {
+    trackEvent('claim_open', parameters: {'type': type, 'targetId': targetId});
   }
 
   void trackClaimCompletion({
@@ -94,11 +95,10 @@ class AnalyticsService {
     required String targetId,
     required String actorId,
   }) {
-    trackEvent('claim_completion', parameters: {
-      'type': type,
-      'targetId': targetId,
-      'actorId': actorId,
-    });
+    trackEvent(
+      'claim_completion',
+      parameters: {'type': type, 'targetId': targetId, 'actorId': actorId},
+    );
   }
 
   void trackJoinCompletion({
@@ -106,10 +106,9 @@ class AnalyticsService {
     required String targetId,
     required String actorId,
   }) {
-    trackEvent('join_completion', parameters: {
-      'type': type,
-      'targetId': targetId,
-      'actorId': actorId,
-    });
+    trackEvent(
+      'join_completion',
+      parameters: {'type': type, 'targetId': targetId, 'actorId': actorId},
+    );
   }
 }

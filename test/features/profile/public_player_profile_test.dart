@@ -491,7 +491,10 @@ class _ResolverFixture {
     resolver = PublicPlayerProfileResolver(
       playerRepository: playerRepository,
       guestPlayerRepository: guestPlayerRepository,
-      matchEventService: MatchEventService(repository: matchEventRepository),
+      matchEventService: MatchEventService(
+        repository: matchEventRepository,
+        firestore: firestore,
+      ),
     );
   }
 
@@ -538,6 +541,7 @@ class _FakeResolver extends PublicPlayerProfileResolver {
           repository: MatchEventRepositoryImpl(
             firestore: FakeFirebaseFirestore(),
           ),
+          firestore: FakeFirebaseFirestore(),
         ),
       );
 

@@ -5,6 +5,7 @@ import '../../../app/routes/app_routes.dart';
 import '../../../core/constants/feature_flags.dart';
 import '../../../core/enums/claim_target_type.dart';
 import '../../../core/services/analytics_service.dart';
+import '../../../core/auth/auth_service.dart';
 
 class ClaimEntryController extends GetxController {
   final AnalyticsService _analyticsService;
@@ -37,10 +38,13 @@ class ClaimEntryController extends GetxController {
     final resolvedTargetId = targetId;
 
     if (resolvedTargetType != null && resolvedTargetId != null) {
-      _analyticsService.trackClaimOpen(
-        type: resolvedTargetType.name,
-        targetId: resolvedTargetId,
-      );
+      if (Get.isRegistered<AuthService>() &&
+          Get.find<AuthService>().currentUserId != null) {
+        _analyticsService.trackClaimOpen(
+          type: resolvedTargetType.name,
+          targetId: resolvedTargetId,
+        );
+      }
     }
     if (code == null || code!.isEmpty) {
       errorMessage.value = 'رابط الـ claim لا يحتوي على code صالح.';
