@@ -4,20 +4,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:get/get.dart';
 import 'app/theme/app_theme.dart';
 import 'app/routes/app_pages.dart';
-import 'firebase_options.dart';
 import 'core/auth/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  // ── تهيئة Firebase (بدون الاعتماد على الإعدادات القديمة) ──
   if (Firebase.apps.isEmpty) {
-    FirebaseOptions? options;
-    try {
-      options = DefaultFirebaseOptions.currentPlatform;
-    } catch (_) {
-      options = null;
-    }
-    await Firebase.initializeApp(options: options);
+    await Firebase.initializeApp(); // سطر واحد فقط نظيف
   }
 
   // ── تسجيل الخدمات الأساسية ──

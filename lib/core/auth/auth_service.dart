@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:get/get.dart';
 import 'session_reset_coordinator.dart';
+import '../../../app/routes/app_routes.dart';
 import '../constants/app_constants.dart';
 import '../../data/repositories/player_repository_impl.dart';
 import '../../domain/entities/player.dart';
@@ -52,13 +53,39 @@ class AuthService extends GetxService {
   /// تحميل بروفايل اللاعب
   Future<void> _loadPlayerProfile(String uid) async {
     try {
-      final player = await _playerRepo.getPlayer(uid);
+      Player? player = await _playerRepo.getPlayer(uid);
+      
+      // Auto-recovery: If Auth exists but Firestore profile is missing
+      if (player == null && _auth.currentUser != null) {
+        final firebaseUser = _auth.currentUser!;
+        final now = DateTime.now();
+        player = Player(
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName ?? 'حريف جديد',
+          photoUrl: firebaseUser.photoURL,
+          qrCode: '7reef://player/${firebaseUser.uid}',
+          photoFrame: 'newcomer',
+          phone: firebaseUser.phoneNumber,
+          rating: AppConstants.baseRating,
+          createdAt: now,
+          lastActiveAt: now,
+        );
+        await _playerRepo.createPlayer(player);
+      }
+
       currentPlayer.value = player;
       if (player != null) {
         await _sessionResetCoordinator.handleSessionStarted(uid);
+      } else {
+        await signOut(); // Fallback if recovery fails
+        Get.offAllNamed(AppRoutes.login);
       }
-    } catch (e) {
+    } catch (e, stack) {
+      print('🔥 AuthService Error in _loadPlayerProfile: $e');
+      print(stack);
       currentPlayer.value = null;
+      await signOut(); // Force logout to escape broken session state
+      Get.offAllNamed(AppRoutes.login);
     }
   }
 
