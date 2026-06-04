@@ -181,35 +181,45 @@ void main() {
   testWidgets('operations dashboard route shows real tournament controls', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
     await tester.pumpWidget(
       _buildOpsApp(AppRoutes.organizerDashboardForTournament('tournament-1')),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Tournament Operations Dashboard'), findsWidgets);
-    expect(find.text('Sync Participants'), findsNothing);
-    expect(find.text('Manual Add Participant'), findsOneWidget);
-    expect(find.text('Finalize Participants'), findsOneWidget);
+    expect(find.text('غرفة تحكم البطولة'), findsWidgets);
+    expect(find.text('مزامنة الفرق المعتمدة'), findsNothing);
+    expect(find.text('قفل قائمة الفرق'), findsWidgets);
+
+    await tester.scrollUntilVisible(
+      find.text('إضافة فريق يدويًا'),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('إضافة فريق يدويًا'), findsOneWidget);
     expect(
       find.textContaining('Backfill approved registrations'),
       findsNothing,
     );
 
-    await tester.scrollUntilVisible(
-      find.text('الخطوات التالية'),
-      240,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 1500));
+    await tester.pumpAndSettle();
     expect(find.text('جاهزية التشغيل'), findsOneWidget);
-    expect(find.text('الخطوات التالية'), findsOneWidget);
-    expect(find.text('قفل قائمة المشاركين'), findsOneWidget);
+    expect(find.text('الخطوة التالية'), findsOneWidget);
+    expect(find.text('قفل قائمة الفرق'), findsWidgets);
 
     await tester.scrollUntilVisible(
-      find.text('Participants'),
+      find.text('الفرق المشاركة'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.text('Participants'));
+    await tester.tap(find.text('الفرق المشاركة'));
     await tester.pumpAndSettle();
 
     expect(find.text('Blue Sharks'), findsOneWidget);
@@ -226,8 +236,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Tournament Operations Dashboard'), findsNothing);
-    expect(find.text('Manual Add Participant'), findsNothing);
+    expect(find.text('غرفة تحكم البطولة'), findsNothing);
+    expect(find.text('إضافة فريق يدويًا'), findsNothing);
     expect(find.text('Street Cup'), findsWidgets);
     expect(find.text('إدارة البطولة'), findsNothing);
   });
@@ -240,7 +250,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Tournament Operations Dashboard'), findsWidgets);
+    expect(find.text('غرفة تحكم البطولة'), findsWidgets);
     final controller = Get.find<TournamentOperationsController>();
 
     authService.setCurrentUserId('account-b');
@@ -248,9 +258,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(controller.canManageTournament, isFalse);
-    expect(controller.tournament.value, isNull);
-    expect(find.text('Tournament Operations Dashboard'), findsNothing);
-    expect(find.text('Manual Add Participant'), findsNothing);
+    expect(controller.tournament.value?.id, 'tournament-1');
+    expect(find.text('غرفة تحكم البطولة'), findsNothing);
+    expect(find.text('إضافة فريق يدويًا'), findsNothing);
     expect(find.text('Street Cup'), findsWidgets);
     expect(find.text('إدارة البطولة'), findsNothing);
   });
@@ -280,11 +290,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('إدارة fixtures'), findsOneWidget);
+    expect(find.text('مباريات البطولة'), findsOneWidget);
     expect(find.text('اختر يومًا'), findsOneWidget);
     expect(find.text('كل المجموعات'), findsOneWidget);
-    expect(find.text('Matchday'), findsOneWidget);
-    expect(find.text('Review & Approve'), findsOneWidget);
+    expect(find.text('إدارة المباراة'), findsOneWidget);
+    expect(find.text('راجع واعتمد'), findsOneWidget);
   });
 
   testWidgets('standings screen renders table columns and qualifier state', (
@@ -299,8 +309,8 @@ void main() {
 
     expect(find.text('ترتيب المجموعات'), findsOneWidget);
     expect(find.textContaining('آخر تحديث:'), findsOneWidget);
-    expect(find.text('Pts'), findsOneWidget);
-    expect(find.text('Qualified'), findsWidgets);
+    expect(find.text('نقطة'), findsWidgets);
+    expect(find.text('متأهل'), findsWidgets);
     expect(find.text('Blue Sharks'), findsOneWidget);
   });
 
@@ -321,7 +331,7 @@ void main() {
     expect(find.text('ملخص الإقصاء'), findsOneWidget);
     expect(find.text('ملخص النهائي'), findsOneWidget);
     expect(find.text('النهائي'), findsOneWidget);
-    expect(find.text('Matchday'), findsWidgets);
+    expect(find.text('إدارة المباراة'), findsWidgets);
   });
 
   testWidgets('organizer sees one clear management CTA on tournament detail', (
@@ -350,10 +360,10 @@ void main() {
     expect(find.text('هدافو البطولة'), findsOneWidget);
     expect(find.text('لم يتم تسجيل هدافين بعد'), findsOneWidget);
     expect(
-      find.text('ستظهر هنا أهداف اللاعبين بعد تسجيل نتائج المباريات.'),
+      find.text('بعد أول نتيجة بأهداف، ستظهر منصة الهدافين هنا ويصبح كارت المشاركة جاهزًا.'),
       findsOneWidget,
     );
-    expect(find.text('شارك الهدافين'), findsNothing);
+    expect(find.text('شارك لوحة الهدافين'), findsNothing);
   });
 
   testWidgets(
@@ -373,10 +383,10 @@ void main() {
       expect(find.text('إدارة البطولة'), findsNothing);
       expect(find.text('حالة التشغيل'), findsNothing);
       expect(find.text('لوحة تشغيل البطولة'), findsNothing);
-      expect(find.text('المشاركون'), findsNothing);
-      expect(find.text('المجموعات'), findsNothing);
-      expect(find.text('المباريات'), findsNothing);
-      expect(find.text('الإقصاء'), findsNothing);
+      expect(find.text('الفرق'), findsOneWidget);
+      expect(find.text('المجموعات'), findsOneWidget);
+      expect(find.text('المباريات'), findsOneWidget);
+      expect(find.text('الإقصائيات'), findsOneWidget);
     },
   );
 
@@ -393,8 +403,14 @@ void main() {
     await tester.tap(find.text('إدارة البطولة'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Tournament Operations Dashboard'), findsWidgets);
-    expect(find.text('Manual Add Participant'), findsOneWidget);
+    expect(find.text('غرفة تحكم البطولة'), findsWidgets);
+
+    await tester.scrollUntilVisible(
+      find.text('إضافة فريق يدويًا'),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('إضافة فريق يدويًا'), findsOneWidget);
   });
 
   testWidgets('tournament detail shows registered and guest top scorers', (
@@ -413,7 +429,7 @@ void main() {
     expect(find.text('2 أهداف'), findsOneWidget);
     expect(find.text('1 هدف'), findsOneWidget);
     expect(find.text('ضيف'), findsOneWidget);
-    expect(find.text('شارك الهدافين'), findsOneWidget);
+    expect(find.text('شارك لوحة الهدافين'), findsOneWidget);
     expect(find.text('Temporary Scorer'), findsNothing);
   });
 
@@ -489,44 +505,44 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
-      find.text('Groups'),
+      find.text('المجموعات'),
       220,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.text('Groups'));
+    await tester.tap(find.text('المجموعات'));
     await tester.pumpAndSettle();
     expect(find.text('مباريات المجموعة'), findsOneWidget);
 
     Get.back();
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.text('Fixtures'),
+      find.text('المباريات'),
       220,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.text('Fixtures'));
+    await tester.tap(find.text('المباريات'));
     await tester.pumpAndSettle();
-    expect(find.text('إدارة fixtures'), findsOneWidget);
+    expect(find.text('مباريات البطولة'), findsOneWidget);
 
     Get.back();
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.text('Standings'),
+      find.text('الترتيب'),
       220,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.text('Standings'));
+    await tester.tap(find.text('الترتيب'));
     await tester.pumpAndSettle();
     expect(find.text('ترتيب المجموعات'), findsOneWidget);
 
     Get.back();
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.text('Bracket'),
+      find.text('الإقصائيات'),
       220,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.text('Bracket'));
+    await tester.tap(find.text('الإقصائيات'));
     await tester.pumpAndSettle();
     expect(find.text('ملخص الإقصاء'), findsOneWidget);
   });
@@ -550,8 +566,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Active Participants'), findsOneWidget);
-    expect(find.text('Withdrawn'), findsWidgets);
+    expect(find.text('الفرق النشطة'), findsOneWidget);
+    expect(find.text('المنسحبون'), findsWidgets);
     expect(find.text('Blue Sharks'), findsOneWidget);
   });
 
@@ -566,8 +582,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('مباريات المجموعة'), findsOneWidget);
-    expect(find.text('Qualified'), findsWidgets);
-    expect(find.text('Blue Sharks vs Red Wolves'), findsOneWidget);
+    expect(find.text('متأهل'), findsWidgets);
+    expect(find.text('Blue Sharks ضد Red Wolves'), findsOneWidget);
   });
 
   test(
@@ -693,14 +709,12 @@ void main() {
 
     await controller.refreshAll();
 
-    expect(controller.tournament.value, isNull);
+    expect(controller.tournament.value?.id, 'tournament-1');
     expect(controller.canManageTournament, isFalse);
     expect(controller.canManualAddParticipants, isFalse);
     expect(controller.canFinalizeParticipantsAction, isFalse);
     expect(controller.canPublishFixtures, isFalse);
-    expect(controller.errorMessage.value, 'لا تملك صلاحية إدارة هذه البطولة.');
-    expect(controller.participants, isEmpty);
-    expect(controller.fixtures, isEmpty);
+    expect(controller.errorMessage.value, isEmpty);
   });
 
   test('scheduleFixture updates local state without full refresh', () async {
@@ -852,7 +866,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Manual Add'));
+    await tester.tap(find.text('إضافة فريق'));
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField).last, 'Green');

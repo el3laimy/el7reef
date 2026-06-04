@@ -22,6 +22,8 @@ import 'package:el7reef/data/repositories/match_repository_impl.dart';
 import 'package:el7reef/data/repositories/match_side_player_repository_impl.dart';
 import 'package:el7reef/data/repositories/match_side_repository_impl.dart';
 import 'package:el7reef/data/repositories/team_repository_impl.dart';
+import 'package:el7reef/data/repositories/tournament_assistant_permission_repository_impl.dart';
+import 'package:el7reef/data/repositories/tournament_repository_impl.dart';
 import 'package:el7reef/domain/entities/guest_player.dart';
 import 'package:el7reef/domain/entities/match.dart';
 import 'package:el7reef/domain/entities/match_event.dart';
@@ -1204,7 +1206,7 @@ void main() {
           const GetMaterialApp(home: ScoreSubmitScreen()),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.text('حفظ النتيجة ⚽'));
+        await tester.tap(find.text('اعتمد النتيجة وجهّز الفخر'));
         await tester.pumpAndSettle();
 
         expect(controller.errorMessage.value, contains('فشل تسجيل أحداث'));
@@ -1472,6 +1474,13 @@ void main() {
     testWidgets('no-player side shows safe actionable empty state', (
       tester,
     ) async {
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      tester.view.physicalSize = const Size(1440, 3200);
+      tester.view.devicePixelRatio = 1.0;
+
       await _saveMatch(firestore, _match(id: 'match-empty-score-ui'));
       final controller = _controller(
         firestore: firestore,
@@ -1567,6 +1576,9 @@ ScoreSubmitController _controller({
     sideRepository: MatchSideRepositoryImpl(firestore: firestore),
     sidePlayerRepository: MatchSidePlayerRepositoryImpl(firestore: firestore),
     teamRepository: TeamRepositoryImpl(firestore: firestore),
+    tournamentRepository: TournamentRepositoryImpl(firestore: firestore),
+    assistantPermissionRepository:
+        TournamentAssistantPermissionRepositoryImpl(firestore: firestore),
     currentUserIdProvider: () => 'organizer-1',
   );
 }

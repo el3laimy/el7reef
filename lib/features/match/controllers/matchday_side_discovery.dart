@@ -10,7 +10,7 @@ extension MatchdaySideDiscovery on MatchdayController {
       return const [];
     }
 
-    final organizerLevel = _hasOrganizerLevelAccess(
+    final organizerLevel = await _hasOrganizerLevelAccess(
       match: match,
       tournament: tournament,
       actorId: actorId,
@@ -176,23 +176,22 @@ extension MatchdaySideDiscovery on MatchdayController {
     }
   }
 
-  bool _hasOrganizerLevelAccess({
+  Future<bool> _hasOrganizerLevelAccess({
     required Match match,
     required Tournament? tournament,
     required String actorId,
-  }) {
+  }) async {
     if (tournament == null) {
       return match.organizerId == actorId;
     }
     if (tournament.organizerId == actorId) {
       return true;
     }
-    if (!tournament.assistants.any(
-      (assistant) => assistant.userId == actorId,
-    )) {
-      return false;
-    }
-    return _tournamentPermissionService.canManageTeams(tournament, actorId);
+    return hasTournamentAssistantPermission(
+      tournament,
+      actorId,
+      TournamentAssistantPermissionKey.canStartMatch,
+    );
   }
 
   bool _canManageRegisteredTeam(Team team, String actorId) {

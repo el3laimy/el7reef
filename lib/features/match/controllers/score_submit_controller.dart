@@ -9,6 +9,8 @@ import '../../../data/repositories/match_repository_impl.dart';
 import '../../../data/repositories/match_side_player_repository_impl.dart';
 import '../../../data/repositories/match_side_repository_impl.dart';
 import '../../../data/repositories/team_repository_impl.dart';
+import '../../../data/repositories/tournament_assistant_permission_repository_impl.dart';
+import '../../../data/repositories/tournament_repository_impl.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/entities/match_participant_roster.dart';
 import '../../../domain/entities/match_side.dart';
@@ -17,6 +19,7 @@ import '../../../domain/entities/participant_ref.dart';
 import '../../../domain/entities/player.dart';
 import '../../../domain/entities/player_match_stats.dart';
 import '../../../domain/entities/team.dart';
+import '../../../domain/entities/tournament_assistant_permission.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/friendly_match_side_view.dart';
 import 'match_controller.dart';
@@ -73,6 +76,8 @@ class ScoreSubmitController extends GetxController {
   final MatchSideRepositoryImpl _sideRepository;
   final MatchSidePlayerRepositoryImpl _sidePlayerRepository;
   final TeamRepositoryImpl _teamRepository;
+  final TournamentRepositoryImpl _tournamentRepository;
+  final TournamentAssistantPermissionRepositoryImpl _assistantPermissionRepo;
   final String? Function() _currentUserIdProvider;
 
   ScoreSubmitController({
@@ -84,6 +89,8 @@ class ScoreSubmitController extends GetxController {
     MatchSideRepositoryImpl? sideRepository,
     MatchSidePlayerRepositoryImpl? sidePlayerRepository,
     TeamRepositoryImpl? teamRepository,
+    TournamentRepositoryImpl? tournamentRepository,
+    TournamentAssistantPermissionRepositoryImpl? assistantPermissionRepository,
     String? Function()? currentUserIdProvider,
   }) : _matchRepo = matchRepository ?? MatchRepositoryImpl(),
        _settlementService = settlementService ?? MatchSettlementService(),
@@ -91,10 +98,14 @@ class ScoreSubmitController extends GetxController {
        _officialRosterService =
            officialRosterService ?? OfficialMatchRosterService(),
        _sideRepository = sideRepository ?? MatchSideRepositoryImpl(),
-       _sidePlayerRepository =
-           sidePlayerRepository ?? MatchSidePlayerRepositoryImpl(),
-       _teamRepository = teamRepository ?? TeamRepositoryImpl(),
-       _currentUserIdProvider =
+        _sidePlayerRepository =
+            sidePlayerRepository ?? MatchSidePlayerRepositoryImpl(),
+        _teamRepository = teamRepository ?? TeamRepositoryImpl(),
+        _tournamentRepository =
+            tournamentRepository ?? TournamentRepositoryImpl(),
+        _assistantPermissionRepo = assistantPermissionRepository ??
+            TournamentAssistantPermissionRepositoryImpl(),
+        _currentUserIdProvider =
            currentUserIdProvider ??
            (() => Get.find<AuthService>().currentUserId) {
     teamAScoreController.addListener(_handleTeamAScoreTextChanged);
@@ -169,6 +180,10 @@ class ScoreSubmitController extends GetxController {
         errorMessage.value = 'هذه المباراة ملغاة ولا يمكن تسجيل نتيجة لها.';
         return;
       }
+      if (!await _canCurrentUserSubmitScore(loadedMatch)) {
+        errorMessage.value = 'لا تملك صلاحية تسجيل نتيجة هذه المباراة.';
+        return;
+      }
 
       match.value = loadedMatch;
       selectedMvpKey.value = '';
@@ -206,6 +221,33 @@ class ScoreSubmitController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  Future<bool> _canCurrentUserSubmitScore(Match loadedMatch) async {
+    final actorId = _currentUserIdProvider();
+    if (actorId == null || actorId.isEmpty) {
+      return false;
+    }
+    if (loadedMatch.organizerId == actorId) {
+      return true;
+    }
+    final tournamentId = loadedMatch.tournamentId;
+    if (tournamentId == null || tournamentId.isEmpty) {
+      return false;
+    }
+    final tournament = await _tournamentRepository.getTournament(tournamentId);
+    if (tournament == null) {
+      return false;
+    }
+    if (tournament.organizerId == actorId) {
+      return true;
+    }
+    final assistantPermission = await _assistantPermissionRepo
+        .getAssistantPermission(tournament.id, actorId);
+    return assistantPermission?.hasPermission(
+          TournamentAssistantPermissionKey.canSubmitScore,
+        ) ==
+        true;
   }
 
   @override

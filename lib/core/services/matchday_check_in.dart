@@ -3,7 +3,6 @@ part of 'matchday_service.dart';
 class _MatchdayCheckInService extends _MatchdayServiceBase {
   _MatchdayCheckInService({
     super.firestore,
-    super.tournamentPermissionService,
     super.teamRosterPolicy,
     super.uuid,
   });

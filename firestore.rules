@@ -204,10 +204,22 @@ service cloud.firestore {
         );
     }
 
+    function canReadTournamentRegistration(data) {
+      return isAuthenticated() &&
+        data.tournamentId is string &&
+        (
+          data.status == 'approved' ||
+          organizesTournamentById(data.tournamentId) ||
+          ownsTournamentRegistrationSource(data) ||
+          data.createdBy == request.auth.uid
+        );
+    }
+
     function canManageMatchdaySide(data) {
       return isAuthenticated() &&
         data.matchId is string &&
         (
+          hasActiveAssistantPermissionForMatch(data.matchId, 'canStartMatch') ||
           (
             data.teamId is string &&
             (
@@ -222,6 +234,20 @@ service cloud.firestore {
               isMatchOrganizerById(data.matchId)
             )
           )
+        );
+    }
+
+    function canUnlockLineupSnapshot(data) {
+      return isAuthenticated() &&
+        data.matchId is string &&
+        exists(/databases/$(database)/documents/matches/$(data.matchId)) &&
+        get(/databases/$(database)/documents/matches/$(data.matchId))
+          .data.status in ['open', 'full'] &&
+        get(/databases/$(database)/documents/matches/$(data.matchId))
+          .data.isFrozen != true &&
+        (
+          isMatchOrganizerById(data.matchId) ||
+          hasActiveAssistantPermissionForMatch(data.matchId, 'canStartMatch')
         );
     }
 
@@ -604,6 +630,150 @@ service cloud.firestore {
         get(
           /databases/$(database)/documents/tournaments/$(tournamentId)/assistants/$(request.auth.uid)
         ).data.permissions.get(permissionName, false) == true;
+    }
+
+    function hasActiveAssistantPermissionForMatch(matchId, permissionName) {
+      return isAuthenticated() &&
+        matchId is string &&
+        exists(/databases/$(database)/documents/matches/$(matchId)) &&
+        get(/databases/$(database)/documents/matches/$(matchId))
+          .data.tournamentId is string &&
+        hasActiveTournamentAssistantPermission(
+          get(/databases/$(database)/documents/matches/$(matchId))
+            .data.tournamentId,
+          permissionName
+        );
+    }
+
+    function isAssistantScoreSubmissionUpdate(matchId) {
+      return hasActiveAssistantPermissionForMatch(matchId, 'canSubmitScore') &&
+        resource.data.status == 'live' &&
+        resource.data.isFrozen != true &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly([
+            'scoreTeamA',
+            'scoreTeamB',
+            'mvpPlayerId',
+            'completedAt',
+            'isAnomaly',
+            'status'
+          ]) &&
+        request.resource.data.status in ['completed', 'pendingReview'] &&
+        request.resource.data.scoreTeamA is int &&
+        request.resource.data.scoreTeamB is int &&
+        nullableString(request.resource.data, 'mvpPlayerId') &&
+        request.resource.data.isAnomaly is bool &&
+        request.resource.data.completedAt is int;
+    }
+
+    function isAssistantLineupSnapshotIdUpdate(matchId) {
+      return hasActiveAssistantPermissionForMatch(matchId, 'canStartMatch') &&
+        resource.data.status in ['open', 'full'] &&
+        resource.data.isFrozen != true &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly([
+            'lineupSnapshotIds',
+            'guestLineupSnapshotIds',
+            'matchSideLineupSnapshotIds'
+          ]) &&
+        request.resource.data.get('lineupSnapshotIds', {}) is map &&
+        request.resource.data.get('guestLineupSnapshotIds', {}) is map &&
+        request.resource.data.get('matchSideLineupSnapshotIds', {}) is map;
+    }
+
+    function isAssistantScoreApprovalUpdate(matchId) {
+      return hasActiveAssistantPermissionForMatch(matchId, 'canApproveScore') &&
+        resource.data.status in ['completed', 'pendingReview'] &&
+        resource.data.isFrozen != true &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly([
+            'status',
+            'isAnomaly',
+            'ratingsAppliedAt'
+          ]) &&
+        request.resource.data.status == 'settled' &&
+        request.resource.data.isAnomaly == false &&
+        request.resource.data.ratingsAppliedAt is int;
+    }
+
+    function canReadAuditEvent(data) {
+      return isAuthenticated() &&
+        (
+          data.actorId == request.auth.uid ||
+          (
+            data.entityType == 'tournament' &&
+            data.entityId is string &&
+            organizesTournamentById(data.entityId)
+          ) ||
+          (
+            data.entityType == 'match' &&
+            data.entityId is string &&
+            isMatchOrganizerById(data.entityId)
+          ) ||
+          (
+            data.entityType == 'team' &&
+            data.entityId is string &&
+            canManageTeamById(data.entityId)
+          ) ||
+          (
+            data.entityType == 'registration' &&
+            data.entityId is string &&
+            exists(/databases/$(database)/documents/tournamentRegistrations/$(data.entityId)) &&
+            canReadTournamentRegistration(
+              get(/databases/$(database)/documents/tournamentRegistrations/$(data.entityId)).data
+            )
+          ) ||
+          (
+            data.entityType == 'tournamentParticipant' &&
+            data.entityId is string &&
+            exists(/databases/$(database)/documents/tournamentParticipants/$(data.entityId)) &&
+            organizesTournamentById(
+              get(/databases/$(database)/documents/tournamentParticipants/$(data.entityId)).data.tournamentId
+            )
+          ) ||
+          (
+            data.entityType == 'tournamentGroup' &&
+            data.entityId is string &&
+            exists(/databases/$(database)/documents/tournamentGroups/$(data.entityId)) &&
+            organizesTournamentById(
+              get(/databases/$(database)/documents/tournamentGroups/$(data.entityId)).data.tournamentId
+            )
+          ) ||
+          (
+            data.entityType == 'groupStandingSnapshot' &&
+            data.entityId is string &&
+            exists(/databases/$(database)/documents/groupStandingSnapshots/$(data.entityId)) &&
+            organizesTournamentById(
+              get(/databases/$(database)/documents/groupStandingSnapshots/$(data.entityId)).data.tournamentId
+            )
+          ) ||
+          (
+            data.entityType == 'knockoutBracket' &&
+            data.entityId is string &&
+            exists(/databases/$(database)/documents/knockoutBrackets/$(data.entityId)) &&
+            organizesTournamentById(
+              get(/databases/$(database)/documents/knockoutBrackets/$(data.entityId)).data.tournamentId
+            )
+          ) ||
+          (
+            data.entityType == 'knockoutTie' &&
+            data.entityId is string &&
+            exists(/databases/$(database)/documents/knockoutTies/$(data.entityId)) &&
+            organizesTournamentById(
+              get(/databases/$(database)/documents/knockoutTies/$(data.entityId)).data.tournamentId
+            )
+          ) ||
+          (
+            data.metadata is map &&
+            data.metadata.tournamentId is string &&
+            organizesTournamentById(data.metadata.tournamentId)
+          ) ||
+          (
+            data.metadata is map &&
+            data.metadata.matchId is string &&
+            isMatchOrganizerById(data.metadata.matchId)
+          )
+        );
     }
 
     function validAssistantPermissionMap(permissions) {
@@ -1272,7 +1442,21 @@ service cloud.firestore {
     match /players/{playerId} {
       allow read: if isAuthenticated();
       allow create: if isOwner(playerId);
-      allow update: if isOwner(playerId);
+      allow update: if isOwner(playerId) &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny([
+            'rating',
+            'totalMatches',
+            'wins',
+            'draws',
+            'losses',
+            'mvpCount',
+            'trustWeight',
+            'trustLevel',
+            'role',
+            'isGuest',
+            'createdAt'
+          ]);
       allow delete: if false;
     }
 
@@ -1339,12 +1523,16 @@ service cloud.firestore {
     match /matches/{matchId} {
       allow read: if isAuthenticated();
       allow create: if canCreateMatch(request.resource.data, matchId);
-      allow update: if isMatchOrganizer();
+      allow update: if isMatchOrganizer() ||
+        isAssistantLineupSnapshotIdUpdate(matchId) ||
+        isAssistantScoreApprovalUpdate(matchId) ||
+        isAssistantScoreSubmissionUpdate(matchId);
       allow delete: if false;
 
       match /player_stats/{playerId} {
         allow read: if isAuthenticated();
-        allow create, update: if isMatchOrganizerById(matchId);
+        allow create, update: if isMatchOrganizerById(matchId) ||
+          hasActiveAssistantPermissionForMatch(matchId, 'canSubmitScore');
         allow delete: if false;
       }
     }
@@ -1383,7 +1571,8 @@ service cloud.firestore {
     match /matchLineupSnapshots/{snapshotId} {
       allow read: if isAuthenticated();
       allow create: if canManageMatchdaySide(request.resource.data);
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if canUnlockLineupSnapshot(resource.data);
     }
 
     match /matchSubstitutions/{substitutionId} {
@@ -1415,7 +1604,7 @@ service cloud.firestore {
     }
 
     match /tournamentRegistrations/{registrationId} {
-      allow read: if isAuthenticated();
+      allow read: if canReadTournamentRegistration(resource.data);
       allow create: if canCreateTournamentRegistration(request.resource.data);
       allow update: if canUpdateTournamentRegistration();
       allow delete: if false;
@@ -1566,7 +1755,9 @@ service cloud.firestore {
 
     match /fanVotingSessions/{sessionId} {
       allow read: if isAuthenticated();
-      allow create, update: if isMatchOrganizerById(sessionId);
+      allow create, update: if isMatchOrganizerById(sessionId) ||
+        hasActiveAssistantPermissionForMatch(sessionId, 'canSubmitScore') ||
+        hasActiveAssistantPermissionForMatch(sessionId, 'canApproveScore');
       allow delete: if false;
     }
 
@@ -1619,7 +1810,7 @@ service cloud.firestore {
     // ── Phase 7: Audit & Disputes ──
 
     match /auditEvents/{eventId} {
-      allow read: if isAuthenticated();
+      allow read: if canReadAuditEvent(resource.data);
       allow create: if isAuthenticated() &&
         request.resource.data.keys().hasOnly([
           'entityType',

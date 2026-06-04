@@ -7,7 +7,6 @@ import '../../../core/enums/match_status.dart';
 import '../../../core/enums/team_membership_status.dart';
 import '../../../core/enums/tournament_registration_status.dart';
 import '../../../core/services/matchday_service.dart';
-import '../../../core/services/tournament_permission_service.dart';
 import '../../../app/routes/app_routes.dart';
 import '../../../data/repositories/guest_player_repository_impl.dart';
 import '../../../data/repositories/guest_team_repository_impl.dart';
@@ -20,6 +19,7 @@ import '../../../data/repositories/match_substitution_repository_impl.dart';
 import '../../../data/repositories/player_repository_impl.dart';
 import '../../../data/repositories/team_membership_repository_impl.dart';
 import '../../../data/repositories/team_repository_impl.dart';
+import '../../../data/repositories/tournament_assistant_permission_repository_impl.dart';
 import '../../../data/repositories/tournament_registration_repository_impl.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
 import '../../../domain/entities/guest_player.dart';
@@ -33,6 +33,7 @@ import '../../../domain/entities/player.dart';
 import '../../../domain/entities/team.dart';
 import '../../../domain/entities/team_membership.dart';
 import '../../../domain/entities/tournament.dart';
+import '../../../domain/entities/tournament_assistant_permission.dart';
 import '../models/friendly_match_side_view.dart';
 
 part 'matchday_side_discovery.dart';
@@ -137,7 +138,7 @@ class MatchdayController extends GetxController {
   final MatchLineupSnapshotRepositoryImpl _snapshotRepository;
   final MatchSideRepositoryImpl _matchSideRepository;
   final MatchSubstitutionRepositoryImpl _substitutionRepository;
-  final TournamentPermissionService _tournamentPermissionService;
+  final TournamentAssistantPermissionRepositoryImpl _assistantPermissionRepo;
 
   MatchdayController({
     required this.matchId,
@@ -156,7 +157,7 @@ class MatchdayController extends GetxController {
     required MatchLineupSnapshotRepositoryImpl snapshotRepository,
     required MatchSideRepositoryImpl matchSideRepository,
     required MatchSubstitutionRepositoryImpl substitutionRepository,
-    required TournamentPermissionService tournamentPermissionService,
+    TournamentAssistantPermissionRepositoryImpl? assistantPermissionRepository,
   }) : _authSession = authSession,
        _matchdayService = matchdayService,
        _matchRepository = matchRepository,
@@ -172,7 +173,8 @@ class MatchdayController extends GetxController {
        _snapshotRepository = snapshotRepository,
        _matchSideRepository = matchSideRepository,
        _substitutionRepository = substitutionRepository,
-       _tournamentPermissionService = tournamentPermissionService;
+       _assistantPermissionRepo = assistantPermissionRepository ??
+           TournamentAssistantPermissionRepositoryImpl();
 
   final RxBool isLoading = true.obs;
   final RxBool isSubmitting = false.obs;
@@ -192,6 +194,8 @@ class MatchdayController extends GetxController {
   final RxList<MatchSubstitution> sideSubstitutions = <MatchSubstitution>[].obs;
   final RxList<MatchdayParticipantDraft> participants =
       <MatchdayParticipantDraft>[].obs;
+  final RxBool canSubmitScorePermission = false.obs;
+  final RxBool canUnlockLineupPermission = false.obs;
 
   final RxMap<String, MatchAttendanceStatus> attendanceDrafts =
       <String, MatchAttendanceStatus>{}.obs;
@@ -235,6 +239,14 @@ class MatchdayController extends GetxController {
       tournament.value?.teamSize.value ?? match.value?.teamSize;
   bool get isLineupLocked => activeSnapshot.value != null;
   bool get isMatchLive => match.value?.status == MatchStatus.live;
+  bool get canSubmitScore {
+    final currentMatch = match.value;
+    if (currentMatch == null) return false;
+    if (currentMatch.status != MatchStatus.live || currentMatch.isFrozen) {
+      return false;
+    }
+    return canSubmitScorePermission.value;
+  }
   bool get canEditPreKickoff =>
       !isLineupLocked &&
       !isMatchLive &&
@@ -295,6 +307,14 @@ class MatchdayController extends GetxController {
 
       match.value = loadedMatch;
       tournament.value = loadedTournament;
+      canSubmitScorePermission.value = await _resolveCanSubmitScore(
+        match: loadedMatch,
+        tournament: loadedTournament,
+      );
+      canUnlockLineupPermission.value = await _resolveCanStartMatchday(
+        match: loadedMatch,
+        tournament: loadedTournament,
+      );
       await _loadFriendlySideDisplayNames(loadedMatch);
 
       final sides = await _discoverManagedSides(
@@ -320,6 +340,51 @@ class MatchdayController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  Future<bool> _resolveCanSubmitScore({
+    required Match match,
+    required Tournament? tournament,
+  }) async {
+    final actorId = currentUserId;
+    if (actorId == null || actorId.isEmpty) return false;
+    if (match.organizerId == actorId) return true;
+    if (tournament == null) return false;
+    if (tournament.organizerId == actorId) return true;
+    final permission = await _assistantPermissionRepo.getAssistantPermission(
+      tournament.id,
+      actorId,
+    );
+    return permission?.hasPermission(
+          TournamentAssistantPermissionKey.canSubmitScore,
+        ) ==
+        true;
+  }
+
+  Future<bool> _resolveCanStartMatchday({
+    required Match match,
+    required Tournament? tournament,
+  }) async {
+    final actorId = currentUserId;
+    if (actorId == null || actorId.isEmpty) return false;
+    if (match.organizerId == actorId) return true;
+    if (tournament == null) return false;
+    if (tournament.organizerId == actorId) return true;
+    return hasTournamentAssistantPermission(
+      tournament,
+      actorId,
+      TournamentAssistantPermissionKey.canStartMatch,
+    );
+  }
+
+  Future<bool> hasTournamentAssistantPermission(
+    Tournament tournament,
+    String actorId,
+    TournamentAssistantPermissionKey permission,
+  ) async {
+    final assistantPermission = await _assistantPermissionRepo
+        .getAssistantPermission(tournament.id, actorId);
+    return assistantPermission?.hasPermission(permission) == true;
   }
 
   Future<void> selectSide(String sideKey) async {
@@ -545,10 +610,7 @@ class MatchdayController extends GetxController {
     }
     final currentTournament = tournament.value;
     if (currentTournament != null) {
-      return _tournamentPermissionService.canManageTeams(
-        currentTournament,
-        actorId,
-      );
+      return canUnlockLineupPermission.value;
     }
     return currentMatch.organizerId == actorId;
   }

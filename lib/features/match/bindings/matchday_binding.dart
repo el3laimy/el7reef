@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 import '../../../core/auth/auth_service_session.dart';
 import '../../../core/auth/auth_session.dart';
 import '../../../core/services/matchday_service.dart';
-import '../../../core/services/tournament_permission_service.dart';
 import '../../../data/repositories/guest_player_repository_impl.dart';
 import '../../../data/repositories/guest_team_repository_impl.dart';
 import '../../../data/repositories/match_attendance_repository_impl.dart';
@@ -15,6 +14,7 @@ import '../../../data/repositories/match_substitution_repository_impl.dart';
 import '../../../data/repositories/player_repository_impl.dart';
 import '../../../data/repositories/team_membership_repository_impl.dart';
 import '../../../data/repositories/team_repository_impl.dart';
+import '../../../data/repositories/tournament_assistant_permission_repository_impl.dart';
 import '../../../data/repositories/tournament_registration_repository_impl.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
 import '../../../core/auth/auth_service.dart';
@@ -37,6 +37,11 @@ class MatchdayBinding extends Bindings {
     if (!Get.isRegistered<TournamentRegistrationRepositoryImpl>()) {
       Get.lazyPut<TournamentRegistrationRepositoryImpl>(
         () => TournamentRegistrationRepositoryImpl(),
+      );
+    }
+    if (!Get.isRegistered<TournamentAssistantPermissionRepositoryImpl>()) {
+      Get.lazyPut<TournamentAssistantPermissionRepositoryImpl>(
+        () => TournamentAssistantPermissionRepositoryImpl(),
       );
     }
     if (!Get.isRegistered<TeamRepositoryImpl>()) {
@@ -79,11 +84,6 @@ class MatchdayBinding extends Bindings {
         () => MatchSubstitutionRepositoryImpl(),
       );
     }
-    if (!Get.isRegistered<TournamentPermissionService>()) {
-      Get.lazyPut<TournamentPermissionService>(
-        () => TournamentPermissionService(),
-      );
-    }
     if (!Get.isRegistered<MatchdayService>()) {
       Get.lazyPut<MatchdayService>(() => MatchdayService());
     }
@@ -113,7 +113,8 @@ class MatchdayBinding extends Bindings {
         snapshotRepository: Get.find<MatchLineupSnapshotRepositoryImpl>(),
         matchSideRepository: Get.find<MatchSideRepositoryImpl>(),
         substitutionRepository: Get.find<MatchSubstitutionRepositoryImpl>(),
-        tournamentPermissionService: Get.find<TournamentPermissionService>(),
+        assistantPermissionRepository:
+            Get.find<TournamentAssistantPermissionRepositoryImpl>(),
       ),
     );
   }

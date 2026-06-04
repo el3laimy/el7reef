@@ -25,12 +25,12 @@ class MatchdayHeader extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF0D2137), Color(0xFF1C2E45)],
+          colors: [AppColors.surfaceSunken, AppColors.surface],
         ),
         border: Border.all(color: AppColors.surfaceBorder, width: 0.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
+            color: AppColors.backgroundDeep.withValues(alpha: 0.3),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -102,7 +102,7 @@ class MatchdayHeader extends StatelessWidget {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.3),
+                  color: AppColors.backgroundDeep.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: _statusColor(match?.status).withValues(alpha: 0.3),
@@ -159,7 +159,7 @@ class MatchdayHeader extends StatelessWidget {
           ),
 
           // Record Score Button for Live matches only.
-          if (match != null && match.status == MatchStatus.live) ...[
+          if (match != null && controller.canSubmitScore) ...[
             const SizedBox(height: AppDimensions.md),
             SizedBox(
               width: double.infinity,
@@ -171,7 +171,7 @@ class MatchdayHeader extends StatelessWidget {
                 label: const Text('تسجيل وإنهاء المباراة'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.success,
-                  foregroundColor: Colors.white,
+                  foregroundColor: AppColors.textPrimary,
                 ),
               ),
             ),
@@ -239,7 +239,7 @@ class _TeamBadge extends StatelessWidget {
           style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w800,
-            color: Colors.white,
+            color: AppColors.textPrimary,
           ),
         ),
       ),
@@ -441,7 +441,7 @@ class _StepDot extends StatelessWidget {
           ),
           child: Center(
             child: done
-                ? const Icon(Icons.check, size: 16, color: Colors.white)
+                ? const Icon(Icons.check, size: 16, color: AppColors.textPrimary)
                 : active
                 ? Container(
                     width: 8,

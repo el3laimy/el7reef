@@ -109,6 +109,7 @@ void main() {
       final controller = TournamentController(
         authService: authService,
         tournamentRepository: TournamentRepositoryImpl(db: firestore),
+        teamRepository: TeamRepositoryImpl(firestore: firestore),
       );
       controller.myOrganizedTournaments.add(_tournament('tournament-a'));
       controller.errorMessage.value = 'old error';
@@ -273,6 +274,7 @@ void main() {
       final controller = _ReloadTrackingTournamentController(
         authService: authService,
         tournamentRepository: TournamentRepositoryImpl(db: firestore),
+        teamRepository: TeamRepositoryImpl(firestore: firestore),
       );
       controller.onInit();
       controller.myOrganizedTournaments.add(_tournament('account-a-cup'));
@@ -314,6 +316,7 @@ class _ReloadTrackingTournamentController extends TournamentController {
   _ReloadTrackingTournamentController({
     required super.authService,
     required super.tournamentRepository,
+    required super.teamRepository,
   });
 
   @override

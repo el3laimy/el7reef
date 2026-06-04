@@ -41,7 +41,6 @@ import '../../domain/entities/team_membership.dart';
 import '../../domain/entities/tournament.dart';
 import '../../domain/entities/tournament_registration.dart';
 import 'team_roster_policy.dart';
-import 'tournament_permission_service.dart';
 
 part 'matchday_service_base.dart';
 part 'matchday_check_in.dart';
@@ -113,27 +112,23 @@ class MatchdayService {
 
   MatchdayService({
     FirebaseFirestore? firestore,
-    TournamentPermissionService? tournamentPermissionService,
     TeamRosterPolicy? teamRosterPolicy,
     Uuid? uuid,
   }) : _checkIn = _MatchdayCheckInService(
-         firestore: firestore,
-         tournamentPermissionService: tournamentPermissionService,
-         teamRosterPolicy: teamRosterPolicy,
-         uuid: uuid,
-       ),
-       _lineup = _MatchdayLineupService(
-         firestore: firestore,
-         tournamentPermissionService: tournamentPermissionService,
-         teamRosterPolicy: teamRosterPolicy,
-         uuid: uuid,
-       ),
-       _substitution = _MatchdaySubstitutionService(
-         firestore: firestore,
-         tournamentPermissionService: tournamentPermissionService,
-         teamRosterPolicy: teamRosterPolicy,
-         uuid: uuid,
-       );
+          firestore: firestore,
+          teamRosterPolicy: teamRosterPolicy,
+          uuid: uuid,
+        ),
+        _lineup = _MatchdayLineupService(
+          firestore: firestore,
+          teamRosterPolicy: teamRosterPolicy,
+          uuid: uuid,
+        ),
+        _substitution = _MatchdaySubstitutionService(
+          firestore: firestore,
+          teamRosterPolicy: teamRosterPolicy,
+          uuid: uuid,
+        );
 
   Future<MatchdayCheckInResult> checkInRegisteredTeam({
     required String matchId,

@@ -44,6 +44,7 @@ function matchData(overrides = {}) {
     title: 'Street Cup - Round 1',
     type: 'tournament',
     status: 'open',
+    isFrozen: false,
     tournamentId: 'tournament-1',
     teamAId: 'team-1',
     teamBId: 'team-2',
@@ -55,6 +56,25 @@ function matchData(overrides = {}) {
     fixtureStatus: 'draft',
     createdAt: now,
     updatedAt: now,
+    ...overrides,
+  };
+}
+
+function lineupSnapshotData(overrides = {}) {
+  return {
+    matchId: 'match-1',
+    teamId: 'team-1',
+    guestTeamId: null,
+    matchSideId: null,
+    tournamentRegistrationId: null,
+    starters: [],
+    bench: [],
+    lockedBy: 'assistant-1',
+    lockedAt: now,
+    playerCount: 5,
+    formationCode: null,
+    formationLabel: null,
+    notes: null,
     ...overrides,
   };
 }
@@ -636,8 +656,29 @@ describe('tournament assistant permission Firestore rules', () => {
     });
   });
 
-  describe('assistant match updates remain denied', () => {
-    it('denies canStartMatch assistant match updates', async () => {
+  describe('assistant limited match updates', () => {
+    it('allows canStartMatch assistant lineup reference updates and snapshot delete before kickoff', async () => {
+      await seedTournamentFixture();
+      await seedAssistant({permissions: {canStartMatch: true}});
+      const db = authedDb('assistant-1');
+
+      await assertSucceeds(
+        setDoc(
+          doc(db, 'matchLineupSnapshots', 'snapshot-1'),
+          lineupSnapshotData(),
+        ),
+      );
+      await assertSucceeds(
+        updateDoc(doc(db, 'matches', 'match-1'), {
+          lineupSnapshotIds: {'team-1': 'snapshot-1'},
+        }),
+      );
+      await assertSucceeds(
+        deleteDoc(doc(db, 'matchLineupSnapshots', 'snapshot-1')),
+      );
+    });
+
+    it('denies canStartMatch assistant arbitrary match updates', async () => {
       await seedTournamentFixture();
       await seedAssistant({permissions: {canStartMatch: true}});
       const db = authedDb('assistant-1');
@@ -647,6 +688,54 @@ describe('tournament assistant permission Firestore rules', () => {
           status: 'live',
           startedAt: now + 1,
           updatedAt: now + 1,
+        }),
+      );
+    });
+
+    it('denies canStartMatch assistant lineup reference updates after kickoff', async () => {
+      await seedTournament();
+      await seed('matches/match-1', matchData({status: 'live'}));
+      await seedAssistant({permissions: {canStartMatch: true}});
+      const db = authedDb('assistant-1');
+
+      await assertFails(
+        updateDoc(doc(db, 'matches', 'match-1'), {
+          lineupSnapshotIds: {'team-1': 'snapshot-1'},
+        }),
+      );
+    });
+
+    it('allows canSubmitScore assistant score submission from live matches only', async () => {
+      await seedTournament();
+      await seed('matches/match-1', matchData({status: 'live'}));
+      await seedAssistant({permissions: {canSubmitScore: true}});
+      const db = authedDb('assistant-1');
+
+      await assertSucceeds(
+        updateDoc(doc(db, 'matches', 'match-1'), {
+          scoreTeamA: 2,
+          scoreTeamB: 1,
+          mvpPlayerId: null,
+          completedAt: now + 1,
+          isAnomaly: false,
+          status: 'completed',
+        }),
+      );
+    });
+
+    it('denies canSubmitScore assistant valid-looking score submission before live status', async () => {
+      await seedTournamentFixture();
+      await seedAssistant({permissions: {canSubmitScore: true}});
+      const db = authedDb('assistant-1');
+
+      await assertFails(
+        updateDoc(doc(db, 'matches', 'match-1'), {
+          scoreTeamA: 2,
+          scoreTeamB: 1,
+          mvpPlayerId: null,
+          completedAt: now + 1,
+          isAnomaly: false,
+          status: 'completed',
         }),
       );
     });
@@ -664,6 +753,30 @@ describe('tournament assistant permission Firestore rules', () => {
           submittedBy: 'assistant-1',
           submittedAt: now + 1,
           updatedAt: now + 1,
+        }),
+      );
+    });
+
+    it('allows canApproveScore assistant settlement update after score submission', async () => {
+      await seedTournament();
+      await seed(
+        'matches/match-1',
+        matchData({
+          status: 'completed',
+          scoreTeamA: 2,
+          scoreTeamB: 1,
+          completedAt: now + 1,
+          isAnomaly: false,
+        }),
+      );
+      await seedAssistant({permissions: {canApproveScore: true}});
+      const db = authedDb('assistant-1');
+
+      await assertSucceeds(
+        updateDoc(doc(db, 'matches', 'match-1'), {
+          status: 'settled',
+          isAnomaly: false,
+          ratingsAppliedAt: now + 2,
         }),
       );
     });

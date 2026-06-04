@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../../core/enums/match_status.dart';
 import '../../../core/enums/tournament_enums.dart';
 import '../../../core/enums/tournament_ops_enums.dart';
+import '../../../core/permissions/tournament_viewer_context.dart';
 import '../../../core/services/match_settlement_service.dart';
 import '../../../core/services/tournament_fixture_service.dart';
 import '../../../core/services/tournament_lifecycle_service.dart';
@@ -151,10 +152,11 @@ class TournamentOperationsController extends GetxController {
   bool get canManageTournament {
     final currentTournament = tournament.value;
     final actorId = _authService.currentUserId;
-    return currentTournament != null &&
-        actorId != null &&
-        actorId.isNotEmpty &&
-        currentTournament.organizerId == actorId;
+    if (currentTournament == null) return false;
+    return TournamentViewerContext.fromTournament(
+      tournament: currentTournament,
+      userId: actorId,
+    ).canManageTournament;
   }
 
   bool get hasOperationalStageStarted {
@@ -392,7 +394,7 @@ class TournamentOperationsController extends GetxController {
         label: 'مرحلة المجموعات',
         isReady: hasGroupStage,
         detail: hasGroupStage
-            ? 'تم إنشاء المجموعات والـ fixtures الخاصة بها.'
+            ? 'تم إنشاء المجموعات والمباريات الخاصة بها.'
             : canStartGroupStageAction
                 ? 'جاهزة للبدء من لوحة التشغيل.'
                 : currentTournament.format == TournamentFormat.knockoutOnly
@@ -400,22 +402,22 @@ class TournamentOperationsController extends GetxController {
                     : 'تنتظر قفل قائمة المشاركين أولًا.',
       ),
       TournamentOpsChecklistItem(
-        label: 'نشر fixtures',
+        label: 'نشر المباريات',
         isReady: hasPublishedFixtures,
         detail: hasPublishedFixtures
-            ? 'تم نشر جزء من fixtures بالفعل.'
+            ? 'تم نشر جزء من المباريات بالفعل.'
             : canPublishFixtures
-                ? 'توجد fixtures draft جاهزة للنشر.'
+                ? 'توجد مباريات مسودة جاهزة للنشر.'
                 : fixtures.isEmpty
-                    ? 'لم تُولد fixtures بعد.'
-                    : 'كل fixtures الحالية منشورة بالفعل.',
+                    ? 'لم تُولد مباريات بعد.'
+                    : 'كل المباريات الحالية منشورة بالفعل.',
       ),
       TournamentOpsChecklistItem(
         label: 'مرحلة الإقصاء',
         isReady: hasKnockoutStage,
         detail: hasKnockoutStage
             ? knockoutBracket.value?.championParticipantId == null
-                ? 'تم إنشاء bracket الإقصاء.'
+                ? 'تم إنشاء شجرة الإقصاء.'
                 : 'تم تحديد بطل الإقصاء.'
             : canStartKnockoutAction
                 ? 'جاهزة للبدء الآن.'
@@ -447,17 +449,17 @@ class TournamentOperationsController extends GetxController {
       actions.add(
         const TournamentOpsPendingAction(
           title: 'بدء مرحلة المجموعات',
-          detail: 'المشاركون جاهزون ويمكن الآن توليد المجموعات والـ fixtures.',
+          detail: 'المشاركون جاهزون ويمكن الآن توليد المجموعات والمباريات.',
         ),
       );
     }
     if (canPublishFixtures) {
       actions.add(
         TournamentOpsPendingAction(
-          title: 'نشر fixtures',
+          title: 'نشر المباريات',
           detail: draftFixturesCount == 0
-              ? 'كل fixtures الحالية منشورة.'
-              : 'يوجد $draftFixturesCount fixture بصيغة draft تنتظر النشر.',
+              ? 'كل المباريات الحالية منشورة.'
+              : 'يوجد $draftFixturesCount مباراة مسودة تنتظر النشر.',
         ),
       );
     }
@@ -465,7 +467,7 @@ class TournamentOperationsController extends GetxController {
       actions.add(
         const TournamentOpsPendingAction(
           title: 'بدء الإقصاء',
-          detail: 'النتائج والمؤهلون جاهزون لبناء bracket الإقصاء.',
+          detail: 'النتائج والمؤهلون جاهزون لبناء شجرة الإقصاء.',
         ),
       );
     }
@@ -531,11 +533,6 @@ class TournamentOperationsController extends GetxController {
       final currentTournament = await _tournamentRepository.getTournament(id);
       if (currentTournament == null) {
         errorMessage.value = 'تعذر العثور على البطولة المطلوبة.';
-        _clearOperationalState();
-        return;
-      }
-      if (!_canCurrentUserManage(currentTournament)) {
-        errorMessage.value = accessDeniedMessage;
         _clearOperationalState();
         return;
       }
@@ -805,13 +802,6 @@ class TournamentOperationsController extends GetxController {
     _participantById = const <String, TournamentParticipant>{};
     _groupNameById = const <String, String>{};
     _participantsByGroupId = const <String, List<TournamentParticipant>>{};
-  }
-
-  bool _canCurrentUserManage(Tournament currentTournament) {
-    final actorId = _authService.currentUserId;
-    return actorId != null &&
-        actorId.isNotEmpty &&
-        currentTournament.organizerId == actorId;
   }
 
   void _clearOperationalState() {

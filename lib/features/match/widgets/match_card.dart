@@ -29,6 +29,10 @@ class MatchCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isOrganizer =
         match.organizerId == controller.authService.currentUserId;
+    final currentUserId = controller.authService.currentUserId;
+    final isParticipant = currentUserId != null &&
+        (match.teamAPlayerIds.contains(currentUserId) ||
+            match.teamBPlayerIds.contains(currentUserId));
     final canOpenMatchday =
         isOrganizer ||
         match.isOrganized ||
@@ -63,7 +67,7 @@ class MatchCard extends StatelessWidget {
                       child: Text(
                         '⭐ ذهبي',
                         style: AppTextStyles.labelSmall.copyWith(
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ),
@@ -150,7 +154,13 @@ class MatchCard extends StatelessWidget {
                     onPressed: () =>
                         Get.toNamed(AppRoutes.matchDetailsById(match.id)),
                     icon: const Icon(Icons.fact_check_outlined, size: 18),
-                    label: const Text('إدارة يوم المباراة'),
+                    label: Text(
+                      isOrganizer
+                          ? 'إدارة المباراة'
+                          : isParticipant
+                              ? 'تفاصيل مباراتي'
+                              : 'عرض المباراة',
+                    ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,
                       side: const BorderSide(color: AppColors.primary),
@@ -249,7 +259,7 @@ class MatchCard extends StatelessWidget {
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.success,
-                      foregroundColor: Colors.white,
+                      foregroundColor: AppColors.textPrimary,
                     ),
                   ),
                 ),

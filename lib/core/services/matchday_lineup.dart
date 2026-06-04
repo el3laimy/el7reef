@@ -3,7 +3,6 @@ part of 'matchday_service.dart';
 class _MatchdayLineupService extends _MatchdayServiceBase {
   _MatchdayLineupService({
     super.firestore,
-    super.tournamentPermissionService,
     super.teamRosterPolicy,
     super.uuid,
   });
@@ -238,14 +237,38 @@ class _MatchdayLineupService extends _MatchdayServiceBase {
         await firestore.runTransaction<_SnapshotTransactionResult>(
       (transaction) async {
         final snapshotSnapshot = await transaction.get(snapshotRef);
+        DateTime lockedAtVal = effectiveNow;
+        String? effectiveFormationCode = _normalizeOptionalText(formationCode);
+        String? effectiveFormationLabel = _normalizeOptionalText(formationLabel);
+        String? effectiveNotes = _normalizeOptionalText(notes);
+        final existingAssignments = <String, SlotAssignment>{};
+
         if (snapshotSnapshot.exists && snapshotSnapshot.data() != null) {
-          return _SnapshotTransactionResult(
-            outcome: MatchdayLineupLockOutcome.alreadyLocked,
-            snapshot: MatchLineupSnapshotModel.fromJson(
-              snapshotSnapshot.data()!,
-              snapshotSnapshot.id,
-            ).toEntity(),
-          );
+          final existing = MatchLineupSnapshotModel.fromJson(
+            snapshotSnapshot.data()!,
+            snapshotSnapshot.id,
+          ).toEntity();
+          lockedAtVal = existing.lockedAt;
+          effectiveFormationCode ??= existing.formationCode;
+          effectiveFormationLabel ??= existing.formationLabel;
+          effectiveNotes ??= existing.notes;
+
+          for (final entry in existing.starters) {
+            if (entry.hasSlotAssignment) {
+              final key = entry.teamMembershipId;
+              if (key != null) {
+                existingAssignments[key] = SlotAssignment(
+                  membershipId: key,
+                  slotId: entry.slotId!,
+                  slotRole: entry.slotRole!,
+                  lineIndex: entry.lineIndex ?? 0,
+                  slotIndex: entry.slotIndex ?? 0,
+                  slotX: entry.slotX ?? 50.0,
+                  slotY: entry.slotY ?? 50.0,
+                );
+              }
+            }
+          }
         }
 
         final matchSnapshot =
@@ -258,14 +281,30 @@ class _MatchdayLineupService extends _MatchdayServiceBase {
           matchSnapshot.id,
         ).toEntity();
         _ensureMatchAvailableForPreKickoff(match);
+
+        final mergedAssignments = <String, SlotAssignment>{};
+        mergedAssignments.addAll(existingAssignments);
+        for (final assignment in slotAssignments) {
+          mergedAssignments[assignment.membershipId] = assignment;
+        }
+
+        final starterKeys = validation.starters
+            .map((entry) => entry.teamMembershipId)
+            .whereType<String>()
+            .toSet();
+
+        final finalAssignmentsList = mergedAssignments.values
+            .where((assignment) => starterKeys.contains(assignment.membershipId))
+            .toList();
+
         _assertSlotAssignmentsBelongToStarters(
           starters: validation.starters,
-          slotAssignments: slotAssignments,
+          slotAssignments: finalAssignmentsList,
         );
 
         final decoratedStarters = _decorateEntriesWithSlotAssignments(
           entries: validation.starters,
-          slotAssignments: slotAssignments,
+          slotAssignments: finalAssignmentsList,
         );
         final snapshot = MatchLineupSnapshot(
           id: snapshotId,
@@ -276,11 +315,11 @@ class _MatchdayLineupService extends _MatchdayServiceBase {
           starters: decoratedStarters,
           bench: validation.bench,
           lockedBy: actorId,
-          lockedAt: effectiveNow,
+          lockedAt: lockedAtVal,
           playerCount: validation.requiredStarterCount,
-          formationCode: _normalizeOptionalText(formationCode),
-          formationLabel: _normalizeOptionalText(formationLabel),
-          notes: _normalizeOptionalText(notes),
+          formationCode: effectiveFormationCode,
+          formationLabel: effectiveFormationLabel,
+          notes: effectiveNotes,
         );
         transaction.set(
           snapshotRef,
@@ -294,7 +333,9 @@ class _MatchdayLineupService extends _MatchdayServiceBase {
           updatesByAttendanceId: attendanceUpdates,
         );
         return _SnapshotTransactionResult(
-          outcome: MatchdayLineupLockOutcome.locked,
+          outcome: snapshotSnapshot.exists
+              ? MatchdayLineupLockOutcome.alreadyLocked
+              : MatchdayLineupLockOutcome.locked,
           snapshot: snapshot,
         );
       },
@@ -357,14 +398,38 @@ class _MatchdayLineupService extends _MatchdayServiceBase {
         await firestore.runTransaction<_SnapshotTransactionResult>(
       (transaction) async {
         final snapshotSnapshot = await transaction.get(snapshotRef);
+        DateTime lockedAtVal = effectiveNow;
+        String? effectiveFormationCode = _normalizeOptionalText(formationCode);
+        String? effectiveFormationLabel = _normalizeOptionalText(formationLabel);
+        String? effectiveNotes = _normalizeOptionalText(notes);
+        final existingAssignments = <String, SlotAssignment>{};
+
         if (snapshotSnapshot.exists && snapshotSnapshot.data() != null) {
-          return _SnapshotTransactionResult(
-            outcome: MatchdayLineupLockOutcome.alreadyLocked,
-            snapshot: MatchLineupSnapshotModel.fromJson(
-              snapshotSnapshot.data()!,
-              snapshotSnapshot.id,
-            ).toEntity(),
-          );
+          final existing = MatchLineupSnapshotModel.fromJson(
+            snapshotSnapshot.data()!,
+            snapshotSnapshot.id,
+          ).toEntity();
+          lockedAtVal = existing.lockedAt;
+          effectiveFormationCode ??= existing.formationCode;
+          effectiveFormationLabel ??= existing.formationLabel;
+          effectiveNotes ??= existing.notes;
+
+          for (final entry in existing.starters) {
+            if (entry.hasSlotAssignment) {
+              final key = entry.guestPlayerId;
+              if (key != null) {
+                existingAssignments[key] = SlotAssignment(
+                  membershipId: key,
+                  slotId: entry.slotId!,
+                  slotRole: entry.slotRole!,
+                  lineIndex: entry.lineIndex ?? 0,
+                  slotIndex: entry.slotIndex ?? 0,
+                  slotX: entry.slotX ?? 50.0,
+                  slotY: entry.slotY ?? 50.0,
+                );
+              }
+            }
+          }
         }
 
         final matchSnapshot =
@@ -377,15 +442,31 @@ class _MatchdayLineupService extends _MatchdayServiceBase {
           matchSnapshot.id,
         ).toEntity();
         _ensureMatchAvailableForPreKickoff(match);
+
+        final mergedAssignments = <String, SlotAssignment>{};
+        mergedAssignments.addAll(existingAssignments);
+        for (final assignment in slotAssignments) {
+          mergedAssignments[assignment.membershipId] = assignment;
+        }
+
+        final starterKeys = validation.starters
+            .map((entry) => entry.guestPlayerId)
+            .whereType<String>()
+            .toSet();
+
+        final finalAssignmentsList = mergedAssignments.values
+            .where((assignment) => starterKeys.contains(assignment.membershipId))
+            .toList();
+
         _assertSlotAssignmentsBelongToStarters(
           starters: validation.starters,
-          slotAssignments: slotAssignments,
+          slotAssignments: finalAssignmentsList,
           useGuestPlayerIdAsKey: true,
         );
 
         final decoratedStarters = _decorateEntriesWithSlotAssignments(
           entries: validation.starters,
-          slotAssignments: slotAssignments,
+          slotAssignments: finalAssignmentsList,
           useGuestPlayerIdAsKey: true,
         );
         final snapshot = MatchLineupSnapshot(
@@ -397,11 +478,11 @@ class _MatchdayLineupService extends _MatchdayServiceBase {
           starters: decoratedStarters,
           bench: validation.bench,
           lockedBy: actorId,
-          lockedAt: effectiveNow,
+          lockedAt: lockedAtVal,
           playerCount: validation.requiredStarterCount,
-          formationCode: _normalizeOptionalText(formationCode),
-          formationLabel: _normalizeOptionalText(formationLabel),
-          notes: _normalizeOptionalText(notes),
+          formationCode: effectiveFormationCode,
+          formationLabel: effectiveFormationLabel,
+          notes: effectiveNotes,
         );
         transaction.set(
           snapshotRef,
@@ -415,7 +496,9 @@ class _MatchdayLineupService extends _MatchdayServiceBase {
           updatesByAttendanceId: attendanceUpdates,
         );
         return _SnapshotTransactionResult(
-          outcome: MatchdayLineupLockOutcome.locked,
+          outcome: snapshotSnapshot.exists
+              ? MatchdayLineupLockOutcome.alreadyLocked
+              : MatchdayLineupLockOutcome.locked,
           snapshot: snapshot,
         );
       },
@@ -514,34 +597,41 @@ class _MatchdayLineupService extends _MatchdayServiceBase {
       matchSideId: matchSideId,
     );
     final snapshotRef = _snapshotsRef.doc(snapshotId);
-    final decoratedStarters = _decorateEntriesWithSlotAssignments(
-      entries: starters,
-      slotAssignments: slotAssignments,
-      useMatchSidePlayerIdAsKey: true,
-    );
-    final snapshot = MatchLineupSnapshot(
-      id: snapshotId,
-      matchId: matchId,
-      matchSideId: matchSideId,
-      sideKey: normalizedSide,
-      starters: decoratedStarters,
-      bench: bench,
-      lockedBy: actorId,
-      lockedAt: effectiveNow,
-      playerCount: requiredStarterCount,
-      formationCode: _normalizeOptionalText(formationCode),
-      formationLabel: _normalizeOptionalText(formationLabel),
-      notes: _normalizeOptionalText(notes),
-    );
-
     return firestore.runTransaction<MatchLineupSnapshot>(
       (transaction) async {
         final existingSnapshot = await transaction.get(snapshotRef);
+        DateTime lockedAtVal = effectiveNow;
+        String? effectiveFormationCode = _normalizeOptionalText(formationCode);
+        String? effectiveFormationLabel = _normalizeOptionalText(formationLabel);
+        String? effectiveNotes = _normalizeOptionalText(notes);
+        final existingAssignments = <String, SlotAssignment>{};
+
         if (existingSnapshot.exists && existingSnapshot.data() != null) {
-          return MatchLineupSnapshotModel.fromJson(
+          final existing = MatchLineupSnapshotModel.fromJson(
             existingSnapshot.data()!,
             existingSnapshot.id,
           ).toEntity();
+          lockedAtVal = existing.lockedAt;
+          effectiveFormationCode ??= existing.formationCode;
+          effectiveFormationLabel ??= existing.formationLabel;
+          effectiveNotes ??= existing.notes;
+
+          for (final entry in existing.starters) {
+            if (entry.hasSlotAssignment) {
+              final key = entry.matchSidePlayerId;
+              if (key != null) {
+                existingAssignments[key] = SlotAssignment(
+                  membershipId: key,
+                  slotId: entry.slotId!,
+                  slotRole: entry.slotRole!,
+                  lineIndex: entry.lineIndex ?? 0,
+                  slotIndex: entry.slotIndex ?? 0,
+                  slotX: entry.slotX ?? 50.0,
+                  slotY: entry.slotY ?? 50.0,
+                );
+              }
+            }
+          }
         }
 
         final matchSnapshot =
@@ -554,6 +644,49 @@ class _MatchdayLineupService extends _MatchdayServiceBase {
           matchSnapshot.id,
         ).toEntity();
         _ensureMatchAvailableForPreKickoff(transactionMatch);
+
+        final mergedAssignments = <String, SlotAssignment>{};
+        mergedAssignments.addAll(existingAssignments);
+        for (final assignment in slotAssignments) {
+          mergedAssignments[assignment.membershipId] = assignment;
+        }
+
+        final starterKeys = starters
+            .map((entry) => entry.matchSidePlayerId)
+            .whereType<String>()
+            .toSet();
+
+        final finalAssignmentsList = mergedAssignments.values
+            .where((assignment) => starterKeys.contains(assignment.membershipId))
+            .toList();
+
+        _assertSlotAssignmentsBelongToStarters(
+          starters: starters,
+          slotAssignments: finalAssignmentsList,
+          useMatchSidePlayerIdAsKey: true,
+        );
+
+        final decoratedStarters = _decorateEntriesWithSlotAssignments(
+          entries: starters,
+          slotAssignments: finalAssignmentsList,
+          useMatchSidePlayerIdAsKey: true,
+        );
+
+        final snapshot = MatchLineupSnapshot(
+          id: snapshotId,
+          matchId: matchId,
+          matchSideId: matchSideId,
+          sideKey: normalizedSide,
+          starters: decoratedStarters,
+          bench: bench,
+          lockedBy: actorId,
+          lockedAt: lockedAtVal,
+          playerCount: requiredStarterCount,
+          formationCode: effectiveFormationCode,
+          formationLabel: effectiveFormationLabel,
+          notes: effectiveNotes,
+        );
+
         transaction.set(
           snapshotRef,
           MatchLineupSnapshotModel.fromEntity(snapshot).toJson(),
@@ -606,7 +739,8 @@ class _MatchdayLineupService extends _MatchdayServiceBase {
         transaction: transaction,
         tournamentId: match.tournamentId,
       );
-      _ensureCanUnlockLineup(
+      await _ensureCanUnlockLineup(
+        transaction: transaction,
         match: match,
         tournament: tournament,
         actorId: actorId,

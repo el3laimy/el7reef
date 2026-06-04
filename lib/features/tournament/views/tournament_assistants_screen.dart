@@ -5,8 +5,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/widgets/glassmorphic_container.dart';
-import '../../../core/enums/tournament_enums.dart';
-import '../../../domain/entities/tournament_assistant.dart';
+import '../../../domain/entities/tournament_assistant_permission.dart';
 import '../controllers/tournament_assistants_controller.dart';
 
 class TournamentAssistantsScreen extends GetView<TournamentAssistantsController> {
@@ -34,6 +33,9 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
           }
 
           final tournament = controller.currentTournament.value;
+          final assistants = controller.assistants
+              .where((assistant) => assistant.isActive)
+              .toList(growable: false);
           if (tournament == null) {
             return Center(
               child: Padding(
@@ -72,13 +74,13 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
               const SizedBox(height: AppDimensions.lg),
 
               Expanded(
-                child: tournament.assistants.isEmpty
+                child: assistants.isEmpty
                     ? _buildEmptyState()
                     : ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
-                        itemCount: tournament.assistants.length,
+                        itemCount: assistants.length,
                         itemBuilder: (context, index) {
-                          final assistant = tournament.assistants[index];
+                          final assistant = assistants[index];
                           return _buildAssistantCard(assistant, controller)
                             .animate().fadeIn(delay: (40 * index).ms).slideY(begin: 0.1);
                         },
@@ -120,30 +122,28 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
     );
   }
 
-  Widget _buildAssistantCard(TournamentAssistant assistant, TournamentAssistantsController controller) {
+  Widget _buildAssistantCard(TournamentAssistantPermission assistant, TournamentAssistantsController controller) {
     String roleName = 'مساعد';
     Color roleColor = AppColors.primary;
 
-    switch (assistant.role) {
-      case TournamentAssistantRole.full:
-        roleName = 'صلاحيات كاملة';
+    switch (assistant.preset) {
+      case TournamentAssistantPermissionPreset.matchdayAssistant:
+        roleName = 'إدارة يوم المباراة';
         roleColor = AppColors.primary;
         break;
-      case TournamentAssistantRole.resultsOnly:
+      case TournamentAssistantPermissionPreset.resultsAssistant:
         roleName = 'إدخال نتائج';
         roleColor = AppColors.success;
         break;
-      case TournamentAssistantRole.observer:
-        roleName = 'مراقب';
-        roleColor = AppColors.textMuted;
-        break;
-      case TournamentAssistantRole.emergency:
-        roleName = 'بديل طارئ (72 ساعة)';
+      case TournamentAssistantPermissionPreset.scoreApprover:
+        roleName = 'اعتماد النتائج';
         roleColor = AppColors.error;
         break;
+      case TournamentAssistantPermissionPreset.customLimited:
+        roleName = 'مشاهدة محدودة';
+        roleColor = AppColors.textMuted;
+        break;
     }
-
-    bool isEmergencyExpired = assistant.role == TournamentAssistantRole.emergency && !assistant.isValidEmergency;
 
     return GlassmorphicContainer(
       margin: const EdgeInsets.only(bottom: AppDimensions.md),
@@ -164,19 +164,11 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('User: ${assistant.userId.substring(0, 5)}...', style: AppTextStyles.titleMedium),
+                Text('User: ${_shortUserId(assistant.userId)}', style: AppTextStyles.titleMedium),
                 const SizedBox(height: 4),
                 Row(
                   children: [
                     Text(roleName, style: AppTextStyles.labelSmall.copyWith(color: roleColor)),
-                    if (isEmergencyExpired) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                        decoration: BoxDecoration(color: AppColors.error, borderRadius: BorderRadius.circular(4)),
-                        child: const Text('منتهي الصلاحية', style: TextStyle(fontSize: 10, color: Colors.white)),
-                      )
-                    ]
                   ],
                 ),
               ],
@@ -195,7 +187,7 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
 
   void _showAddAssistantBottomSheet(BuildContext context, TournamentAssistantsController controller) {
     final TextEditingController idController = TextEditingController();
-    TournamentAssistantRole selectedRole = TournamentAssistantRole.resultsOnly;
+    TournamentAssistantPermissionPreset selectedPreset = TournamentAssistantPermissionPreset.resultsAssistant;
 
     Get.bottomSheet(
       StatefulBuilder(
@@ -225,19 +217,19 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
                     borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
                     border: Border.all(color: AppColors.surfaceBorder),
                   ),
-                  child: DropdownButton<TournamentAssistantRole>(
-                    value: selectedRole,
+                  child: DropdownButton<TournamentAssistantPermissionPreset>(
+                    value: selectedPreset,
                     isExpanded: true,
                     underline: const SizedBox(),
                     items: const [
-                      DropdownMenuItem(value: TournamentAssistantRole.resultsOnly, child: Text('إدخال نتائج فقط')),
-                      DropdownMenuItem(value: TournamentAssistantRole.full, child: Text('صلاحيات كاملة')),
-                      DropdownMenuItem(value: TournamentAssistantRole.emergency, child: Text('بديل طارئ (يحل محلك طوال 72س)')),
-                      DropdownMenuItem(value: TournamentAssistantRole.observer, child: Text('مراقب فقط')),
+                      DropdownMenuItem(value: TournamentAssistantPermissionPreset.resultsAssistant, child: Text('إدخال النتائج والأهداف')),
+                      DropdownMenuItem(value: TournamentAssistantPermissionPreset.matchdayAssistant, child: Text('إدارة يوم المباراة')),
+                      DropdownMenuItem(value: TournamentAssistantPermissionPreset.scoreApprover, child: Text('اعتماد النتائج فقط')),
+                      DropdownMenuItem(value: TournamentAssistantPermissionPreset.customLimited, child: Text('مشاهدة يوم المباراة فقط')),
                     ],
                     onChanged: (val) {
                       if (val != null) {
-                        setModalState(() => selectedRole = val);
+                        setModalState(() => selectedPreset = val);
                       }
                     },
                   ),
@@ -253,7 +245,7 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
                     ),
                     onPressed: () {
                       if (idController.text.isNotEmpty) {
-                        controller.addAssistant(idController.text.trim(), selectedRole);
+                        controller.addAssistant(idController.text.trim(), selectedPreset);
                       }
                     },
                     child: Text('منح الصلاحية', style: AppTextStyles.buttonText.copyWith(color: AppColors.background)),
@@ -267,5 +259,10 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
       ),
       isScrollControlled: true,
     );
+  }
+
+  String _shortUserId(String userId) {
+    if (userId.length <= 8) return userId;
+    return '${userId.substring(0, 5)}...${userId.substring(userId.length - 3)}';
   }
 }

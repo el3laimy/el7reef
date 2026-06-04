@@ -3,7 +3,6 @@ part of 'matchday_service.dart';
 class _MatchdaySubstitutionService extends _MatchdayServiceBase {
   _MatchdaySubstitutionService({
     super.firestore,
-    super.tournamentPermissionService,
     super.teamRosterPolicy,
     super.uuid,
   });

@@ -44,18 +44,14 @@ class _SnapshotTransactionResult {
 
 abstract class _MatchdayServiceBase {
   final FirebaseFirestore firestore;
-  final TournamentPermissionService tournamentPermissionService;
   final TeamRosterPolicy teamRosterPolicy;
   final Uuid uuid;
 
   _MatchdayServiceBase({
     FirebaseFirestore? firestore,
-    TournamentPermissionService? tournamentPermissionService,
     TeamRosterPolicy? teamRosterPolicy,
     Uuid? uuid,
   }) : firestore = firestore ?? FirebaseFirestore.instance,
-       tournamentPermissionService =
-           tournamentPermissionService ?? TournamentPermissionService(),
        teamRosterPolicy = teamRosterPolicy ?? const TeamRosterPolicy(),
        uuid = uuid ?? const Uuid();
 
@@ -101,6 +97,10 @@ abstract class _MatchdayServiceBase {
   CollectionReference<Map<String, dynamic>> get _substitutionsRef =>
       firestore.collection(FirebasePaths.matchSubstitutions);
 
+  CollectionReference<Map<String, dynamic>> _assistantPermissionsRef(
+    String tournamentId,
+  ) => _tournamentsRef.doc(tournamentId).collection('assistants');
+
   Future<_RegisteredSideContext> _loadRegisteredContext({
     required String matchId,
     required String teamId,
@@ -114,7 +114,7 @@ abstract class _MatchdayServiceBase {
 
     final team = await _requireTeam(teamId);
     final tournament = await _loadTournamentIfNeeded(match.tournamentId);
-    final hasOrganizerLevelAccess = _hasOrganizerLevelAccess(
+    final hasOrganizerLevelAccess = await _hasOrganizerLevelAccess(
       match: match,
       tournament: tournament,
       actorId: actorId,
@@ -157,7 +157,7 @@ abstract class _MatchdayServiceBase {
 
     final guestTeam = await _requireGuestTeam(guestTeamId);
     final tournament = await _loadTournamentIfNeeded(match.tournamentId);
-    final hasOrganizerLevelAccess = _hasOrganizerLevelAccess(
+    final hasOrganizerLevelAccess = await _hasOrganizerLevelAccess(
       match: match,
       tournament: tournament,
       actorId: actorId,
@@ -288,16 +288,21 @@ abstract class _MatchdayServiceBase {
     return TournamentModel.fromJson(snapshot.data()!, snapshot.id).toEntity();
   }
 
-  void _ensureCanUnlockLineup({
+  Future<void> _ensureCanUnlockLineup({
+    required Transaction transaction,
     required Match match,
     required Tournament? tournament,
     required String actorId,
-  }) {
+  }) async {
     if (tournament != null) {
-      if (!tournamentPermissionService.canManageTeams(
-        tournament,
-        actorId,
-      )) {
+      if (tournament.organizerId == actorId) return;
+      final canStartMatch = await _hasAssistantPermissionInTransaction(
+        transaction: transaction,
+        tournamentId: tournament.id,
+        actorId: actorId,
+        permissionName: 'canStartMatch',
+      );
+      if (!canStartMatch) {
         throw Exception(
           'فقط منظم أو مشرف البطولة يمكنه فك قفل التشكيلة.',
         );
@@ -368,23 +373,54 @@ abstract class _MatchdayServiceBase {
     return registration;
   }
 
-  bool _hasOrganizerLevelAccess({
+  Future<bool> _hasOrganizerLevelAccess({
     required Match match,
     required Tournament? tournament,
     required String actorId,
-  }) {
+  }) async {
     if (tournament == null) {
       return match.organizerId == actorId;
     }
     if (tournament.organizerId == actorId) {
       return true;
     }
-    if (!tournament.assistants.any(
-      (assistant) => assistant.userId == actorId,
-    )) {
-      return false;
-    }
-    return tournamentPermissionService.canManageTeams(tournament, actorId);
+    return _hasAssistantPermission(
+      tournamentId: tournament.id,
+      actorId: actorId,
+      permissionName: 'canStartMatch',
+    );
+  }
+
+  Future<bool> _hasAssistantPermission({
+    required String tournamentId,
+    required String actorId,
+    required String permissionName,
+  }) async {
+    final snapshot =
+        await _assistantPermissionsRef(tournamentId).doc(actorId).get();
+    final data = snapshot.data();
+    final permissions = data?['permissions'];
+    return snapshot.exists &&
+        data?['status'] == 'active' &&
+        permissions is Map &&
+        permissions[permissionName] == true;
+  }
+
+  Future<bool> _hasAssistantPermissionInTransaction({
+    required Transaction transaction,
+    required String tournamentId,
+    required String actorId,
+    required String permissionName,
+  }) async {
+    final snapshot = await transaction.get(
+      _assistantPermissionsRef(tournamentId).doc(actorId),
+    );
+    final data = snapshot.data();
+    final permissions = data?['permissions'];
+    return snapshot.exists &&
+        data?['status'] == 'active' &&
+        permissions is Map &&
+        permissions[permissionName] == true;
   }
 
   void _assertRegisteredTeamBelongsToMatch({

@@ -15,7 +15,6 @@ import 'package:el7reef/core/enums/tournament_enums.dart';
 import 'package:el7reef/core/enums/tournament_registration_mode.dart';
 import 'package:el7reef/core/enums/tournament_registration_status.dart';
 import 'package:el7reef/core/services/matchday_service.dart';
-import 'package:el7reef/core/services/tournament_permission_service.dart';
 import 'package:el7reef/data/repositories/guest_player_repository_impl.dart';
 import 'package:el7reef/data/repositories/guest_team_repository_impl.dart';
 import 'package:el7reef/data/repositories/match_attendance_repository_impl.dart';
@@ -27,6 +26,7 @@ import 'package:el7reef/data/repositories/match_substitution_repository_impl.dar
 import 'package:el7reef/data/repositories/player_repository_impl.dart';
 import 'package:el7reef/data/repositories/team_membership_repository_impl.dart';
 import 'package:el7reef/data/repositories/team_repository_impl.dart';
+import 'package:el7reef/data/repositories/tournament_assistant_permission_repository_impl.dart';
 import 'package:el7reef/data/repositories/tournament_registration_repository_impl.dart';
 import 'package:el7reef/data/repositories/tournament_repository_impl.dart';
 import 'package:el7reef/domain/entities/guest_player.dart';
@@ -82,6 +82,10 @@ void main() {
       registrationRepository,
       permanent: true,
     );
+    Get.put<TournamentAssistantPermissionRepositoryImpl>(
+      TournamentAssistantPermissionRepositoryImpl(firestore: firestore),
+      permanent: true,
+    );
     Get.put<TeamRepositoryImpl>(teamRepository, permanent: true);
     Get.put<TeamMembershipRepositoryImpl>(
       membershipRepository,
@@ -108,10 +112,6 @@ void main() {
     );
     Get.put<MatchSubstitutionRepositoryImpl>(
       substitutionRepository,
-      permanent: true,
-    );
-    Get.put<TournamentPermissionService>(
-      TournamentPermissionService(),
       permanent: true,
     );
     Get.put<MatchdayService>(matchdayService, permanent: true);
@@ -479,7 +479,8 @@ MatchdayController _putDirectController({
       snapshotRepository: Get.find<MatchLineupSnapshotRepositoryImpl>(),
       matchSideRepository: Get.find<MatchSideRepositoryImpl>(),
       substitutionRepository: Get.find<MatchSubstitutionRepositoryImpl>(),
-      tournamentPermissionService: Get.find<TournamentPermissionService>(),
+      assistantPermissionRepository:
+          Get.find<TournamentAssistantPermissionRepositoryImpl>(),
     ),
     permanent: true,
   );

@@ -12,7 +12,6 @@ import '../../data/models/tournament_model.dart';
 import 'official_match_roster_service.dart';
 import 'rating_engine.dart';
 import 'tournament_lifecycle_service.dart';
-import 'tournament_permission_service.dart';
 
 class MatchSettlementResult {
   final MatchStatus status;
@@ -32,23 +31,19 @@ class MatchSettlementService {
   final FirebaseFirestore _firestore;
   final TournamentLifecycleService _tournamentLifecycleService;
   final OfficialMatchRosterService _officialRosterService;
-  final TournamentPermissionService _tournamentPermissionService;
 
   MatchSettlementService({
     FirebaseFirestore? firestore,
     TournamentLifecycleService? tournamentLifecycleService,
-    TournamentPermissionService? tournamentPermissionService,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _tournamentLifecycleService =
            tournamentLifecycleService ??
            TournamentLifecycleService(
              firestore: firestore ?? FirebaseFirestore.instance,
-           ),
-       _officialRosterService = OfficialMatchRosterService(
-         firestore: firestore ?? FirebaseFirestore.instance,
-       ),
-       _tournamentPermissionService =
-           tournamentPermissionService ?? TournamentPermissionService();
+        ),
+        _officialRosterService = OfficialMatchRosterService(
+          firestore: firestore ?? FirebaseFirestore.instance,
+        );
 
   Future<MatchSettlementResult> submitScore({
     required String matchId,
@@ -98,6 +93,7 @@ class MatchSettlementService {
         transaction: transaction,
         match: rawMatch,
         actorId: actorId,
+        assistantPermission: 'canSubmitScore',
       );
 
       final isAnomaly = RatingEngine.isAnomalousResult(
@@ -176,6 +172,7 @@ class MatchSettlementService {
         transaction: transaction,
         match: match,
         actorId: actorId,
+        assistantPermission: 'canApproveScore',
       );
 
       if (_isSettled(matchSnapshot)) {
@@ -461,6 +458,7 @@ class MatchSettlementService {
     required Transaction transaction,
     required Match match,
     required String actorId,
+    required String assistantPermission,
   }) async {
     final tournamentId = match.tournamentId;
     if (tournamentId == null || tournamentId.isEmpty) {
@@ -474,9 +472,40 @@ class MatchSettlementService {
       transaction: transaction,
       tournamentId: tournamentId,
     );
-    if (!_tournamentPermissionService.canEditResults(tournament, actorId)) {
+    if (tournament.organizerId == actorId) {
+      return;
+    }
+    final hasAssistantPermission = await _hasAssistantPermission(
+      transaction: transaction,
+      tournamentId: tournamentId,
+      actorId: actorId,
+      permissionName: assistantPermission,
+    );
+    if (!hasAssistantPermission) {
       throw StateError('لا تملك صلاحية إدارة نتائج هذه البطولة.');
     }
+  }
+
+  Future<bool> _hasAssistantPermission({
+    required Transaction transaction,
+    required String tournamentId,
+    required String actorId,
+    required String permissionName,
+  }) async {
+    final assistantRef = _firestore
+        .collection(FirebasePaths.tournaments)
+        .doc(tournamentId)
+        .collection('assistants')
+        .doc(actorId);
+    final assistantSnapshot = await transaction.get(assistantRef);
+    final data = assistantSnapshot.data();
+    if (!assistantSnapshot.exists || data == null) {
+      return false;
+    }
+    final permissions = data['permissions'];
+    return data['status'] == 'active' &&
+        permissions is Map &&
+        permissions[permissionName] == true;
   }
 
   Future<Tournament> _loadTournamentForTransaction({
