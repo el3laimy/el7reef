@@ -13,6 +13,8 @@ class TournamentModel {
   final String format;
   final int teamSize;
   final int maxTeams;
+  final String visibility;
+  final bool discoverable;
   final int? prizePool;
   final String? prizeDescription;
   final String status;
@@ -42,6 +44,8 @@ class TournamentModel {
     required this.format,
     required this.teamSize,
     required this.maxTeams,
+    this.visibility = 'public',
+    this.discoverable = true,
     this.prizePool,
     this.prizeDescription,
     this.status = 'upcoming',
@@ -64,6 +68,7 @@ class TournamentModel {
   });
 
   factory TournamentModel.fromJson(Map<String, dynamic> json, String docId) {
+    final visibility = json['visibility'] as String? ?? 'public';
     return TournamentModel(
       id: docId,
       organizerId: json['organizerId'] as String? ?? '',
@@ -73,6 +78,8 @@ class TournamentModel {
       format: json['format'] as String? ?? 'groupsOnly',
       teamSize: (json['teamSize'] as num?)?.toInt() ?? 5,
       maxTeams: (json['maxTeams'] as num?)?.toInt() ?? 8,
+      visibility: visibility,
+      discoverable: json['discoverable'] as bool? ?? visibility == 'public',
       prizePool: (json['prizePool'] as num?)?.toInt(),
       prizeDescription: json['prizeDescription'] as String?,
       status: json['status'] as String? ?? 'upcoming',
@@ -128,6 +135,8 @@ class TournamentModel {
       'format': format,
       'teamSize': teamSize,
       'maxTeams': maxTeams,
+      'visibility': visibility,
+      'discoverable': discoverable,
       'prizePool': prizePool,
       'prizeDescription': prizeDescription,
       'status': status,
@@ -166,6 +175,8 @@ class TournamentModel {
     format: _parseFormat(format),
     teamSize: TournamentTeamSize.fromInt(teamSize),
     maxTeams: maxTeams,
+    visibility: _parseVisibility(visibility),
+    discoverable: discoverable,
     prizePool: prizePool,
     prizeDescription: prizeDescription,
     status: _parseStatus(status),
@@ -204,6 +215,8 @@ class TournamentModel {
     format: t.format.name,
     teamSize: t.teamSize.value,
     maxTeams: t.maxTeams,
+    visibility: t.visibility.name,
+    discoverable: t.discoverable,
     prizePool: t.prizePool,
     prizeDescription: t.prizeDescription,
     status: t.status.name,
@@ -234,4 +247,10 @@ class TournamentModel {
 
   static TournamentStatus _parseStatus(String v) => TournamentStatus.values
       .firstWhere((e) => e.name == v, orElse: () => TournamentStatus.upcoming);
+
+  static TournamentVisibility _parseVisibility(String v) =>
+      TournamentVisibility.values.firstWhere(
+        (e) => e.name == v,
+        orElse: () => TournamentVisibility.public,
+      );
 }

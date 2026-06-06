@@ -22,7 +22,6 @@ import 'package:el7reef/domain/entities/player.dart';
 import 'package:el7reef/domain/entities/team.dart';
 import 'package:el7reef/domain/entities/tournament.dart';
 import 'package:el7reef/domain/repositories/challenge_repository.dart';
-import 'package:el7reef/domain/repositories/match_repository.dart';
 import 'package:el7reef/features/match/controllers/challenge_controller.dart';
 import 'package:el7reef/features/match/controllers/match_controller.dart';
 import 'package:el7reef/features/profile/controllers/profile_controller.dart';
@@ -112,6 +111,7 @@ void main() {
         teamRepository: TeamRepositoryImpl(firestore: firestore),
       );
       controller.myOrganizedTournaments.add(_tournament('tournament-a'));
+      controller.followedTournaments.add(_tournament('followed-a'));
       controller.errorMessage.value = 'old error';
       controller.isLoading.value = true;
       controller.nameController.text = 'Old Cup';
@@ -120,11 +120,13 @@ void main() {
       controller.maxTeamsController.text = '32';
       controller.selectedFormat.value = TournamentFormat.knockoutOnly;
       controller.selectedTeamSize.value = TournamentTeamSize.elevenVsEleven;
+      controller.selectedVisibility.value = TournamentVisibility.private;
       controller.isFantasyEnabled.value = true;
 
       controller.resetSessionState();
 
       expect(controller.myOrganizedTournaments, isEmpty);
+      expect(controller.followedTournaments, isEmpty);
       expect(controller.errorMessage.value, isEmpty);
       expect(controller.isLoading.value, isFalse);
       expect(controller.nameController.text, isEmpty);
@@ -136,7 +138,46 @@ void main() {
         TournamentFormat.groupsThenKnockout,
       );
       expect(controller.selectedTeamSize.value, TournamentTeamSize.fiveVsFive);
+      expect(controller.selectedVisibility.value, TournamentVisibility.public);
       expect(controller.isFantasyEnabled.value, isFalse);
+      controller.onClose();
+    },
+  );
+
+  test(
+    'TournamentController keeps followed tournaments separate from my tournaments',
+    () {
+      final controller = TournamentController(
+        authService: authService,
+        tournamentRepository: TournamentRepositoryImpl(db: firestore),
+        teamRepository: TeamRepositoryImpl(firestore: firestore),
+      );
+      final organized = _tournament(
+        'organized-cup',
+      ).copyWith(createdAt: DateTime(2026, 5, 8));
+      final participating = _tournament(
+        'participating-cup',
+      ).copyWith(createdAt: DateTime(2026, 5, 9));
+      final followedOnly = _tournament(
+        'followed-only-cup',
+      ).copyWith(createdAt: DateTime(2026, 5, 10));
+
+      controller.myOrganizedTournaments.add(organized);
+      controller.myParticipatingTournaments.add(participating);
+      controller.followedTournaments.addAll([
+        followedOnly,
+        organized,
+        participating,
+      ]);
+
+      expect(controller.myTournaments.map((tournament) => tournament.id), [
+        'participating-cup',
+        'organized-cup',
+      ]);
+      expect(
+        controller.followedOnlyTournaments.map((tournament) => tournament.id),
+        ['followed-only-cup'],
+      );
       controller.onClose();
     },
   );

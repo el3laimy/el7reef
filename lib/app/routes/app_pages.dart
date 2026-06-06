@@ -240,6 +240,13 @@ class AppPages {
       transition: Transition.rightToLeftWithFade,
     ),
 
+    GetPage(
+      name: AppRoutes.tournamentExplore,
+      page: () => const TournamentExploreScreen(),
+      binding: TournamentBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
     // ── Tournament List (alias — مُستخدم في QR Scanner) ──
     GetPage(
       name: AppRoutes.tournaments,
@@ -258,40 +265,35 @@ class AppPages {
 
     GetPage(
       name: AppRoutes.tournamentParticipants,
-      page: () =>
-          const TournamentOrganizerGuard(child: TournamentParticipantsScreen()),
+      page: () => const TournamentParticipantsScreen(),
       binding: TournamentOperationsBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 
     GetPage(
       name: AppRoutes.tournamentGroups,
-      page: () =>
-          const TournamentOrganizerGuard(child: TournamentGroupsScreen()),
+      page: () => const TournamentGroupsScreen(),
       binding: TournamentOperationsBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 
     GetPage(
       name: AppRoutes.tournamentFixtures,
-      page: () =>
-          const TournamentOrganizerGuard(child: TournamentFixturesScreen()),
+      page: () => const TournamentFixturesScreen(),
       binding: TournamentOperationsBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 
     GetPage(
       name: AppRoutes.tournamentStandings,
-      page: () =>
-          const TournamentOrganizerGuard(child: TournamentStandingsScreen()),
+      page: () => const TournamentStandingsScreen(),
       binding: TournamentOperationsBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 
     GetPage(
       name: AppRoutes.tournamentBracket,
-      page: () =>
-          const TournamentOrganizerGuard(child: TournamentBracketScreen()),
+      page: () => const TournamentBracketScreen(),
       binding: TournamentOperationsBinding(),
       transition: Transition.rightToLeftWithFade,
     ),

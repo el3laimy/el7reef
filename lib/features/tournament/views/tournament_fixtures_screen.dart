@@ -3,8 +3,14 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart' as intl;
 
 import '../../../app/routes/app_routes.dart';
+import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_dimensions.dart';
+import '../../../app/theme/app_text_styles.dart';
 import '../../../core/enums/match_status.dart';
 import '../../../core/enums/tournament_ops_enums.dart';
+import '../../../core/widgets/el7reef_badge.dart';
+import '../../../core/widgets/el7reef_state_card.dart';
+import '../../../core/widgets/el7reef_surface.dart';
 import '../../../domain/entities/match.dart';
 import '../controllers/tournament_operations_controller.dart';
 
@@ -27,16 +33,25 @@ class _TournamentFixturesScreenState extends State<TournamentFixturesScreen> {
   @override
   Widget build(BuildContext context) {
     return _ScaffoldListScreen(
-      title: 'Fixtures',
+      title: 'مباريات البطولة',
       child: Obx(() {
         if (controller.fixtures.isEmpty) {
-          return const _StateMessage(
-            title: 'لا توجد fixtures بعد',
-            message: 'ابدأ المجموعات أو الإقصاء لتوليد المباريات.',
+          return const Center(
+            child: El7reefStateCard(
+              title: 'لا توجد مباريات بعد',
+              message: 'ابدأ دور المجموعات أو الإقصائيات لتوليد مباريات البطولة.',
+              icon: Icons.sports_soccer_rounded,
+              color: AppColors.primary,
+            ),
           );
         }
+        final visibleFixtures = controller.canManageTournament
+            ? controller.fixtures.toList(growable: false)
+            : controller.fixtures
+                .where((fixture) => fixture.fixtureStatus != FixtureStatus.draft)
+                .toList(growable: false);
         final filteredFixtures =
-            controller.fixtures
+            visibleFixtures
                 .where((fixture) {
                   if (_stageFilter != null &&
                       fixture.stageType != _stageFilter) {
@@ -69,180 +84,200 @@ class _TournamentFixturesScreenState extends State<TournamentFixturesScreen> {
 
         return ListView(
           children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'إدارة fixtures',
-                      style: Theme.of(context).textTheme.titleMedium,
+            El7reefSurface(
+              elevated: true,
+              borderColor: AppColors.primary.withValues(alpha: 0.22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('لوحة المباريات', style: AppTextStyles.titleLarge),
+                  const SizedBox(height: AppDimensions.xs),
+                  Text(
+                    controller.canManageTournament
+                        ? 'تابع جدول البطولة، ابدأ المباريات، وسجّل النتائج أول بأول.'
+                        : 'شاهد جدول البطولة والنتائج المنشورة بدون أدوات إدارة.',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textSecondaryTinted,
                     ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
+                  ),
+                  const SizedBox(height: AppDimensions.md),
+                  Wrap(
+                    spacing: AppDimensions.sm,
+                    runSpacing: AppDimensions.sm,
+                    children: [
+                      _MetricChip(
+                        label: 'الكل',
+                        value: visibleFixtures.length.toString(),
+                      ),
+                      if (controller.canManageTournament)
                         _MetricChip(
-                          label: 'All',
-                          value: controller.fixtures.length.toString(),
-                        ),
-                        _MetricChip(
-                          label: 'Draft',
+                          label: 'مسودة',
                           value: controller.draftFixturesCount.toString(),
                         ),
-                        _MetricChip(
-                          label: 'Published',
-                          value: controller.publishedFixturesCount.toString(),
-                        ),
-                        _MetricChip(
-                          label: 'Scheduled',
-                          value: controller.scheduledFixturesCount.toString(),
-                        ),
-                        _MetricChip(
-                          label: 'Official',
-                          value: controller.officialResultsCount.toString(),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'الفلاتر',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'عرض ${filteredFixtures.length} من أصل ${controller.fixtures.length} fixture',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        ChoiceChip(
-                          label: const Text('كل المراحل'),
-                          selected: _stageFilter == null,
-                          onSelected: (_) =>
-                              setState(() => _stageFilter = null),
-                        ),
-                        ...TournamentStageType.values.map(
-                          (stage) => ChoiceChip(
-                            label: Text(_stageLabel(stage)),
-                            selected: _stageFilter == stage,
-                            onSelected: (_) => setState(() {
-                              _stageFilter = _stageFilter == stage
-                                  ? null
-                                  : stage;
-                            }),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        ChoiceChip(
-                          label: const Text('كل الحالات'),
-                          selected: _publicationFilter == null,
-                          onSelected: (_) =>
-                              setState(() => _publicationFilter = null),
-                        ),
-                        ...FixtureStatus.values.map(
-                          (status) => ChoiceChip(
-                            label: Text(_fixtureStatusLabel(status)),
-                            selected: _publicationFilter == status,
-                            onSelected: (_) => setState(() {
-                              _publicationFilter = _publicationFilter == status
-                                  ? null
-                                  : status;
-                            }),
-                          ),
-                        ),
-                        ChoiceChip(
-                          label: const Text('مجدولة'),
-                          selected: _scheduledFilter == true,
-                          onSelected: (_) => setState(() {
-                            _scheduledFilter = _scheduledFilter == true
-                                ? null
-                                : true;
-                          }),
-                        ),
-                        ChoiceChip(
-                          label: const Text('غير مجدولة'),
-                          selected: _scheduledFilter == false,
-                          onSelected: (_) => setState(() {
-                            _scheduledFilter = _scheduledFilter == false
-                                ? null
-                                : false;
-                          }),
-                        ),
-                      ],
-                    ),
-                    if (controller.groups.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          ChoiceChip(
-                            label: const Text('كل المجموعات'),
-                            selected: _groupFilter == null,
-                            onSelected: (_) =>
-                                setState(() => _groupFilter = null),
-                          ),
-                          ...controller.groups.map(
-                            (group) => ChoiceChip(
-                              label: Text(group.name),
-                              selected: _groupFilter == group.id,
-                              onSelected: (_) => setState(() {
-                                _groupFilter = _groupFilter == group.id
-                                    ? null
-                                    : group.id;
-                              }),
-                            ),
-                          ),
-                        ],
+                      _MetricChip(
+                        label: 'منشورة',
+                        value: visibleFixtures
+                            .where(
+                              (fixture) =>
+                                  fixture.fixtureStatus == FixtureStatus.published,
+                            )
+                            .length
+                            .toString(),
+                      ),
+                      _MetricChip(
+                        label: 'مجدولة',
+                        value: visibleFixtures
+                            .where((fixture) => fixture.scheduledAt != null)
+                            .length
+                            .toString(),
+                      ),
+                      _MetricChip(
+                        label: 'نتائج رسمية',
+                        value: controller.officialResultsCount.toString(),
                       ),
                     ],
-                    const SizedBox(height: 8),
+                  ),
+                  const SizedBox(height: AppDimensions.lg),
+                  Text('الفلاتر', style: AppTextStyles.titleMedium),
+                  const SizedBox(height: AppDimensions.xs),
+                  Text(
+                     'يعرض ${filteredFixtures.length} من ${visibleFixtures.length} مباراة',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSecondaryTinted,
+                    ),
+                  ),
+                  const SizedBox(height: AppDimensions.sm),
+                  Wrap(
+                    spacing: AppDimensions.sm,
+                    runSpacing: AppDimensions.sm,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('كل المراحل'),
+                        selected: _stageFilter == null,
+                        onSelected: (_) => setState(() => _stageFilter = null),
+                      ),
+                      ...TournamentStageType.values.map(
+                        (stage) => ChoiceChip(
+                          label: Text(_stageLabel(stage)),
+                          selected: _stageFilter == stage,
+                          onSelected: (_) => setState(() {
+                            _stageFilter = _stageFilter == stage
+                                ? null
+                                : stage;
+                          }),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppDimensions.sm),
+                  Wrap(
+                    spacing: AppDimensions.sm,
+                    runSpacing: AppDimensions.sm,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('كل الحالات'),
+                        selected: _publicationFilter == null,
+                        onSelected: (_) =>
+                            setState(() => _publicationFilter = null),
+                      ),
+                      ...FixtureStatus.values
+                          .where(
+                            (status) =>
+                                controller.canManageTournament ||
+                                status != FixtureStatus.draft,
+                          )
+                          .map(
+                        (status) => ChoiceChip(
+                          label: Text(_fixtureStatusLabel(status)),
+                          selected: _publicationFilter == status,
+                          onSelected: (_) => setState(() {
+                            _publicationFilter = _publicationFilter == status
+                                ? null
+                                : status;
+                          }),
+                        ),
+                      ),
+                      ChoiceChip(
+                        label: const Text('مجدولة'),
+                        selected: _scheduledFilter == true,
+                        onSelected: (_) => setState(() {
+                          _scheduledFilter = _scheduledFilter == true
+                              ? null
+                              : true;
+                        }),
+                      ),
+                      ChoiceChip(
+                        label: const Text('غير مجدولة'),
+                        selected: _scheduledFilter == false,
+                        onSelected: (_) => setState(() {
+                          _scheduledFilter = _scheduledFilter == false
+                              ? null
+                              : false;
+                        }),
+                      ),
+                    ],
+                  ),
+                  if (controller.groups.isNotEmpty) ...[
+                    const SizedBox(height: AppDimensions.sm),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: AppDimensions.sm,
+                      runSpacing: AppDimensions.sm,
                       children: [
-                        OutlinedButton.icon(
-                          onPressed: () => _pickScheduledDay(context),
-                          icon: const Icon(Icons.event),
-                          label: Text(
-                            _scheduledDayFilter == null
-                                ? 'اختر يومًا'
-                                : intl.DateFormat(
-                                    'yyyy/MM/dd',
-                                  ).format(_scheduledDayFilter!),
+                        ChoiceChip(
+                          label: const Text('كل المجموعات'),
+                          selected: _groupFilter == null,
+                          onSelected: (_) => setState(() => _groupFilter = null),
+                        ),
+                        ...controller.groups.map(
+                          (group) => ChoiceChip(
+                            label: Text(group.name),
+                            selected: _groupFilter == group.id,
+                            onSelected: (_) => setState(() {
+                              _groupFilter = _groupFilter == group.id
+                                  ? null
+                                  : group.id;
+                            }),
                           ),
                         ),
-                        if (_scheduledDayFilter != null)
-                          ActionChip(
-                            avatar: const Icon(Icons.close, size: 18),
-                            label: const Text('إزالة فلتر اليوم'),
-                            onPressed: () =>
-                                setState(() => _scheduledDayFilter = null),
-                          ),
                       ],
                     ),
                   ],
-                ),
+                  const SizedBox(height: AppDimensions.sm),
+                  Wrap(
+                    spacing: AppDimensions.sm,
+                    runSpacing: AppDimensions.sm,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _pickScheduledDay(context),
+                        icon: const Icon(Icons.event),
+                        label: Text(
+                          _scheduledDayFilter == null
+                              ? 'اختر يومًا'
+                              : intl.DateFormat(
+                                  'yyyy/MM/dd',
+                                ).format(_scheduledDayFilter!),
+                        ),
+                      ),
+                      if (_scheduledDayFilter != null)
+                        ActionChip(
+                          avatar: const Icon(Icons.close, size: 18),
+                          label: const Text('إزالة فلتر اليوم'),
+                          onPressed: () =>
+                              setState(() => _scheduledDayFilter = null),
+                        ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppDimensions.md),
             if (filteredFixtures.isEmpty)
-              const _StateMessage(
-                title: 'لا توجد نتائج مطابقة',
-                message: 'غيّر الفلاتر الحالية لإظهار fixtures أخرى.',
+              const El7reefStateCard(
+                title: 'لا توجد مباريات مطابقة',
+                message: 'غيّر الفلاتر الحالية لعرض مباريات أخرى.',
+                icon: Icons.filter_alt_off_rounded,
+                color: AppColors.warning,
               )
             else
               ...filteredFixtures.map(
@@ -292,11 +327,11 @@ class _TournamentFixturesScreenState extends State<TournamentFixturesScreen> {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('جدولة fixture'),
+          title: const Text('جدولة المباراة'),
           content: TextField(
             controller: venueController,
             decoration: const InputDecoration(
-              labelText: 'Venue / Pitch',
+              labelText: 'الملعب',
               hintText: 'مثال: الملعب 1',
             ),
           ),
@@ -404,9 +439,14 @@ class _FixtureOperationsCard extends StatelessWidget {
           )
         : controller.groupLabelFor(fixture.groupId);
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+    final statusColor = _matchStatusColor(fixture);
+    final homeName = controller.fixtureTeamLabel(fixture, isHome: true);
+    final awayName = controller.fixtureTeamLabel(fixture, isHome: false);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppDimensions.md),
+      child: El7reefSurface(
+        borderColor: statusColor.withValues(alpha: 0.26),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -414,109 +454,165 @@ class _FixtureOperationsCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Wrap(
+                    spacing: AppDimensions.sm,
+                    runSpacing: AppDimensions.xs,
                     children: [
-                      Text(
-                        '${controller.fixtureTeamLabel(fixture, isHome: true)} vs ${controller.fixtureTeamLabel(fixture, isHome: false)}',
-                        style: Theme.of(context).textTheme.titleMedium,
+                      El7reefBadge(
+                        label: _tournamentStageLabel(fixture.stageType),
+                        color: AppColors.primary,
+                        icon: Icons.account_tree_rounded,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${_tournamentStageLabel(fixture.stageType)} • $stageDetail',
-                        style: Theme.of(context).textTheme.bodySmall,
+                      El7reefBadge(
+                        label: stageDetail,
+                        color: AppColors.accent,
+                        icon: Icons.flag_rounded,
                       ),
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: fixture.isOfficialTournamentResult
-                        ? const Color(0xFFE7F7ED)
-                        : fixture.status == MatchStatus.pendingReview
-                        ? const Color(0xFFFFF2CC)
-                        : const Color(0xFFF4F4F4),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    _matchStatusLabel(fixture.status),
-                    style: Theme.of(context).textTheme.labelMedium,
-                  ),
+                El7reefBadge(
+                  label: _matchStatusLabel(fixture.status),
+                  color: statusColor,
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppDimensions.md),
+            Directionality(
+              textDirection: TextDirection.ltr,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _TeamNameBlock(name: homeName, alignLeft: true),
+                  ),
+                  _ScorePill(fixture: fixture),
+                  Expanded(
+                    child: _TeamNameBlock(name: awayName, alignLeft: false),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppDimensions.md),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: AppDimensions.sm,
+              runSpacing: AppDimensions.sm,
               children: [
                 _MetricChip(
-                  label: 'Fixture',
+                  label: 'النشر',
                   value: _fixtureStatusLabelText(fixture.fixtureStatus),
                 ),
                 _MetricChip(
-                  label: 'Schedule',
+                  label: 'الموعد',
                   value: _formatDateTime(fixture.scheduledAt),
                 ),
                 if (fixture.venueId != null && fixture.venueId!.isNotEmpty)
-                  _MetricChip(label: 'Venue', value: fixture.venueId!),
+                  _MetricChip(label: 'الملعب', value: fixture.venueId!),
                 if (fixture.scoreTeamA != null && fixture.scoreTeamB != null)
                   _MetricChip(
-                    label: 'Score',
+                    label: 'النتيجة',
                     value: '${fixture.scoreTeamA} - ${fixture.scoreTeamB}',
                   ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppDimensions.md),
             Text(
-              fixture.isOfficialTournamentResult
-                  ? 'النتيجة معتمدة وتؤثر مباشرة على الترتيب أو الإقصاء.'
-                  : fixture.status == MatchStatus.live
-                  ? 'المباراة جارية الآن ويمكن الدخول مباشرة إلى مراجعة النتيجة.'
-                  : fixture.fixtureStatus == FixtureStatus.draft
-                  ? 'هذه fixture ما زالت draft ويجب نشرها قبل بدء المباراة.'
-                  : fixture.status == MatchStatus.open
-                  ? 'بعد check-in وقفل التشكيل للطرفين يمكنك بدء المباراة من هنا.'
-                  : fixture.scheduledAt == null
-                  ? 'يفضل تحديد الموعد والملعب قبل يوم التشغيل.'
-                  : 'الـ fixture جاهزة للوصول السريع إلى التشغيل أو مراجعة النتيجة.',
-              style: Theme.of(context).textTheme.bodySmall,
+              _fixtureHint(fixture),
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textSecondaryTinted,
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppDimensions.md),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: AppDimensions.sm,
+              runSpacing: AppDimensions.sm,
               children: [
                 OutlinedButton.icon(
                   onPressed: () =>
                       Get.toNamed(AppRoutes.matchDetailsById(fixture.id)),
                   icon: const Icon(Icons.sports_soccer),
-                  label: const Text('Matchday'),
-                ),
-                FilledButton.icon(
-                  onPressed: onStartMatch,
-                  icon: const Icon(Icons.play_arrow),
-                  label: const Text('Start Match'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _scoreActionForMatch(controller, fixture),
-                  icon: Icon(_scoreActionIcon(fixture)),
-                  label: Text(_scoreActionLabel(fixture)),
-                ),
-                FilledButton.icon(
-                  onPressed: onSchedule,
-                  icon: const Icon(Icons.schedule),
                   label: Text(
-                    fixture.scheduledAt == null ? 'Schedule' : 'Reschedule',
+                    controller.canManageTournament
+                        ? 'إدارة المباراة'
+                        : 'عرض المباراة',
                   ),
                 ),
+                if (controller.canManageTournament) ...[
+                  FilledButton.icon(
+                    onPressed: onStartMatch,
+                    icon: const Icon(Icons.play_arrow),
+                    label: const Text('ابدأ المباراة'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _scoreActionForMatch(controller, fixture),
+                    icon: Icon(_scoreActionIcon(fixture)),
+                    label: Text(_scoreActionLabel(fixture)),
+                  ),
+                  FilledButton.icon(
+                    onPressed: onSchedule,
+                    icon: const Icon(Icons.schedule),
+                    label: Text(
+                      fixture.scheduledAt == null ? 'جدولة' : 'تعديل الموعد',
+                    ),
+                  ),
+                ],
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TeamNameBlock extends StatelessWidget {
+  final String name;
+  final bool alignLeft;
+
+  const _TeamNameBlock({required this.name, required this.alignLeft});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      name,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      textAlign: alignLeft ? TextAlign.left : TextAlign.right,
+      style: AppTextStyles.titleLarge.copyWith(
+        color: AppColors.textPrimaryTinted,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+  }
+}
+
+class _ScorePill extends StatelessWidget {
+  final Match fixture;
+
+  const _ScorePill({required this.fixture});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasScore = fixture.scoreTeamA != null && fixture.scoreTeamB != null;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: AppDimensions.sm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimensions.md,
+        vertical: AppDimensions.sm,
+      ),
+      decoration: BoxDecoration(
+        color: hasScore ? AppColors.primarySurface : AppColors.surfaceSunken,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+        border: Border.all(
+          color: hasScore
+              ? AppColors.primary.withValues(alpha: 0.35)
+              : AppColors.surfaceBorderStrong,
+        ),
+      ),
+      child: Text(
+        hasScore ? '${fixture.scoreTeamA} - ${fixture.scoreTeamB}' : 'ضد',
+        style: AppTextStyles.headlineMedium.copyWith(
+          color: hasScore ? AppColors.primary : AppColors.textSecondaryTinted,
+          fontWeight: FontWeight.w900,
         ),
       ),
     );
@@ -536,35 +632,13 @@ class _ScaffoldListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(title)),
-      body: SafeArea(
-        child: Padding(padding: const EdgeInsets.all(16), child: child),
-      ),
-    );
-  }
-}
-
-class _StateMessage extends StatelessWidget {
-  final String title;
-  final String message;
-
-  const _StateMessage({required this.title, required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-          ],
+      body: Container(
+        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(AppDimensions.pagePadding),
+            child: child,
+          ),
         ),
       ),
     );
@@ -579,17 +653,31 @@ class _MetricChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Chip(
-      label: Text('$label: $value'),
-      visualDensity: VisualDensity.compact,
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimensions.sm,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSunken,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+        border: Border.all(color: AppColors.surfaceBorderStrong),
+      ),
+      child: Text(
+        '$label: $value',
+        style: AppTextStyles.labelSmall.copyWith(
+          color: AppColors.textSecondaryTinted,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }
 
 String _fixtureStatusLabelText(FixtureStatus status) => switch (status) {
-  FixtureStatus.draft => 'Draft',
-  FixtureStatus.published => 'Published',
-  FixtureStatus.completed => 'Completed',
+  FixtureStatus.draft => 'مسودة',
+  FixtureStatus.published => 'منشورة',
+  FixtureStatus.completed => 'مكتملة',
 };
 
 VoidCallback? _scoreActionForMatch(
@@ -611,11 +699,11 @@ VoidCallback? _scoreActionForMatch(
 }
 
 String _scoreActionLabel(Match match) => switch (match.status) {
-  MatchStatus.live => 'Submit Score',
-  MatchStatus.completed => 'Approve Score',
-  MatchStatus.pendingReview => 'Review & Approve',
-  MatchStatus.settled => 'Approved',
-  _ => 'Score Review',
+  MatchStatus.live => 'سجّل النتيجة',
+  MatchStatus.completed => 'اعتمد النتيجة',
+  MatchStatus.pendingReview => 'راجع واعتمد',
+  MatchStatus.settled => 'معتمدة',
+  _ => 'مراجعة النتيجة',
 };
 
 IconData _scoreActionIcon(Match match) => switch (match.status) {
@@ -637,27 +725,61 @@ String _knockoutRoundLabel(int roundIndex, {required int maxRoundIndex}) {
     0 => 'النهائي',
     1 => 'نصف النهائي',
     2 => 'ربع النهائي',
-    _ => 'Round ${roundIndex + 1}',
+    _ => 'دور ${roundIndex + 1}',
   };
 }
 
 String _matchStatusLabel(MatchStatus status) => switch (status) {
-  MatchStatus.open => 'Open',
-  MatchStatus.full => 'Full',
-  MatchStatus.live => 'Live',
-  MatchStatus.pendingReview => 'Pending Review',
-  MatchStatus.completed => 'Completed',
-  MatchStatus.settled => 'Settled',
-  MatchStatus.ratingWindow => 'Rating Window',
-  MatchStatus.frozen => 'Frozen',
-  MatchStatus.cancelled => 'Cancelled',
+  MatchStatus.open => 'مفتوحة',
+  MatchStatus.full => 'مكتملة العدد',
+  MatchStatus.live => 'جارية',
+  MatchStatus.pendingReview => 'بانتظار الاعتماد',
+  MatchStatus.completed => 'انتهت',
+  MatchStatus.settled => 'معتمدة',
+  MatchStatus.ratingWindow => 'نافذة التقييم',
+  MatchStatus.frozen => 'مجمّدة',
+  MatchStatus.cancelled => 'ملغاة',
 };
+
+Color _matchStatusColor(Match fixture) {
+  if (fixture.isOfficialTournamentResult ||
+      fixture.status == MatchStatus.settled) {
+    return AppColors.success;
+  }
+  return switch (fixture.status) {
+    MatchStatus.live => AppColors.primary,
+    MatchStatus.pendingReview || MatchStatus.completed => AppColors.warning,
+    MatchStatus.cancelled || MatchStatus.frozen => AppColors.error,
+    _ => AppColors.accent,
+  };
+}
+
+String _fixtureHint(Match fixture) {
+  if (fixture.isOfficialTournamentResult) {
+    return 'النتيجة معتمدة وتؤثر مباشرة على الترتيب أو الإقصاء.';
+  }
+  if (fixture.status == MatchStatus.live) {
+    return 'المباراة جارية الآن. سجّل النتيجة والهدافين والـ MVP بعد الصفارة.';
+  }
+  if (fixture.fixtureStatus == FixtureStatus.draft) {
+    return 'هذه المباراة ما زالت مسودة. انشر الجدول قبل بدء التشغيل.';
+  }
+  if (fixture.status == MatchStatus.open) {
+    return 'بعد جاهزية الطرفين يمكنك بدء المباراة من هنا.';
+  }
+  if (fixture.scheduledAt == null) {
+    return 'يفضل تحديد الموعد والملعب قبل يوم التشغيل.';
+  }
+  if (fixture.status == MatchStatus.pendingReview ||
+      fixture.status == MatchStatus.completed) {
+    return 'راجع النتيجة قبل اعتمادها حتى تظهر في الترتيب وكروت الفخر.';
+  }
+  return 'المباراة جاهزة للوصول السريع إلى التشغيل أو مراجعة النتيجة.';
+}
 
 String _formatDateTime(DateTime? value) {
   if (value == null) {
     return 'غير محدد';
   }
-  return intl.DateFormat('yyyy/MM/dd – HH:mm').format(value);
+  return intl.DateFormat('yyyy/MM/dd - HH:mm').format(value);
 }
-
-

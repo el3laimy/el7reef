@@ -12,14 +12,20 @@ abstract class AppColors {
   // ── Neutral ──
   static const Color black = Color(0xFF0B0B0B);
   static const Color background = Color(0xFF121212);
+  static const Color backgroundDeep = Color(0xFF0D130F);
   static const Color backgroundLight = Color(0xFF1A1A1A); // Player Card Background
   static const Color surface = Color(0xFF1E1E1E);
+  static const Color surfaceRaised = Color(0xFF242720);
+  static const Color surfaceSunken = Color(0xFF151812);
   static const Color surfaceLight = Color(0xFF1E1E1E);
   static const Color surfaceBorder = Color(0xFF2A2A2A);
+  static const Color surfaceBorderStrong = Color(0xFF3B4136);
 
   // ── Text ──
   static const Color textPrimary = Color(0xFFFFFFFF);
+  static const Color textPrimaryTinted = Color(0xFFF4F7EE);
   static const Color textSecondary = Color(0xFFA0A0A0);
+  static const Color textSecondaryTinted = Color(0xFFB5BBAE);
   static const Color textMuted = Color(0xFF64748B);
   static const Color textOnPrimary = Color(0xFF0B0B0B);
 
@@ -35,9 +41,13 @@ abstract class AppColors {
 
   // ── Semantic ──
   static const Color success = Color(0xFF4CAF50);
+  static const Color successSurface = Color(0x1F4CAF50);
   static const Color error = Color(0xFFFF4D4F);
+  static const Color errorSurface = Color(0x1FFF4D4F);
   static const Color warning = Color(0xFFFFC107);
+  static const Color warningSurface = Color(0x1FFFC107);
   static const Color info = Color(0xFF29B6F6);
+  static const Color infoSurface = Color(0x1F29B6F6);
 
   // ── Rank Tiers ──
   static const Color rankBronze = Color(0xFFCD7F32);
@@ -61,7 +71,7 @@ abstract class AppColors {
   );
 
   static const LinearGradient backgroundGradient = LinearGradient(
-    colors: [background, black],
+    colors: [background, backgroundDeep],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );

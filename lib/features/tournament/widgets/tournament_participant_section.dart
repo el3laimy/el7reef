@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/theme/app_dimensions.dart';
+import '../../../app/theme/app_text_styles.dart';
 import '../../../domain/entities/tournament_participant.dart';
 import '../controllers/tournament_operations_controller.dart';
 import 'tournament_participant_card.dart';
@@ -21,11 +23,11 @@ class TournamentParticipantSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
+        Text(title, style: AppTextStyles.titleMedium),
+        const SizedBox(height: AppDimensions.sm),
         ...participants.map(
           (participant) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: AppDimensions.sm),
             child: TournamentParticipantCard(
               participant: participant,
               controller: controller,

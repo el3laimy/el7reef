@@ -5,6 +5,7 @@ import '../../../core/constants/feature_flags.dart';
 import '../../../core/enums/tournament_enums.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
+import '../../../data/repositories/team_repository_impl.dart';
 import '../../../domain/entities/tournament.dart';
 import '../../../core/auth/auth_service.dart';
 
@@ -12,18 +13,50 @@ import '../../../core/auth/auth_service.dart';
 class TournamentController extends GetxController {
   final AuthService _authService;
   final TournamentRepositoryImpl _repo;
+  final TeamRepositoryImpl _teamRepo;
 
   TournamentController({
     AuthService? authService,
     TournamentRepositoryImpl? tournamentRepository,
+    TeamRepositoryImpl? teamRepository,
   }) : _authService = authService ?? Get.find<AuthService>(),
-       _repo = tournamentRepository ?? TournamentRepositoryImpl();
+       _repo = tournamentRepository ?? TournamentRepositoryImpl(),
+       _teamRepo = teamRepository ?? TeamRepositoryImpl();
 
   // ── State ──
-  final RxList<Tournament> liveTournaments = <Tournament>[].obs;
+  final RxList<Tournament> discoverableTournaments = <Tournament>[].obs;
   final RxList<Tournament> myOrganizedTournaments = <Tournament>[].obs;
+  final RxList<Tournament> myParticipatingTournaments = <Tournament>[].obs;
+  final RxList<Tournament> followedTournaments = <Tournament>[].obs;
   final RxBool isLoading = false.obs;
+  final RxBool isLoadingMyTournaments = false.obs;
+  final RxBool isLoadingDiscoverableTournaments = false.obs;
   final RxString errorMessage = ''.obs;
+
+  /// Backward-compatible alias for older callers. Prefer discoverableTournaments.
+  RxList<Tournament> get liveTournaments => discoverableTournaments;
+
+  List<Tournament> get myTournaments {
+    final byId = <String, Tournament>{};
+    for (final tournament in myOrganizedTournaments) {
+      byId[tournament.id] = tournament;
+    }
+    for (final tournament in myParticipatingTournaments) {
+      byId.putIfAbsent(tournament.id, () => tournament);
+    }
+    final list = byId.values.toList(growable: false);
+    list.sort((left, right) => right.createdAt.compareTo(left.createdAt));
+    return list;
+  }
+
+  List<Tournament> get followedOnlyTournaments {
+    final myIds = myTournaments.map((tournament) => tournament.id).toSet();
+    final list = followedTournaments
+        .where((tournament) => !myIds.contains(tournament.id))
+        .toList(growable: false);
+    list.sort((left, right) => right.createdAt.compareTo(left.createdAt));
+    return list;
+  }
 
   // ── Create Form ──
   final nameController = TextEditingController();
@@ -36,6 +69,8 @@ class TournamentController extends GetxController {
       TournamentFormat.groupsThenKnockout.obs;
   final Rx<TournamentTeamSize> selectedTeamSize =
       TournamentTeamSize.fiveVsFive.obs;
+  final Rx<TournamentVisibility> selectedVisibility =
+      TournamentVisibility.public.obs;
   final RxBool isFantasyEnabled = false.obs;
   Worker? _authWorker;
 
@@ -49,38 +84,61 @@ class TournamentController extends GetxController {
         loadMyTournaments();
       }
     });
-    loadLiveTournaments();
     loadMyTournaments();
   }
 
   void resetSessionState() {
     myOrganizedTournaments.clear();
+    myParticipatingTournaments.clear();
+    followedTournaments.clear();
+    discoverableTournaments.clear();
     isLoading.value = false;
+    isLoadingMyTournaments.value = false;
+    isLoadingDiscoverableTournaments.value = false;
     errorMessage.value = '';
     _clearForm();
   }
 
-  /// تحميل الدورات الجارية
-  Future<void> loadLiveTournaments() async {
+  /// تحميل البطولات العامة القابلة للاستكشاف
+  Future<void> loadDiscoverableTournaments() async {
     try {
-      isLoading.value = true;
-      liveTournaments.value = await _repo.getLiveTournaments();
+      isLoadingDiscoverableTournaments.value = true;
+      discoverableTournaments.value = await _repo.getDiscoverableTournaments();
     } catch (e) {
-      AppLogger.error('TournamentController.loadTournaments', e);
-      errorMessage.value = 'فشل تحميل الدورات';
+      AppLogger.error('TournamentController.loadDiscoverableTournaments', e);
+      errorMessage.value = 'فشل تحميل البطولات العامة';
     } finally {
-      isLoading.value = false;
+      isLoadingDiscoverableTournaments.value = false;
     }
   }
+
+  Future<void> loadLiveTournaments() => loadDiscoverableTournaments();
 
   /// تحميل دوراتي (كمنظم)
   Future<void> loadMyTournaments() async {
     final uid = _authService.currentUserId;
     if (uid == null) return;
     try {
-      myOrganizedTournaments.value = await _repo.getOrganizerTournaments(uid);
+      isLoadingMyTournaments.value = true;
+      final organized = await _repo.getOrganizerTournaments(uid);
+      final followed = await _repo.getFollowedTournaments(uid);
+      final teams = await _teamRepo.getPlayerTeams(uid);
+      final participating = <String, Tournament>{};
+      for (final team in teams) {
+        final tournaments = await _repo.getPlayerTournaments(team.id);
+        for (final tournament in tournaments) {
+          participating[tournament.id] = tournament;
+        }
+      }
+      myOrganizedTournaments.value = organized;
+      myParticipatingTournaments.value = participating.values.toList(
+        growable: false,
+      )..sort((left, right) => right.createdAt.compareTo(left.createdAt));
+      followedTournaments.value = followed;
     } catch (e) {
       AppLogger.error('TournamentController.loadMyTournaments', e);
+    } finally {
+      isLoadingMyTournaments.value = false;
     }
   }
 
@@ -107,6 +165,8 @@ class TournamentController extends GetxController {
         format: selectedFormat.value,
         teamSize: selectedTeamSize.value,
         maxTeams: int.tryParse(maxTeamsController.text) ?? 8,
+        visibility: selectedVisibility.value,
+        discoverable: selectedVisibility.value == TournamentVisibility.public,
         status: TournamentStatus.registration,
         isFantasyEnabled:
             FeatureFlags.fantasyUiEnabled && isFantasyEnabled.value,
@@ -115,7 +175,9 @@ class TournamentController extends GetxController {
 
       await _repo.createTournament(tournament);
       myOrganizedTournaments.insert(0, tournament);
-      liveTournaments.insert(0, tournament);
+      if (tournament.isDiscoverable) {
+        discoverableTournaments.insert(0, tournament);
+      }
 
       _clearForm();
       Get.back();
@@ -138,6 +200,7 @@ class TournamentController extends GetxController {
     maxTeamsController.text = '8';
     selectedFormat.value = TournamentFormat.groupsThenKnockout;
     selectedTeamSize.value = TournamentTeamSize.fiveVsFive;
+    selectedVisibility.value = TournamentVisibility.public;
     isFantasyEnabled.value = false;
   }
 

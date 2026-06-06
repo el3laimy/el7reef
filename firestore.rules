@@ -896,6 +896,28 @@ service cloud.firestore {
       return organizesTournamentById(tournamentId) || isOwner(assistantUserId);
     }
 
+    function validTournamentFollower(data, tournamentId, followerUserId) {
+      return data.keys().hasOnly([
+          'tournamentId',
+          'userId',
+          'createdAt'
+        ]) &&
+        data.keys().hasAll([
+          'tournamentId',
+          'userId',
+          'createdAt'
+        ]) &&
+        data.tournamentId == tournamentId &&
+        data.userId == followerUserId &&
+        data.createdAt is int;
+    }
+
+    function canReadOwnFollowerDocument(followerUserId) {
+      return isOwner(followerUserId) &&
+        resource.data.userId is string &&
+        resource.data.userId == request.auth.uid;
+    }
+
     function ownsTournamentOperation(data) {
       return data.tournamentId is string &&
         organizesTournamentById(data.tournamentId);
@@ -1581,6 +1603,11 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /{path=**}/followers/{followerUserId} {
+      allow get, list: if canReadOwnFollowerDocument(followerUserId);
+      allow create, update, delete: if false;
+    }
+
     match /tournaments/{tournamentId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() &&
@@ -1600,6 +1627,27 @@ service cloud.firestore {
           assistantUserId
         );
         allow delete: if false;
+      }
+
+      match /followers/{followerUserId} {
+        allow get: if isOwner(followerUserId) ||
+          organizesTournamentById(tournamentId);
+        allow list: if isAuthenticated() &&
+          (
+            organizesTournamentById(tournamentId) ||
+            resource.data.userId == request.auth.uid
+          );
+        allow create: if isOwner(followerUserId) &&
+          exists(/databases/$(database)/documents/tournaments/$(tournamentId)) &&
+          get(/databases/$(database)/documents/tournaments/$(tournamentId))
+            .data.organizerId != request.auth.uid &&
+          validTournamentFollower(
+            request.resource.data,
+            tournamentId,
+            followerUserId
+          );
+        allow update: if false;
+        allow delete: if isOwner(followerUserId);
       }
     }
 

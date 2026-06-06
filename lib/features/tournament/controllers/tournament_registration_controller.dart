@@ -82,6 +82,24 @@ class TournamentRegistrationController extends GetxController {
           .toList(growable: false)
         ..sort((left, right) => right.updatedAt.compareTo(left.updatedAt));
 
+  List<TournamentRegistration> get myVisibleRegistrations {
+    final userId = currentUserId;
+    if (userId == null || userId.isEmpty) {
+      return const <TournamentRegistration>[];
+    }
+    final myTeamIds = myTeams.map((team) => team.id).toSet();
+    final list = registrations
+        .where(
+          (registration) =>
+              registration.createdBy == userId ||
+              (registration.teamId != null &&
+                  myTeamIds.contains(registration.teamId)),
+        )
+        .toList(growable: false);
+    list.sort((left, right) => right.updatedAt.compareTo(left.updatedAt));
+    return list;
+  }
+
   @override
   void onInit() {
     super.onInit();
@@ -111,11 +129,12 @@ class TournamentRegistrationController extends GetxController {
       }
 
       tournament.value = loadedTournament;
-      final loadedRegistrations = await _registrationRepository
-          .getTournamentRegistrations(id);
+      await _loadMyTeams();
+      final loadedRegistrations = loadedTournament.organizerId == currentUserId
+          ? await _registrationRepository.getTournamentRegistrations(id)
+          : await _loadPublicAndOwnRegistrations(id);
       registrations.assignAll(loadedRegistrations);
       await _primeParticipantLookups(loadedRegistrations);
-      await _loadMyTeams();
     } catch (error) {
       errorMessage.value = _normalizeError(error);
     } finally {
@@ -247,6 +266,28 @@ class TournamentRegistrationController extends GetxController {
     for (final team in loadedTeams) {
       teamLookups[team.id] = team;
     }
+  }
+
+  Future<List<TournamentRegistration>> _loadPublicAndOwnRegistrations(
+    String tournamentId,
+  ) async {
+    final approved = await _registrationRepository
+        .getApprovedTournamentRegistrations(tournamentId);
+    final ownTeamRegistrations = await _registrationRepository
+        .getTournamentRegistrationsForTeamIds(
+      tournamentId: tournamentId,
+      teamIds: myTeams.map((team) => team.id).toList(growable: false),
+    );
+    final byId = <String, TournamentRegistration>{};
+    for (final registration in approved) {
+      byId[registration.id] = registration;
+    }
+    for (final registration in ownTeamRegistrations) {
+      byId[registration.id] = registration;
+    }
+    final list = byId.values.toList(growable: false);
+    list.sort((left, right) => left.createdAt.compareTo(right.createdAt));
+    return list;
   }
 
   Future<void> _primeParticipantLookups(

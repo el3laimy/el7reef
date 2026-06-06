@@ -30,14 +30,11 @@ class MatchCard extends StatelessWidget {
     final isOrganizer =
         match.organizerId == controller.authService.currentUserId;
     final currentUserId = controller.authService.currentUserId;
-    final isParticipant = currentUserId != null &&
+    final isParticipant =
+        currentUserId != null &&
         (match.teamAPlayerIds.contains(currentUserId) ||
             match.teamBPlayerIds.contains(currentUserId));
-    final canOpenMatchday =
-        isOrganizer ||
-        match.isOrganized ||
-        match.teamAId != null ||
-        match.teamBId != null;
+    final canOpenMatchday = isOrganizer || isParticipant;
     final hasResult = match.scoreTeamA != null && match.scoreTeamB != null;
 
     return GlassmorphicContainer(
@@ -155,11 +152,7 @@ class MatchCard extends StatelessWidget {
                         Get.toNamed(AppRoutes.matchDetailsById(match.id)),
                     icon: const Icon(Icons.fact_check_outlined, size: 18),
                     label: Text(
-                      isOrganizer
-                          ? 'إدارة المباراة'
-                          : isParticipant
-                              ? 'تفاصيل مباراتي'
-                              : 'عرض المباراة',
+                      isOrganizer ? 'إدارة المباراة' : 'تفاصيل مباراتي',
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,

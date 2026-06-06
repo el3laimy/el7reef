@@ -60,6 +60,54 @@ class TournamentRegistrationRepositoryImpl
   }
 
   @override
+  Future<List<TournamentRegistration>> getApprovedTournamentRegistrations(
+    String tournamentId,
+  ) async {
+    return FirebaseErrorHandler.guard(() async {
+      final snapshot = await _registrationsRef
+          .where('tournamentId', isEqualTo: tournamentId)
+          .where('status', isEqualTo: 'approved')
+          .get();
+      final registrations = snapshot.docs
+          .map((doc) => TournamentRegistrationModel.fromJson(doc.data(), doc.id).toEntity())
+          .toList(growable: true);
+      registrations.sort((left, right) => left.updatedAt.compareTo(right.updatedAt));
+      return registrations;
+    });
+  }
+
+  @override
+  Future<List<TournamentRegistration>> getTournamentRegistrationsForTeamIds({
+    required String tournamentId,
+    required List<String> teamIds,
+  }) async {
+    return FirebaseErrorHandler.guard(() async {
+      final normalizedTeamIds = teamIds
+          .map((id) => id.trim())
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList(growable: false);
+      if (normalizedTeamIds.isEmpty) {
+        return const <TournamentRegistration>[];
+      }
+
+      final byId = <String, TournamentRegistration>{};
+      for (final chunk in _chunkIds(normalizedTeamIds)) {
+        final snapshot = await _registrationsRef
+            .where('tournamentId', isEqualTo: tournamentId)
+            .where('teamId', whereIn: chunk)
+            .get();
+        for (final doc in snapshot.docs) {
+          byId[doc.id] = TournamentRegistrationModel.fromJson(doc.data(), doc.id).toEntity();
+        }
+      }
+      final registrations = byId.values.toList(growable: true);
+      registrations.sort((left, right) => right.updatedAt.compareTo(left.updatedAt));
+      return registrations;
+    });
+  }
+
+  @override
   Future<TournamentRegistration?> getRegistrationByTeamId({
     required String tournamentId,
     required String teamId,
@@ -124,5 +172,15 @@ class TournamentRegistrationRepositoryImpl
       registrations.sort((left, right) => right.createdAt.compareTo(left.createdAt));
       return registrations;
     });
+  }
+
+  List<List<String>> _chunkIds(List<String> ids) {
+    const chunkSize = 10;
+    final chunks = <List<String>>[];
+    for (var i = 0; i < ids.length; i += chunkSize) {
+      final end = i + chunkSize > ids.length ? ids.length : i + chunkSize;
+      chunks.add(ids.sublist(i, end));
+    }
+    return chunks;
   }
 }

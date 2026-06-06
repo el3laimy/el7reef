@@ -1,31 +1,36 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
-import '../../../../core/enums/tournament_ops_enums.dart';
-import '../../../../domain/entities/tournament_participant.dart';
+import '../../../app/routes/app_routes.dart';
+import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_dimensions.dart';
+import '../../../app/theme/app_text_styles.dart';
+import '../../../core/enums/tournament_ops_enums.dart';
+import '../../../domain/entities/tournament_participant.dart';
 import '../controllers/tournament_operations_controller.dart';
 
 String participantStatusLabel(TournamentParticipantStatus status) =>
     switch (status) {
-      TournamentParticipantStatus.approved => 'Approved',
-      TournamentParticipantStatus.finalized => 'Finalized',
-      TournamentParticipantStatus.withdrawn => 'Withdrawn',
-      TournamentParticipantStatus.replaced => 'Replaced',
+      TournamentParticipantStatus.approved => 'معتمد',
+      TournamentParticipantStatus.finalized => 'مؤكد',
+      TournamentParticipantStatus.withdrawn => 'منسحب',
+      TournamentParticipantStatus.replaced => 'مستبدل',
     };
 
 String participantSourceLabel(TournamentParticipantSourceType sourceType) =>
     switch (sourceType) {
-      TournamentParticipantSourceType.registeredTeam => 'Registered Team',
-      TournamentParticipantSourceType.guestTeam => 'Guest Team',
+      TournamentParticipantSourceType.registeredTeam => 'فريق مسجل',
+      TournamentParticipantSourceType.guestTeam => 'فريق ضيف',
     };
 
 Color participantStatusColor(TournamentParticipantStatus status) =>
     switch (status) {
-      TournamentParticipantStatus.approved => const Color(0xFFEAF1FF),
-      TournamentParticipantStatus.finalized => const Color(0xFFE7F7ED),
-      TournamentParticipantStatus.withdrawn => const Color(0xFFFFF2CC),
-      TournamentParticipantStatus.replaced => const Color(0xFFF0F0F0),
+      TournamentParticipantStatus.approved => AppColors.info,
+      TournamentParticipantStatus.finalized => AppColors.success,
+      TournamentParticipantStatus.withdrawn => AppColors.warning,
+      TournamentParticipantStatus.replaced => AppColors.textSecondary,
     };
 
 Future<void> showManualAddParticipantDialog(
@@ -35,7 +40,7 @@ Future<void> showManualAddParticipantDialog(
   final candidate = await showParticipantPickerDialog(
     context: context,
     controller: controller,
-    title: 'إضافة participant يدويًا',
+    title: 'إضافة فريق يدويًا',
   );
   if (candidate == null) {
     return;
@@ -80,13 +85,13 @@ Future<void> showSeedEditorDialog(
     final result = await showDialog<String?>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('تعديل Seed لـ ${participant.displayName}'),
+        title: Text('تعديل تصنيف ${participant.displayName}'),
         content: TextField(
           controller: seedController,
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(
-            labelText: 'Seed',
-            hintText: 'اتركها فارغة لإزالة الـ seed',
+            labelText: 'التصنيف',
+            hintText: 'اتركها فارغة لإزالة التصنيف',
           ),
         ),
         actions: [
@@ -225,7 +230,7 @@ Future<TournamentParticipantCandidate?> showParticipantPickerDialog({
                 children: [
                   DropdownButtonFormField<TournamentParticipantSourceType>(
                     initialValue: selectedSourceType,
-                    decoration: const InputDecoration(labelText: 'نوع المصدر'),
+                    decoration: const InputDecoration(labelText: 'نوع الفريق'),
                     items: TournamentParticipantSourceType.values
                         .map(
                           (sourceType) => DropdownMenuItem(
@@ -234,8 +239,8 @@ Future<TournamentParticipantCandidate?> showParticipantPickerDialog({
                               sourceType ==
                                       TournamentParticipantSourceType
                                           .registeredTeam
-                                  ? 'Registered Team'
-                                  : 'Guest Team',
+                                  ? 'فريق مسجل'
+                                  : 'فريق ضيف',
                             ),
                           ),
                         )
@@ -258,40 +263,36 @@ Future<TournamentParticipantCandidate?> showParticipantPickerDialog({
                             }
                           },
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppDimensions.md),
                   TextField(
                     controller: searchController,
                     decoration: const InputDecoration(
                       labelText: 'ابحث بالاسم',
-                      hintText: 'مثال: Blue أو Falcons',
+                      hintText: 'اكتب اسم الفريق للبحث',
+                      prefixIcon: Icon(Icons.search_rounded),
                     ),
                     textInputAction: TextInputAction.search,
                     onChanged: (value) => scheduleSearch(setState, value),
                     onSubmitted: (_) => performSearch(setState),
                   ),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: FilledButton.icon(
-                      onPressed: isSearching
-                          ? null
-                          : () => performSearch(setState),
-                      icon: const Icon(Icons.search),
-                      label: const Text('Search'),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppDimensions.md),
                   if (isSearching)
                     const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: CircularProgressIndicator(),
+                      padding: EdgeInsets.symmetric(vertical: AppDimensions.lg),
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
                     )
                   else if (searchError.isNotEmpty)
-                    Align(
-                      alignment: Alignment.centerLeft,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppDimensions.sm,
+                      ),
                       child: Text(
                         searchError,
-                        style: const TextStyle(color: Colors.red),
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.error,
+                        ),
                       ),
                     )
                   else if (results.isNotEmpty)
@@ -305,9 +306,24 @@ Future<TournamentParticipantCandidate?> showParticipantPickerDialog({
                         itemBuilder: (context, index) {
                           final candidate = results[index];
                           return ListTile(
-                            title: Text(candidate.displayName),
+                            leading: Icon(
+                              candidate.sourceType ==
+                                      TournamentParticipantSourceType
+                                          .registeredTeam
+                                  ? Icons.verified_rounded
+                                  : Icons.group_rounded,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
+                            title: Text(
+                              candidate.displayName,
+                              style: AppTextStyles.titleSmall.copyWith(
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
                             subtitle: Text(
-                              '${candidate.sourceType.name} • ${candidate.sourceEntityId}',
+                              participantSourceLabel(candidate.sourceType),
+                              style: AppTextStyles.bodySmall,
                             ),
                             onTap: () =>
                                 Navigator.of(dialogContext).pop(candidate),
@@ -316,19 +332,51 @@ Future<TournamentParticipantCandidate?> showParticipantPickerDialog({
                       ),
                     )
                   else if (hasSearched)
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'لا توجد نتائج مناسبة أو أن الفريق موجود بالفعل داخل البطولة.',
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppDimensions.md,
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.search_off_rounded,
+                            size: 40,
+                            color: AppColors.textMuted.withValues(alpha: 0.5),
+                          ),
+                          const SizedBox(height: AppDimensions.sm),
+                          Text(
+                            'لا توجد نتائج مطابقة',
+                            style: AppTextStyles.titleSmall.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: AppDimensions.xs),
+                          Text(
+                            'تأكد من الاسم أو أنشئ فريق ضيف جديد من الزر أدناه.',
+                            style: AppTextStyles.bodySmall,
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     )
                   else
-                    const Align(
-                      alignment: Alignment.centerLeft,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppDimensions.md,
+                      ),
                       child: Text(
-                        'ابحث ثم اختر فريقًا مسجلًا أو ضيفًا لإضافته أو استبداله.',
+                        'ابحث عن فريق مسجل أو ضيف موجود لإضافته للبطولة.',
+                        style: AppTextStyles.bodySmall,
+                        textAlign: TextAlign.center,
                       ),
                     ),
+                  const Divider(height: AppDimensions.lg),
+                  _CreateGuestTeamButton(
+                    tournamentId: controller.tournamentId,
+                    onCreated: (candidate) {
+                      Navigator.of(dialogContext).pop(candidate);
+                    },
+                  ),
                 ],
               ),
             ),
@@ -345,5 +393,53 @@ Future<TournamentParticipantCandidate?> showParticipantPickerDialog({
   } finally {
     searchDebounce?.cancel();
     searchController.dispose();
+  }
+}
+
+class _CreateGuestTeamButton extends StatelessWidget {
+  final String? tournamentId;
+  final ValueChanged<TournamentParticipantCandidate>? onCreated;
+
+  const _CreateGuestTeamButton({
+    required this.tournamentId,
+    this.onCreated,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final id = tournamentId;
+    if (id == null || id.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () async {
+          final result = await Get.toNamed(
+            AppRoutes.tournamentGuestTeamCreateForTournament(id),
+          );
+          if (result is Map<String, dynamic> &&
+              result.containsKey('guestTeamId') &&
+              result.containsKey('guestTeamName')) {
+            onCreated?.call(
+              TournamentParticipantCandidate(
+                sourceType: TournamentParticipantSourceType.guestTeam,
+                sourceEntityId: result['guestTeamId'] as String,
+                displayName: result['guestTeamName'] as String,
+              ),
+            );
+          }
+        },
+        icon: const Icon(Icons.add_circle_outline_rounded),
+        label: const Text('إنشاء فريق ضيف جديد'),
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 44),
+          foregroundColor: AppColors.secondary,
+          side: BorderSide(
+            color: AppColors.secondary.withValues(alpha: 0.4),
+          ),
+        ),
+      ),
+    );
   }
 }

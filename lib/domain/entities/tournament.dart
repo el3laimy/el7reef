@@ -12,6 +12,8 @@ class Tournament {
   final TournamentFormat format;
   final TournamentTeamSize teamSize;
   final int maxTeams;
+  final TournamentVisibility visibility;
+  final bool discoverable;
   final int? prizePool;
   final String? prizeDescription;
   final TournamentStatus status;
@@ -41,6 +43,8 @@ class Tournament {
     required this.format,
     required this.teamSize,
     required this.maxTeams,
+    this.visibility = TournamentVisibility.public,
+    this.discoverable = true,
     this.prizePool,
     this.prizeDescription,
     this.status = TournamentStatus.upcoming,
@@ -68,6 +72,10 @@ class Tournament {
   /// هل يمكن إضافة فريق جديد؟
   bool get canRegister => isRegistrationOpen && teamCount < maxTeams;
 
+  bool get isPublic => visibility == TournamentVisibility.public;
+
+  bool get isDiscoverable => isPublic && discoverable;
+
   /// عدد الفرق الحالي
   int get teamCount => activeParticipantCount ?? registeredTeamIds.length;
 
@@ -85,6 +93,8 @@ class Tournament {
     TournamentFormat? format,
     TournamentTeamSize? teamSize,
     int? maxTeams,
+    TournamentVisibility? visibility,
+    bool? discoverable,
     int? prizePool,
     String? prizeDescription,
     TournamentStatus? status,
@@ -114,6 +124,8 @@ class Tournament {
       format: format ?? this.format,
       teamSize: teamSize ?? this.teamSize,
       maxTeams: maxTeams ?? this.maxTeams,
+      visibility: visibility ?? this.visibility,
+      discoverable: discoverable ?? this.discoverable,
       prizePool: prizePool ?? this.prizePool,
       prizeDescription: prizeDescription ?? this.prizeDescription,
       status: status ?? this.status,

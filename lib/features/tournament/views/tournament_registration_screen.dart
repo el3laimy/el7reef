@@ -35,8 +35,18 @@ class TournamentRegistrationScreen
           final pendingRegistrations = controller.pendingRegistrations;
           final approvedRegistrations = controller.approvedRegistrations;
           final rejectedRegistrations = controller.rejectedRegistrations;
+          final myVisibleRegistrations = controller.myVisibleRegistrations;
           final myTeams = controller.myTeams;
           final canManageRegistrations = controller.isOrganizer;
+          final publicRejectedRegistrations = canManageRegistrations
+              ? rejectedRegistrations
+              : const <TournamentRegistration>[];
+          final publicPendingCount = canManageRegistrations
+              ? pendingRegistrations.length
+              : 0;
+          final publicRejectedCount = canManageRegistrations
+              ? rejectedRegistrations.length
+              : 0;
 
           return RefreshIndicator(
             onRefresh: controller.loadScreen,
@@ -46,8 +56,8 @@ class TournamentRegistrationScreen
                 _TournamentSummaryCard(
                   tournamentName: tournament.name,
                   approvedCount: approvedRegistrations.length,
-                  pendingCount: pendingRegistrations.length,
-                  rejectedCount: rejectedRegistrations.length,
+                  pendingCount: publicPendingCount,
+                  rejectedCount: publicRejectedCount,
                   maxTeams: tournament.maxTeams,
                 ),
                 const SizedBox(height: 16),
@@ -188,8 +198,23 @@ class TournamentRegistrationScreen
                     ),
                   const SizedBox(height: 16),
                 ],
-                _SectionTitle(title: 'التسجيلات الحالية'),
-                if (approvedRegistrations.isEmpty && rejectedRegistrations.isEmpty)
+                if (!canManageRegistrations && myVisibleRegistrations.isNotEmpty) ...[
+                  _SectionTitle(title: 'حالة طلباتك'),
+                  ...myVisibleRegistrations.map(
+                    (registration) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _RegistrationReviewCard(
+                        title: controller.participantLabel(registration),
+                        subtitle: _myRegistrationSubtitle(registration.status),
+                        status: registration.status,
+                        notes: null,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                _SectionTitle(title: 'الفرق المعتمدة'),
+                if (approvedRegistrations.isEmpty && publicRejectedRegistrations.isEmpty)
                   const _CenteredState(
                     icon: Icons.app_registration_rounded,
                     title: 'لا توجد تسجيلات بعد',
@@ -206,7 +231,7 @@ class TournamentRegistrationScreen
                             ? 'فريق ضيف معتمد'
                             : 'فريق مسجل معتمد',
                         status: registration.status,
-                        notes: registration.notes,
+                        notes: canManageRegistrations ? registration.notes : null,
                         onPressed: canManageRegistrations
                             ? () async {
                                 await Get.toNamed(
@@ -222,7 +247,7 @@ class TournamentRegistrationScreen
                       ),
                     ),
                   ),
-                  ...rejectedRegistrations.map(
+                  ...publicRejectedRegistrations.map(
                     (registration) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _RegistrationReviewCard(
@@ -270,6 +295,15 @@ class TournamentRegistrationScreen
       case null:
         return 'تسجيل الآن';
     }
+  }
+
+  String _myRegistrationSubtitle(TournamentRegistrationStatus status) {
+    return switch (status) {
+      TournamentRegistrationStatus.approved => 'طلبك معتمد ضمن الفرق المشاركة',
+      TournamentRegistrationStatus.pending => 'طلبك بانتظار مراجعة المنظم',
+      TournamentRegistrationStatus.rejected => 'طلبك مرفوض ويمكنك إعادة التسجيل إذا كان متاحًا',
+      TournamentRegistrationStatus.cancelled => 'طلبك ملغي ويمكنك إعادة التفعيل إذا كان متاحًا',
+    };
   }
 }
 

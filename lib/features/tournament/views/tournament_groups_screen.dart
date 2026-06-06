@@ -3,6 +3,9 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart' as intl;
 
 import '../../../app/routes/app_routes.dart';
+import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_text_styles.dart';
+import '../../../core/enums/tournament_ops_enums.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/entities/tournament_group.dart';
 import '../controllers/tournament_operations_controller.dart';
@@ -36,7 +39,13 @@ class TournamentGroupsScreen extends GetView<TournamentOperationsController> {
                     ),
                     _MetricChip(
                       label: 'Fixtures',
-                      value: controller.groupStageFixtures.length.toString(),
+                      value: controller.groupStageFixtures
+                          .where(
+                            (fixture) => controller.canManageTournament ||
+                                fixture.fixtureStatus != FixtureStatus.draft,
+                          )
+                          .length
+                          .toString(),
                     ),
                     _MetricChip(
                       label: 'Official',
@@ -78,6 +87,10 @@ class _GroupCard extends StatelessWidget {
     final groupFixtures =
         controller.groupStageFixtures
             .where((fixture) => fixture.groupId == group.id)
+            .where(
+              (fixture) => controller.canManageTournament ||
+                  fixture.fixtureStatus != FixtureStatus.draft,
+            )
             .toList(growable: false)
           ..sort((left, right) {
             final leftDate = left.scheduledAt ?? left.createdAt;
@@ -113,11 +126,11 @@ class _GroupCard extends StatelessWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEAF6EA),
+                      color: AppColors.surface,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
-                      '${qualifiers.length} Qualified',
+                      '${qualifiers.length} متأهل',
                       style: Theme.of(context).textTheme.labelMedium,
                     ),
                   ),
@@ -129,19 +142,19 @@ class _GroupCard extends StatelessWidget {
               runSpacing: 8,
               children: [
                 _MetricChip(
-                  label: 'Teams',
+                  label: 'فرق',
                   value: participants.length.toString(),
                 ),
                 _MetricChip(
-                  label: 'Fixtures',
+                  label: 'مباريات',
                   value: groupFixtures.length.toString(),
                 ),
                 _MetricChip(
-                  label: 'Scheduled',
+                  label: 'مجدولة',
                   value: scheduledFixtures.toString(),
                 ),
                 _MetricChip(
-                  label: 'Official',
+                  label: 'رسمية',
                   value: officialFixtures.toString(),
                 ),
               ],
@@ -164,10 +177,15 @@ class _GroupCard extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFD9F2D9),
+                          color: AppColors.success.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(999),
                         ),
-                        child: const Text('Qualified'),
+                          child: Text(
+                            'متأهل',
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColors.success,
+                            ),
+                          ),
                       ),
                   ],
                 ),
@@ -185,13 +203,13 @@ class _GroupCard extends StatelessWidget {
                   contentPadding: EdgeInsets.zero,
                   dense: true,
                   title: Text(
-                    '${controller.fixtureTeamLabel(fixture, isHome: true)} vs ${controller.fixtureTeamLabel(fixture, isHome: false)}',
+                    '${controller.fixtureTeamLabel(fixture, isHome: true)} ضد ${controller.fixtureTeamLabel(fixture, isHome: false)}',
                   ),
                   subtitle: Text(
                     '${_formatDateTime(fixture.scheduledAt)} • ${_matchScoreLabel(fixture)}',
                   ),
                   trailing: fixture.isOfficialTournamentResult
-                      ? const Icon(Icons.check_circle, color: Colors.green)
+                      ? const Icon(Icons.check_circle, color: AppColors.success)
                       : const Icon(Icons.chevron_right),
                   onTap: () =>
                       Get.toNamed(AppRoutes.matchDetailsById(fixture.id)),

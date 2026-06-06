@@ -132,7 +132,10 @@ class TournamentGuestTeamCreateController extends GetxController {
       }
 
       Get.snackbar('تم', 'تم إنشاء الفريق الضيف وتسجيله في البطولة.');
-      Get.back(result: true);
+      Get.back(result: <String, dynamic>{
+        'guestTeamId': guestTeam.id,
+        'guestTeamName': guestTeam.name,
+      });
     } catch (error) {
       errorMessage.value = _normalizeError(error);
     } finally {

@@ -7,6 +7,13 @@ abstract class TournamentRegistrationRepository {
   Future<List<TournamentRegistration>> getTournamentRegistrations(
     String tournamentId,
   );
+  Future<List<TournamentRegistration>> getApprovedTournamentRegistrations(
+    String tournamentId,
+  );
+  Future<List<TournamentRegistration>> getTournamentRegistrationsForTeamIds({
+    required String tournamentId,
+    required List<String> teamIds,
+  });
   Future<TournamentRegistration?> getRegistrationByTeamId({
     required String tournamentId,
     required String teamId,

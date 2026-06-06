@@ -127,7 +127,7 @@ void main() {
     );
 
     test(
-      'getLiveTournaments remains public discovery and can include other organizers',
+      'getDiscoverableTournaments returns only public discoverable live tournaments',
       () async {
         await repository.createTournament(
           Tournament(
@@ -153,13 +153,79 @@ void main() {
             createdAt: now.add(const Duration(minutes: 1)),
           ),
         );
+        await repository.createTournament(
+          Tournament(
+            id: 'account-b-private-cup',
+            organizerId: 'account-b',
+            name: 'Account B Private Cup',
+            format: TournamentFormat.groupsOnly,
+            teamSize: TournamentTeamSize.fiveVsFive,
+            maxTeams: 8,
+            visibility: TournamentVisibility.private,
+            discoverable: false,
+            status: TournamentStatus.registration,
+            createdAt: now.add(const Duration(minutes: 2)),
+          ),
+        );
+
+        final discoverableTournaments = await repository
+            .getDiscoverableTournaments();
+
+        expect(
+          discoverableTournaments.map((tournament) => tournament.id),
+          containsAll(['account-a-public-cup', 'account-b-public-cup']),
+        );
+        expect(
+          discoverableTournaments.map((tournament) => tournament.id),
+          isNot(contains('account-b-private-cup')),
+        );
+      },
+    );
+
+    test(
+      'getLiveTournaments keeps legacy callers on discoverable query',
+      () async {
+        await repository.createTournament(
+          Tournament(
+            id: 'public-live-cup',
+            organizerId: 'organizer-1',
+            name: 'Public Live Cup',
+            format: TournamentFormat.groupsOnly,
+            teamSize: TournamentTeamSize.fiveVsFive,
+            maxTeams: 8,
+            status: TournamentStatus.registration,
+            createdAt: now,
+          ),
+        );
 
         final liveTournaments = await repository.getLiveTournaments();
 
-        expect(
-          liveTournaments.map((tournament) => tournament.id),
-          containsAll(['account-a-public-cup', 'account-b-public-cup']),
-        );
+        expect(liveTournaments.map((tournament) => tournament.id), [
+          'public-live-cup',
+        ]);
+      },
+    );
+
+    test(
+      'getDiscoverableTournaments keeps legacy documents discoverable',
+      () async {
+        await firestore.collection('tournaments').doc('legacy-live-cup').set({
+          'organizerId': 'organizer-1',
+          'name': 'Legacy Live Cup',
+          'format': TournamentFormat.groupsOnly.name,
+          'teamSize': TournamentTeamSize.fiveVsFive.value,
+          'maxTeams': 8,
+          'status': TournamentStatus.registration.name,
+          'createdAt': now.millisecondsSinceEpoch,
+        });
+
+        final tournaments = await repository.getDiscoverableTournaments();
+
+        expect(tournaments.map((tournament) => tournament.id), [
+          'legacy-live-cup',
+        ]);
+        expect(tournaments.single.visibility, TournamentVisibility.public);
+        expect(tournaments.single.discoverable, isTrue);
       },
     );
 
@@ -225,6 +291,40 @@ void main() {
         expect(data, isNotNull);
         expect(data!['groupRoundIds'], const ['legacy-group-round']);
         expect(data['knockoutRoundIds'], const ['legacy-knockout-round']);
+      },
+    );
+
+    test(
+      'followTournament stores self follower and fetches followed tournaments',
+      () async {
+        await repository.createTournament(
+          Tournament(
+            id: 'followed-cup',
+            organizerId: 'organizer-1',
+            name: 'Followed Cup',
+            format: TournamentFormat.groupsOnly,
+            teamSize: TournamentTeamSize.fiveVsFive,
+            maxTeams: 8,
+            status: TournamentStatus.registration,
+            createdAt: now,
+          ),
+        );
+
+        await repository.followTournament('followed-cup', 'player-1');
+
+        expect(
+          await repository.isFollowingTournament('followed-cup', 'player-1'),
+          isTrue,
+        );
+        final followed = await repository.getFollowedTournaments('player-1');
+        expect(followed.map((tournament) => tournament.id), ['followed-cup']);
+
+        await repository.unfollowTournament('followed-cup', 'player-1');
+
+        expect(
+          await repository.isFollowingTournament('followed-cup', 'player-1'),
+          isFalse,
+        );
       },
     );
   });

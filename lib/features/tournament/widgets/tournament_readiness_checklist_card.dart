@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_dimensions.dart';
+import '../../../app/theme/app_text_styles.dart';
+import '../../../core/widgets/el7reef_surface.dart';
 import '../controllers/tournament_operations_controller.dart';
 
 class TournamentReadinessChecklistCard extends StatelessWidget {
@@ -9,47 +13,45 @@ class TournamentReadinessChecklistCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'جاهزية التشغيل',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 12),
-            ...controller.readinessChecklist.map(
-              (item) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      item.isReady ? Icons.check_circle : Icons.hourglass_top,
-                      color: item.isReady ? Colors.green : Colors.orange,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(item.label),
-                          const SizedBox(height: 2),
-                          Text(
-                            item.detail,
-                            style: Theme.of(context).textTheme.bodySmall,
+    return El7reefSurface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('جاهزية التشغيل', style: AppTextStyles.titleMedium),
+          const SizedBox(height: AppDimensions.md),
+          ...controller.readinessChecklist.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: AppDimensions.sm),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    item.isReady
+                        ? Icons.check_circle_rounded
+                        : Icons.hourglass_top_rounded,
+                    color: item.isReady ? AppColors.success : AppColors.warning,
+                  ),
+                  const SizedBox(width: AppDimensions.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.label, style: AppTextStyles.titleSmall),
+                        const SizedBox(height: 2),
+                        Text(
+                          item.detail,
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textSecondaryTinted,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

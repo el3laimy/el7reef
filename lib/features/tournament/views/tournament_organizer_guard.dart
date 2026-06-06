@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../app/routes/app_routes.dart';
+import '../../../core/permissions/tournament_viewer_context.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
 import '../../../domain/entities/player.dart';
 import '../../../core/auth/auth_service.dart';
@@ -89,7 +90,13 @@ class _TournamentOrganizerGuardState extends State<TournamentOrganizerGuard> {
       return false;
     }
     final tournament = await _tournamentRepository.getTournament(tournamentId);
-    return tournament != null && tournament.organizerId == actorId;
+    if (tournament == null) {
+      return false;
+    }
+    return TournamentViewerContext.fromTournament(
+      tournament: tournament,
+      userId: actorId,
+    ).canViewAdminDashboard;
   }
 
   void _resetAccessCheck() {

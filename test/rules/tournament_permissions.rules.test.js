@@ -7,10 +7,15 @@ const {
 } = require('@firebase/rules-unit-testing');
 
 const {
+  collectionGroup,
   deleteDoc,
   doc,
+  getDoc,
+  getDocs,
+  query,
   setDoc,
   updateDoc,
+  where,
 } = require('firebase/firestore');
 
 const projectId = 'demo-no-project';
@@ -398,6 +403,109 @@ describe('tournament permission Firestore rules', () => {
       const db = authedDb('organizer-1');
 
       await assertFails(deleteDoc(doc(db, 'tournaments', 'tournament-1')));
+    });
+
+    it('allows a player to follow and unfollow a tournament as self', async () => {
+      await seed('tournaments/tournament-1', tournamentData());
+      const db = authedDb('player-1');
+      const followerRef = doc(
+        db,
+        'tournaments/tournament-1/followers/player-1',
+      );
+
+      await assertSucceeds(
+        setDoc(followerRef, {
+          tournamentId: 'tournament-1',
+          userId: 'player-1',
+          createdAt: now,
+        }),
+      );
+      await assertSucceeds(deleteDoc(followerRef));
+    });
+
+    it('denies forged follower identity and organizer self-follow', async () => {
+      await seed('tournaments/tournament-1', tournamentData());
+      const playerDb = authedDb('player-1');
+      const organizerDb = authedDb('organizer-1');
+
+      await assertFails(
+        setDoc(doc(playerDb, 'tournaments/tournament-1/followers/player-2'), {
+          tournamentId: 'tournament-1',
+          userId: 'player-2',
+          createdAt: now,
+        }),
+      );
+      await assertFails(
+        setDoc(
+          doc(organizerDb, 'tournaments/tournament-1/followers/organizer-1'),
+          {
+            tournamentId: 'tournament-1',
+            userId: 'organizer-1',
+            createdAt: now,
+          },
+        ),
+      );
+    });
+
+    it('denies malformed follower documents and cross-user follower access', async () => {
+      await seed('tournaments/tournament-1', tournamentData());
+      await seed('tournaments/tournament-1/followers/player-2', {
+        tournamentId: 'tournament-1',
+        userId: 'player-2',
+        createdAt: now,
+      });
+      const playerDb = authedDb('player-1');
+
+      await assertFails(
+        setDoc(doc(playerDb, 'tournaments/tournament-1/followers/player-1'), {
+          tournamentId: 'tournament-1',
+          userId: 'player-1',
+          createdAt: now,
+          role: 'admin',
+        }),
+      );
+      await assertFails(
+        getDoc(doc(playerDb, 'tournaments/tournament-1/followers/player-2')),
+      );
+      await assertFails(
+        deleteDoc(doc(playerDb, 'tournaments/tournament-1/followers/player-2')),
+      );
+    });
+
+    it('allows a player to query only their own followed tournaments', async () => {
+      await seed('tournaments/tournament-1', tournamentData());
+      await seed(
+        'tournaments/tournament-2',
+        tournamentData({organizerId: 'organizer-2'}),
+      );
+      await seed('tournaments/tournament-1/followers/player-1', {
+        tournamentId: 'tournament-1',
+        userId: 'player-1',
+        createdAt: now,
+      });
+      await seed('tournaments/tournament-2/followers/player-2', {
+        tournamentId: 'tournament-2',
+        userId: 'player-2',
+        createdAt: now,
+      });
+      const playerDb = authedDb('player-1');
+
+      await assertSucceeds(
+        getDocs(
+          query(
+            collectionGroup(playerDb, 'followers'),
+            where('userId', '==', 'player-1'),
+          ),
+        ),
+      );
+      await assertFails(
+        getDocs(
+          query(
+            collectionGroup(playerDb, 'followers'),
+            where('userId', '==', 'player-2'),
+          ),
+        ),
+      );
     });
   });
 

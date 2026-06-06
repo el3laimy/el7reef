@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_dimensions.dart';
+
 class TournamentScaffoldListScreen extends StatelessWidget {
   final String title;
   final Widget child;
@@ -17,8 +20,15 @@ class TournamentScaffoldListScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(title)),
       floatingActionButton: floatingActionButton,
-      body: SafeArea(
-        child: Padding(padding: const EdgeInsets.all(16), child: child),
+      body: Container(
+        decoration:
+            const BoxDecoration(gradient: AppColors.backgroundGradient),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(AppDimensions.pagePadding),
+            child: child,
+          ),
+        ),
       ),
     );
   }

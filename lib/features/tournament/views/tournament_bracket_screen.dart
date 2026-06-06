@@ -3,7 +3,9 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart' as intl;
 
 import '../../../app/routes/app_routes.dart';
+import '../../../app/theme/app_colors.dart';
 import '../../../core/enums/match_status.dart';
+import '../../../core/enums/tournament_ops_enums.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/entities/knockout_tie.dart';
 import '../controllers/tournament_operations_controller.dart';
@@ -24,8 +26,13 @@ class TournamentBracketScreen extends GetView<TournamentOperationsController> {
           );
         }
         final tiesByRound = <int, List<KnockoutTie>>{};
+        final visibleKnockoutFixtures = controller.canManageTournament
+            ? controller.knockoutFixtures.toList(growable: false)
+            : controller.knockoutFixtures
+                .where((fixture) => fixture.fixtureStatus != FixtureStatus.draft)
+                .toList(growable: false);
         final matchById = {
-          for (final fixture in controller.knockoutFixtures)
+          for (final fixture in visibleKnockoutFixtures)
             fixture.id: fixture,
         };
         for (final tie in controller.knockoutTies) {
@@ -117,7 +124,7 @@ class _KnockoutFinalSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: const Color(0xFFF8F4E8),
+      color: AppColors.surface,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -163,13 +170,18 @@ class _KnockoutFinalSummaryCard extends StatelessWidget {
                     onPressed: () =>
                         Get.toNamed(AppRoutes.matchDetailsById(match!.id)),
                     icon: const Icon(Icons.sports_soccer),
-                    label: const Text('Matchday'),
+                    label: Text(
+                      controller.canManageTournament
+                          ? 'إدارة المباراة'
+                          : 'عرض المباراة',
+                    ),
                   ),
-                  OutlinedButton.icon(
-                    onPressed: _scoreActionForMatch(controller, match!),
-                    icon: Icon(_scoreActionIcon(match!)),
-                    label: Text(_scoreActionLabel(match!)),
-                  ),
+                  if (controller.canManageTournament)
+                    OutlinedButton.icon(
+                      onPressed: _scoreActionForMatch(controller, match!),
+                      icon: Icon(_scoreActionIcon(match!)),
+                      label: Text(_scoreActionLabel(match!)),
+                    ),
                 ],
               ),
             ],
@@ -225,12 +237,12 @@ class _KnockoutTieCard extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: tie.winnerParticipantId == null
-                        ? const Color(0xFFF4F4F4)
-                        : const Color(0xFFE7F7ED),
+                        ? AppColors.surface
+                        : AppColors.success.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    tie.winnerParticipantId == null ? 'Pending' : 'Winner Set',
+                    tie.winnerParticipantId == null ? 'قيد الانتظار' : 'تم التحديد',
                     style: Theme.of(context).textTheme.labelMedium,
                   ),
                 ),
@@ -273,13 +285,18 @@ class _KnockoutTieCard extends StatelessWidget {
                     onPressed: () =>
                         Get.toNamed(AppRoutes.matchDetailsById(match!.id)),
                     icon: const Icon(Icons.sports_soccer),
-                    label: const Text('Matchday'),
+                    label: Text(
+                      controller.canManageTournament
+                          ? 'إدارة المباراة'
+                          : 'عرض المباراة',
+                    ),
                   ),
-                  OutlinedButton.icon(
-                    onPressed: _scoreActionForMatch(controller, match!),
-                    icon: Icon(_scoreActionIcon(match!)),
-                    label: Text(_scoreActionLabel(match!)),
-                  ),
+                  if (controller.canManageTournament)
+                    OutlinedButton.icon(
+                      onPressed: _scoreActionForMatch(controller, match!),
+                      icon: Icon(_scoreActionIcon(match!)),
+                      label: Text(_scoreActionLabel(match!)),
+                    ),
                 ],
               ),
             ],

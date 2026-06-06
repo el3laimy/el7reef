@@ -113,9 +113,13 @@ class TeamRepositoryImpl implements TeamRepository {
   @override
   Future<List<Team>> searchTeams(String query) async {
     return FirebaseErrorHandler.guard(() async {
+      final normalizedQuery = query.trim().toLowerCase();
+      if (normalizedQuery.isEmpty) {
+        return const <Team>[];
+      }
       final snapshot = await _teamsRef
-          .where('name', isGreaterThanOrEqualTo: query)
-          .where('name', isLessThanOrEqualTo: '$query\uf8ff')
+          .where('nameLower', isGreaterThanOrEqualTo: normalizedQuery)
+          .where('nameLower', isLessThanOrEqualTo: '$normalizedQuery\uf8ff')
           .limit(20)
           .get();
       return snapshot.docs

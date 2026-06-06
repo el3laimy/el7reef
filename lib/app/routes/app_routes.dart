@@ -23,6 +23,7 @@ abstract class AppRoutes {
   static const String mvpVote = '/rating/mvp/:matchId';
   static const String createTournament = '/tournament/create';
   static const String tournamentList = '/tournament/list';
+  static const String tournamentExplore = '/tournament/explore';
   static const String tournamentDetail = '/tournament/:id';
   static const String tournamentBracket = '/tournament/:id/bracket';
   static const String tournamentParticipants = '/tournament/:id/participants';
