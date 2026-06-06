@@ -1604,7 +1604,10 @@ service cloud.firestore {
     }
 
     match /{path=**}/followers/{followerUserId} {
-      allow get, list: if canReadOwnFollowerDocument(followerUserId);
+      allow get: if canReadOwnFollowerDocument(followerUserId);
+      allow list: if isAuthenticated() &&
+        resource.data.userId is string &&
+        resource.data.userId == request.auth.uid;
       allow create, update, delete: if false;
     }
 
