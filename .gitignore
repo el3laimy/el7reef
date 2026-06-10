@@ -45,3 +45,10 @@ app.*.map.json
 /android/app/release
 node_modules/
 package-lock.json
+
+# Secure Keys & Configurations Exclusions
+key.properties
+**/*.keystore
+**/*.jks
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
