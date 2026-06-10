@@ -18,6 +18,7 @@ const {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
 } = require('firebase/firestore');
 
 const projectId = 'demo-no-project';
@@ -37,7 +38,7 @@ function claimCodeData(overrides = {}) {
     status: 'active',
     createdAt: now,
     updatedAt: now,
-    expiresAt: now + 604800000,
+    expiresAt: null,
     claimedByPlayerId: null,
     claimedAt: null,
     ...overrides,
@@ -50,6 +51,77 @@ async function seedClaimCode(code, data = {}) {
       doc(context.firestore(), 'claimCodes', code),
       claimCodeData(data),
     );
+  });
+}
+
+function guestPlayerData(overrides = {}) {
+  return {
+    displayName: 'ضيف سريع',
+    normalizedName: 'ضيف سريع',
+    phoneNumber: null,
+    jerseyNumber: null,
+    preferredPosition: null,
+    teamId: 'team-1',
+    tournamentId: 'tournament-1',
+    createdBy: 'creator-1',
+    createdAt: now,
+    updatedAt: now,
+    claimCode: 'PLAYER-CODE-1',
+    notes: null,
+    claimStatus: 'invited',
+    linkedPlayerId: null,
+    ...overrides,
+  };
+}
+
+function guestTeamData(overrides = {}) {
+  return {
+    name: 'فريق ضيف',
+    normalizedName: 'فريق ضيف',
+    creatorId: 'creator-1',
+    contactName: 'كابتن ضيف',
+    contactPhone: null,
+    logoUrl: null,
+    tournamentIds: ['tournament-1'],
+    captainGuestPlayerId: null,
+    claimCode: 'TEAM-CODE-1',
+    createdAt: now,
+    updatedAt: now,
+    claimStatus: 'invited',
+    linkedTeamId: null,
+    ...overrides,
+  };
+}
+
+async function seedGuestPlayer(id, data = {}) {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(
+      doc(context.firestore(), 'guestPlayers', id),
+      guestPlayerData(data),
+    );
+  });
+}
+
+async function seedGuestTeam(id, data = {}) {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(
+      doc(context.firestore(), 'guestTeams', id),
+      guestTeamData(data),
+    );
+  });
+}
+
+async function seedTeam(id, data = {}) {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'teams', id), {
+      name: 'فريق مسجل',
+      ownerId: 'claimer-1',
+      playerIds: [],
+      viceCaptainIds: [],
+      tournamentIds: [],
+      createdAt: now,
+      ...data,
+    });
   });
 }
 
@@ -191,5 +263,87 @@ describe('claimCodes Firestore rules', () => {
         updatedAt: now + 1,
       }),
     );
+  });
+
+  it('denies guest player self-claim without same-batch claim code proof', async () => {
+    await seedClaimCode('PLAYER-CODE-1');
+    await seedGuestPlayer('guest-player-1');
+
+    const db = testEnv.authenticatedContext('claimer-1').firestore();
+
+    await assertFails(
+      updateDoc(doc(db, 'guestPlayers', 'guest-player-1'), {
+        claimStatus: 'claimed',
+        linkedPlayerId: 'claimer-1',
+        updatedAt: now + 1,
+      }),
+    );
+  });
+
+  it('allows guest player self-claim with same-batch claim code proof', async () => {
+    await seedClaimCode('PLAYER-CODE-1');
+    await seedGuestPlayer('guest-player-1');
+
+    const db = testEnv.authenticatedContext('claimer-1').firestore();
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'guestPlayers', 'guest-player-1'), {
+      claimStatus: 'claimed',
+      linkedPlayerId: 'claimer-1',
+      updatedAt: now + 1,
+    });
+    batch.update(doc(db, 'claimCodes', 'PLAYER-CODE-1'), {
+      status: 'claimed',
+      claimedByPlayerId: 'claimer-1',
+      claimedAt: now + 1,
+      updatedAt: now + 1,
+    });
+
+    await assertSucceeds(batch.commit());
+  });
+
+  it('denies guest team self-claim without same-batch claim code proof', async () => {
+    await seedTeam('team-claimed');
+    await seedClaimCode('TEAM-CODE-1', {
+      targetType: 'guestTeam',
+      targetId: 'guest-team-1',
+      teamId: 'team-claimed',
+    });
+    await seedGuestTeam('guest-team-1');
+
+    const db = testEnv.authenticatedContext('claimer-1').firestore();
+
+    await assertFails(
+      updateDoc(doc(db, 'guestTeams', 'guest-team-1'), {
+        claimStatus: 'claimed',
+        linkedTeamId: 'team-claimed',
+        updatedAt: now + 1,
+      }),
+    );
+  });
+
+  it('allows guest team self-claim with same-batch claim code proof', async () => {
+    await seedTeam('team-claimed');
+    await seedClaimCode('TEAM-CODE-1', {
+      targetType: 'guestTeam',
+      targetId: 'guest-team-1',
+      teamId: 'team-claimed',
+    });
+    await seedGuestTeam('guest-team-1');
+
+    const db = testEnv.authenticatedContext('claimer-1').firestore();
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'guestTeams', 'guest-team-1'), {
+      claimStatus: 'claimed',
+      linkedTeamId: 'team-claimed',
+      updatedAt: now + 1,
+    });
+    batch.update(doc(db, 'claimCodes', 'TEAM-CODE-1'), {
+      status: 'claimed',
+      claimedByPlayerId: 'claimer-1',
+      claimedAt: now + 1,
+      updatedAt: now + 1,
+    });
+
+    await assertSucceeds(batch.commit());
   });
 });

@@ -105,6 +105,18 @@ function analyticsEventData(overrides = {}) {
   };
 }
 
+function auditEventData(overrides = {}) {
+  return {
+    entityType: 'tournament',
+    entityId: 'tournament-1',
+    action: 'fixtureStarted',
+    actorId: 'organizer-1',
+    metadata: { tournamentId: 'tournament-1' },
+    createdAt: now,
+    ...overrides,
+  };
+}
+
 async function seed(path, data) {
   await testEnv.withSecurityRulesDisabled(async (context) => {
     await setDoc(doc(context.firestore(), path), data);
@@ -299,10 +311,10 @@ describe('backend security Firestore rules', () => {
     );
   });
 
-  it('ties organizer action actorId to the authenticated user', async () => {
+  it('denies client writes to organizerActions', async () => {
     const actorDb = testEnv.authenticatedContext('actor-1').firestore();
 
-    await assertSucceeds(
+    await assertFails(
       setDoc(doc(actorDb, 'organizerActions', 'action-1'), {
         actorId: 'actor-1',
         action: 'start_match',
@@ -316,6 +328,34 @@ describe('backend security Firestore rules', () => {
         createdAt: now,
       }),
     );
+  });
+
+  it('denies client auditEvents creation, update, and delete', async () => {
+    await seed('auditEvents/event-1', auditEventData());
+    const organizerDb = testEnv.authenticatedContext('organizer-1').firestore();
+    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
+
+    await seed('tournaments/tournament-1', {
+      name: 'Street Cup',
+      organizerId: 'organizer-1',
+      visibility: 'public',
+      discoverable: true,
+      createdAt: now,
+    });
+
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'auditEvents', 'forged-event'),
+        auditEventData({ actorId: 'actor-1' }),
+      ),
+    );
+    await assertFails(
+      updateDoc(doc(organizerDb, 'auditEvents', 'event-1'), {
+        action: 'tournamentCompleted',
+      }),
+    );
+    await assertFails(deleteDoc(doc(organizerDb, 'auditEvents', 'event-1')));
+    await assertSucceeds(getDoc(doc(organizerDb, 'auditEvents', 'event-1')));
   });
 
   it('denies deletes for challenges and match invitations', async () => {

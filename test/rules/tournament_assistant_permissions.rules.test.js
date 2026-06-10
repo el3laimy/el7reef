@@ -705,13 +705,35 @@ describe('tournament assistant permission Firestore rules', () => {
       );
     });
 
-    it('allows canSubmitScore assistant score submission from live matches only', async () => {
+    it('allows assistant with score and event permissions to submit live match score', async () => {
       await seedTournament();
       await seed('matches/match-1', matchData({status: 'live'}));
-      await seedAssistant({permissions: {canSubmitScore: true}});
+      await seedAssistant({
+        permissions: {canSubmitScore: true, canRecordGoalsAndMvp: true},
+      });
       const db = authedDb('assistant-1');
 
       await assertSucceeds(
+        updateDoc(doc(db, 'matches', 'match-1'), {
+          scoreTeamA: 2,
+          scoreTeamB: 1,
+          mvpPlayerId: null,
+          completedAt: now + 1,
+          isAnomaly: false,
+          status: 'completed',
+        }),
+      );
+    });
+
+    it('denies score submission when assistant cannot record goals and MVP', async () => {
+      await seedTournament();
+      await seed('matches/match-1', matchData({status: 'live'}));
+      await seedAssistant({
+        permissions: {canSubmitScore: true, canRecordGoalsAndMvp: false},
+      });
+      const db = authedDb('assistant-1');
+
+      await assertFails(
         updateDoc(doc(db, 'matches', 'match-1'), {
           scoreTeamA: 2,
           scoreTeamB: 1,

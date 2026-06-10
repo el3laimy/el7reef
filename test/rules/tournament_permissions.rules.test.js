@@ -7,6 +7,7 @@ const {
 } = require('@firebase/rules-unit-testing');
 
 const {
+  collection,
   collectionGroup,
   deleteDoc,
   doc,
@@ -34,6 +35,7 @@ function tournamentData(overrides = {}) {
     registeredTeamCount: 0,
     guestTeamCount: 0,
     approvedParticipantCount: 0,
+    participantViewerIds: [],
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -403,6 +405,121 @@ describe('tournament permission Firestore rules', () => {
       const db = authedDb('organizer-1');
 
       await assertFails(deleteDoc(doc(db, 'tournaments', 'tournament-1')));
+    });
+
+    it('allows authenticated users to read public discoverable tournaments', async () => {
+      await seed('tournaments/tournament-1', tournamentData());
+      const db = authedDb('player-1');
+
+      await assertSucceeds(getDoc(doc(db, 'tournaments/tournament-1')));
+    });
+
+    it('denies outsiders reading private tournaments', async () => {
+      await seed(
+        'tournaments/tournament-1',
+        tournamentData({
+          visibility: 'private',
+          discoverable: false,
+        }),
+      );
+      const db = authedDb('player-1');
+
+      await assertFails(getDoc(doc(db, 'tournaments/tournament-1')));
+    });
+
+    it('allows organizer to read own private tournament', async () => {
+      await seed(
+        'tournaments/tournament-1',
+        tournamentData({
+          visibility: 'private',
+          discoverable: false,
+        }),
+      );
+      const db = authedDb('organizer-1');
+
+      await assertSucceeds(getDoc(doc(db, 'tournaments/tournament-1')));
+    });
+
+    it('allows active assistants to read private tournament details', async () => {
+      await seed(
+        'tournaments/tournament-1',
+        tournamentData({
+          visibility: 'private',
+          discoverable: false,
+        }),
+      );
+      await seed('tournaments/tournament-1/assistants/assistant-1', {
+        tournamentId: 'tournament-1',
+        userId: 'assistant-1',
+        addedBy: 'organizer-1',
+        status: 'active',
+        preset: 'customLimited',
+        permissions: {
+          canViewMatchday: true,
+          canStartMatch: false,
+          canSubmitScore: false,
+          canRecordGoalsAndMvp: false,
+          canApproveScore: false,
+          canDeclareForfeit: false,
+        },
+        createdAt: now,
+        updatedAt: now,
+        revokedAt: null,
+      });
+      const db = authedDb('assistant-1');
+
+      await assertSucceeds(getDoc(doc(db, 'tournaments/tournament-1')));
+    });
+
+    it('allows listed participant viewers to read private tournament details', async () => {
+      await seed(
+        'tournaments/tournament-1',
+        tournamentData({
+          visibility: 'private',
+          discoverable: false,
+          participantViewerIds: ['player-1'],
+        }),
+      );
+      const db = authedDb('player-1');
+
+      await assertSucceeds(getDoc(doc(db, 'tournaments/tournament-1')));
+    });
+
+    it('allows public discovery queries and rejects private tournament lists', async () => {
+      await seed(
+        'tournaments/tournament-1',
+        tournamentData({
+          visibility: 'public',
+          discoverable: true,
+        }),
+      );
+      await seed(
+        'tournaments/tournament-2',
+        tournamentData({
+          organizerId: 'organizer-2',
+          visibility: 'private',
+          discoverable: false,
+        }),
+      );
+      const db = authedDb('player-1');
+
+      await assertSucceeds(
+        getDocs(
+          query(
+            collection(db, 'tournaments'),
+            where('visibility', '==', 'public'),
+            where('discoverable', '==', true),
+          ),
+        ),
+      );
+      await assertFails(
+        getDocs(
+          query(
+            collection(db, 'tournaments'),
+            where('visibility', '==', 'private'),
+          ),
+        ),
+      );
     });
 
     it('allows a player to follow and unfollow a tournament as self', async () => {
