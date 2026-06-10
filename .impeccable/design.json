@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-14T03:38:00Z",
+  "title": "Design System: EL7REEF",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Electric Pitch", "canonical": "#7ED957", "tonalRamp": ["#1F7A3E", "#2C9C4D", "#4ADE80", "#7ED957", "#9AE37A", "#B8ED9E", "#D8F6C7", "#EFFCE8"] },
+      "neutral-bg": { "role": "neutral", "displayName": "Midnight Asphalt", "canonical": "#121212", "tonalRamp": ["#000000", "#121212", "#1E1E1E", "#2A2A2A", "#3D3D3D", "#5C5C5C", "#858585", "#B8B8B8"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero headlines only." },
+      "headline": { "displayName": "Headline", "purpose": "Section headers." }
+    },
+    "shadows": [
+      { "name": "neon-lift", "value": "0 4px 12px rgba(126, 217, 87, 0.25)", "purpose": "Electric glow for active primary elements." },
+      { "name": "card-shadow", "value": "0 8px 24px rgba(0, 0, 0, 0.4)", "purpose": "Deep shadow for elevated hero cards." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Default easing for state transitions." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Tactile, chunky button for primary actions like 'Start Match'.",
+      "html": "<button class=\"ds-btn-primary\">START MATCH</button>",
+      "css": ".ds-btn-primary { background: #7ED957; color: #0B0B0B; padding: 0 24px; min-height: 48px; border-radius: 12px; font-family: 'Cairo', sans-serif; font-weight: 700; font-size: 16px; border: none; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-primary:hover { background: #4ADE80; box-shadow: 0 4px 12px rgba(126, 217, 87, 0.25); transform: translateY(-1px); }"
+    },
+    {
+      "name": "Outlined Button",
+      "kind": "button",
+      "refersTo": "button-outlined",
+      "description": "Secondary actions that need less emphasis.",
+      "html": "<button class=\"ds-btn-outlined\">SHARE RESULTS</button>",
+      "css": ".ds-btn-outlined { background: transparent; color: #7ED957; padding: 0 24px; min-height: 48px; border-radius: 12px; font-family: 'Cairo', sans-serif; font-weight: 700; font-size: 16px; border: 1px solid #7ED957; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-outlined:hover { background: rgba(126, 217, 87, 0.1); }"
+    },
+    {
+      "name": "Data Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Standard container for matches or player stats.",
+      "html": "<div class=\"ds-card\"><h3>Match Overview</h3><p>Data goes here.</p></div>",
+      "css": ".ds-card { background: #1E1E1E; border-radius: 16px; border: 1px solid #2A2A2A; padding: 16px; color: #FFFFFF; font-family: 'Cairo', sans-serif; } .ds-card h3 { margin: 0 0 8px 0; font-size: 20px; font-weight: 600; } .ds-card p { margin: 0; font-size: 14px; color: #A0A0A0; }"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Small tag for player or match status.",
+      "html": "<span class=\"ds-chip\">GUEST PLAYER</span>",
+      "css": ".ds-chip { background: rgba(126, 217, 87, 0.15); color: #7ED957; padding: 4px 8px; border-radius: 8px; font-family: 'Cairo', sans-serif; font-weight: 700; font-size: 12px; display: inline-block; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Champion's Hub",
+    "overview": "The EL7REEF UI is designed to feel highly aggressive and competitive. It channels the raw energy of street football into a structured, professional, and imposing digital arena. We embrace high contrast, bold typography, and a dark, moody environment to make every tournament feel like a high-stakes championship. The design explicitly rejects boring data-entry tables and generic SaaS styling, opting instead for a street-authentic, hype-driven aesthetic that makes players feel like true stars.",
+    "keyCharacteristics": [
+      "Aggressive & Competitive: High contrast and bold elements that demand attention.",
+      "Ego-Driven: Big typography and prominent player cards to amplify pride.",
+      "Deep & Moody: A dark canvas that makes the bright turf green pop intensely.",
+      "Tactile: Elements you want to press, with satisfying, chunky interactions."
+    ],
+    "rules": [
+      { "name": "The Electric Focus Rule", "body": "The primary green (Electric Pitch) is incredibly powerful. Use it deliberately for primary CTAs and active states. Do not wash the screen in it; its impact comes from its contrast against the Midnight Asphalt.", "section": "colors" },
+      { "name": "The Ego Type Rule", "body": "Names and scores are the most important data in the app. They should always be typeset larger and bolder than standard data-entry labels.", "section": "typography" },
+      { "name": "The Tactical Glow Rule", "body": "Glows are earned, not given. Only the most important, interactive elements (like the 'Start Match' button or an MVP card) get the Neon Lift. Everything else remains grounded with subtle borders.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use Electric Pitch (#7ED957) sparingly but aggressively for primary actions to maximize its punch.",
+      "Do use large, bold Cairo typography for player names, team names, and match scores.",
+      "Do make interactive elements feel tactile and chunky, with 48px minimum hit areas.",
+      "Do apply subtle neon glows to highlight the most critical actions on the screen."
+    ],
+    "donts": [
+      "Don't use boring, generic SaaS tables for standings; make them feel like a sports leaderboard.",
+      "Don't build complex admin dashboard layouts; maintain a street-authentic, mobile-first vibe.",
+      "Don't include fake features or 'coming soon' buttons that dilute the app's real value.",
+      "Don't wash the screen in green; let the Midnight Asphalt dominate so the accents shine.",
+      "Don't use border-left greater than 1px as a colored stripe on cards.",
+      "Don't use glassmorphism as a default decorative element unless it specifically serves a tactical purpose (like a modal overlay)."
+    ]
+  }
+}

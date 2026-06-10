@@ -177,4 +177,64 @@ extension TeamRosterOps on TeamRosterController {
       isSubmitting.value = false;
     }
   }
+
+  Future<void> saveVisualLineup() async {
+    final targetTeamId = teamId;
+    final actorId = currentUserId;
+    if (targetTeamId == null || actorId == null) {
+      Get.snackbar('خطأ', 'يجب تسجيل الدخول أولاً.');
+      return;
+    }
+
+    try {
+      isSubmitting.value = true;
+
+      // الحشوات الحالية للاعبي الملعب الأساسيين (تخزن معرفات العضوية)
+      final visualStarters = visualSlots
+          .map((slot) => slot.playerId ?? slot.guestPlayerId)
+          .whereType<String>()
+          .toSet();
+
+      final updates = <Future<void>>[];
+      for (final memberData in rosterMembers) {
+        final membership = memberData.membership;
+        if (membership.status == TeamMembershipStatus.inactive) {
+          continue; // لا نعدل على اللاعبين غير النشطين
+        }
+
+        final isVisualStarter = visualStarters.contains(membership.id);
+        final desiredStatus = isVisualStarter
+            ? TeamMembershipStatus.starter
+            : TeamMembershipStatus.bench;
+
+        if (membership.status != desiredStatus) {
+          updates.add(
+            _teamRosterService.updateMembershipStatus(
+              teamId: targetTeamId,
+              actorId: actorId,
+              membershipId: membership.id,
+              status: desiredStatus,
+            ),
+          );
+        }
+      }
+
+      if (updates.isNotEmpty) {
+        await Future.wait(updates);
+      }
+
+      isLineupDirty.value = false;
+      await loadTeamRoster();
+      Get.snackbar('تم', 'تم حفظ خطة وتشكيلة الفريق بنجاح.');
+    } catch (e) {
+      Get.snackbar('خطأ', _readableError(e));
+    } finally {
+      isSubmitting.value = false;
+    }
+  }
+
+  void cancelVisualLineup() {
+    initVisualLineup(); // إعادة التهيئة من القائمة المحملة بقاعدة البيانات
+    Get.snackbar('تنبيه', 'تم إلغاء التغييرات غير المحفوظة.');
+  }
 }

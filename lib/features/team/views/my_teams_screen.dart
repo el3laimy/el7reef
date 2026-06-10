@@ -5,7 +5,6 @@ import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../core/widgets/el7reef_button.dart';
 import '../../../domain/entities/team.dart';
 import '../../../core/auth/auth_service.dart';
@@ -42,11 +41,23 @@ class MyTeamsScreen extends GetView<TeamController> {
           );
         }),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateTeamSheet(context),
-        backgroundColor: AppColors.primary,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: Text('فريق جديد', style: AppTextStyles.buttonText),
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.25),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+        ),
+        child: FloatingActionButton.extended(
+          onPressed: () => _showCreateTeamSheet(context),
+          backgroundColor: AppColors.primary,
+          icon: const Icon(Icons.add, color: AppColors.textOnPrimary),
+          label: Text('فريق جديد', style: AppTextStyles.buttonText.copyWith(color: AppColors.textOnPrimary)),
+        ),
       ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.5),
     );
   }
@@ -56,12 +67,12 @@ class MyTeamsScreen extends GetView<TeamController> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text('👥', style: TextStyle(fontSize: 64)),
+          Icon(Icons.emoji_events, size: 64, color: AppColors.textMuted.withValues(alpha: 0.5)),
           const SizedBox(height: AppDimensions.md),
-          Text('ما عندكش فرق لسّه', style: AppTextStyles.headlineMedium),
+          Text('لا توجد فرق', style: AppTextStyles.headlineMedium),
           const SizedBox(height: AppDimensions.sm),
           Text(
-            'أنشئ فريقك الأول وابدأ المنافسة!',
+            'ابدأ إمبراطوريتك الآن.',
             style: AppTextStyles.bodyMedium,
           ),
         ],
@@ -89,10 +100,14 @@ class MyTeamsScreen extends GetView<TeamController> {
 
     return GestureDetector(
       onTap: () => Get.toNamed(AppRoutes.teamProfileById(team.id)),
-      child: GlassmorphicContainer(
+      child: Container(
         margin: const EdgeInsets.only(bottom: AppDimensions.md),
         padding: const EdgeInsets.all(AppDimensions.md),
-        borderRadius: AppDimensions.radiusLg,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+          border: Border.all(color: AppColors.surfaceBorder),
+        ),
         child: Row(
           children: [
           // شعار الفريق
@@ -106,7 +121,7 @@ class MyTeamsScreen extends GetView<TeamController> {
             child: Center(
               child: Text(
                 team.name.isNotEmpty ? team.name[0] : '?',
-                style: AppTextStyles.headlineLarge.copyWith(color: Colors.white),
+                style: AppTextStyles.headlineLarge.copyWith(color: AppColors.textPrimary),
               ),
             ),
           ),
@@ -116,7 +131,7 @@ class MyTeamsScreen extends GetView<TeamController> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(team.name, style: AppTextStyles.titleLarge),
+                Text(team.name, style: AppTextStyles.headlineMedium.copyWith(color: AppColors.textPrimary)),
                 const SizedBox(height: 4),
                 // Badge for Role
                 Container(

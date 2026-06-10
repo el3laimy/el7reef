@@ -268,10 +268,10 @@ void main() {
     WidgetTester tester,
   ) async {
     final fakeShareLinkService = _RecordingShareLinkService(
-      claimCodeRepository: Get.find<ClaimCodeRepositoryImpl>(),
+      claimCodeRepository: ClaimCodeRepositoryImpl(firestore: firestore),
       teamRepository: teamRepository,
       guestPlayerRepository: guestPlayerRepository,
-      guestTeamRepository: Get.find<GuestTeamRepositoryImpl>(),
+      guestTeamRepository: GuestTeamRepositoryImpl(firestore: firestore),
     );
     final sharedTexts = <String>[];
 
@@ -289,7 +289,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(find.text('Mahmoud Ali'), 500);
+    final rosterScrollable = find.descendant(
+      of: find.byKey(const ValueKey('team-roster-list-view')),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('team-roster-member-actions-guest-1')),
+      500,
+      scrollable: rosterScrollable,
+    );
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey('team-roster-member-actions-guest-1')),
@@ -333,7 +341,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.scrollUntilVisible(find.text('Mahmoud Ali'), 500);
+      final rosterScrollable = find.descendant(
+        of: find.byKey(const ValueKey('team-roster-list-view')),
+        matching: find.byType(Scrollable),
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('team-roster-member-actions-guest-1')),
+        500,
+        scrollable: rosterScrollable,
+      );
       await tester.pumpAndSettle();
       expect(
         find.text('تم ربط هذا الضيف بالفعل ببروفايل لاعب مسجل.'),
@@ -392,10 +408,10 @@ void main() {
   ) async {
     final fakeShareLinkService = _RecordingShareLinkService(
       shouldThrow: true,
-      claimCodeRepository: Get.find<ClaimCodeRepositoryImpl>(),
+      claimCodeRepository: ClaimCodeRepositoryImpl(firestore: firestore),
       teamRepository: teamRepository,
       guestPlayerRepository: guestPlayerRepository,
-      guestTeamRepository: Get.find<GuestTeamRepositoryImpl>(),
+      guestTeamRepository: GuestTeamRepositoryImpl(firestore: firestore),
     );
 
     await tester.pumpWidget(
@@ -412,7 +428,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(find.text('Mahmoud Ali'), 500);
+    final rosterScrollable = find.descendant(
+      of: find.byKey(const ValueKey('team-roster-list-view')),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('team-roster-member-actions-guest-1')),
+      500,
+      scrollable: rosterScrollable,
+    );
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey('team-roster-member-actions-guest-1')),

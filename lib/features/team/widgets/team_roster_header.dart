@@ -37,7 +37,7 @@ class TeamRosterHeader extends StatelessWidget {
                 child: Text(
                   team.name.isNotEmpty ? team.name[0] : '?',
                   style: AppTextStyles.headlineLarge.copyWith(
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),
