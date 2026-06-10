@@ -107,7 +107,7 @@ void main() {
       ),
     );
 
-    expect(find.text('نجم المباراة'), findsOneWidget);
+    expect(find.text('نجم المباراة'), findsNWidgets(2));
     expect(find.text('ضيف المباراة'), findsOneWidget);
     expect(find.text('Street Cup'), findsOneWidget);
     expect(find.text('الحريف 3 - 2 الخصم'), findsOneWidget);

@@ -27,14 +27,16 @@ class MatchResultShareCard extends StatelessWidget {
         height: exportMode ? exportLogicalHeight : null,
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          color: const Color(0xFF08111F),
+          color: AppColors.backgroundDeep,
           borderRadius: BorderRadius.circular(exportMode ? 20 : 28),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          border: Border.all(
+            color: AppColors.textPrimaryTinted.withValues(alpha: 0.12),
+          ),
           boxShadow: exportMode
               ? null
               : [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.35),
+                    color: AppColors.backgroundDeep.withValues(alpha: 0.40),
                     blurRadius: 24,
                     offset: const Offset(0, 14),
                   ),
@@ -52,7 +54,7 @@ class MatchResultShareCard extends StatelessWidget {
                       center: Alignment.topCenter,
                       radius: 1.1,
                       colors: [
-                        Colors.white.withValues(alpha: 0.08),
+                        AppColors.textPrimaryTinted.withValues(alpha: 0.08),
                         Colors.transparent,
                       ],
                     ),
@@ -87,7 +89,7 @@ class _GlowBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFF0B1728), Color(0xFF050914)],
+              colors: [AppColors.surfaceSunken, AppColors.backgroundDeep],
             ),
           ),
           child: SizedBox.expand(),
@@ -134,22 +136,22 @@ class _CardContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final titleStyle = exportMode
         ? const TextStyle(
-            color: Colors.white,
+            color: AppColors.textPrimaryTinted,
             fontSize: 18,
             fontWeight: FontWeight.w900,
           )
         : AppTextStyles.titleMedium.copyWith(
-            color: Colors.white,
+            color: AppColors.textPrimaryTinted,
             fontWeight: FontWeight.w900,
           );
     final subtitleStyle = exportMode
         ? TextStyle(
-            color: Colors.white.withValues(alpha: 0.68),
+            color: AppColors.textSecondaryTinted.withValues(alpha: 0.82),
             fontSize: 10,
             fontWeight: FontWeight.w600,
           )
         : AppTextStyles.labelSmall.copyWith(
-            color: Colors.white.withValues(alpha: 0.68),
+            color: AppColors.textSecondaryTinted.withValues(alpha: 0.82),
           );
 
     return Padding(
@@ -192,7 +194,7 @@ class _TopMeta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chipStyle = TextStyle(
-      color: Colors.white,
+      color: AppColors.textPrimaryTinted,
       fontSize: exportMode ? 9 : 11,
       fontWeight: FontWeight.w900,
       letterSpacing: 0,
@@ -211,11 +213,11 @@ class _TopMeta extends StatelessWidget {
             child: Text(
               data.tournamentName!,
               style: chipStyle.copyWith(
-                color: Colors.white.withValues(alpha: 0.78),
+                color: AppColors.textPrimaryTinted.withValues(alpha: 0.78),
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.left,
+              textAlign: TextAlign.start,
             ),
           ),
       ],
@@ -285,7 +287,7 @@ class _TeamPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final logoSize = exportMode ? 54.0 : 58.0;
     final nameStyle = TextStyle(
-      color: Colors.white,
+      color: AppColors.textPrimaryTinted,
       fontSize: exportMode ? 14 : 14,
       fontWeight: FontWeight.w900,
       height: 1.08,
@@ -322,7 +324,7 @@ class _TeamPanel extends StatelessWidget {
                   child: Icon(
                     Icons.emoji_events_rounded,
                     size: exportMode ? 18 : 18,
-                    color: const Color(0xFFF7C948),
+            color: AppColors.secondaryLight,
                   ),
                 ),
             ],
@@ -381,7 +383,7 @@ class _TeamLogo extends StatelessWidget {
         child: Text(
           _initials(name),
           style: TextStyle(
-            color: Colors.white,
+            color: AppColors.textPrimaryTinted,
             fontSize: exportMode ? 18 : 20,
             fontWeight: FontWeight.w900,
           ),
@@ -420,7 +422,7 @@ class _ScoreBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scoreStyle = TextStyle(
-      color: Colors.white,
+      color: AppColors.textPrimaryTinted,
       fontSize: exportMode ? 44 : 46,
       fontWeight: FontWeight.w900,
       height: 0.95,
@@ -439,7 +441,7 @@ class _ScoreBlock extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(99),
               gradient: LinearGradient(
-                colors: [data.teamAAccent, data.teamBAccent],
+      colors: [data.teamAAccent, data.teamBAccent],
               ),
             ),
           ),
@@ -463,7 +465,7 @@ class _FooterMeta extends StatelessWidget {
     final meta = [
       ?playedAt,
       if (data.mvpName != null && data.mvpName!.isNotEmpty)
-        'MVP ${data.mvpName}',
+        'نجم المباراة: ${data.mvpName}',
     ].join('  •  ');
     return Column(
       children: [
@@ -471,7 +473,7 @@ class _FooterMeta extends StatelessWidget {
           Text(
             meta,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.62),
+              color: AppColors.textSecondaryTinted.withValues(alpha: 0.72),
               fontSize: exportMode ? 9 : 11,
               fontWeight: FontWeight.w700,
             ),
@@ -482,7 +484,7 @@ class _FooterMeta extends StatelessWidget {
           SizedBox(height: exportMode ? 8 : 8),
         ],
         Text(
-          'EL7REEF  •  الحريف',
+          'EL7REEF  •  العب. اتوثق. اتفاخر.',
           style: TextStyle(
             color: AppColors.primaryLight,
             fontSize: exportMode ? 10 : 12,
@@ -544,14 +546,14 @@ class _FormationChip extends StatelessWidget {
         vertical: exportMode ? 5 : 5,
       ),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.28),
+        color: AppColors.backgroundDeep.withValues(alpha: 0.42),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: accent.withValues(alpha: 0.46)),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.9),
+          color: AppColors.textPrimaryTinted.withValues(alpha: 0.9),
           fontSize: exportMode ? 9 : 10,
           fontWeight: FontWeight.w900,
         ),
@@ -564,7 +566,7 @@ class _PitchLinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.045)
+      ..color = AppColors.textPrimaryTinted.withValues(alpha: 0.045)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.4;
     canvas.drawCircle(

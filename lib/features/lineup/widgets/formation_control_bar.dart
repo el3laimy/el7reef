@@ -32,9 +32,9 @@ class FormationControlBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppDimensions.sm),
       decoration: BoxDecoration(
-        color: const Color(0xFF101A28).withValues(alpha: 0.92),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(color: AppColors.surfaceBorder),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -111,7 +111,7 @@ class _MenuChip<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     return PopupMenuButton<T>(
       enabled: enabled,
-      color: const Color(0xFF162235),
+      color: AppColors.surface,
       onSelected: onSelected,
       itemBuilder: (context) => values
           .map(
@@ -200,12 +200,12 @@ class _ControlButtonSurface extends StatelessWidget {
       height: 38,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: enabled ? 0.06 : 0.03),
+        color: enabled ? AppColors.surfaceBorder : Colors.transparent,
         borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
         border: Border.all(
           color: enabled
               ? AppColors.primary.withValues(alpha: 0.28)
-              : Colors.white.withValues(alpha: 0.06),
+              : AppColors.surfaceBorder,
         ),
       ),
       child: Row(

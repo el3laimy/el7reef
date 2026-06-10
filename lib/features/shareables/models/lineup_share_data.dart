@@ -16,6 +16,12 @@ class LineupSharePlayerData {
   final double slotY;
   final bool isTemporary;
 
+  /// Arabic position label (e.g. مهاجم صريح, جناح أيمن, حارس مرمى).
+  final String? positionLabel;
+
+  /// Short latin name for jersey back (e.g. A ASHRAF).
+  final String? shortName;
+
   const LineupSharePlayerData({
     required this.id,
     required this.displayName,
@@ -26,6 +32,8 @@ class LineupSharePlayerData {
     required this.slotX,
     required this.slotY,
     required this.isTemporary,
+    this.positionLabel,
+    this.shortName,
   });
 }
 
@@ -67,6 +75,12 @@ class LineupShareData {
   final String? statusLabel;
   final String? updatedLabel;
 
+  /// Auto-generated tactical notes for the card footer.
+  final List<String> tacticalNotes;
+
+  /// Motivational quote displayed on the card.
+  final String motivationalQuote;
+
   const LineupShareData({
     required this.matchId,
     required this.lineupOwnerType,
@@ -86,5 +100,7 @@ class LineupShareData {
     this.benchPlayers = const [],
     this.statusLabel,
     this.updatedLabel,
+    this.tacticalNotes = const [],
+    this.motivationalQuote = 'روح واحدة.. هدف واحد',
   });
 }

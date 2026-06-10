@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' as intl;
 
+import '../../../app/theme/app_colors.dart';
 import '../../../core/lineup/formation_engine.dart';
 import '../../../core/lineup/formation_library.dart';
 import '../../../core/lineup/lineup_types.dart';
@@ -44,7 +45,7 @@ class LineupShareController {
       lineupOwnerType: LineupShareOwnerType.officialTeam,
       lineupTypeLabel: 'فريق رسمي',
       matchLabel: matchLabel,
-      accentColor: const Color(0xFF2563EB),
+      accentColor: AppColors.primary,
     );
   }
 
@@ -73,7 +74,7 @@ class LineupShareController {
       lineupOwnerType: LineupShareOwnerType.temporarySide,
       lineupTypeLabel: 'فريق مؤقت',
       matchLabel: matchLabel ?? 'مباراة ودية',
-      accentColor: const Color(0xFF22C55E),
+      accentColor: AppColors.primaryLight,
     );
   }
 
@@ -85,7 +86,7 @@ class LineupShareController {
     LineupShareOwnerType? lineupOwnerType,
     String? lineupTypeLabel,
     String? matchLabel,
-    Color accentColor = const Color(0xFF2563EB),
+    Color accentColor = AppColors.primary,
   }) {
     final ownerType = lineupOwnerType ?? _ownerTypeForSnapshot(snapshot);
     final resolvedName = _normalizeName(teamName);
@@ -93,6 +94,7 @@ class LineupShareController {
     final teamSize = normalizeMatchTeamSize(
       snapshot.playerCount ?? snapshot.starters.length,
     );
+    final pitchPlayers = _pitchPlayers(snapshot, teamSize, formationCode);
     return LineupShareData(
       matchId: snapshot.matchId,
       lineupOwnerType: ownerType,
@@ -108,10 +110,11 @@ class LineupShareController {
       teamSize: teamSize,
       lineupTypeLabel: lineupTypeLabel ?? _lineupTypeLabel(ownerType),
       matchLabel: _normalizeOptional(matchLabel),
-      pitchPlayers: _pitchPlayers(snapshot, teamSize, formationCode),
+      pitchPlayers: pitchPlayers,
       benchPlayers: snapshot.bench.map(_benchPlayer).toList(growable: false),
       statusLabel: 'التشكيلة المعتمدة',
       updatedLabel: intl.DateFormat('yyyy/MM/dd').format(snapshot.lockedAt),
+      tacticalNotes: _generateTacticalNotes(formationCode, pitchPlayers),
     );
   }
 
@@ -166,6 +169,11 @@ class LineupShareController {
       slotX: entry.slotX ?? fallbackSlot?.x ?? 50,
       slotY: entry.slotY ?? fallbackSlot?.y ?? 50,
       isTemporary: entry.matchSidePlayerId != null,
+      positionLabel: _positionLabelForRole(
+        role,
+        entry.slotX ?? fallbackSlot?.x ?? 50,
+      ),
+      shortName: _generateShortName(entry.displayName),
     );
   }
 
@@ -242,5 +250,77 @@ class LineupShareController {
     final trimmed = value?.trim();
     if (trimmed == null || trimmed.isEmpty) return null;
     return trimmed;
+  }
+
+  // ── New helpers for redesigned card ──
+
+  String _positionLabelForRole(SlotRole role, double slotX) {
+    // slotX: 0=left of pitch, 100=right. In RTL context:
+    // slotX < 35 = right side, slotX > 65 = left side, middle = center.
+    final isRight = slotX < 35;
+    final isLeft = slotX > 65;
+
+    return switch (role) {
+      SlotRole.gk => 'حارس مرمى',
+      SlotRole.def => isRight
+          ? 'ظهير أيمن'
+          : isLeft
+              ? 'ظهير أيسر'
+              : 'قلب دفاع',
+      SlotRole.mid => isRight
+          ? 'جناح أيمن'
+          : isLeft
+              ? 'جناح أيسر'
+              : 'نص ملعب',
+      SlotRole.att => isRight
+          ? 'جناح أيمن'
+          : isLeft
+              ? 'جناح أيسر'
+              : 'مهاجم صريح',
+    };
+  }
+
+  String _generateShortName(String fullName) {
+    final parts = fullName
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList(growable: false);
+    if (parts.isEmpty) return 'PLAYER';
+    if (parts.length == 1) return parts.first.toUpperCase();
+    // First initial + last name: "احمد اشرف" → "A ASHRAF"
+    final firstInitial = parts.first.characters.first.toUpperCase();
+    final lastName = parts.last.toUpperCase();
+    return '$firstInitial $lastName';
+  }
+
+  List<String> _generateTacticalNotes(
+    String formationCode,
+    List<LineupSharePlayerData> players,
+  ) {
+    final notes = <String>[];
+    notes.add('تنظيم $formationCode');
+
+    final defCount = players.where((p) => p.slotRole == SlotRole.def).length;
+    final midCount = players.where((p) => p.slotRole == SlotRole.mid).length;
+    final attCount = players.where((p) => p.slotRole == SlotRole.att).length;
+
+    if (defCount >= 4) {
+      notes.add('استقرار دفاعي');
+    } else if (defCount <= 2 && attCount >= 3) {
+      notes.add('دعم هجومي');
+    } else {
+      notes.add('توازن بين الخطوط');
+    }
+
+    if (attCount >= 3) {
+      notes.add('ضغط عالي');
+    }
+    if (midCount >= 3) {
+      notes.add('تحكم في الوسط');
+    }
+
+    notes.add('انتشار جيد');
+    return notes;
   }
 }

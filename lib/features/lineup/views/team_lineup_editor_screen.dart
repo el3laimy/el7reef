@@ -5,6 +5,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/lineup/lineup_types.dart';
+import '../../../core/utils/app_logger.dart';
 import '../../shareables/controllers/lineup_share_controller.dart';
 import '../../shareables/models/lineup_share_data.dart';
 import '../../shareables/services/share_card_capture_service.dart';
@@ -69,9 +70,11 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
                 children: [
                   _TeamLineupHeader(controller: controller),
                   const SizedBox(height: AppDimensions.md),
-                  if (controller.isConfirmed)
-                    _ConfirmedNotice(controller: controller)
-                  else
+                  if (controller.isConfirmed) ...[
+                    _ConfirmedNotice(controller: controller),
+                    const SizedBox(height: AppDimensions.md),
+                  ],
+                  if (controller.canEdit)
                     FormationControlBar(
                       playerCount: controller.playerCount.value,
                       formationCode: controller.formationCode.value,
@@ -111,7 +114,7 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
                         : null,
                   ),
                   const SizedBox(height: AppDimensions.md),
-                  if (!controller.isConfirmed)
+                  if (controller.canEdit)
                     LineupBottomActionBar(
                       isSaving: controller.isSaving.value,
                       canStart: false,
@@ -157,7 +160,7 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
         child: Container(
           padding: const EdgeInsets.all(AppDimensions.lg),
           decoration: const BoxDecoration(
-            color: Color(0xFF07111F),
+            color: AppColors.surface,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
@@ -202,7 +205,7 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
         child: Container(
           padding: const EdgeInsets.all(AppDimensions.lg),
           decoration: const BoxDecoration(
-            color: Color(0xFF07111F),
+            color: AppColors.surface,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
@@ -318,7 +321,8 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
     if (url == null || url.isEmpty) return;
     try {
       await precacheImage(NetworkImage(url), context);
-    } catch (_) {
+    } catch (error) {
+      AppLogger.warning('TeamLineupEditorScreen._precacheLineupLogo', error);
       // Initials fallback remains available if the logo cannot be loaded.
     }
   }
@@ -422,9 +426,9 @@ class _TeamLineupHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppDimensions.lg),
       decoration: BoxDecoration(
-        color: const Color(0xFF101A28),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.22)),
+        border: Border.all(color: AppColors.surfaceBorder),
       ),
       child: Row(
         children: [
@@ -448,7 +452,7 @@ class _TeamLineupHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(controller.teamName, style: AppTextStyles.headlineSmall),
+                Text(controller.teamName, style: AppTextStyles.headlineMedium),
                 const SizedBox(height: 2),
                 Text(
                   '${controller.playerCount.value}v${controller.playerCount.value} • ${controller.formationCode.value}',

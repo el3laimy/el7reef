@@ -269,7 +269,7 @@ void main() {
       await tester.pumpWidget(_buildScreenApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('شارك نجم المباراة'), findsOneWidget);
+      expect(find.text('شارك كارت نجم المباراة'), findsOneWidget);
       expect(find.text('افتح بروفايل النجم'), findsOneWidget);
 
       await tester.tap(find.text('افتح بروفايل النجم'));
@@ -308,7 +308,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('افتح بروفايل النجم'), findsNothing);
-      expect(find.text('شارك نجم المباراة'), findsNothing);
+      expect(find.text('شارك كارت نجم المباراة'), findsNothing);
     });
 
     testWidgets('match-side MVP keeps share CTA but hides profile CTA', (
@@ -327,7 +327,7 @@ void main() {
       await tester.pumpWidget(_buildScreenApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('شارك نجم المباراة'), findsOneWidget);
+      expect(find.text('شارك كارت نجم المباراة'), findsOneWidget);
       expect(find.text('افتح بروفايل النجم'), findsNothing);
     });
   });

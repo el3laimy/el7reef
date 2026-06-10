@@ -26,14 +26,16 @@ class TopScorersShareCard extends StatelessWidget {
         height: exportMode ? exportLogicalHeight : null,
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          color: const Color(0xFF07140D),
+          color: AppColors.backgroundDeep,
           borderRadius: BorderRadius.circular(exportMode ? 20 : 28),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          border: Border.all(
+            color: AppColors.textPrimaryTinted.withValues(alpha: 0.12),
+          ),
           boxShadow: exportMode
               ? null
               : [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.35),
+                    color: AppColors.backgroundDeep.withValues(alpha: 0.35),
                     blurRadius: 24,
                     offset: const Offset(0, 14),
                   ),
@@ -70,7 +72,7 @@ class _TopScorersBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFF0E2417), Color(0xFF050A07)],
+              colors: [AppColors.surfaceRaised, AppColors.backgroundDeep],
             ),
           ),
           child: SizedBox.expand(),
@@ -99,22 +101,22 @@ class _TopScorersContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final titleStyle = exportMode
         ? const TextStyle(
-            color: Colors.white,
+            color: AppColors.textPrimary,
             fontSize: 24,
             fontWeight: FontWeight.w900,
           )
         : AppTextStyles.headlineMedium.copyWith(
-            color: Colors.white,
+            color: AppColors.textPrimary,
             fontWeight: FontWeight.w900,
           );
     final tournamentStyle = exportMode
         ? TextStyle(
-            color: Colors.white.withValues(alpha: 0.76),
+            color: AppColors.textSecondaryTinted.withValues(alpha: 0.76),
             fontSize: 13,
             fontWeight: FontWeight.w700,
           )
         : AppTextStyles.labelLarge.copyWith(
-            color: Colors.white.withValues(alpha: 0.76),
+            color: AppColors.textSecondaryTinted.withValues(alpha: 0.76),
           );
 
     return Padding(
@@ -126,7 +128,7 @@ class _TopScorersContent extends StatelessWidget {
             children: [
               _BrandMark(label: data.brandLabel, exportMode: exportMode),
               const Spacer(),
-              _MetaChip(label: 'TOP 5', exportMode: exportMode),
+              _MetaChip(label: 'أفضل 5', exportMode: exportMode),
             ],
           ),
           const SizedBox(height: 22),
@@ -160,7 +162,9 @@ class _TopScorersContent extends StatelessWidget {
                 (exportMode
                         ? const TextStyle(fontSize: 10)
                         : AppTextStyles.labelSmall)
-                    .copyWith(color: Colors.white.withValues(alpha: 0.62)),
+                    .copyWith(
+              color: AppColors.textSecondaryTinted.withValues(alpha: 0.62),
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -179,11 +183,11 @@ class _ShareScorerRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final nameStyle = exportMode
         ? const TextStyle(
-            color: Colors.white,
+            color: AppColors.textPrimary,
             fontSize: 15,
             fontWeight: FontWeight.w800,
           )
-        : AppTextStyles.titleMedium.copyWith(color: Colors.white);
+        : AppTextStyles.titleMedium.copyWith(color: AppColors.textPrimary);
     final goalStyle = exportMode
         ? const TextStyle(
             color: AppColors.primary,
@@ -196,9 +200,11 @@ class _ShareScorerRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
+        color: AppColors.textPrimaryTinted.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+        border: Border.all(
+          color: AppColors.textPrimaryTinted.withValues(alpha: 0.10),
+        ),
       ),
       child: Row(
         children: [
@@ -294,7 +300,7 @@ class _BrandMark extends StatelessWidget {
     return Text(
       label,
       style: TextStyle(
-        color: Colors.white,
+        color: AppColors.textPrimary,
         fontSize: exportMode ? 13 : 12,
         fontWeight: FontWeight.w900,
       ),
@@ -313,13 +319,13 @@ class _MetaChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.10),
+        color: AppColors.textPrimaryTinted.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: Colors.white,
+          color: AppColors.textPrimary,
           fontSize: exportMode ? 9 : 10,
           fontWeight: FontWeight.w900,
         ),
@@ -351,7 +357,7 @@ class _PitchStripePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.045)
+      ..color = AppColors.textPrimaryTinted.withValues(alpha: 0.045)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
 

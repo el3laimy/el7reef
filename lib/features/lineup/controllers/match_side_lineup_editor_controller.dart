@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/auth/auth_session.dart';
+import '../../../core/enums/match_status.dart';
 import '../../../core/lineup/formation_engine.dart';
 import '../../../core/lineup/formation_library.dart';
 import '../../../core/lineup/lineup_types.dart';
@@ -60,7 +61,11 @@ class MatchSideLineupEditorController extends GetxController {
           .toUpperCase();
   String? get currentUserId => _authSession.currentUserId;
   bool get isConfirmed => confirmedSnapshot.value != null;
-  bool get canEdit => !isConfirmed && !isSaving.value;
+  bool get canEdit {
+    final status = match.value?.status;
+    final isMatchActive = status == MatchStatus.open || status == MatchStatus.full;
+    return isMatchActive && !isSaving.value;
+  }
   String get sideName => matchSide.value?.displayName ?? 'فريق $sideKey';
 
   Map<String, LineupPlayer> get playersByKey => {
@@ -320,22 +325,26 @@ class MatchSideLineupEditorController extends GetxController {
     );
 
     if (_hasCompleteSavedAssignments(snapshot)) {
-      slots.assignAll(
-        snapshot.starters
-            .map((entry) {
-              final player = _lineupPlayerFromEntry(entry);
-              return FormationSlot(
-                id: entry.slotId!,
-                role: _parseSlotRole(entry.slotRole) ?? SlotRole.mid,
-                lineIndex: entry.lineIndex!,
-                slotIndex: entry.slotIndex!,
-                x: entry.slotX ?? 50,
-                y: entry.slotY ?? 50,
-                matchSidePlayerId: player.id,
-              );
-            })
-            .toList(growable: false),
+      final generated = FormationEngine.generateFormationSlots(
+        playerCount: count,
+        formationCode: code,
       );
+      final slotMap = {for (final slot in generated) slot.id: slot};
+      for (final entry in snapshot.starters) {
+        final slot = slotMap[entry.slotId];
+        if (slot != null) {
+          final player = _lineupPlayerFromEntry(entry);
+          slotMap[entry.slotId!] = slot.copyWith(
+            role: _parseSlotRole(entry.slotRole) ?? slot.role,
+            lineIndex: entry.lineIndex ?? slot.lineIndex,
+            slotIndex: entry.slotIndex ?? slot.slotIndex,
+            x: entry.slotX ?? slot.x,
+            y: entry.slotY ?? slot.y,
+            matchSidePlayerId: player.id,
+          );
+        }
+      }
+      slots.assignAll(slotMap.values.toList());
       return;
     }
 

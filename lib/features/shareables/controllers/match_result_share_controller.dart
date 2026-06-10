@@ -1,5 +1,4 @@
-import 'package:flutter/material.dart';
-
+import '../../../app/theme/app_colors.dart';
 import '../../../core/enums/match_status.dart';
 import '../../../domain/entities/match.dart';
 import '../../../features/lineup/controllers/match_result_lineup_controller.dart';
@@ -30,11 +29,11 @@ class MatchResultShareController {
       teamAName: teamA.label,
       teamALogoUrl: teamA.logoUrl,
       teamAFormation: _nullableFormation(teamAFormation),
-      teamAAccent: const Color(0xFF2563EB),
+      teamAAccent: AppColors.primary,
       teamBName: teamB.label,
       teamBLogoUrl: teamB.logoUrl,
       teamBFormation: _nullableFormation(teamBFormation),
-      teamBAccent: const Color(0xFFEF4444),
+      teamBAccent: AppColors.error,
       scoreA: scoreA,
       scoreB: scoreB,
       statusLabel: _statusLabel(match.status),
@@ -56,10 +55,10 @@ class MatchResultShareController {
   }
 
   String _statusLabel(MatchStatus status) => switch (status) {
-    MatchStatus.live => 'LIVE',
-    MatchStatus.completed => 'FT',
+    MatchStatus.live => 'جارية',
+    MatchStatus.completed => 'نهاية المباراة',
     MatchStatus.pendingReview => 'قيد المراجعة',
-    MatchStatus.ratingWindow => 'FT',
+    MatchStatus.ratingWindow => 'نهاية المباراة',
     MatchStatus.settled => 'تم اعتماد النتيجة',
     MatchStatus.frozen => 'مجمّدة',
     MatchStatus.cancelled => 'ملغاة',

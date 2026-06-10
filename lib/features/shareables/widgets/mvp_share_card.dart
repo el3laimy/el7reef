@@ -22,14 +22,16 @@ class MvpShareCard extends StatelessWidget {
         height: exportMode ? exportLogicalHeight : null,
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          color: const Color(0xFF0B1020),
+          color: AppColors.backgroundDeep,
           borderRadius: BorderRadius.circular(exportMode ? 20 : 28),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          border: Border.all(
+            color: AppColors.textPrimaryTinted.withValues(alpha: 0.12),
+          ),
           boxShadow: exportMode
               ? null
               : [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.34),
+                    color: AppColors.backgroundDeep.withValues(alpha: 0.34),
                     blurRadius: 24,
                     offset: const Offset(0, 14),
                   ),
@@ -66,7 +68,7 @@ class _MvpBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFF14213D), Color(0xFF070B16)],
+              colors: [AppColors.surfaceRaised, AppColors.backgroundDeep],
             ),
           ),
           child: SizedBox.expand(),
@@ -95,22 +97,22 @@ class _MvpContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final titleStyle = exportMode
         ? const TextStyle(
-            color: Colors.white,
+            color: AppColors.textPrimary,
             fontSize: 25,
             fontWeight: FontWeight.w900,
           )
         : AppTextStyles.headlineMedium.copyWith(
-            color: Colors.white,
+            color: AppColors.textPrimary,
             fontWeight: FontWeight.w900,
           );
     final nameStyle = exportMode
         ? const TextStyle(
-            color: Colors.white,
+            color: AppColors.textPrimary,
             fontSize: 34,
             fontWeight: FontWeight.w900,
           )
         : AppTextStyles.displayMedium.copyWith(
-            color: Colors.white,
+            color: AppColors.textPrimary,
             fontWeight: FontWeight.w900,
           );
 
@@ -123,7 +125,7 @@ class _MvpContent extends StatelessWidget {
             children: [
               _BrandMark(label: data.brandLabel, exportMode: exportMode),
               const Spacer(),
-              _MetaChip(label: 'MVP', exportMode: exportMode),
+              _MetaChip(label: 'نجم المباراة', exportMode: exportMode),
             ],
           ),
           const SizedBox(height: 24),
@@ -144,7 +146,9 @@ class _MvpContent extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           )
                         : AppTextStyles.labelLarge)
-                    .copyWith(color: Colors.white.withValues(alpha: 0.72)),
+                    .copyWith(
+              color: AppColors.textSecondaryTinted.withValues(alpha: 0.72),
+            ),
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -184,7 +188,9 @@ class _MvpContent extends StatelessWidget {
                 (exportMode
                         ? const TextStyle(fontSize: 10)
                         : AppTextStyles.labelSmall)
-                    .copyWith(color: Colors.white.withValues(alpha: 0.62)),
+                    .copyWith(
+              color: AppColors.textSecondaryTinted.withValues(alpha: 0.62),
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -234,14 +240,16 @@ class _WideChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.10),
+        color: AppColors.textPrimaryTinted.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        border: Border.all(
+          color: AppColors.textPrimaryTinted.withValues(alpha: 0.12),
+        ),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: Colors.white,
+          color: AppColors.textPrimary,
           fontSize: exportMode ? 12 : 13,
           fontWeight: FontWeight.w800,
         ),
@@ -289,7 +297,7 @@ class _BrandMark extends StatelessWidget {
     return Text(
       label,
       style: TextStyle(
-        color: Colors.white,
+        color: AppColors.textPrimary,
         fontSize: exportMode ? 13 : 12,
         fontWeight: FontWeight.w900,
       ),
@@ -308,13 +316,13 @@ class _MetaChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.10),
+        color: AppColors.textPrimaryTinted.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: Colors.white,
+          color: AppColors.textPrimary,
           fontSize: exportMode ? 9 : 10,
           fontWeight: FontWeight.w900,
         ),
@@ -346,7 +354,7 @@ class _StarPitchPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.05)
+      ..color = AppColors.textPrimaryTinted.withValues(alpha: 0.05)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
 

@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/auth/auth_session.dart';
 import '../../../core/enums/match_attendance_status.dart';
 import '../../../core/enums/team_member_availability.dart';
+import '../../../core/enums/match_status.dart';
 import '../../../core/enums/team_membership_status.dart';
 import '../../../core/lineup/formation_engine.dart';
 import '../../../core/lineup/formation_library.dart';
@@ -97,7 +98,11 @@ class TeamLineupEditorController extends GetxController {
   String get teamId => Get.parameters['teamId'] ?? '';
   String? get currentUserId => _authSession.currentUserId;
   bool get isConfirmed => confirmedSnapshot.value != null;
-  bool get canEdit => !isConfirmed && !isSaving.value;
+  bool get canEdit {
+    final status = match.value?.status;
+    final isMatchActive = status == MatchStatus.open || status == MatchStatus.full;
+    return isMatchActive && !isSaving.value;
+  }
   String get teamName => team.value?.name ?? 'الفريق';
   String? get teamLogoUrl => team.value?.logoUrl;
 
@@ -382,24 +387,30 @@ class TeamLineupEditorController extends GetxController {
       (entry) => entry.hasSlotAssignment,
     );
     if (hasSavedSlots) {
-      slots.assignAll(
-        snapshot.starters
-            .map((entry) {
-              final player = _playerFromSnapshotEntry(entry);
-              return FormationSlot(
-                id: entry.slotId!,
-                role: _parseSlotRole(entry.slotRole),
-                lineIndex: entry.lineIndex ?? 0,
-                slotIndex: entry.slotIndex ?? 0,
-                x: entry.slotX ?? 50,
-                y: entry.slotY ?? 50,
-                playerId: player.isRegistered ? player.id : null,
-                guestPlayerId: player.isGuest ? player.id : null,
-                matchSidePlayerId: player.isTemporary ? player.id : null,
-              );
-            })
-            .toList(growable: false),
+      final generated = FormationEngine.generateFormationSlots(
+        playerCount: count,
+        formationCode: code,
       );
+      final slotMap = {for (final slot in generated) slot.id: slot};
+      for (final entry in snapshot.starters) {
+        if (entry.hasSlotAssignment && entry.slotId != null) {
+          final slot = slotMap[entry.slotId];
+          if (slot != null) {
+            final player = _playerFromSnapshotEntry(entry);
+            slotMap[entry.slotId!] = slot.copyWith(
+              role: _parseSlotRole(entry.slotRole),
+              lineIndex: entry.lineIndex ?? slot.lineIndex,
+              slotIndex: entry.slotIndex ?? slot.slotIndex,
+              x: entry.slotX ?? slot.x,
+              y: entry.slotY ?? slot.y,
+              playerId: player.isRegistered ? player.id : null,
+              guestPlayerId: player.isGuest ? player.id : null,
+              matchSidePlayerId: player.isTemporary ? player.id : null,
+            );
+          }
+        }
+      }
+      slots.assignAll(slotMap.values.toList());
     } else {
       final generated = FormationEngine.generateFormationSlots(
         playerCount: count,

@@ -34,12 +34,12 @@ class BenchBar extends StatelessWidget {
     Widget content = Container(
       padding: const EdgeInsets.all(AppDimensions.md),
       decoration: BoxDecoration(
-        color: const Color(0xFF101A28).withValues(alpha: 0.92),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(color: AppColors.surfaceBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.28),
+            color: AppColors.backgroundDeep.withValues(alpha: 0.28),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -85,9 +85,9 @@ class BenchBar extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(AppDimensions.md),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.04),
+                color: AppColors.surfaceBorder.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                border: Border.all(color: AppColors.surfaceBorder),
               ),
               child: Text(
                 'لا يوجد بدلاء حالياً',
@@ -101,10 +101,11 @@ class BenchBar extends StatelessWidget {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: players.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 10),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(width: 10),
                 itemBuilder: (context, index) {
                   final player = players[index];
-                  Widget card = _BenchPlayerCard(
+                  Widget card = _BenchDockCard(
                     player: player,
                     compact: compact,
                     onTap: onPlayerTap == null
@@ -134,7 +135,6 @@ class BenchBar extends StatelessWidget {
       ),
     );
 
-    // Wrap entire bench area in DragTarget so players can be dropped back.
     if (onPlayerDroppedOnBench != null) {
       final targetChild = content;
       content = DragTarget<LineupPlayer>(
@@ -173,12 +173,12 @@ class BenchBar extends StatelessWidget {
   }
 }
 
-class _BenchPlayerCard extends StatelessWidget {
+class _BenchDockCard extends StatelessWidget {
   final LineupPlayer player;
   final bool compact;
   final VoidCallback? onTap;
 
-  const _BenchPlayerCard({
+  const _BenchDockCard({
     required this.player,
     required this.compact,
     this.onTap,
@@ -197,89 +197,106 @@ class _BenchPlayerCard extends StatelessWidget {
           final availableHeight = constraints.maxHeight.isFinite
               ? constraints.maxHeight
               : compact
-              ? 80.0
-              : 95.0;
+                  ? 80.0
+                  : 95.0;
           final cardWidth = constraints.maxWidth.isFinite
               ? constraints.maxWidth
               : compact
-              ? 82.0
-              : 96.0;
-          final padding = (availableHeight * 0.08).clamp(5.0, 8.0);
-          final avatarSize = (availableHeight * (compact ? 0.38 : 0.4)).clamp(
-            compact ? 28.0 : 34.0,
-            compact ? 36.0 : 42.0,
-          );
-          final nameFontSize = (availableHeight * 0.13).clamp(
-            compact ? 9.0 : 10.0,
-            compact ? 11.0 : 12.0,
-          );
+                  ? 82.0
+                  : 96.0;
+          final padding =
+              (availableHeight * 0.08).clamp(5.0, 8.0);
+          final avatarSize = (availableHeight * (compact ? 0.38 : 0.4))
+              .clamp(compact ? 28.0 : 34.0, compact ? 36.0 : 42.0);
+          final nameFontSize =
+              (availableHeight * 0.13).clamp(compact ? 9.0 : 10.0, compact ? 11.0 : 12.0);
           final metaFontSize = (availableHeight * 0.1).clamp(7.5, 9.5);
 
           return Container(
             width: cardWidth,
             padding: EdgeInsets.all(padding),
             decoration: BoxDecoration(
-              color: const Color(0xFF07111F).withValues(alpha: 0.88),
+              color: AppColors.background,
               borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-              border: Border.all(color: roleColor.withValues(alpha: 0.5)),
+              border: Border.all(
+                color: roleColor.withValues(alpha: 0.5),
+              ),
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.max,
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
               children: [
-                Container(
-                  width: avatarSize,
-                  height: avatarSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: roleColor.withValues(alpha: 0.16),
-                    border: Border.all(color: roleColor),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: (player.photoUrl ?? '').isNotEmpty
-                      ? Image.network(
-                          player.photoUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              _Initial(player: player),
-                        )
-                      : _Initial(player: player),
-                ),
-                SizedBox(height: (availableHeight * 0.05).clamp(3.0, 5.0)),
-                Flexible(
-                  child: Text(
-                    lineupDisplayName(player),
-                    style: AppTextStyles.labelSmall.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: nameFontSize,
-                      height: 1.05,
-                      letterSpacing: 0,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
+                // Role color strip at top
+                PositionedDirectional(
+                  top: 0,
+                  start: 0,
+                  end: 0,
+                  child: Container(
+                    height: 3,
+                    color: roleColor,
                   ),
                 ),
-                Flexible(
-                  child: Text(
-                    player.isTemporary
-                        ? 'مؤقت'
-                        : player.isGuest
-                        ? 'ضيف'
-                        : (player.preferredPosition ?? 'لاعب'),
-                    style: AppTextStyles.labelSmall.copyWith(
-                      color: (player.isGuest || player.isTemporary)
-                          ? AppColors.warning
-                          : roleColor,
-                      fontSize: metaFontSize,
-                      height: 1.05,
-                      letterSpacing: 0,
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    // Avatar
+                    Container(
+                      width: avatarSize,
+                      height: avatarSize,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: roleColor.withValues(alpha: 0.16),
+                        border: Border.all(color: roleColor),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: (player.photoUrl ?? '').isNotEmpty
+                          ? Image.network(
+                              player.photoUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  _BenchInitial(player: player),
+                            )
+                          : _BenchInitial(player: player),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                  ),
+                    SizedBox(
+                      height: (availableHeight * 0.05).clamp(3.0, 5.0),
+                    ),
+                    // Name
+                    Flexible(
+                      child: Text(
+                        lineupDisplayName(player),
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: nameFontSize,
+                          height: 1.05,
+                          letterSpacing: 0,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    // Meta / position
+                    Flexible(
+                      child: Text(
+                        player.isTemporary
+                            ? 'مؤقت'
+                            : player.isGuest
+                                ? 'ضيف'
+                                : (player.preferredPosition ?? 'لاعب'),
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: roleColor,
+                          fontSize: metaFontSize,
+                          height: 1.05,
+                          letterSpacing: 0,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -290,10 +307,10 @@ class _BenchPlayerCard extends StatelessWidget {
   }
 }
 
-class _Initial extends StatelessWidget {
+class _BenchInitial extends StatelessWidget {
   final LineupPlayer player;
 
-  const _Initial({required this.player});
+  const _BenchInitial({required this.player});
 
   @override
   Widget build(BuildContext context) {

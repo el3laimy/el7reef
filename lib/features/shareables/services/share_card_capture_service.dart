@@ -7,6 +7,8 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../app/theme/app_colors.dart';
+
 const double matchResultShareExportPixelRatio = 3.0;
 
 class ShareCardCaptureService {
@@ -74,7 +76,7 @@ class ShareCardCaptureService {
         context: context,
         barrierDismissible: false,
         builder: (_) =>
-            const Center(child: CircularProgressIndicator(color: Colors.white)),
+            Center(child: CircularProgressIndicator(color: AppColors.primary)),
       ),
     );
 

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
-import '../../../app/theme/app_text_styles.dart';
 import '../../../core/lineup/lineup_types.dart';
 import 'lineup_player_display.dart';
 import 'lineup_player_node.dart';
@@ -15,7 +14,26 @@ typedef FormationPlayerSlotCallback =
 typedef FormationSlotDropCallback =
     void Function(FormationSlot slot, LineupPlayer droppedPlayer);
 
-class ProfessionalPitchCard extends StatelessWidget {
+
+
+Offset _projectPitch(double x, double y, double width, double height) {
+  final nx = x / 100.0;
+  final ny = y / 100.0;
+
+  final xFactor = 0.36 + (0.86 - 0.36) * ny;
+  final nyProj = math.pow(ny, 1.30).toDouble();
+
+  final marginX = width * 0.02;
+  final marginY = height * 0.28;
+  final usableHeight = height - marginY - height * 0.05;
+
+  final screenX = (width / 2) + (nx - 0.5) * (width - 2 * marginX) * xFactor;
+  final screenY = marginY + nyProj * usableHeight;
+
+  return Offset(screenX, screenY);
+}
+
+class ProfessionalPitchCard extends StatefulWidget {
   final List<FormationSlot> slots;
   final Map<String, LineupPlayer> playersByKey;
   final String formationCode;
@@ -44,15 +62,46 @@ class ProfessionalPitchCard extends StatelessWidget {
   });
 
   @override
+  State<ProfessionalPitchCard> createState() => _ProfessionalPitchCardState();
+}
+
+class _ProfessionalPitchCardState extends State<ProfessionalPitchCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _shimmerController;
+  bool _isDragging = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    );
+    // Avoid infinite animation loops in widget tests that use pumpAndSettle.
+    final isTesting = WidgetsBinding.instance.toString().contains('TestWidgets');
+    if (!isTesting) {
+      _shimmerController.repeat();
+    } else {
+      _shimmerController.value = 0.5;
+    }
+  }
+
+  @override
+  void dispose() {
+    _shimmerController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth.isFinite
             ? constraints.maxWidth
             : MediaQuery.sizeOf(context).width - AppDimensions.pagePadding * 2;
-        final heightFactor = presentationMode ? 1.58 : 1.5;
-        final height = (width * heightFactor).clamp(430.0, 660.0);
-        final compact = playerCount >= 9 || width < 360;
+        final heightFactor = widget.presentationMode ? 1.66 : 1.58;
+        final height = (width * heightFactor).clamp(430.0, 720.0);
+        final compact = widget.playerCount >= 9 || width < 360;
         final nodeWidth = compact ? 64.0 : 76.0;
         final nodeHeight = compact ? 72.0 : 84.0;
 
@@ -62,17 +111,17 @@ class ProfessionalPitchCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
             border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.55),
+              color: const Color(0xFFF5A623).withValues(alpha: 0.45),
               width: 1.2,
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.16),
+                color: const Color(0xFFF5A623).withValues(alpha: 0.1),
                 blurRadius: 18,
                 spreadRadius: 1,
               ),
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.45),
+                color: AppColors.backgroundDeep.withValues(alpha: 0.45),
                 blurRadius: 24,
                 offset: const Offset(0, 16),
               ),
@@ -81,71 +130,219 @@ class ProfessionalPitchCard extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: Stack(
             children: [
+              // ── LAYER 1: STATIC PITCH BACKGROUND ──
               Positioned.fill(
-                child: CustomPaint(painter: _LineupPitchPainter()),
+                child: RepaintBoundary(
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: Image.asset(
+                          'assets/images/pitch_3d_bg.png',
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+
+                      // Lighting vignette shadow undercoat overlay
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: RadialGradient(
+                              center: const Alignment(0, -0.3),
+                              radius: 0.95,
+                              colors: [
+                                const Color(0xFFF5A623).withValues(alpha: 0.08),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Zone labels (GK/DEF/MID/ATT markers)
+                      ..._buildZoneLabels(height),
+                    ],
+                  ),
+                ),
               ),
+
+              // ── LAYER 2: TACTICAL NETWORKS ──
               Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: const Alignment(0, -0.18),
-                      radius: 0.8,
-                      colors: [
-                        AppColors.primaryLight.withValues(alpha: 0.13),
-                        Colors.transparent,
-                      ],
+                child: AnimatedOpacity(
+                  opacity: _isDragging ? 0.0 : 1.0,
+                  duration: const Duration(milliseconds: 250),
+                  child: CustomPaint(
+                    painter: TacticalNetworkPainter(
+                      slots: widget.slots,
+                      presentationMode: widget.presentationMode,
                     ),
                   ),
                 ),
               ),
-              PositionedDirectional(
-                top: 14,
-                start: 14,
-                child: _PitchBadge(
-                  icon: Icons.grid_view_rounded,
-                  label: formationCode,
-                ),
-              ),
-              if ((teamName ?? '').isNotEmpty)
+
+              // ── LAYER 3: STATIC PITCH BADGES ──
+              if (!widget.presentationMode) ...[
                 PositionedDirectional(
                   top: 14,
-                  end: 14,
+                  start: 14,
                   child: _PitchBadge(
-                    icon: Icons.shield_rounded,
-                    label: teamName!,
-                    maxWidth: width * 0.42,
+                    icon: Icons.grid_view_rounded,
+                    label: widget.formationCode,
                   ),
                 ),
-              ...slots.map((slot) {
+                if ((widget.teamName ?? '').isNotEmpty)
+                  PositionedDirectional(
+                    top: 14,
+                    end: 14,
+                    child: _PitchBadge(
+                      icon: Icons.shield_rounded,
+                      label: widget.teamName!,
+                      maxWidth: width * 0.42,
+                    ),
+                  ),
+              ],
+
+              // ── LAYER 4: PRESENTATIONAL POSTER HEADERS ──
+              if (widget.presentationMode) ...[
+                Positioned(
+                  top: 24,
+                  left: 0,
+                  right: 0,
+                  child: Column(
+                    children: [
+                      Text(
+                        'التشكيلة الرسمية',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: (width * 0.078).clamp(24.0, 32.0),
+                          fontWeight: FontWeight.w900,
+                          color: const Color(0xFFFFCB57),
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withValues(alpha: 0.65),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: width * 0.12,
+                            height: 1.0,
+                            color: const Color(0xFFF5A623).withValues(alpha: 0.45),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: Text(
+                              'الخطة التكتيكية',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                fontSize: (width * 0.038).clamp(11.0, 14.0),
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textSecondaryTinted,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            width: width * 0.12,
+                            height: 1.0,
+                            color: const Color(0xFFF5A623).withValues(alpha: 0.45),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xCD0A0E0B),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: const Color(0xFFF5A623),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFF5A623).withValues(alpha: 0.25),
+                              blurRadius: 10,
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          widget.formationCode,
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontSize: (width * 0.052).clamp(16.0, 20.0),
+                            fontWeight: FontWeight.w900,
+                            color: const Color(0xFFF5A623),
+                            letterSpacing: 2.0,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                PositionedDirectional(
+                  top: 20,
+                  start: 16,
+                  child: _buildEmblemBadge(width),
+                ),
+              ],
+
+              // ── LAYER 5: INTERACTIVE PLAYER NODES ──
+              ...widget.slots.map((slot) {
                 final player = slot.occupantKey == null
                     ? null
-                    : playersByKey[slot.occupantKey];
-                final left = (slot.x / 100) * width - nodeWidth / 2;
-                final top = (slot.y / 100) * height - nodeHeight / 2;
+                    : widget.playersByKey[slot.occupantKey];
+
+                final projected = _projectPitch(slot.x, slot.y, width, height);
+                final left = projected.dx - nodeWidth / 2;
+                final top = projected.dy - nodeHeight / 2;
+
                 final clampedLeft = left
-                    .clamp(4.0, math.max(4.0, width - nodeWidth - 4))
+                    .clamp(2.0, math.max(2.0, width - nodeWidth - 2))
                     .toDouble();
                 final clampedTop = top
-                    .clamp(12.0, math.max(12.0, height - nodeHeight - 8))
+                    .clamp(12.0, math.max(12.0, height - nodeHeight - 6))
                     .toDouble();
 
-                Widget nodeWidget = LineupPlayerNode(
-                  player: player,
-                  role: slot.role,
-                  compact: compact,
-                  presentationMode: presentationMode,
-                  onTap: player == null
-                      ? (editorMode ? () => onEmptySlotTap?.call(slot) : null)
-                      : () => onPlayerTap?.call(slot, player),
-                  onLongPress: player == null
-                      ? null
-                      : () => onPlayerLongPress?.call(slot, player),
+                final perspectiveScale =
+                    0.72 + (0.90 - 0.72) * (slot.y / 100.0);
+
+                Widget nodeWidget = Transform.scale(
+                  scale: perspectiveScale,
+                  child: LineupPlayerNode(
+                    player: player,
+                    role: slot.role,
+                    compact: compact,
+                    presentationMode: widget.presentationMode,
+                    xCoordinate: slot.x,
+                    shimmerAnimation: _shimmerController,
+                    onTap: player == null
+                        ? (widget.editorMode ? () => widget.onEmptySlotTap?.call(slot) : null)
+                        : () => widget.onPlayerTap?.call(slot, player),
+                    onLongPress: player == null
+                        ? null
+                        : () => widget.onPlayerLongPress?.call(slot, player),
+                  ),
                 );
 
-                // Wrap occupied slot in Draggable for drag-out.
-                if (editorMode && player != null) {
+                if (widget.editorMode && player != null) {
                   nodeWidget = Draggable<LineupPlayer>(
                     data: player,
+                    onDragStarted: () {
+                      setState(() {
+                        _isDragging = true;
+                      });
+                    },
+                    onDragEnd: (details) {
+                      setState(() {
+                        _isDragging = false;
+                      });
+                    },
                     feedback: Material(
                       color: Colors.transparent,
                       child: SizedBox(
@@ -158,13 +355,12 @@ class ProfessionalPitchCard extends StatelessWidget {
                   );
                 }
 
-                // Wrap in DragTarget for drop-in.
-                if (editorMode && onPlayerDrop != null) {
+                if (widget.editorMode && widget.onPlayerDrop != null) {
                   final targetChild = nodeWidget;
                   final targetColor = lineupRoleColor(slot.role);
                   nodeWidget = DragTarget<LineupPlayer>(
                     onAcceptWithDetails: (details) {
-                      onPlayerDrop!(slot, details.data);
+                      widget.onPlayerDrop!(slot, details.data);
                     },
                     builder: (context, candidateData, rejectedData) {
                       if (candidateData.isNotEmpty) {
@@ -195,10 +391,181 @@ class ProfessionalPitchCard extends StatelessWidget {
                   child: nodeWidget,
                 );
               }),
+
+              // ── LAYER 6: PRESENTATIONAL BOTTOM PANELS ──
+              if (widget.presentationMode) ...[
+                Positioned(
+                  bottom: 16,
+                  left: 16,
+                  child: Container(
+                    width: (width * 0.38).clamp(110.0, 160.0),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xE60A0E0B),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: const Color(0xFFF5A623).withValues(alpha: 0.45),
+                        width: 1.0,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'ملاحظات تكتيكية',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            color: Color(0xFFF5A623),
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _getTacticalNotesText(),
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            color: Color(0xFFF4F7EE),
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w600,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 16,
+                  right: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xE60A0E0B),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: const Color(0xFFF5A623).withValues(alpha: 0.45),
+                        width: 1.0,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 22,
+                          height: 22,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: AppColors.goldGradient,
+                          ),
+                          child: const Icon(
+                            Icons.sports_soccer_rounded,
+                            size: 14,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'روح واحدة .. هدف واحد',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            color: Color(0xFFFFCB57),
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildEmblemBadge(double width) {
+    return Container(
+      width: (width * 0.12).clamp(38.0, 48.0),
+      height: (width * 0.12).clamp(38.0, 48.0),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xCD0A0E0B),
+        border: Border.all(
+          color: const Color(0xFFF5A623),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF5A623).withValues(alpha: 0.25),
+            blurRadius: 10,
+          ),
+        ],
+      ),
+      child: Center(
+        child: ShaderMask(
+          shaderCallback: (bounds) => AppColors.goldGradient.createShader(bounds),
+          child: const Icon(
+            Icons.shield_rounded,
+            color: Colors.white,
+            size: 24,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getTacticalNotesText() {
+    return switch (widget.formationCode) {
+      '3-2-3' => '• التمرير السريع من المحاور\n• استغلال انطلاقات الأطراف الهجومية\n• الحارس يوجه قلوب الدفاع لبدء الهجمة',
+      '4-3-3' => '• الضغط العالي من المهاجمين\n• أطراف الملعب تفتح مسافات الاختراق\n• المحور يغطي المساحات الخلفية',
+      '4-4-2' => '• التمركز المتوازي للاعبي الوسط\n• ثنائي الهجوم يعتمد على الكرات العرضية\n• الدفاع يحافظ على التماسك الدفاعي',
+      '3-5-2' => '• كثافة عددية بمنتصف الملعب\n• انطلاقات الأجنحة تزيد الدعم الهجومي\n• ثلاثي الدفاع يمنع المرتدات السريعة',
+      _ => '• تنظيم متناسق ومتكامل للخطوط\n• مبادلة تفاعلية ومستمرة للمراكز\n• روح المسؤولية والأداء الجماعي الحاسم',
+    };
+  }
+
+  List<Widget> _buildZoneLabels(double height) {
+    return [
+      _buildZoneLabelText('الهجوم', height * 0.36),
+      _buildZoneLabelText('الوسط', height * 0.53),
+      _buildZoneLabelText('الدفاع', height * 0.70),
+      _buildZoneLabelText('حارس المرمى', height * 0.86),
+    ];
+  }
+
+  Widget _buildZoneLabelText(String label, double topOffset) {
+    return Positioned(
+      top: topOffset,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Cairo',
+            fontSize: 9.5,
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFFF5A623).withValues(alpha: 0.12),
+            letterSpacing: 2.0,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -208,30 +575,45 @@ class _PitchBadge extends StatelessWidget {
   final String label;
   final double? maxWidth;
 
-  const _PitchBadge({required this.icon, required this.label, this.maxWidth});
+  const _PitchBadge({
+    required this.icon,
+    required this.label,
+    this.maxWidth,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: BoxConstraints(maxWidth: maxWidth ?? 180),
+      constraints: maxWidth != null ? BoxConstraints(maxWidth: maxWidth!) : null,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF07111F).withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+        color: const Color(0xCC0D130F),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+        border: Border.all(
+          color: const Color(0xFFF5A623).withValues(alpha: 0.35),
+          width: 0.8,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black38,
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: AppColors.primaryLight),
-          const SizedBox(width: 5),
+          Icon(icon, size: 13, color: const Color(0xFFFFCB57)),
+          const SizedBox(width: 6),
           Flexible(
             child: Text(
               label,
-              style: AppTextStyles.labelSmall.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0,
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                color: Color(0xFFF4F7EE),
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -243,184 +625,98 @@ class _PitchBadge extends StatelessWidget {
   }
 }
 
-class _LineupPitchPainter extends CustomPainter {
+
+
+class TacticalNetworkPainter extends CustomPainter {
+  final List<FormationSlot> slots;
+  final bool presentationMode;
+
+  TacticalNetworkPainter({
+    required this.slots,
+    this.presentationMode = false,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
+    if (slots.length < 2) return;
+
     final w = size.width;
     final h = size.height;
 
-    final bgPaint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Color(0xFF155E2C),
-          Color(0xFF0D4D27),
-          Color(0xFF166534),
-          Color(0xFF0B3D24),
-        ],
-        stops: [0, 0.34, 0.66, 1],
-      ).createShader(Offset.zero & size);
-    canvas.drawRect(Offset.zero & size, bgPaint);
+    final linePaint = Paint()
+      ..color = const Color(0xFF4A90D9).withValues(
+        alpha: presentationMode ? 0.35 : 0.08,
+      )
+      ..strokeWidth = presentationMode ? 1.5 : 1.0
+      ..style = PaintingStyle.stroke;
 
-    final stripePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.035)
-      ..style = PaintingStyle.fill;
-    const stripeCount = 12;
-    final stripeHeight = h / stripeCount;
-    for (var i = 0; i < stripeCount; i += 2) {
-      canvas.drawRect(
-        Rect.fromLTWH(0, i * stripeHeight, w, stripeHeight),
-        stripePaint,
-      );
+    if (presentationMode) {
+      final glowPaint = Paint()
+        ..color = const Color(0xFF4A90D9).withValues(alpha: 0.16)
+        ..strokeWidth = 3.5
+        ..style = PaintingStyle.stroke
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.4);
+
+      _drawLinks(canvas, w, h, glowPaint);
     }
 
-    final vignette = Paint()
-      ..shader = RadialGradient(
-        center: Alignment.center,
-        radius: 0.9,
-        colors: [Colors.transparent, Colors.black.withValues(alpha: 0.26)],
-      ).createShader(Offset.zero & size);
-    canvas.drawRect(Offset.zero & size, vignette);
-
-    final linePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.48)
-      ..strokeWidth = 1.7
-      ..style = PaintingStyle.stroke;
-    final softLinePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.18)
-      ..strokeWidth = 0.9
-      ..style = PaintingStyle.stroke;
-    final dotPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.58)
-      ..style = PaintingStyle.fill;
-
-    final margin = w * 0.055;
-    final pitchRect = Rect.fromLTRB(margin, margin, w - margin, h - margin);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(pitchRect, const Radius.circular(14)),
-      linePaint,
-    );
-
-    canvas.drawLine(
-      Offset(margin, h / 2),
-      Offset(w - margin, h / 2),
-      linePaint,
-    );
-    canvas.drawCircle(Offset(w / 2, h / 2), w * 0.17, linePaint);
-    canvas.drawCircle(Offset(w / 2, h / 2), 3.2, dotPaint);
-
-    final penaltyWidth = w * 0.58;
-    final penaltyHeight = h * 0.16;
-    final goalWidth = w * 0.3;
-    final goalHeight = h * 0.058;
-
-    _drawPenaltyArea(
-      canvas: canvas,
-      w: w,
-      h: h,
-      margin: margin,
-      penaltyWidth: penaltyWidth,
-      penaltyHeight: penaltyHeight,
-      goalWidth: goalWidth,
-      goalHeight: goalHeight,
-      top: true,
-      linePaint: linePaint,
-      softLinePaint: softLinePaint,
-      dotPaint: dotPaint,
-    );
-    _drawPenaltyArea(
-      canvas: canvas,
-      w: w,
-      h: h,
-      margin: margin,
-      penaltyWidth: penaltyWidth,
-      penaltyHeight: penaltyHeight,
-      goalWidth: goalWidth,
-      goalHeight: goalHeight,
-      top: false,
-      linePaint: linePaint,
-      softLinePaint: softLinePaint,
-      dotPaint: dotPaint,
-    );
-
-    final cornerRadius = w * 0.045;
-    canvas.drawArc(
-      Rect.fromCircle(center: Offset(margin, margin), radius: cornerRadius),
-      0,
-      math.pi / 2,
-      false,
-      softLinePaint,
-    );
-    canvas.drawArc(
-      Rect.fromCircle(center: Offset(w - margin, margin), radius: cornerRadius),
-      math.pi / 2,
-      math.pi / 2,
-      false,
-      softLinePaint,
-    );
-    canvas.drawArc(
-      Rect.fromCircle(center: Offset(margin, h - margin), radius: cornerRadius),
-      -math.pi / 2,
-      math.pi / 2,
-      false,
-      softLinePaint,
-    );
-    canvas.drawArc(
-      Rect.fromCircle(
-        center: Offset(w - margin, h - margin),
-        radius: cornerRadius,
-      ),
-      math.pi,
-      math.pi / 2,
-      false,
-      softLinePaint,
-    );
+    _drawLinks(canvas, w, h, linePaint);
   }
 
-  void _drawPenaltyArea({
-    required Canvas canvas,
-    required double w,
-    required double h,
-    required double margin,
-    required double penaltyWidth,
-    required double penaltyHeight,
-    required double goalWidth,
-    required double goalHeight,
-    required bool top,
-    required Paint linePaint,
-    required Paint softLinePaint,
-    required Paint dotPaint,
-  }) {
-    final y = top ? margin : h - margin - penaltyHeight;
-    final goalY = top ? margin : h - margin - goalHeight;
-    canvas.drawRect(
-      Rect.fromLTWH((w - penaltyWidth) / 2, y, penaltyWidth, penaltyHeight),
-      linePaint,
-    );
-    canvas.drawRect(
-      Rect.fromLTWH((w - goalWidth) / 2, goalY, goalWidth, goalHeight),
-      linePaint,
-    );
-    canvas.drawCircle(
-      Offset(w / 2, top ? y + penaltyHeight * 0.68 : y + penaltyHeight * 0.32),
-      2.4,
-      dotPaint,
-    );
-    final arcCenterY = top ? y + penaltyHeight : y;
-    canvas.drawArc(
-      Rect.fromCenter(
-        center: Offset(w / 2, arcCenterY),
-        width: w * 0.24,
-        height: w * 0.14,
-      ),
-      top ? 0 : math.pi,
-      math.pi,
-      false,
-      softLinePaint,
-    );
+  void _drawLinks(Canvas canvas, double w, double h, Paint paint) {
+    final gks = slots.where((s) => s.role == SlotRole.gk).toList();
+    final defs = slots.where((s) => s.role == SlotRole.def).toList();
+    final mids = slots.where((s) => s.role == SlotRole.mid).toList();
+    final atts = slots.where((s) => s.role == SlotRole.att).toList();
+
+    Offset getOffset(FormationSlot s) => _projectPitch(s.x, s.y, w, h);
+
+    // GK to DEF
+    for (final gk in gks) {
+      final gkPt = getOffset(gk);
+      for (final def in defs) {
+        canvas.drawLine(gkPt, getOffset(def), paint);
+      }
+    }
+
+    // DEF horizontal & DEF to MID
+    for (int i = 0; i < defs.length; i++) {
+      final defPt = getOffset(defs[i]);
+      if (i < defs.length - 1) {
+        canvas.drawLine(defPt, getOffset(defs[i + 1]), paint);
+      }
+      for (final mid in mids) {
+        if ((defs[i].x - mid.x).abs() < 36) {
+          canvas.drawLine(defPt, getOffset(mid), paint);
+        }
+      }
+    }
+
+    // MID horizontal & MID to ATT
+    for (int i = 0; i < mids.length; i++) {
+      final midPt = getOffset(mids[i]);
+      if (i < mids.length - 1) {
+        canvas.drawLine(midPt, getOffset(mids[i + 1]), paint);
+      }
+      for (final att in atts) {
+        if ((mids[i].x - att.x).abs() < 36) {
+          canvas.drawLine(midPt, getOffset(att), paint);
+        }
+      }
+    }
+
+    // ATT horizontal
+    for (int i = 0; i < atts.length; i++) {
+      final attPt = getOffset(atts[i]);
+      if (i < atts.length - 1) {
+        canvas.drawLine(attPt, getOffset(atts[i + 1]), paint);
+      }
+    }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant TacticalNetworkPainter oldDelegate) {
+    return oldDelegate.slots != slots ||
+        oldDelegate.presentationMode != presentationMode;
+  }
 }

@@ -29,7 +29,7 @@ class FormationPickerSheet extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(AppDimensions.lg),
           decoration: const BoxDecoration(
-            color: Color(0xFF07111F),
+            color: AppColors.backgroundDeep,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
@@ -48,7 +48,7 @@ class FormationPickerSheet extends StatelessWidget {
                   margin: const EdgeInsets.only(bottom: AppDimensions.sm),
                   child: ListTile(
                     onTap: () => onSelected(code),
-                    tileColor: Colors.white.withValues(alpha: 0.05),
+                    tileColor: AppColors.textPrimaryTinted.withValues(alpha: 0.05),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(
                         AppDimensions.radiusMd,
@@ -56,7 +56,7 @@ class FormationPickerSheet extends StatelessWidget {
                       side: BorderSide(
                         color: code == selectedFormationCode
                             ? AppColors.primary.withValues(alpha: 0.55)
-                            : Colors.white.withValues(alpha: 0.08),
+                            : AppColors.textPrimaryTinted.withValues(alpha: 0.08),
                       ),
                     ),
                     leading: Icon(

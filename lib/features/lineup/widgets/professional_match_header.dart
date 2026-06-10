@@ -50,7 +50,7 @@ class ProfessionalMatchHeader extends StatelessWidget {
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.28)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
+            color: AppColors.backgroundDeep.withValues(alpha: 0.35),
             blurRadius: 22,
             offset: const Offset(0, 12),
           ),
@@ -58,7 +58,7 @@ class ProfessionalMatchHeader extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
-          colors: [Color(0xFF07111F), Color(0xFF102031), Color(0xFF141827)],
+          colors: [AppColors.backgroundDeep, AppColors.surfaceSunken, AppColors.surface],
         ),
       ),
       child: ClipRRect(
@@ -154,7 +154,7 @@ class ProfessionalMatchHeader extends StatelessWidget {
                               vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.34),
+                              color: AppColors.backgroundDeep.withValues(alpha: 0.34),
                               borderRadius: BorderRadius.circular(
                                 AppDimensions.radiusMd,
                               ),
@@ -249,12 +249,12 @@ class ProfessionalMatchHeader extends StatelessWidget {
 
   String _liveTimerLabel(DateTime? startedAt) {
     if (startedAt == null) {
-      return 'LIVE';
+      return 'جارية';
     }
     final elapsed = DateTime.now().difference(startedAt);
     final minutes = elapsed.inMinutes.clamp(0, 999);
     final seconds = elapsed.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$minutes:$seconds LIVE';
+    return '$minutes:$seconds جارية';
   }
 }
 
@@ -286,7 +286,7 @@ class _TeamIdentity extends StatelessWidget {
                 fallbackColor.withValues(alpha: 0.42),
               ],
             ),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+            border: Border.all(color: AppColors.textPrimaryTinted.withValues(alpha: 0.28)),
           ),
           clipBehavior: Clip.antiAlias,
           child: logoUrl == null || logoUrl!.isEmpty
@@ -294,7 +294,7 @@ class _TeamIdentity extends StatelessWidget {
                   child: Text(
                     _initial(name),
                     style: AppTextStyles.headlineMedium.copyWith(
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 )
@@ -305,12 +305,12 @@ class _TeamIdentity extends StatelessWidget {
                     child: Text(
                       _initial(name),
                       style: AppTextStyles.headlineMedium.copyWith(
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ),
                 ),
-        ),
+          ),
         const SizedBox(height: AppDimensions.sm),
         Text(
           name,
@@ -393,9 +393,9 @@ class _HeaderIconButton extends StatelessWidget {
           width: 42,
           height: 42,
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.06),
+            color: AppColors.textPrimaryTinted.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            border: Border.all(color: AppColors.textPrimaryTinted.withValues(alpha: 0.12)),
           ),
           child: Icon(icon, color: AppColors.textPrimary, size: 20),
         ),

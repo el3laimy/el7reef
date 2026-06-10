@@ -51,7 +51,7 @@ class _PlayerPickerSheetState extends State<PlayerPickerSheet> {
             bottom: MediaQuery.viewInsetsOf(context).bottom + AppDimensions.lg,
           ),
           decoration: const BoxDecoration(
-            color: Color(0xFF07111F),
+            color: AppColors.backgroundDeep,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
@@ -81,11 +81,11 @@ class _PlayerPickerSheetState extends State<PlayerPickerSheet> {
                   hintText: 'ابحث باسم اللاعب',
                   prefixIcon: const Icon(Icons.search_rounded),
                   filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.06),
+                  fillColor: AppColors.textPrimaryTinted.withValues(alpha: 0.06),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
                     borderSide: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.12),
+                      color: AppColors.textPrimaryTinted.withValues(alpha: 0.12),
                     ),
                   ),
                 ),
@@ -141,10 +141,10 @@ class _PickerPlayerTile extends StatelessWidget {
         : lineupPlayerRoleColor(player);
     return ListTile(
       onTap: onTap,
-      tileColor: Colors.white.withValues(alpha: 0.05),
+      tileColor: AppColors.textPrimaryTinted.withValues(alpha: 0.05),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        side: BorderSide(color: AppColors.textPrimaryTinted.withValues(alpha: 0.08)),
       ),
       leading: CircleAvatar(
         backgroundColor: roleColor.withValues(alpha: 0.18),
@@ -187,7 +187,7 @@ class _EmptyPickerState extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppDimensions.lg),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: AppColors.textPrimaryTinted.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
       ),
       child: Column(

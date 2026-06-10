@@ -70,9 +70,11 @@ class MatchSideLineupEditorScreen
                 children: [
                   _MatchSideLineupHeader(controller: controller),
                   const SizedBox(height: AppDimensions.md),
-                  if (controller.isConfirmed)
-                    _ConfirmedNotice(controller: controller)
-                  else
+                  if (controller.isConfirmed) ...[
+                    _ConfirmedNotice(controller: controller),
+                    const SizedBox(height: AppDimensions.md),
+                  ],
+                  if (controller.canEdit)
                     FormationControlBar(
                       playerCount: controller.playerCount.value,
                       formationCode: controller.formationCode.value,
@@ -110,7 +112,7 @@ class MatchSideLineupEditorScreen
                         : null,
                   ),
                   const SizedBox(height: AppDimensions.md),
-                  if (!controller.isConfirmed)
+                  if (controller.canEdit)
                     LineupBottomActionBar(
                       isSaving: controller.isSaving.value,
                       canStart: false,
@@ -155,7 +157,7 @@ class MatchSideLineupEditorScreen
         child: Container(
           padding: const EdgeInsets.all(AppDimensions.lg),
           decoration: const BoxDecoration(
-            color: Color(0xFF07111F),
+            color: AppColors.backgroundDeep,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
@@ -200,7 +202,7 @@ class MatchSideLineupEditorScreen
         child: Container(
           padding: const EdgeInsets.all(AppDimensions.lg),
           decoration: const BoxDecoration(
-            color: Color(0xFF07111F),
+            color: AppColors.backgroundDeep,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
@@ -318,9 +320,9 @@ class _MatchSideLineupHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppDimensions.lg),
       decoration: BoxDecoration(
-        color: const Color(0xFF101A28).withValues(alpha: 0.92),
+        color: AppColors.backgroundDeep.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(color: AppColors.textPrimaryTinted.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [

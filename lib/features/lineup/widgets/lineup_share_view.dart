@@ -41,7 +41,7 @@ class LineupShareView extends StatelessWidget {
           padding: const EdgeInsets.all(AppDimensions.pagePadding),
           child: Container(
             decoration: BoxDecoration(
-              color: const Color(0xFF07111F),
+              color: AppColors.backgroundDeep,
               borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
               border: Border.all(
                 color: AppColors.primary.withValues(alpha: 0.22),

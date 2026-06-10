@@ -5,6 +5,9 @@ import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/utils/app_logger.dart';
+import '../../../core/widgets/el7reef_badge.dart';
+import '../../../core/widgets/el7reef_surface.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/entities/match_lineup_snapshot.dart';
 import '../../shareables/controllers/lineup_share_controller.dart';
@@ -89,37 +92,15 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
                         ? () => _shareResult(context)
                         : null,
                   ),
-                  if (_hasShareableScore) ...[
+                  if (_hasShareableScore || _hasShareableMvp) ...[
                     const SizedBox(height: AppDimensions.md),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () => _shareResult(context),
-                        icon: const Icon(Icons.ios_share_rounded),
-                        label: const Text('شارك النتيجة'),
-                      ),
-                    ),
-                  ],
-                  if (_hasShareableMvp) ...[
-                    const SizedBox(height: AppDimensions.sm),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () => _shareMvp(context),
-                        icon: const Icon(Icons.workspace_premium_rounded),
-                        label: const Text('شارك نجم المباراة'),
-                      ),
-                    ),
-                  ],
-                  if (_mvpProfileTarget != null) ...[
-                    const SizedBox(height: AppDimensions.xs),
-                    Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: TextButton.icon(
-                        onPressed: _openMvpProfile,
-                        icon: const Icon(Icons.person_search_rounded),
-                        label: const Text('افتح بروفايل النجم'),
-                      ),
+                    _PrideSharePanel(
+                      canShareScore: _hasShareableScore,
+                      canShareMvp: _hasShareableMvp,
+                      canOpenMvpProfile: _mvpProfileTarget != null,
+                      onShareScore: () => _shareResult(context),
+                      onShareMvp: () => _shareMvp(context),
+                      onOpenMvpProfile: _openMvpProfile,
                     ),
                   ],
                   const SizedBox(height: AppDimensions.lg),
@@ -290,7 +271,17 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
       teamB: away,
       teamAFormation: controller.formationForSnapshot(home.snapshot),
       teamBFormation: controller.formationForSnapshot(away.snapshot),
+      tournamentName: controller.tournamentName.value,
+      mvpName: _mvpNameForResultShare(match),
     );
+  }
+
+  String? _mvpNameForResultShare(Match match) {
+    final eventName = controller.mvpEvent.value?.actor.displayName.trim();
+    if (eventName != null && eventName.isNotEmpty) return eventName;
+    final mvpPlayerId = match.mvpPlayerId?.trim();
+    if (mvpPlayerId == null || mvpPlayerId.isEmpty) return null;
+    return controller.displayNameForParticipantId(mvpPlayerId);
   }
 
   MvpShareData? _buildMvpShareData(Match match) {
@@ -331,7 +322,11 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
       if (!context.mounted) return;
       try {
         await precacheImage(NetworkImage(url), context);
-      } catch (_) {
+      } catch (error) {
+        AppLogger.warning(
+          'MatchResultLineupScreen._precacheShareLogos',
+          error,
+        );
         // Fallback initials are rendered if the logo cannot be loaded in time.
       }
     }
@@ -345,7 +340,8 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
     if (url == null || url.isEmpty) return;
     try {
       await precacheImage(NetworkImage(url), context);
-    } catch (_) {
+    } catch (error) {
+      AppLogger.warning('MatchResultLineupScreen._precacheLineupLogo', error);
       // Initials fallback is used if the logo cannot be loaded in time.
     }
   }
@@ -377,6 +373,77 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
   }
 }
 
+class _PrideSharePanel extends StatelessWidget {
+  final bool canShareScore;
+  final bool canShareMvp;
+  final bool canOpenMvpProfile;
+  final VoidCallback onShareScore;
+  final VoidCallback onShareMvp;
+  final VoidCallback onOpenMvpProfile;
+
+  const _PrideSharePanel({
+    required this.canShareScore,
+    required this.canShareMvp,
+    required this.canOpenMvpProfile,
+    required this.onShareScore,
+    required this.onShareMvp,
+    required this.onOpenMvpProfile,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return El7reefSurface(
+      elevated: true,
+      borderColor: AppColors.secondary.withValues(alpha: 0.30),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const El7reefBadge(
+            label: 'كروت الفخر جاهزة',
+            color: AppColors.secondary,
+            icon: Icons.ios_share_rounded,
+          ),
+          const SizedBox(height: AppDimensions.md),
+          Text('شارك لحظة المباراة', style: AppTextStyles.titleLarge),
+          const SizedBox(height: AppDimensions.xs),
+          Text(
+            'النتيجة والـ MVP والتشكيلات هي الوقود اللي بيخلي اللاعبين يرجعوا يطالبوا ببروفايلاتهم.',
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondaryTinted,
+            ),
+          ),
+          const SizedBox(height: AppDimensions.md),
+          if (canShareScore)
+            FilledButton.icon(
+              onPressed: onShareScore,
+              icon: const Icon(Icons.ios_share_rounded),
+              label: const Text('شارك كارت النتيجة'),
+            ),
+          if (canShareMvp) ...[
+            const SizedBox(height: AppDimensions.sm),
+            OutlinedButton.icon(
+              onPressed: onShareMvp,
+              icon: const Icon(Icons.workspace_premium_rounded),
+              label: const Text('شارك كارت نجم المباراة'),
+            ),
+          ],
+          if (canOpenMvpProfile) ...[
+            const SizedBox(height: AppDimensions.xs),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton.icon(
+                onPressed: onOpenMvpProfile,
+                icon: const Icon(Icons.person_search_rounded),
+                label: const Text('افتح بروفايل النجم'),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _ResultTeamLineupCard extends StatelessWidget {
   final MatchResultLineupController controller;
   final String title;
@@ -402,9 +469,9 @@ class _ResultTeamLineupCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppDimensions.md),
       decoration: BoxDecoration(
-        color: const Color(0xFF101A28).withValues(alpha: 0.92),
+        color: AppColors.backgroundDeep.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(color: AppColors.textPrimaryTinted.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

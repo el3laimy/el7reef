@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/widgets/el7reef_button.dart';
 
 class LineupBottomActionBar extends StatelessWidget {
   final VoidCallback? onManageTeam;
@@ -30,9 +31,9 @@ class LineupBottomActionBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppDimensions.sm),
       decoration: BoxDecoration(
-        color: const Color(0xFF07111F).withValues(alpha: 0.96),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(color: AppColors.surfaceBorder),
       ),
       child: Row(
         children: [
@@ -48,30 +49,13 @@ class LineupBottomActionBar extends StatelessWidget {
             flex: 2,
             child: SizedBox(
               height: 52,
-              child: FilledButton.icon(
+              child: El7reefButton(
+                text: saveOnlyMode ? 'حفظ التشكيلة' : 'بدء المباراة',
+                icon: saveOnlyMode ? Icons.save_outlined : Icons.play_arrow_rounded,
+                isLoading: saveOnlyMode ? isSaving : isStarting,
                 onPressed: saveOnlyMode
                     ? (isSaving ? null : onSave)
                     : (canStart && !isStarting ? onStartMatch : null),
-                icon: (saveOnlyMode ? isSaving : isStarting)
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        saveOnlyMode
-                            ? Icons.save_outlined
-                            : Icons.play_arrow_rounded,
-                      ),
-                label: Text(saveOnlyMode ? 'حفظ التشكيلة' : 'بدء المباراة'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primaryDark,
-                  foregroundColor: Colors.white,
-                  textStyle: AppTextStyles.titleMedium,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-                  ),
-                ),
               ),
             ),
           ),
@@ -120,9 +104,9 @@ class _ActionTile extends StatelessWidget {
         width: 66,
         height: 52,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
+          color: AppColors.background,
           borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          border: Border.all(color: AppColors.surfaceBorder),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

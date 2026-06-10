@@ -5,6 +5,7 @@ import '../../../core/lineup/formation_library.dart';
 import '../../../core/lineup/lineup_types.dart';
 import '../../../core/lineup/lineup_utils.dart';
 import '../../../core/services/match_event_service.dart';
+import '../../../core/utils/app_logger.dart';
 import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
 import '../../../data/repositories/match_repository_impl.dart';
 import '../../../data/repositories/match_side_player_repository_impl.dart';
@@ -396,7 +397,11 @@ class MatchResultLineupController extends GetxController {
   Future<MatchEvent?> _loadMvpEventSafely(String matchId) async {
     try {
       return await _matchEventService.getMvpEvent(matchId);
-    } catch (_) {
+    } catch (error) {
+      AppLogger.warning(
+        'MatchResultLineupController._loadMvpEventSafely',
+        error,
+      );
       return null;
     }
   }
@@ -409,7 +414,11 @@ class MatchResultLineupController extends GetxController {
             normalized,
           ))?.name.trim() ??
           '';
-    } catch (_) {
+    } catch (error) {
+      AppLogger.warning(
+        'MatchResultLineupController._loadTournamentNameSafely',
+        error,
+      );
       return '';
     }
   }
