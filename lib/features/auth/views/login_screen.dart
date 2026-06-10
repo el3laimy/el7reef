@@ -31,7 +31,7 @@ class LoginScreen extends GetView<AuthController> {
                     borderRadius: BorderRadius.circular(28),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF2E7D32).withValues(alpha: 0.3),
+                        color: AppColors.primary.withValues(alpha: 0.3),
                         blurRadius: 30,
                         spreadRadius: 5,
                       ),
@@ -63,7 +63,7 @@ class LoginScreen extends GetView<AuthController> {
                   style: AppTextStyles.displayLarge.copyWith(
                     foreground: Paint()
                       ..shader = const LinearGradient(
-                        colors: [Color(0xFF4CAF50), Color(0xFF81C784)],
+                        colors: [AppColors.primary, AppColors.primaryLight],
                       ).createShader(const Rect.fromLTWH(0, 0, 200, 70)),
                   ),
                 )

@@ -2,7 +2,9 @@ import 'package:get/get.dart';
 
 import '../../../core/auth/auth_session.dart';
 import '../../../core/enums/claim_code_status.dart';
+import '../../../core/enums/guest_claim_status.dart';
 import '../../../core/services/guest_claim_service.dart';
+import '../../../core/utils/app_logger.dart';
 import '../../../domain/entities/claim_code.dart';
 import '../../../domain/entities/guest_team.dart';
 import '../../../domain/entities/player.dart';
@@ -24,11 +26,11 @@ class GuestTeamClaimController extends GetxController {
     required GuestTeamRepository guestTeamRepository,
     required TeamRepository teamRepository,
     required GuestClaimService guestClaimService,
-  })  : _authSession = authSession,
-        _claimCodeRepository = claimCodeRepository,
-        _guestTeamRepository = guestTeamRepository,
-        _teamRepository = teamRepository,
-        _guestClaimService = guestClaimService;
+  }) : _authSession = authSession,
+       _claimCodeRepository = claimCodeRepository,
+       _guestTeamRepository = guestTeamRepository,
+       _teamRepository = teamRepository,
+       _guestClaimService = guestClaimService;
 
   final claimDetails = Rxn<ClaimCode>();
   final guestTeam = Rxn<GuestTeam>();
@@ -42,6 +44,7 @@ class GuestTeamClaimController extends GetxController {
 
   String? get guestTeamId => Get.parameters['guestTeamId'];
   String? get claimCode => Get.parameters['code'];
+  String? get subjectName => Get.parameters['subjectName'];
   Player? get currentPlayer => _authSession.currentPlayer;
   String? get currentUserId => _authSession.currentUserId;
   bool get requiresApprovalHint =>
@@ -97,15 +100,14 @@ class GuestTeamClaimController extends GetxController {
         return;
       }
 
-      final loadedGuestTeam = await _guestTeamRepository.getGuestTeam(id);
-      if (loadedGuestTeam == null) {
-        errorMessage.value = 'الفريق الضيف المطلوب غير موجود.';
-        return;
-      }
-      guestTeam.value = loadedGuestTeam;
+      guestTeam.value = _buildFallbackGuestTeam(id);
 
-      await _loadOwnedTeams();
-      await _loadClaimDetails(expectedGuestTeamId: id);
+      if (isAuthenticated) {
+        await _loadOwnedTeams();
+        await _loadClaimDetails(expectedGuestTeamId: id);
+      }
+
+      await _loadFullGuestTeamFallback(id);
     } catch (error) {
       errorMessage.value = _normalizeError(error);
     } finally {
@@ -122,19 +124,18 @@ class GuestTeamClaimController extends GetxController {
     }
 
     final playerTeams = await _teamRepository.getPlayerTeams(userId);
-    final owned = playerTeams
-        .where((team) => team.ownerId == userId)
-        .toList(growable: false)
-      ..sort((left, right) => left.name.compareTo(right.name));
+    final owned =
+        playerTeams
+            .where((team) => team.ownerId == userId)
+            .toList(growable: false)
+          ..sort((left, right) => left.name.compareTo(right.name));
     ownedTeams.assignAll(owned);
     if (owned.length == 1) {
       selectedTeamId.value = owned.first.id;
     }
   }
 
-  Future<void> _loadClaimDetails({
-    required String expectedGuestTeamId,
-  }) async {
+  Future<void> _loadClaimDetails({required String expectedGuestTeamId}) async {
     final code = claimCode;
     if (code == null || code.isEmpty) {
       return;
@@ -151,6 +152,18 @@ class GuestTeamClaimController extends GetxController {
     }
 
     claimDetails.value = loadedClaim;
+    guestTeam.value = guestTeam.value?.copyWith(
+      creatorId: loadedClaim.createdBy,
+      claimCode: loadedClaim.code,
+      claimStatus: loadedClaim.status == ClaimCodeStatus.claimed
+          ? GuestClaimStatus.claimed
+          : GuestClaimStatus.invited,
+      tournamentIds: [
+        if (loadedClaim.tournamentId != null &&
+            loadedClaim.tournamentId!.isNotEmpty)
+          loadedClaim.tournamentId!,
+      ],
+    );
 
     final requestedTeamId = loadedClaim.teamId;
     if (requestedTeamId == null || requestedTeamId.isEmpty) {
@@ -160,6 +173,33 @@ class GuestTeamClaimController extends GetxController {
     pendingRequestedTeam.value = await _teamRepository.getTeam(requestedTeamId);
     if (ownedTeams.any((team) => team.id == requestedTeamId)) {
       selectedTeamId.value = requestedTeamId;
+    }
+  }
+
+  Future<void> _loadFullGuestTeamFallback(String id) async {
+    try {
+      final loadedGuestTeam = await _guestTeamRepository.getGuestTeam(id);
+      if (loadedGuestTeam == null) {
+        return;
+      }
+      guestTeam.value = loadedGuestTeam;
+      if (claimDetails.value != null) {
+        final requestedTeamId = claimDetails.value!.teamId;
+        if (requestedTeamId != null && requestedTeamId.isNotEmpty) {
+          pendingRequestedTeam.value = await _teamRepository.getTeam(
+            requestedTeamId,
+          );
+          if (ownedTeams.any((team) => team.id == requestedTeamId)) {
+            selectedTeamId.value = requestedTeamId;
+          }
+        }
+      }
+    } catch (error) {
+      AppLogger.warning(
+        'GuestTeamClaimController._loadFullGuestTeamFallback',
+        error,
+      );
+      // Keep the query-param fallback when the secure read is unavailable.
     }
   }
 
@@ -207,5 +247,29 @@ class GuestTeamClaimController extends GetxController {
 
   String _normalizeError(Object error) {
     return error.toString().replaceFirst('Exception: ', '').trim();
+  }
+
+  GuestTeam _buildFallbackGuestTeam(String id) {
+    final effectiveName = _normalizeText(subjectName) ?? 'فريق ضيف';
+    final tournamentId = _normalizeText(Get.parameters['tournamentId']);
+    return GuestTeam(
+      id: id,
+      name: effectiveName,
+      normalizedName: effectiveName.toLowerCase(),
+      creatorId: currentUserId ?? '',
+      tournamentIds: tournamentId == null ? const [] : [tournamentId],
+      createdAt: DateTime.fromMillisecondsSinceEpoch(0),
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(0),
+      claimStatus: GuestClaimStatus.invited,
+      claimCode: claimCode,
+    );
+  }
+
+  String? _normalizeText(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return null;
+    }
+    return trimmed;
   }
 }

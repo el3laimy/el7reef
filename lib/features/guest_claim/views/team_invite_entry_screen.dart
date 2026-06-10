@@ -47,7 +47,7 @@ class TeamInviteEntryScreen extends GetView<TeamInviteEntryController> {
                           shape: BoxShape.circle,
                           gradient: AppColors.primaryGradient,
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.2),
+                            color: AppColors.textPrimaryTinted.withValues(alpha: 0.2),
                             width: 2,
                           ),
                           boxShadow: [
@@ -62,7 +62,7 @@ class TeamInviteEntryScreen extends GetView<TeamInviteEntryController> {
                         child: Text(
                           team.name.isNotEmpty ? team.name[0] : '?',
                           style: AppTextStyles.headlineLarge.copyWith(
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                             fontSize: 48,
                           ),
                         ),

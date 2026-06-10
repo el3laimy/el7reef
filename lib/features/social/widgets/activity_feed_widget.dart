@@ -98,7 +98,7 @@ class ActivityFeedWidget extends StatelessWidget {
         itemBuilder: (context, index) {
           return Container(
             width: 260,
-            margin: const EdgeInsets.only(left: AppDimensions.md, bottom: 8),
+            margin: const EdgeInsetsDirectional.only(start: AppDimensions.md, bottom: 8),
             child: const GlassmorphicContainer(
               padding: EdgeInsets.all(AppDimensions.md),
               borderRadius: AppDimensions.radiusLg,
@@ -142,7 +142,7 @@ class ActivityFeedWidget extends StatelessWidget {
   Widget _buildActivityCard(ActivityFeedEntry item) {
     return Container(
       width: 260,
-      margin: const EdgeInsets.only(left: AppDimensions.md, bottom: 8), // Shadow space
+      margin: const EdgeInsetsDirectional.only(start: AppDimensions.md, bottom: 8), // Shadow space
       child: GlassmorphicContainer(
         padding: const EdgeInsets.all(AppDimensions.md),
         borderRadius: AppDimensions.radiusLg,

@@ -86,7 +86,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppColors.backgroundDeep,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         title: const Text('مسح الباركود'),
@@ -101,7 +101,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                       : Icons.flash_off,
                   color: state.torchState == TorchState.on
                       ? AppColors.secondary
-                      : Colors.white,
+                      : AppColors.textPrimaryTinted,
                 );
               },
             ),
@@ -115,7 +115,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   state.cameraDirection == CameraFacing.front
                       ? Icons.camera_front
                       : Icons.camera_rear,
-                  color: Colors.white,
+                  color: AppColors.textPrimaryTinted,
                 );
               },
             ),
@@ -165,7 +165,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 Text(
                   'وجّه الكاميرا على الباركود',
                   style: AppTextStyles.bodyMedium.copyWith(
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -173,7 +173,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 Text(
                   'باركود اللاعب · الفريق · الدورة',
                   style: AppTextStyles.labelSmall.copyWith(
-                    color: Colors.white70,
+                    color: AppColors.textSecondary,
                   ),
                   textAlign: TextAlign.center,
                 ),

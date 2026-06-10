@@ -174,7 +174,7 @@ class ProfileScreen extends GetView<ProfileController> {
                     ),
                     child: const Icon(
                       Icons.camera_alt,
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                       size: 16,
                     ),
                   ),
@@ -360,7 +360,7 @@ class ProfileScreen extends GetView<ProfileController> {
                         child: Text(
                           '$badge',
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                             fontSize: 10,
                           ),
                         ),

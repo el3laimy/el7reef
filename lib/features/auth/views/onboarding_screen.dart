@@ -31,7 +31,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       title: 'تقييم عادل',
       description: 'خوارزمية ذكية تحسب مستواك بناءً على أدائك الفعلي وقوة خصومك.',
       gradient: LinearGradient(
-        colors: [Color(0xFF2E6DB5), Color(0xFF4A90D9)],
+        colors: [AppColors.primary, AppColors.primaryLight],
       ),
     ),
     _OnboardingPage(

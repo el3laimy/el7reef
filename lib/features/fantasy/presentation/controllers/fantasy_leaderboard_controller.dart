@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 
 import '../../../../core/auth/auth_session.dart';
+import '../../../../core/utils/app_logger.dart';
 import '../../services/fantasy_lifecycle_service.dart';
 import '../../../../data/repositories/fantasy_lifecycle_repository_impl.dart';
 import '../../../../data/repositories/fantasy_repository_impl.dart';
@@ -112,7 +113,12 @@ class FantasyLeaderboardController extends GetxController {
       );
 
       entries.assignAll(loadedEntries);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'FantasyLeaderboardController.loadLeaderboard',
+        error,
+        stackTrace,
+      );
       errorMessage.value = 'تعذر تحميل الترتيب حالياً.';
     } finally {
       isLoading.value = false;

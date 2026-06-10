@@ -1,7 +1,9 @@
 import 'package:get/get.dart';
 
 import '../../../core/auth/auth_session.dart';
+import '../../../core/enums/guest_claim_status.dart';
 import '../../../core/services/guest_claim_service.dart';
+import '../../../core/utils/app_logger.dart';
 import '../../../domain/entities/guest_player.dart';
 import '../../../domain/entities/player.dart';
 import '../../../domain/entities/team.dart';
@@ -19,10 +21,10 @@ class GuestPlayerClaimController extends GetxController {
     required GuestPlayerRepository guestPlayerRepository,
     required TeamRepository teamRepository,
     required GuestClaimService guestClaimService,
-  })  : _authSession = authSession,
-        _guestPlayerRepository = guestPlayerRepository,
-        _teamRepository = teamRepository,
-        _guestClaimService = guestClaimService;
+  }) : _authSession = authSession,
+       _guestPlayerRepository = guestPlayerRepository,
+       _teamRepository = teamRepository,
+       _guestClaimService = guestClaimService;
 
   final guestPlayer = Rxn<GuestPlayer>();
   final linkedTeam = Rxn<Team>();
@@ -33,6 +35,9 @@ class GuestPlayerClaimController extends GetxController {
 
   String? get guestPlayerId => Get.parameters['guestPlayerId'];
   String? get claimCode => Get.parameters['code'];
+  String? get subjectName => Get.parameters['subjectName'];
+  String? get claimTeamId => Get.parameters['teamId'];
+  String? get claimTournamentId => Get.parameters['tournamentId'];
   Player? get currentPlayer => _authSession.currentPlayer;
   String? get currentUserId => _authSession.currentUserId;
 
@@ -59,15 +64,32 @@ class GuestPlayerClaimController extends GetxController {
         return;
       }
 
-      final loadedGuestPlayer = await _guestPlayerRepository.getGuestPlayer(id);
-      if (loadedGuestPlayer == null) {
-        errorMessage.value = 'اللاعب الضيف المطلوب غير موجود.';
-        return;
+      guestPlayer.value = _buildFallbackGuestPlayer(id);
+      if (claimTeamId != null && claimTeamId!.isNotEmpty) {
+        await _loadLinkedTeam(claimTeamId!);
       }
 
-      guestPlayer.value = loadedGuestPlayer;
-      if (loadedGuestPlayer.teamId != null && loadedGuestPlayer.teamId!.isNotEmpty) {
-        linkedTeam.value = await _teamRepository.getTeam(loadedGuestPlayer.teamId!);
+      final canEnrichFromFirestore =
+          isAuthenticated || subjectName == null || subjectName!.trim().isEmpty;
+      if (canEnrichFromFirestore) {
+        try {
+          final loadedGuestPlayer = await _guestPlayerRepository.getGuestPlayer(
+            id,
+          );
+          if (loadedGuestPlayer != null) {
+            guestPlayer.value = loadedGuestPlayer;
+            if (loadedGuestPlayer.teamId != null &&
+                loadedGuestPlayer.teamId!.isNotEmpty) {
+              await _loadLinkedTeam(loadedGuestPlayer.teamId!);
+            }
+          }
+        } catch (error) {
+          AppLogger.warning(
+            'GuestPlayerClaimController.loadClaimTarget.secureReadFallback',
+            error,
+          );
+          // Keep the query-param fallback when the secure read is unavailable.
+        }
       }
     } catch (error) {
       errorMessage.value = _normalizeError(error);
@@ -105,5 +127,38 @@ class GuestPlayerClaimController extends GetxController {
 
   String _normalizeError(Object error) {
     return error.toString().replaceFirst('Exception: ', '').trim();
+  }
+
+  GuestPlayer _buildFallbackGuestPlayer(String id) {
+    final effectiveName = _normalizeText(subjectName) ?? 'لاعب ضيف';
+    return GuestPlayer(
+      id: id,
+      displayName: effectiveName,
+      normalizedName: effectiveName.toLowerCase(),
+      teamId: claimTeamId,
+      tournamentId: claimTournamentId,
+      createdBy: currentUserId ?? '',
+      createdAt: DateTime.fromMillisecondsSinceEpoch(0),
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(0),
+      claimStatus: GuestClaimStatus.invited,
+      claimCode: claimCode,
+    );
+  }
+
+  Future<void> _loadLinkedTeam(String teamId) async {
+    try {
+      linkedTeam.value = await _teamRepository.getTeam(teamId);
+    } catch (error) {
+      AppLogger.warning('GuestPlayerClaimController._loadLinkedTeam', error);
+      linkedTeam.value = null;
+    }
+  }
+
+  String? _normalizeText(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return null;
+    }
+    return trimmed;
   }
 }

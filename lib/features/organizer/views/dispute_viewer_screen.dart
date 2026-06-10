@@ -28,7 +28,7 @@ class DisputeViewerScreen extends GetView<DisputeViewerController> {
             if (open == 0) return const SizedBox.shrink();
             return Center(
               child: Container(
-                margin: const EdgeInsets.only(left: 12),
+                margin: const EdgeInsetsDirectional.only(start: 12),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.warning.withValues(alpha: 0.2),
@@ -59,7 +59,7 @@ class DisputeViewerScreen extends GetView<DisputeViewerController> {
               'تم',
               controller.successMessage.value,
               backgroundColor: AppColors.success.withValues(alpha: 0.9),
-              colorText: Colors.white,
+              colorText: AppColors.textPrimary,
             );
             controller.successMessage.value = '';
           });

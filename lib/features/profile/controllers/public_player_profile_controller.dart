@@ -1,6 +1,8 @@
 import 'package:get/get.dart';
 
 import '../../../app/routes/app_routes.dart';
+import '../../../core/utils/app_logger.dart';
+import '../../../domain/entities/participant_ref.dart';
 import '../models/public_player_profile_data.dart';
 import '../services/public_player_profile_resolver.dart';
 
@@ -25,6 +27,7 @@ class PublicPlayerProfileController extends GetxController {
     'code',
     'type',
     'targetId',
+    'subjectName',
     'scope',
     'teamId',
     'tournamentId',
@@ -45,14 +48,29 @@ class PublicPlayerProfileController extends GetxController {
       errorMessage.value = '';
       final resolved = await _resolver.resolve(kind: kind, id: id);
       if (resolved == null) {
-        profile.value = null;
-        errorMessage.value = 'تعذر العثور على هذا اللاعب.';
+        final fallback = _guestProfileFallback();
+        if (fallback == null) {
+          profile.value = null;
+          errorMessage.value = 'تعذر العثور على هذا اللاعب.';
+          return;
+        }
+        profile.value = fallback;
         return;
       }
-      profile.value = resolved;
-    } catch (_) {
-      profile.value = null;
-      errorMessage.value = 'تعذر تحميل بروفايل اللاعب الآن.';
+      profile.value = _applyGuestQueryFallbacks(resolved);
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'PublicPlayerProfileController.loadProfile',
+        error,
+        stackTrace,
+      );
+      final fallback = _guestProfileFallback();
+      if (fallback == null) {
+        profile.value = null;
+        errorMessage.value = 'تعذر تحميل بروفايل اللاعب الآن.';
+        return;
+      }
+      profile.value = fallback;
     } finally {
       isLoading.value = false;
     }
@@ -146,5 +164,48 @@ class PublicPlayerProfileController extends GetxController {
     if (data.id.trim().isEmpty) return false;
     if (data.isClaimed || _hasText(data.linkedPlayerId)) return false;
     return true;
+  }
+
+  PublicPlayerProfileData? _applyGuestQueryFallbacks(
+    PublicPlayerProfileData resolved,
+  ) {
+    if (!resolved.isGuest) {
+      return resolved;
+    }
+
+    final subjectName = _queryValue('subjectName');
+    if (subjectName == null) {
+      return resolved;
+    }
+
+    return PublicPlayerProfileData(
+      kind: resolved.kind,
+      id: resolved.id,
+      displayName: subjectName,
+      totalGoals: resolved.totalGoals,
+      totalMvps: resolved.totalMvps,
+      linkedPlayerId: resolved.linkedPlayerId,
+      isClaimed: resolved.isClaimed,
+    );
+  }
+
+  PublicPlayerProfileData? _guestProfileFallback() {
+    final subjectName = _queryValue('subjectName');
+    if (!_hasText(subjectName)) {
+      return null;
+    }
+    final kindValue = kind.trim();
+    if (kindValue != 'guestPlayer') {
+      return null;
+    }
+
+    return PublicPlayerProfileData(
+      kind: ParticipantRefKind.guestPlayer,
+      id: id.trim(),
+      displayName: subjectName!,
+      totalGoals: 0,
+      totalMvps: 0,
+      isClaimed: false,
+    );
   }
 }

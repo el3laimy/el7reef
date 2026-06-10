@@ -105,7 +105,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       borderRadius: BorderRadius.circular(32),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF2E7D32).withValues(alpha: 0.4),
+                          color: AppColors.primary.withValues(alpha: 0.4),
                           blurRadius: 40,
                           spreadRadius: 8,
                         ),
@@ -124,7 +124,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       .animate()
                       .scale(begin: const Offset(0.0, 0.0), end: const Offset(1.0, 1.0), duration: 800.ms, curve: Curves.elasticOut)
                       .fadeIn(duration: 400.ms)
-                      .shimmer(delay: 1000.ms, duration: 1500.ms, color: Colors.white.withValues(alpha: 0.2)),
+                      .shimmer(delay: 1000.ms, duration: 1500.ms, color: AppColors.textPrimaryTinted.withValues(alpha: 0.2)),
 
                   const SizedBox(height: AppDimensions.lg),
 
@@ -133,7 +133,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     style: AppTextStyles.displayLarge.copyWith(
                       foreground: Paint()
                         ..shader = const LinearGradient(
-                          colors: [Color(0xFF4CAF50), Color(0xFF81C784)],
+                          colors: [AppColors.primary, AppColors.primaryLight],
                         ).createShader(const Rect.fromLTWH(0, 0, 200, 70)),
                     ),
                   )
