@@ -5,6 +5,7 @@ import '../../../core/enums/match_status.dart';
 import '../../../core/services/match_event_service.dart';
 import '../../../core/services/match_settlement_service.dart';
 import '../../../core/services/official_match_roster_service.dart';
+import '../../../core/utils/app_logger.dart';
 import '../../../data/repositories/match_repository_impl.dart';
 import '../../../data/repositories/match_side_player_repository_impl.dart';
 import '../../../data/repositories/match_side_repository_impl.dart';
@@ -98,14 +99,15 @@ class ScoreSubmitController extends GetxController {
        _officialRosterService =
            officialRosterService ?? OfficialMatchRosterService(),
        _sideRepository = sideRepository ?? MatchSideRepositoryImpl(),
-        _sidePlayerRepository =
-            sidePlayerRepository ?? MatchSidePlayerRepositoryImpl(),
-        _teamRepository = teamRepository ?? TeamRepositoryImpl(),
-        _tournamentRepository =
-            tournamentRepository ?? TournamentRepositoryImpl(),
-        _assistantPermissionRepo = assistantPermissionRepository ??
-            TournamentAssistantPermissionRepositoryImpl(),
-        _currentUserIdProvider =
+       _sidePlayerRepository =
+           sidePlayerRepository ?? MatchSidePlayerRepositoryImpl(),
+       _teamRepository = teamRepository ?? TeamRepositoryImpl(),
+       _tournamentRepository =
+           tournamentRepository ?? TournamentRepositoryImpl(),
+       _assistantPermissionRepo =
+           assistantPermissionRepository ??
+           TournamentAssistantPermissionRepositoryImpl(),
+       _currentUserIdProvider =
            currentUserIdProvider ??
            (() => Get.find<AuthService>().currentUserId) {
     teamAScoreController.addListener(_handleTeamAScoreTextChanged);
@@ -186,6 +188,7 @@ class ScoreSubmitController extends GetxController {
       }
 
       match.value = loadedMatch;
+      pendingPrideEventRetry.value = loadedMatch.prideEventsPending;
       selectedMvpKey.value = '';
       _setScoreControllerText(
         sideKey: 'A',
@@ -244,10 +247,13 @@ class ScoreSubmitController extends GetxController {
     }
     final assistantPermission = await _assistantPermissionRepo
         .getAssistantPermission(tournament.id, actorId);
-    return assistantPermission?.hasPermission(
+    return assistantPermission != null &&
+        assistantPermission.hasPermission(
           TournamentAssistantPermissionKey.canSubmitScore,
-        ) ==
-        true;
+        ) &&
+        assistantPermission.hasPermission(
+          TournamentAssistantPermissionKey.canRecordGoalsAndMvp,
+        );
   }
 
   @override
@@ -507,6 +513,7 @@ class ScoreSubmitController extends GetxController {
             scoreTeamA: scoreA,
             scoreTeamB: scoreB,
             mvpPlayerId: resolvedMvp?.actor.id,
+            prideEventsPending: true,
             status: result.status,
           );
       match.value = updatedMatch;
@@ -516,8 +523,13 @@ class ScoreSubmitController extends GetxController {
           resolvedMvp: resolvedMvp,
           actorId: actorId,
         );
-        pendingPrideEventRetry.value = false;
-      } catch (_) {
+        await _clearPrideEventRetryState(updatedMatch);
+      } catch (error, stackTrace) {
+        AppLogger.error(
+          'ScoreSubmitController.submitScore.recordPrideEvents',
+          error,
+          stackTrace,
+        );
         _surfacePrideEventFailure();
         return null;
       }
@@ -562,6 +574,23 @@ class ScoreSubmitController extends GetxController {
       fullParticipantRoster.value = null;
       fullRosterErrorMessage.value =
           'تعذر تحميل قائمة المشاركين الكاملة: ${_readableError(error)}';
+    }
+  }
+
+  Future<void> _clearPrideEventRetryState(Match submittedMatch) async {
+    final clearedMatch = submittedMatch.copyWith(prideEventsPending: false);
+    try {
+      await _matchRepo.updateMatch(clearedMatch);
+      match.value = clearedMatch;
+      pendingPrideEventRetry.value = false;
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'ScoreSubmitController._clearPrideEventRetryState',
+        error,
+        stackTrace,
+      );
+      match.value = submittedMatch.copyWith(prideEventsPending: true);
+      pendingPrideEventRetry.value = true;
     }
   }
 

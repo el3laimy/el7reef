@@ -19,7 +19,7 @@ extension ScoreSubmitPrideEvents on ScoreSubmitController {
         resolvedMvp: resolvedMvp,
         actorId: actorId,
       );
-      pendingPrideEventRetry.value = false;
+      await _clearPrideEventRetryState(submittedMatch);
       errorMessage.value = '';
       Get.snackbar(
         'تم الحفظ',
@@ -27,7 +27,12 @@ extension ScoreSubmitPrideEvents on ScoreSubmitController {
         snackPosition: SnackPosition.BOTTOM,
       );
       return submittedMatch;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'ScoreSubmitController._retryPrideEventWrites',
+        error,
+        stackTrace,
+      );
       _surfacePrideEventFailure();
       return null;
     } finally {
@@ -69,9 +74,6 @@ extension ScoreSubmitPrideEvents on ScoreSubmitController {
     required Match submittedMatch,
     required String actorId,
   }) async {
-    final drafts = allGoalDrafts.where((draft) => draft.goals > 0).toList();
-    if (drafts.isEmpty) return;
-
     final activeEvents = await _matchEventService.getMatchEvents(
       submittedMatch.id,
     );
@@ -80,6 +82,9 @@ extension ScoreSubmitPrideEvents on ScoreSubmitController {
         await _matchEventService.voidEvent(event.id);
       }
     }
+
+    final drafts = allGoalDrafts.where((draft) => draft.goals > 0).toList();
+    if (drafts.isEmpty) return;
 
     for (final draft in drafts) {
       for (var index = 1; index <= draft.goals; index += 1) {

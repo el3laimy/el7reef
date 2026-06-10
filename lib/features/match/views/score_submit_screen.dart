@@ -5,8 +5,9 @@ import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/widgets/el7reef_badge.dart';
 import '../../../core/widgets/el7reef_button.dart';
+import '../../../core/widgets/el7reef_surface.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/entities/participant_ref.dart';
 import '../controllers/score_submit_controller.dart';
@@ -65,6 +66,10 @@ class ScoreSubmitScreen extends StatelessWidget {
                   controller.fullRosterErrorMessage.value,
                 ),
               ],
+              if (controller.pendingPrideEventRetry.value) ...[
+                const SizedBox(height: AppDimensions.sm),
+                _buildPrideRetryBanner(),
+              ],
               const SizedBox(height: AppDimensions.lg),
 
               Expanded(
@@ -75,51 +80,50 @@ class ScoreSubmitScreen extends StatelessWidget {
                     bottom: 120, // space for sticky button
                   ),
                   children: [
-                    Text(
-                      controller.teamASideName.value,
-                      style: AppTextStyles.headlineMedium.copyWith(
-                        color: AppColors.primary,
-                      ),
+                    _buildTeamScoringSection(
+                      title: controller.teamASideName.value,
+                      color: AppColors.primary,
+                      participants: controller.teamAScoringParticipants,
+                      controller: controller,
                     ),
-                    const SizedBox(height: AppDimensions.sm),
-                    if (controller.teamAScoringParticipants.isEmpty)
-                      _buildNoScoringParticipantsNote()
-                    else
-                      ...controller.teamAScoringParticipants.map(
-                        (participant) => _buildParticipantScoringRow(
-                          participant,
-                          controller,
+                    const SizedBox(height: AppDimensions.lg),
+                    _buildTeamScoringSection(
+                      title: controller.teamBSideName.value,
+                      color: AppColors.error,
+                      participants: controller.teamBScoringParticipants,
+                      controller: controller,
+                    ),
+                    const SizedBox(height: AppDimensions.lg),
+                    if (controller.allParticipants.isNotEmpty)
+                      El7reefSurface(
+                        borderColor: AppColors.secondary.withValues(
+                          alpha: 0.26,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const El7reefBadge(
+                              label: 'لحظة الفخر',
+                              color: AppColors.secondary,
+                              icon: Icons.star_rounded,
+                            ),
+                            const SizedBox(height: AppDimensions.md),
+                            Text(
+                              'أفضل لاعب (MVP)',
+                              style: AppTextStyles.titleLarge,
+                            ),
+                            const SizedBox(height: AppDimensions.xs),
+                            Text(
+                              'اختيار الـ MVP يظهر في كارت المشاركة ويمنح اللاعب لحظة يتفاخر بها.',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textSecondaryTinted,
+                              ),
+                            ),
+                            const SizedBox(height: AppDimensions.md),
+                            _buildMvpSelector(controller),
+                          ],
                         ),
                       ),
-
-                    const SizedBox(height: AppDimensions.xl),
-
-                    Text(
-                      controller.teamBSideName.value,
-                      style: AppTextStyles.headlineMedium.copyWith(
-                        color: AppColors.error,
-                      ),
-                    ),
-                    const SizedBox(height: AppDimensions.sm),
-                    if (controller.teamBScoringParticipants.isEmpty)
-                      _buildNoScoringParticipantsNote()
-                    else
-                      ...controller.teamBScoringParticipants.map(
-                        (participant) => _buildParticipantScoringRow(
-                          participant,
-                          controller,
-                        ),
-                      ),
-
-                    const SizedBox(height: AppDimensions.xl),
-                    if (controller.allParticipants.isNotEmpty) ...[
-                      Text(
-                        'أفضل لاعب (MVP)',
-                        style: AppTextStyles.headlineMedium,
-                      ),
-                      const SizedBox(height: AppDimensions.sm),
-                      _buildMvpSelector(controller),
-                    ],
                   ],
                 ),
               ),
@@ -136,7 +140,8 @@ class ScoreSubmitScreen extends StatelessWidget {
           child: SizedBox(
             width: double.infinity,
             child: El7reefButton(
-              text: 'حفظ النتيجة ⚽',
+              text: 'اعتمد النتيجة وجهّز الفخر',
+              icon: Icons.emoji_events_rounded,
               isLoading: controller.isLoading.value,
               onPressed: () {
                 _handleSubmit(context, controller);
@@ -185,18 +190,24 @@ class ScoreSubmitScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(
         horizontal: AppDimensions.pagePadding,
       ),
-      child: GlassmorphicContainer(
-        padding: const EdgeInsets.all(AppDimensions.md),
-        borderRadius: AppDimensions.radiusLg,
+      child: El7reefSurface(
+        elevated: true,
+        borderColor: AppColors.primary.withValues(alpha: 0.24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const El7reefBadge(
+              label: 'تسجيل رسمي',
+              color: AppColors.primary,
+              icon: Icons.verified_rounded,
+            ),
+            const SizedBox(height: AppDimensions.md),
             Text('النتيجة النهائية', style: AppTextStyles.titleLarge),
             const SizedBox(height: AppDimensions.xs),
             Text(
-              'أدخل النتيجة مباشرة، ووزّع الأهداف على اللاعبين المتاحين عند الحاجة.',
+              'أدخل النتيجة، نسب الأهداف، واختار MVP. البيانات دي هتطلع ترتيب وكروت فخر.',
               style: AppTextStyles.bodySmall.copyWith(
-                color: AppColors.textMuted,
+                color: AppColors.textSecondaryTinted,
               ),
             ),
             const SizedBox(height: AppDimensions.md),
@@ -213,7 +224,12 @@ class ScoreSubmitScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppDimensions.md,
                   ),
-                  child: Text('VS', style: AppTextStyles.titleLarge),
+                  child: Text(
+                    'ضد',
+                    style: AppTextStyles.titleMedium.copyWith(
+                      color: AppColors.textSecondaryTinted,
+                    ),
+                  ),
                 ),
                 Expanded(
                   child: _buildTeamScoreField(
@@ -300,14 +316,66 @@ class ScoreSubmitScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildTeamScoringSection({
+    required String title,
+    required Color color,
+    required List<ParticipantRef> participants,
+    required ScoreSubmitController controller,
+  }) {
+    return El7reefSurface(
+      borderColor: color.withValues(alpha: 0.24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              El7reefBadge(
+                label: 'هدافو الطرف',
+                color: color,
+                icon: Icons.sports_soccer_rounded,
+              ),
+              const Spacer(),
+              Text(
+                '${participants.length} لاعب',
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: AppColors.textSecondaryTinted,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppDimensions.md),
+          Text(
+            title,
+            style: AppTextStyles.headlineMedium.copyWith(color: color),
+          ),
+          const SizedBox(height: AppDimensions.xs),
+          Text(
+            'كل هدف منسوب هنا يدخل الهدافين ويظهر في كروت المشاركة.',
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondaryTinted,
+            ),
+          ),
+          const SizedBox(height: AppDimensions.md),
+          if (participants.isEmpty)
+            _buildNoScoringParticipantsNote()
+          else
+            ...participants.map(
+              (participant) =>
+                  _buildParticipantScoringRow(participant, controller),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildRosterErrorBanner(String message) {
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppDimensions.pagePadding,
       ),
-      child: GlassmorphicContainer(
-        padding: const EdgeInsets.all(AppDimensions.md),
-        borderRadius: AppDimensions.radiusMd,
+      child: El7reefSurface(
+        color: AppColors.warningSurface,
+        borderColor: AppColors.warning.withValues(alpha: 0.28),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -318,6 +386,31 @@ class ScoreSubmitScreen extends StatelessWidget {
                 '$message يمكنك حفظ النتيجة فقط، لكن اختيارات الهدافين وMVP قد تكون غير مكتملة.',
                 style: AppTextStyles.bodySmall.copyWith(
                   color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrideRetryBanner() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimensions.pagePadding,
+      ),
+      child: El7reefSurface(
+        borderColor: AppColors.secondary.withValues(alpha: 0.36),
+        child: Row(
+          children: [
+            const Icon(Icons.sync_problem_rounded, color: AppColors.secondary),
+            const SizedBox(width: AppDimensions.sm),
+            Expanded(
+              child: Text(
+                'تم حفظ النتيجة، لكن أحداث الفخر ما زالت تحتاج إعادة محاولة قبل المشاركة.',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.textSecondaryTinted,
                 ),
               ),
             ),
@@ -345,10 +438,9 @@ class ScoreSubmitScreen extends StatelessWidget {
   }
 
   Widget _buildNoScoringParticipantsNote() {
-    return GlassmorphicContainer(
+    return El7reefSurface(
       margin: const EdgeInsets.only(bottom: AppDimensions.sm),
-      padding: const EdgeInsets.all(AppDimensions.md),
-      borderRadius: AppDimensions.radiusMd,
+      color: AppColors.surfaceSunken,
       child: Text(
         'لا يوجد لاعبون متاحون لهذا الطرف. أضف لاعبين للفريق أو لقائمة المباراة قبل تسجيل الأهداف.',
         style: AppTextStyles.bodySmall.copyWith(color: AppColors.textMuted),
@@ -364,10 +456,9 @@ class ScoreSubmitScreen extends StatelessWidget {
         participant.kind == ParticipantRefKind.player &&
         controller.playerStats.containsKey(participant.id);
 
-    return GlassmorphicContainer(
+    return El7reefSurface(
       margin: const EdgeInsets.only(bottom: AppDimensions.sm),
-      padding: const EdgeInsets.all(AppDimensions.sm),
-      borderRadius: AppDimensions.radiusMd,
+      padding: const EdgeInsets.all(AppDimensions.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -381,7 +472,9 @@ class ScoreSubmitScreen extends StatelessWidget {
                   children: [
                     Text(
                       participant.displayName,
-                      style: AppTextStyles.titleMedium,
+                      style: AppTextStyles.titleMedium.copyWith(
+                        color: AppColors.textPrimaryTinted,
+                      ),
                     ),
                     if (participant.kind != ParticipantRefKind.player)
                       _buildParticipantBadge(participant),
@@ -457,7 +550,7 @@ class ScoreSubmitScreen extends StatelessWidget {
             child: Container(
               width: 16,
               height: 24,
-              margin: const EdgeInsets.only(left: 4),
+              margin: const EdgeInsetsDirectional.only(start: 4),
               decoration: BoxDecoration(
                 color: st['yellowCard'] == true
                     ? Colors.yellow
@@ -471,7 +564,7 @@ class ScoreSubmitScreen extends StatelessWidget {
             child: Container(
               width: 16,
               height: 24,
-              margin: const EdgeInsets.only(left: 8),
+              margin: const EdgeInsetsDirectional.only(start: 8),
               decoration: BoxDecoration(
                 color: st['redCard'] == true
                     ? Colors.red
@@ -559,12 +652,15 @@ class ScoreSubmitScreen extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
       child: Container(
-        padding: const EdgeInsets.all(4),
+        width: 36,
+        height: 36,
+        alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: AppColors.surfaceBorder.withValues(alpha: 0.3),
+          color: AppColors.surfaceBorder.withValues(alpha: 0.34),
           shape: BoxShape.circle,
+          border: Border.all(color: AppColors.surfaceBorderStrong),
         ),
-        child: Icon(icon, size: 16, color: AppColors.textPrimary),
+        child: Icon(icon, size: 18, color: AppColors.textPrimaryTinted),
       ),
     );
   }
@@ -576,15 +672,28 @@ class ScoreSubmitScreen extends StatelessWidget {
       children: controller.allParticipants.map((participant) {
         final participantKey = controller.participantKey(participant);
         final isSelected = controller.selectedMvpKey.value == participantKey;
-        return ChoiceChip(
+        return FilterChip(
+          avatar: Icon(
+            isSelected ? Icons.star_rounded : Icons.person_rounded,
+            size: 18,
+            color: isSelected ? AppColors.secondary : AppColors.textMuted,
+          ),
           label: Text(_mvpChoiceLabel(participant)),
           selected: isSelected,
           onSelected: (_) =>
               controller.selectMvp(isSelected ? '' : participantKey),
-          selectedColor: AppColors.primarySurface,
-          backgroundColor: AppColors.surface,
-          labelStyle: TextStyle(
-            color: isSelected ? AppColors.secondary : AppColors.textPrimary,
+          selectedColor: AppColors.secondary.withValues(alpha: 0.18),
+          backgroundColor: AppColors.surfaceSunken,
+          side: BorderSide(
+            color: isSelected
+                ? AppColors.secondary.withValues(alpha: 0.55)
+                : AppColors.surfaceBorderStrong,
+          ),
+          labelStyle: AppTextStyles.labelMedium.copyWith(
+            color: isSelected
+                ? AppColors.secondary
+                : AppColors.textPrimaryTinted,
+            fontWeight: FontWeight.w800,
           ),
         );
       }).toList(),
@@ -631,7 +740,13 @@ class _ResultSubmitSuccessSheet extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('تم تسجيل النتيجة ✅', style: AppTextStyles.headlineSmall),
+              const El7reefBadge(
+                label: 'تم الاعتماد',
+                color: AppColors.primary,
+                icon: Icons.verified_rounded,
+              ),
+              const SizedBox(height: AppDimensions.md),
+              Text('النتيجة اتسجلت', style: AppTextStyles.headlineSmall),
               const SizedBox(height: AppDimensions.sm),
               Text(
                 _successMessage,
@@ -642,10 +757,7 @@ class _ResultSubmitSuccessSheet extends StatelessWidget {
               if (scoreLine != null) ...[
                 const SizedBox(height: AppDimensions.md),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppDimensions.md,
-                    vertical: AppDimensions.sm,
-                  ),
+                  padding: const EdgeInsets.all(AppDimensions.md),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
@@ -656,17 +768,25 @@ class _ResultSubmitSuccessSheet extends StatelessWidget {
                   child: Text(
                     scoreLine!,
                     textAlign: TextAlign.center,
-                    style: AppTextStyles.titleLarge.copyWith(
-                      color: AppColors.textPrimary,
+                    style: AppTextStyles.headlineSmall.copyWith(
+                      color: AppColors.textPrimaryTinted,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
               ],
               const SizedBox(height: AppDimensions.lg),
+              Text(
+                'الخطوة الجاية: شارك النتيجة وخلي اللاعبين يشوفوا لحظة الفخر.',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.textSecondaryTinted,
+                ),
+              ),
+              const SizedBox(height: AppDimensions.md),
               FilledButton.icon(
                 onPressed: onShareResult,
                 icon: const Icon(Icons.ios_share_rounded),
-                label: const Text('مشاركة النتيجة'),
+                label: const Text('شارك كارت النتيجة'),
               ),
               const SizedBox(height: AppDimensions.sm),
               TextButton(

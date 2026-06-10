@@ -154,7 +154,7 @@ class _SendChallengeSheetState extends State<SendChallengeSheet> {
                 },
                 selectedColor: AppColors.primary,
                 labelStyle: TextStyle(
-                  color: isSelected ? Colors.white : AppColors.textPrimary,
+                  color: isSelected ? AppColors.textOnPrimary : AppColors.textPrimary,
                 ),
               );
             }).toList(),

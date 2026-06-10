@@ -173,7 +173,8 @@ class MatchdayController extends GetxController {
        _snapshotRepository = snapshotRepository,
        _matchSideRepository = matchSideRepository,
        _substitutionRepository = substitutionRepository,
-       _assistantPermissionRepo = assistantPermissionRepository ??
+       _assistantPermissionRepo =
+           assistantPermissionRepository ??
            TournamentAssistantPermissionRepositoryImpl();
 
   final RxBool isLoading = true.obs;
@@ -247,6 +248,7 @@ class MatchdayController extends GetxController {
     }
     return canSubmitScorePermission.value;
   }
+
   bool get canEditPreKickoff =>
       !isLineupLocked &&
       !isMatchLive &&
@@ -355,10 +357,13 @@ class MatchdayController extends GetxController {
       tournament.id,
       actorId,
     );
-    return permission?.hasPermission(
+    return permission != null &&
+        permission.hasPermission(
           TournamentAssistantPermissionKey.canSubmitScore,
-        ) ==
-        true;
+        ) &&
+        permission.hasPermission(
+          TournamentAssistantPermissionKey.canRecordGoalsAndMvp,
+        );
   }
 
   Future<bool> _resolveCanStartMatchday({

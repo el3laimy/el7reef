@@ -1143,6 +1143,73 @@ void main() {
       controller.onClose();
     });
 
+    testWidgets('zero-goal submit voids stale goal MatchEvents', (
+      tester,
+    ) async {
+      await tester.pumpWidget(const GetMaterialApp(home: SizedBox.shrink()));
+      await _saveMatch(
+        firestore,
+        _match(
+          id: 'match-zero-goals-voids',
+          teamAPlayerIds: const ['player-a'],
+          teamBPlayerIds: const ['player-b'],
+        ),
+      );
+      await _savePlayer(firestore, _player(id: 'player-a', name: 'أحمد'));
+      await _savePlayer(firestore, _player(id: 'player-b', name: 'باسم'));
+      final matchEventService = MatchEventService(
+        repository: MatchEventRepositoryImpl(firestore: firestore),
+        firestore: firestore,
+      );
+      final controller = _controller(
+        firestore: firestore,
+        matchId: 'match-zero-goals-voids',
+        matchEventService: matchEventService,
+      );
+      await controller.loadMatchAndPlayers();
+      await matchEventService.recordGoal(
+        eventId: 'goal-stale-a',
+        matchId: 'match-zero-goals-voids',
+        sideKey: 'A',
+        actor: controller.teamAParticipants.single,
+        createdBy: 'organizer-1',
+      );
+      await matchEventService.recordGoal(
+        eventId: 'goal-stale-b',
+        matchId: 'match-zero-goals-voids',
+        sideKey: 'B',
+        actor: controller.teamBParticipants.single,
+        createdBy: 'organizer-1',
+      );
+      expect(
+        await _activeGoalEvents(firestore, 'match-zero-goals-voids'),
+        hasLength(2),
+      );
+
+      controller.teamAScoreController.text = '0';
+      controller.teamBScoreController.text = '0';
+      final updatedMatch = await controller.submit();
+
+      expect(updatedMatch?.scoreTeamA, 0);
+      expect(updatedMatch?.scoreTeamB, 0);
+      expect(
+        await _activeGoalEvents(firestore, 'match-zero-goals-voids'),
+        isEmpty,
+      );
+      final allGoalEvents = await firestore
+          .collection(FirebasePaths.matchEvents)
+          .where('matchId', isEqualTo: 'match-zero-goals-voids')
+          .where('eventType', isEqualTo: 'goal')
+          .get();
+      expect(allGoalEvents.docs, hasLength(2));
+      expect(
+        allGoalEvents.docs.map((doc) => doc.data()['status']),
+        everyElement('voided'),
+      );
+      await _drainSnackbars(tester);
+      controller.onClose();
+    });
+
     testWidgets('submitScore failure writes no MVP MatchEvent', (tester) async {
       await tester.pumpWidget(const GetMaterialApp(home: SizedBox.shrink()));
       await _saveMatch(
@@ -1225,7 +1292,39 @@ void main() {
             .doc('match-event-write-failure')
             .get();
         expect(savedMatch.data()?['scoreTeamA'], 1);
+        expect(savedMatch.data()?['prideEventsPending'], isTrue);
         await _drainSnackbars(tester);
+        await tester.pumpAndSettle();
+        controller.onClose();
+      },
+    );
+
+    testWidgets(
+      'reloading a match with pending pride events restores retry state',
+      (tester) async {
+        await _saveMatch(
+          firestore,
+          _match(
+            id: 'match-pride-retry-state',
+            teamAPlayerIds: const ['player-a'],
+            teamBPlayerIds: const ['player-b'],
+            scoreTeamA: 1,
+            scoreTeamB: 0,
+            status: MatchStatus.completed,
+            prideEventsPending: true,
+          ),
+        );
+        await _savePlayer(firestore, _player(id: 'player-a', name: 'أحمد'));
+        await _savePlayer(firestore, _player(id: 'player-b', name: 'باسم'));
+        final controller = _controller(
+          firestore: firestore,
+          matchId: 'match-pride-retry-state',
+        );
+
+        await controller.loadMatchAndPlayers();
+
+        expect(controller.pendingPrideEventRetry.value, isTrue);
+        expect(controller.match.value?.prideEventsPending, isTrue);
         controller.onClose();
       },
     );
@@ -1577,8 +1676,9 @@ ScoreSubmitController _controller({
     sidePlayerRepository: MatchSidePlayerRepositoryImpl(firestore: firestore),
     teamRepository: TeamRepositoryImpl(firestore: firestore),
     tournamentRepository: TournamentRepositoryImpl(firestore: firestore),
-    assistantPermissionRepository:
-        TournamentAssistantPermissionRepositoryImpl(firestore: firestore),
+    assistantPermissionRepository: TournamentAssistantPermissionRepositoryImpl(
+      firestore: firestore,
+    ),
     currentUserIdProvider: () => 'organizer-1',
   );
 }
@@ -1640,6 +1740,10 @@ Match _match({
   String? tournamentId,
   List<String> teamAPlayerIds = const [],
   List<String> teamBPlayerIds = const [],
+  int? scoreTeamA,
+  int? scoreTeamB,
+  MatchStatus status = MatchStatus.live,
+  bool prideEventsPending = false,
 }) {
   return Match(
     id: id,
@@ -1647,7 +1751,10 @@ Match _match({
     tournamentId: tournamentId,
     teamAPlayerIds: teamAPlayerIds,
     teamBPlayerIds: teamBPlayerIds,
-    status: MatchStatus.live,
+    scoreTeamA: scoreTeamA,
+    scoreTeamB: scoreTeamB,
+    status: status,
+    prideEventsPending: prideEventsPending,
     createdAt: DateTime(2026, 5, 4, 20),
   );
 }
@@ -1799,5 +1906,6 @@ Future<void> _expectNoGoalEvents(
 
 Future<void> _drainSnackbars(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 10));
+  Get.closeAllSnackbars();
   await tester.pumpAndSettle();
 }
