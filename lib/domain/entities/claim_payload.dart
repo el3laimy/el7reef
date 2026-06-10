@@ -7,6 +7,7 @@ class ClaimPayload {
   final String code;
   final ClaimTargetType targetType;
   final String targetId;
+  final String? subjectName;
   final ClaimPayloadScope scope;
   final String? teamId;
   final String? tournamentId;
@@ -19,6 +20,7 @@ class ClaimPayload {
     required this.code,
     required this.targetType,
     required this.targetId,
+    this.subjectName,
     required this.scope,
     this.teamId,
     this.tournamentId,
@@ -33,6 +35,8 @@ class ClaimPayload {
       'code': code,
       'type': targetType.name,
       'targetId': targetId,
+      if (subjectName != null && subjectName!.isNotEmpty)
+        'subjectName': subjectName!,
       'scope': scope.name,
       'requiresApproval': requiresApproval ? '1' : '0',
       'expiresAt': expiresAt.millisecondsSinceEpoch.toString(),
@@ -62,6 +66,7 @@ class ClaimPayload {
       code: params['code'] ?? '',
       targetType: targetType,
       targetId: params['targetId'] ?? '',
+      subjectName: params['subjectName'],
       scope: scope,
       teamId: params['teamId'],
       tournamentId: params['tournamentId'],

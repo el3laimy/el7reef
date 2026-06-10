@@ -7,6 +7,7 @@ import '../../data/models/tournament_model.dart';
 import '../../data/models/tournament_registration_model.dart';
 import '../../domain/entities/tournament.dart';
 import '../../domain/entities/tournament_registration.dart';
+import '../utils/app_logger.dart';
 import 'tournament_participant_service.dart';
 
 class TournamentOpsMigrationReport {
@@ -75,7 +76,11 @@ class TournamentOpsMigrationService {
           refreshTournamentSummary: false,
         );
         legacyTeamsBackfilled += 1;
-      } catch (_) {
+      } catch (error) {
+        AppLogger.warning(
+          'TournamentOpsMigrationService.backfillTournament.legacyTeam',
+          error,
+        );
         // The participant already exists or the source is invalid; keep the
         // migration idempotent and continue.
       }

@@ -866,11 +866,18 @@ class TournamentRegistrationService {
     var syncedTournamentTeamIds = false;
     var syncedParticipantTournamentIds = false;
 
+    final tournamentUpdates = <String, dynamic>{};
     if (!tournament.registeredTeamIds.contains(team.id)) {
-      transaction.update(tournamentRef, {
-        'registeredTeamIds': [...tournament.registeredTeamIds, team.id],
-      });
+      tournamentUpdates['registeredTeamIds'] = FieldValue.arrayUnion([team.id]);
       syncedTournamentTeamIds = true;
+    }
+    if (!tournament.participantViewerIds.contains(team.ownerId)) {
+      tournamentUpdates['participantViewerIds'] = FieldValue.arrayUnion([
+        team.ownerId,
+      ]);
+    }
+    if (tournamentUpdates.isNotEmpty) {
+      transaction.update(tournamentRef, tournamentUpdates);
     }
 
     if (!team.tournamentIds.contains(tournament.id)) {
@@ -893,12 +900,16 @@ class TournamentRegistrationService {
     required DocumentReference<Map<String, dynamic>> guestTeamRef,
   }) {
     var syncedParticipantTournamentIds = false;
+    final tournamentRef = _tournamentsRef.doc(tournamentId);
     if (!guestTeam.tournamentIds.contains(tournamentId)) {
       transaction.update(guestTeamRef, {
         'tournamentIds': [...guestTeam.tournamentIds, tournamentId],
       });
       syncedParticipantTournamentIds = true;
     }
+    transaction.update(tournamentRef, {
+      'participantViewerIds': FieldValue.arrayUnion([guestTeam.creatorId]),
+    });
     return _RegistrationSyncResult(
       syncedParticipantTournamentIds: syncedParticipantTournamentIds,
     );

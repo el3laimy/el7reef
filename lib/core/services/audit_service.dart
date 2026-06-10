@@ -1,5 +1,7 @@
 import 'package:uuid/uuid.dart';
 
+import '../errors/app_exceptions.dart';
+import '../utils/app_logger.dart';
 import '../../core/enums/audit_action.dart';
 import '../../domain/entities/audit_event.dart';
 import '../../domain/repositories/audit_repository.dart';
@@ -12,11 +14,9 @@ class AuditService {
   final AuditRepository _repository;
   final Uuid _uuid;
 
-  AuditService({
-    required AuditRepository repository,
-    Uuid? uuid,
-  })  : _repository = repository,
-        _uuid = uuid ?? const Uuid();
+  AuditService({required AuditRepository repository, Uuid? uuid})
+    : _repository = repository,
+      _uuid = uuid ?? const Uuid();
 
   /// تسجيل حدث تدقيق عام
   Future<AuditEvent> record({
@@ -41,7 +41,14 @@ class AuditService {
       createdAt: now ?? DateTime.now(),
     );
 
-    await _repository.createAuditEvent(event);
+    try {
+      await _repository.createAuditEvent(event);
+    } on AppException catch (error) {
+      AppLogger.warning('AuditService.record', error);
+    } catch (error, stackTrace) {
+      AppLogger.warning('AuditService.record', error);
+      AppLogger.error('AuditService.record', error, stackTrace);
+    }
     return event;
   }
 
@@ -142,10 +149,7 @@ class AuditService {
   }
 
   /// جلب سجل تدقيق ممثل (actor) محدد
-  Future<List<AuditEvent>> getActorHistory(
-    String actorId, {
-    int limit = 50,
-  }) {
+  Future<List<AuditEvent>> getActorHistory(String actorId, {int limit = 50}) {
     return _repository.getActorAuditEvents(actorId, limit: limit);
   }
 }

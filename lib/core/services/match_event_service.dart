@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/firebase_paths.dart';
 import '../../data/repositories/match_event_repository_impl.dart';
 import '../../data/repositories/tournament_assistant_permission_repository_impl.dart';
+import '../utils/app_logger.dart';
 import '../../domain/entities/match_event.dart';
 import '../../domain/entities/participant_ref.dart';
 import '../../domain/entities/tournament_assistant_permission.dart';
@@ -249,7 +250,11 @@ class MatchEventService {
     try {
       assistantPermission = await _assistantPermissionRepository
           .getAssistantPermission(matchTournamentId, normalizedActorId);
-    } catch (_) {
+    } catch (error) {
+      AppLogger.warning(
+        'MatchEventService.getTournamentIdForActor.permissionLookup',
+        error,
+      );
       throw Exception('لا تملك صلاحية تسجيل أحداث هذه المباراة.');
     }
     if (assistantPermission == null || !assistantPermission.isActive) {

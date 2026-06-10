@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/firebase_paths.dart';
+import '../../core/utils/app_logger.dart';
 
 /// خدمة Username — RULE-01: فريد عالمياً + حجز القديم 14 يوماً
 class UsernameService {
@@ -168,7 +169,8 @@ class UsernameService {
       return UsernameSetResult.success;
     } on _UsernameTakenException {
       return UsernameSetResult.taken;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.error('UsernameService.setUsername', error, stackTrace);
       return UsernameSetResult.error;
     }
   }

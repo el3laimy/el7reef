@@ -19,6 +19,7 @@ class MatchModel {
   final int? scoreTeamA;
   final int? scoreTeamB;
   final String? mvpPlayerId;
+  final bool prideEventsPending;
   final String? location;
   final double? latitude;
   final double? longitude;
@@ -60,6 +61,7 @@ class MatchModel {
     this.scoreTeamA,
     this.scoreTeamB,
     this.mvpPlayerId,
+    this.prideEventsPending = false,
     this.location,
     this.latitude,
     this.longitude,
@@ -119,6 +121,7 @@ class MatchModel {
       scoreTeamA: (json['scoreTeamA'] as num?)?.toInt(),
       scoreTeamB: (json['scoreTeamB'] as num?)?.toInt(),
       mvpPlayerId: json['mvpPlayerId'] as String?,
+      prideEventsPending: json['prideEventsPending'] as bool? ?? false,
       location: json['location'] as String?,
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
@@ -186,6 +189,7 @@ class MatchModel {
     'scoreTeamA': scoreTeamA,
     'scoreTeamB': scoreTeamB,
     'mvpPlayerId': mvpPlayerId,
+    'prideEventsPending': prideEventsPending,
     'location': location,
     'latitude': latitude,
     'longitude': longitude,
@@ -228,6 +232,7 @@ class MatchModel {
     scoreTeamA: scoreTeamA,
     scoreTeamB: scoreTeamB,
     mvpPlayerId: mvpPlayerId,
+    prideEventsPending: prideEventsPending,
     location: location,
     latitude: latitude,
     longitude: longitude,
@@ -281,6 +286,7 @@ class MatchModel {
     scoreTeamA: m.scoreTeamA,
     scoreTeamB: m.scoreTeamB,
     mvpPlayerId: m.mvpPlayerId,
+    prideEventsPending: m.prideEventsPending,
     location: m.location,
     latitude: m.latitude,
     longitude: m.longitude,

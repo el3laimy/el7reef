@@ -14,6 +14,7 @@ class Tournament {
   final int maxTeams;
   final TournamentVisibility visibility;
   final bool discoverable;
+  final List<String> participantViewerIds;
   final int? prizePool;
   final String? prizeDescription;
   final TournamentStatus status;
@@ -45,6 +46,7 @@ class Tournament {
     required this.maxTeams,
     this.visibility = TournamentVisibility.public,
     this.discoverable = true,
+    this.participantViewerIds = const [],
     this.prizePool,
     this.prizeDescription,
     this.status = TournamentStatus.upcoming,
@@ -95,6 +97,7 @@ class Tournament {
     int? maxTeams,
     TournamentVisibility? visibility,
     bool? discoverable,
+    List<String>? participantViewerIds,
     int? prizePool,
     String? prizeDescription,
     TournamentStatus? status,
@@ -126,6 +129,7 @@ class Tournament {
       maxTeams: maxTeams ?? this.maxTeams,
       visibility: visibility ?? this.visibility,
       discoverable: discoverable ?? this.discoverable,
+      participantViewerIds: participantViewerIds ?? this.participantViewerIds,
       prizePool: prizePool ?? this.prizePool,
       prizeDescription: prizeDescription ?? this.prizeDescription,
       status: status ?? this.status,

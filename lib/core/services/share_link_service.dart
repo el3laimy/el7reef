@@ -219,7 +219,7 @@ class ShareLinkService {
     required String label,
     required String subjectName,
   }) {
-    final payload = claimCode.toPayload();
+    final payload = claimCode.toPayload(subjectName: subjectName);
     final routeHost = claimCode.targetType == ClaimTargetType.teamInvite
         ? 'invite'
         : 'claim';

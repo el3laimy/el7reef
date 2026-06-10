@@ -6,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:uuid/uuid.dart';
 
 import '../constants/firebase_paths.dart';
+import '../utils/app_logger.dart';
 
 class AnalyticsService {
   final FirebaseFirestore? _firestore;
@@ -70,7 +71,8 @@ class AnalyticsService {
     try {
       Firebase.app();
       return FirebaseFirestore.instance;
-    } catch (_) {
+    } catch (error) {
+      AppLogger.info('AnalyticsService.resolveFirestoreIfAvailable', error);
       return null;
     }
   }

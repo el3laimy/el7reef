@@ -38,11 +38,12 @@ class ClaimCode {
 
   bool isExpiredAt(DateTime now) => expiresAt.isBefore(now);
 
-  ClaimPayload toPayload() {
+  ClaimPayload toPayload({String? subjectName}) {
     return ClaimPayload(
       code: code,
       targetType: targetType,
       targetId: targetId,
+      subjectName: subjectName,
       scope: scope,
       teamId: teamId,
       tournamentId: tournamentId,
@@ -86,7 +87,9 @@ class ClaimCode {
       claimedByPlayerId: identical(claimedByPlayerId, _unset)
           ? this.claimedByPlayerId
           : claimedByPlayerId as String?,
-      claimedAt: identical(claimedAt, _unset) ? this.claimedAt : claimedAt as DateTime?,
+      claimedAt: identical(claimedAt, _unset)
+          ? this.claimedAt
+          : claimedAt as DateTime?,
     );
   }
 }

@@ -99,6 +99,7 @@ void main() {
         expect(result.syncedParticipantTournamentIds, isTrue);
         expect(registration?.status, TournamentRegistrationStatus.approved);
         expect(tournament?.registeredTeamIds, contains('team-1'));
+        expect(tournament?.participantViewerIds, contains('owner-1'));
         expect(tournament?.activeParticipantCount, 1);
         expect(tournament?.teamCount, 1);
         expect(team?.tournamentIds, contains('tournament-1'));
@@ -181,6 +182,7 @@ void main() {
         expect(registration?.status, TournamentRegistrationStatus.approved);
         expect(registration?.verifiedBy, 'organizer-1');
         expect(tournament?.registeredTeamIds, contains('team-1'));
+        expect(tournament?.participantViewerIds, contains('owner-1'));
         expect(tournament?.activeParticipantCount, 1);
         expect(team?.tournamentIds, contains('tournament-1'));
         expect(participants.single.sourceEntityId, 'team-1');
@@ -210,6 +212,9 @@ void main() {
         final guestTeam = await guestTeamRepository.getGuestTeam(
           'guest-team-1',
         );
+        final tournament = await tournamentRepository.getTournament(
+          'tournament-1',
+        );
         final participants = await participantService.getTournamentParticipants(
           'tournament-1',
         );
@@ -219,12 +224,8 @@ void main() {
         expect(registration?.status, TournamentRegistrationStatus.approved);
         expect(registration?.verifiedBy, 'organizer-1');
         expect(guestTeam?.tournamentIds, contains('tournament-1'));
-        expect(
-          (await tournamentRepository.getTournament(
-            'tournament-1',
-          ))?.activeParticipantCount,
-          1,
-        );
+        expect(tournament?.participantViewerIds, contains('guest-owner-1'));
+        expect(tournament?.activeParticipantCount, 1);
         expect(participants, hasLength(1));
         expect(
           participants.single.sourceType,

@@ -16,6 +16,7 @@ class Match {
   final int? scoreTeamA;
   final int? scoreTeamB;
   final String? mvpPlayerId;
+  final bool prideEventsPending;
   final String? location;
   final double? latitude;
   final double? longitude;
@@ -57,6 +58,7 @@ class Match {
     this.scoreTeamA,
     this.scoreTeamB,
     this.mvpPlayerId,
+    this.prideEventsPending = false,
     this.location,
     this.latitude,
     this.longitude,
@@ -124,6 +126,7 @@ class Match {
     int? scoreTeamA,
     int? scoreTeamB,
     String? mvpPlayerId,
+    bool? prideEventsPending,
     String? location,
     double? latitude,
     double? longitude,
@@ -165,6 +168,7 @@ class Match {
       scoreTeamA: scoreTeamA ?? this.scoreTeamA,
       scoreTeamB: scoreTeamB ?? this.scoreTeamB,
       mvpPlayerId: mvpPlayerId ?? this.mvpPlayerId,
+      prideEventsPending: prideEventsPending ?? this.prideEventsPending,
       location: location ?? this.location,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,

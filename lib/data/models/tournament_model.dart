@@ -15,6 +15,7 @@ class TournamentModel {
   final int maxTeams;
   final String visibility;
   final bool discoverable;
+  final List<String> participantViewerIds;
   final int? prizePool;
   final String? prizeDescription;
   final String status;
@@ -46,6 +47,7 @@ class TournamentModel {
     required this.maxTeams,
     this.visibility = 'public',
     this.discoverable = true,
+    this.participantViewerIds = const [],
     this.prizePool,
     this.prizeDescription,
     this.status = 'upcoming',
@@ -80,6 +82,11 @@ class TournamentModel {
       maxTeams: (json['maxTeams'] as num?)?.toInt() ?? 8,
       visibility: visibility,
       discoverable: json['discoverable'] as bool? ?? visibility == 'public',
+      participantViewerIds:
+          (json['participantViewerIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
       prizePool: (json['prizePool'] as num?)?.toInt(),
       prizeDescription: json['prizeDescription'] as String?,
       status: json['status'] as String? ?? 'upcoming',
@@ -137,6 +144,7 @@ class TournamentModel {
       'maxTeams': maxTeams,
       'visibility': visibility,
       'discoverable': discoverable,
+      'participantViewerIds': participantViewerIds,
       'prizePool': prizePool,
       'prizeDescription': prizeDescription,
       'status': status,
@@ -177,6 +185,7 @@ class TournamentModel {
     maxTeams: maxTeams,
     visibility: _parseVisibility(visibility),
     discoverable: discoverable,
+    participantViewerIds: participantViewerIds,
     prizePool: prizePool,
     prizeDescription: prizeDescription,
     status: _parseStatus(status),
@@ -217,6 +226,7 @@ class TournamentModel {
     maxTeams: t.maxTeams,
     visibility: t.visibility.name,
     discoverable: t.discoverable,
+    participantViewerIds: t.participantViewerIds,
     prizePool: t.prizePool,
     prizeDescription: t.prizeDescription,
     status: t.status.name,

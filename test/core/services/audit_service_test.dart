@@ -2,9 +2,12 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:el7reef/core/constants/firebase_paths.dart';
+import 'package:el7reef/core/errors/app_exceptions.dart';
 import 'package:el7reef/core/enums/audit_action.dart';
 import 'package:el7reef/core/services/audit_service.dart';
 import 'package:el7reef/data/repositories/audit_repository_impl.dart';
+import 'package:el7reef/domain/entities/audit_event.dart';
+import 'package:el7reef/domain/repositories/audit_repository.dart';
 
 void main() {
   group('AuditService', () {
@@ -13,9 +16,7 @@ void main() {
 
     setUp(() {
       firestore = FakeFirebaseFirestore();
-      service = AuditService(
-        repository: AuditRepositoryImpl(db: firestore),
-      );
+      service = AuditService(repository: AuditRepositoryImpl(db: firestore));
     });
 
     test('records a match event and retrieves it by entity id', () async {
@@ -103,35 +104,38 @@ void main() {
       expect(timeline.last.action, AuditAction.matchCreated);
     });
 
-    test('entity timeline isolates events by entity type and id together', () async {
-      final base = DateTime(2026, 4, 18, 10);
-      await service.recordMatchEvent(
-        matchId: 'shared-id',
-        action: AuditAction.matchCreated,
-        actorId: 'organizer-1',
-        now: base,
-      );
-      await service.recordTournamentEvent(
-        tournamentId: 'shared-id',
-        action: AuditAction.tournamentCreated,
-        actorId: 'organizer-1',
-        now: base.add(const Duration(minutes: 5)),
-      );
+    test(
+      'entity timeline isolates events by entity type and id together',
+      () async {
+        final base = DateTime(2026, 4, 18, 10);
+        await service.recordMatchEvent(
+          matchId: 'shared-id',
+          action: AuditAction.matchCreated,
+          actorId: 'organizer-1',
+          now: base,
+        );
+        await service.recordTournamentEvent(
+          tournamentId: 'shared-id',
+          action: AuditAction.tournamentCreated,
+          actorId: 'organizer-1',
+          now: base.add(const Duration(minutes: 5)),
+        );
 
-      final matchTimeline = await service.getEntityTimeline(
-        entityType: AuditEntityType.match,
-        entityId: 'shared-id',
-      );
-      final tournamentTimeline = await service.getEntityTimeline(
-        entityType: AuditEntityType.tournament,
-        entityId: 'shared-id',
-      );
+        final matchTimeline = await service.getEntityTimeline(
+          entityType: AuditEntityType.match,
+          entityId: 'shared-id',
+        );
+        final tournamentTimeline = await service.getEntityTimeline(
+          entityType: AuditEntityType.tournament,
+          entityId: 'shared-id',
+        );
 
-      expect(matchTimeline, hasLength(1));
-      expect(matchTimeline.single.action, AuditAction.matchCreated);
-      expect(tournamentTimeline, hasLength(1));
-      expect(tournamentTimeline.single.action, AuditAction.tournamentCreated);
-    });
+        expect(matchTimeline, hasLength(1));
+        expect(matchTimeline.single.action, AuditAction.matchCreated);
+        expect(tournamentTimeline, hasLength(1));
+        expect(tournamentTimeline.single.action, AuditAction.tournamentCreated);
+      },
+    );
 
     test('retrieves actor history across different entities', () async {
       final now = DateTime(2026, 4, 17, 20);
@@ -165,5 +169,53 @@ void main() {
       expect(event.action, AuditAction.disputeOpened);
       expect(event.metadata?['reason'], 'نتيجة خاطئة');
     });
+
+    test('returns the event even when persistence is denied', () async {
+      final failingService = AuditService(
+        repository: _FailingAuditRepository(),
+      );
+
+      final event = await failingService.recordTournamentEvent(
+        tournamentId: 'tournament-1',
+        action: AuditAction.tournamentCreated,
+        actorId: 'organizer-1',
+        now: DateTime(2026, 4, 17, 23),
+      );
+
+      expect(event.entityId, 'tournament-1');
+      expect(event.action, AuditAction.tournamentCreated);
+    });
   });
+}
+
+class _FailingAuditRepository implements AuditRepository {
+  @override
+  Future<void> createAuditEvent(AuditEvent event) async {
+    throw const PermissionDeniedException();
+  }
+
+  @override
+  Future<List<AuditEvent>> getActorAuditEvents(
+    String actorId, {
+    int limit = 50,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<AuditEvent>> getAuditEventsByType(
+    String entityType, {
+    int limit = 50,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<AuditEvent>> getEntityAuditEvents({
+    required AuditEntityType entityType,
+    required String entityId,
+    int limit = 50,
+  }) {
+    throw UnimplementedError();
+  }
 }

@@ -34,5 +34,16 @@ void main() {
       expect(model.teamSize, 9);
       expect(model.toEntity().teamSize, 9);
     });
+
+    test('round-trips prideEventsPending safely', () {
+      final model = MatchModel.fromJson({
+        'organizerId': 'organizer-1',
+        'prideEventsPending': true,
+        'createdAt': DateTime(2026, 4, 24).millisecondsSinceEpoch,
+      }, 'match-1');
+
+      expect(model.toEntity().prideEventsPending, isTrue);
+      expect(model.toJson()['prideEventsPending'], isTrue);
+    });
   });
 }
