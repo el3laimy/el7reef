@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart' as intl;
 
 import '../../../app/theme/app_colors.dart';
@@ -324,7 +325,7 @@ class _TeamPanel extends StatelessWidget {
                   child: Icon(
                     Icons.emoji_events_rounded,
                     size: exportMode ? 18 : 18,
-            color: AppColors.secondaryLight,
+                    color: AppColors.secondaryLight,
                   ),
                 ),
             ],
@@ -395,12 +396,13 @@ class _TeamLogo extends StatelessWidget {
       return fallback;
     }
     return ClipOval(
-      child: Image.network(
-        url,
+      child: CachedNetworkImage(
+        imageUrl: url,
         width: size,
         height: size,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => fallback,
+        placeholder: (context, url) => fallback,
+        errorWidget: (context, url, error) => fallback,
       ),
     );
   }
@@ -441,7 +443,7 @@ class _ScoreBlock extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(99),
               gradient: LinearGradient(
-      colors: [data.teamAAccent, data.teamBAccent],
+                colors: [data.teamAAccent, data.teamBAccent],
               ),
             ),
           ),

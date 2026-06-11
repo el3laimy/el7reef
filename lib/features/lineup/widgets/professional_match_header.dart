@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
@@ -58,7 +59,11 @@ class ProfessionalMatchHeader extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
-          colors: [AppColors.backgroundDeep, AppColors.surfaceSunken, AppColors.surface],
+          colors: [
+            AppColors.backgroundDeep,
+            AppColors.surfaceSunken,
+            AppColors.surface,
+          ],
         ),
       ),
       child: ClipRRect(
@@ -154,7 +159,9 @@ class ProfessionalMatchHeader extends StatelessWidget {
                               vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.backgroundDeep.withValues(alpha: 0.34),
+                              color: AppColors.backgroundDeep.withValues(
+                                alpha: 0.34,
+                              ),
                               borderRadius: BorderRadius.circular(
                                 AppDimensions.radiusMd,
                               ),
@@ -286,7 +293,9 @@ class _TeamIdentity extends StatelessWidget {
                 fallbackColor.withValues(alpha: 0.42),
               ],
             ),
-            border: Border.all(color: AppColors.textPrimaryTinted.withValues(alpha: 0.28)),
+            border: Border.all(
+              color: AppColors.textPrimaryTinted.withValues(alpha: 0.28),
+            ),
           ),
           clipBehavior: Clip.antiAlias,
           child: logoUrl == null || logoUrl!.isEmpty
@@ -298,10 +307,18 @@ class _TeamIdentity extends StatelessWidget {
                     ),
                   ),
                 )
-              : Image.network(
-                  logoUrl!,
+              : CachedNetworkImage(
+                  imageUrl: logoUrl!,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Center(
+                  placeholder: (context, url) => Center(
+                    child: Text(
+                      _initial(name),
+                      style: AppTextStyles.headlineMedium.copyWith(
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Center(
                     child: Text(
                       _initial(name),
                       style: AppTextStyles.headlineMedium.copyWith(
@@ -310,7 +327,7 @@ class _TeamIdentity extends StatelessWidget {
                     ),
                   ),
                 ),
-          ),
+        ),
         const SizedBox(height: AppDimensions.sm),
         Text(
           name,
@@ -395,7 +412,9 @@ class _HeaderIconButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.textPrimaryTinted.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-            border: Border.all(color: AppColors.textPrimaryTinted.withValues(alpha: 0.12)),
+            border: Border.all(
+              color: AppColors.textPrimaryTinted.withValues(alpha: 0.12),
+            ),
           ),
           child: Icon(icon, color: AppColors.textPrimary, size: 20),
         ),

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../models/lineup_share_data.dart';
@@ -189,18 +190,19 @@ class _TeamBranding extends StatelessWidget {
           ),
           clipBehavior: Clip.antiAlias,
           child: hasLogo
-              ? Image.network(
-                  url,
+              ? CachedNetworkImage(
+                  imageUrl: url,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, e, s) => _LogoFallback(
+                  placeholder: (context, url) => _LogoFallback(
+                    initials: data.initials,
+                    exportMode: exportMode,
+                  ),
+                  errorWidget: (context, url, error) => _LogoFallback(
                     initials: data.initials,
                     exportMode: exportMode,
                   ),
                 )
-              : _LogoFallback(
-                  initials: data.initials,
-                  exportMode: exportMode,
-                ),
+              : _LogoFallback(initials: data.initials, exportMode: exportMode),
         ),
         const SizedBox(height: 4),
         // Team name
@@ -287,9 +289,7 @@ class _PitchSection extends StatelessWidget {
             final nodeH = exportMode ? 90.0 : 95.0;
             return Stack(
               children: [
-                Positioned.fill(
-                  child: CustomPaint(painter: _PitchPainter()),
-                ),
+                Positioned.fill(child: CustomPaint(painter: _PitchPainter())),
                 for (final player in players)
                   Positioned(
                     left: _pos(player.slotX, constraints.maxWidth, nodeW),
@@ -500,7 +500,9 @@ class _FooterSection extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      ...data.tacticalNotes.take(5).map(
+                      ...data.tacticalNotes
+                          .take(5)
+                          .map(
                             (note) => Padding(
                               padding: const EdgeInsets.only(bottom: 1),
                               child: Row(
@@ -519,8 +521,9 @@ class _FooterSection extends StatelessWidget {
                                     child: Text(
                                       note,
                                       style: TextStyle(
-                                        color: AppColors.textPrimary
-                                            .withValues(alpha: 0.8),
+                                        color: AppColors.textPrimary.withValues(
+                                          alpha: 0.8,
+                                        ),
                                         fontSize: exportMode ? 8 : 8.5,
                                         fontWeight: FontWeight.w600,
                                         height: 1.4,
@@ -625,10 +628,7 @@ class _CardBgPainter extends CustomPainter {
       ..shader = RadialGradient(
         center: const Alignment(0, -1.0),
         radius: 0.45,
-        colors: [
-          _goldLight.withValues(alpha: 0.14),
-          Colors.transparent,
-        ],
+        colors: [_goldLight.withValues(alpha: 0.14), Colors.transparent],
       ).createShader(Offset.zero & size);
     canvas.drawRect(Rect.fromLTWH(0, 0, w, h * 0.3), centerGlow);
 
@@ -689,10 +689,7 @@ class _PitchPainter extends CustomPainter {
     const stripeCount = 14;
     final stripeH = h / stripeCount;
     for (var i = 0; i < stripeCount; i += 2) {
-      canvas.drawRect(
-        Rect.fromLTWH(0, i * stripeH, w, stripeH),
-        stripePaint,
-      );
+      canvas.drawRect(Rect.fromLTWH(0, i * stripeH, w, stripeH), stripePaint);
     }
 
     // Vignette
@@ -723,11 +720,7 @@ class _PitchPainter extends CustomPainter {
     // Halfway
     canvas.drawLine(Offset(m, h / 2), Offset(w - m, h / 2), lp);
     canvas.drawCircle(Offset(w / 2, h / 2), w * 0.14, lp);
-    canvas.drawCircle(
-      Offset(w / 2, h / 2),
-      2.5,
-      Paint()..color = _pitchLine,
-    );
+    canvas.drawCircle(Offset(w / 2, h / 2), 2.5, Paint()..color = _pitchLine);
 
     // Penalty areas
     final pw = w * 0.55;
@@ -738,14 +731,8 @@ class _PitchPainter extends CustomPainter {
     for (final top in [true, false]) {
       final y = top ? m : h - m - ph;
       final gy = top ? m : h - m - gh;
-      canvas.drawRect(
-        Rect.fromLTWH((w - pw) / 2, y, pw, ph),
-        lp,
-      );
-      canvas.drawRect(
-        Rect.fromLTWH((w - gw) / 2, gy, gw, gh),
-        lp,
-      );
+      canvas.drawRect(Rect.fromLTWH((w - pw) / 2, y, pw, ph), lp);
+      canvas.drawRect(Rect.fromLTWH((w - gw) / 2, gy, gw, gh), lp);
       final arcY = top ? y + ph : y;
       canvas.drawArc(
         Rect.fromCenter(

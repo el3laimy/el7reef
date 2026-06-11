@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
@@ -101,8 +102,7 @@ class BenchBar extends StatelessWidget {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: players.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(width: 10),
+                separatorBuilder: (context, index) => const SizedBox(width: 10),
                 itemBuilder: (context, index) {
                   final player = players[index];
                   Widget card = _BenchDockCard(
@@ -197,19 +197,22 @@ class _BenchDockCard extends StatelessWidget {
           final availableHeight = constraints.maxHeight.isFinite
               ? constraints.maxHeight
               : compact
-                  ? 80.0
-                  : 95.0;
+              ? 80.0
+              : 95.0;
           final cardWidth = constraints.maxWidth.isFinite
               ? constraints.maxWidth
               : compact
-                  ? 82.0
-                  : 96.0;
-          final padding =
-              (availableHeight * 0.08).clamp(5.0, 8.0);
-          final avatarSize = (availableHeight * (compact ? 0.38 : 0.4))
-              .clamp(compact ? 28.0 : 34.0, compact ? 36.0 : 42.0);
-          final nameFontSize =
-              (availableHeight * 0.13).clamp(compact ? 9.0 : 10.0, compact ? 11.0 : 12.0);
+              ? 82.0
+              : 96.0;
+          final padding = (availableHeight * 0.08).clamp(5.0, 8.0);
+          final avatarSize = (availableHeight * (compact ? 0.38 : 0.4)).clamp(
+            compact ? 28.0 : 34.0,
+            compact ? 36.0 : 42.0,
+          );
+          final nameFontSize = (availableHeight * 0.13).clamp(
+            compact ? 9.0 : 10.0,
+            compact ? 11.0 : 12.0,
+          );
           final metaFontSize = (availableHeight * 0.1).clamp(7.5, 9.5);
 
           return Container(
@@ -218,9 +221,7 @@ class _BenchDockCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.background,
               borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-              border: Border.all(
-                color: roleColor.withValues(alpha: 0.5),
-              ),
+              border: Border.all(color: roleColor.withValues(alpha: 0.5)),
             ),
             clipBehavior: Clip.antiAlias,
             child: Stack(
@@ -230,10 +231,7 @@ class _BenchDockCard extends StatelessWidget {
                   top: 0,
                   start: 0,
                   end: 0,
-                  child: Container(
-                    height: 3,
-                    color: roleColor,
-                  ),
+                  child: Container(height: 3, color: roleColor),
                 ),
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -250,17 +248,17 @@ class _BenchDockCard extends StatelessWidget {
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: (player.photoUrl ?? '').isNotEmpty
-                          ? Image.network(
-                              player.photoUrl!,
+                          ? CachedNetworkImage(
+                              imageUrl: player.photoUrl!,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
+                              placeholder: (context, url) =>
+                                  _BenchInitial(player: player),
+                              errorWidget: (context, url, error) =>
                                   _BenchInitial(player: player),
                             )
                           : _BenchInitial(player: player),
                     ),
-                    SizedBox(
-                      height: (availableHeight * 0.05).clamp(3.0, 5.0),
-                    ),
+                    SizedBox(height: (availableHeight * 0.05).clamp(3.0, 5.0)),
                     // Name
                     Flexible(
                       child: Text(
@@ -283,8 +281,8 @@ class _BenchDockCard extends StatelessWidget {
                         player.isTemporary
                             ? 'مؤقت'
                             : player.isGuest
-                                ? 'ضيف'
-                                : (player.preferredPosition ?? 'لاعب'),
+                            ? 'ضيف'
+                            : (player.preferredPosition ?? 'لاعب'),
                         style: AppTextStyles.labelSmall.copyWith(
                           color: roleColor,
                           fontSize: metaFontSize,

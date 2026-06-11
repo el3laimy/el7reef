@@ -323,10 +323,7 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
       try {
         await precacheImage(NetworkImage(url), context);
       } catch (error) {
-        AppLogger.warning(
-          'MatchResultLineupScreen._precacheShareLogos',
-          error,
-        );
+        AppLogger.warning('MatchResultLineupScreen._precacheShareLogos', error);
         // Fallback initials are rendered if the logo cannot be loaded in time.
       }
     }
@@ -471,7 +468,9 @@ class _ResultTeamLineupCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.backgroundDeep.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
-        border: Border.all(color: AppColors.textPrimaryTinted.withValues(alpha: 0.1)),
+        border: Border.all(
+          color: AppColors.textPrimaryTinted.withValues(alpha: 0.1),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

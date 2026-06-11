@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../core/lineup/lineup_types.dart';
@@ -279,10 +280,12 @@ class _JerseyWidget extends StatelessWidget {
                   ],
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: Image.network(
-                  photoUrl,
+                child: CachedNetworkImage(
+                  imageUrl: photoUrl,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
+                  placeholder: (context, url) =>
+                      _buildJerseyTexts(shortName, numberText, _chalkColor),
+                  errorWidget: (context, url, error) =>
                       _buildJerseyTexts(shortName, numberText, _chalkColor),
                 ),
               ),
