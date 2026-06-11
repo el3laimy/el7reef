@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 
 import '../../../../core/auth/auth_session.dart';
+import '../../../../core/utils/app_logger.dart';
 import '../../../../data/repositories/fantasy_repository_impl.dart';
 import '../../../../data/repositories/tournament_repository_impl.dart';
 import '../../../../domain/entities/fantasy_team.dart';
@@ -31,10 +32,10 @@ class FantasyHomeController extends GetxController {
     FantasyRepositoryImpl? fantasyRepository,
     TournamentRepositoryImpl? tournamentRepository,
     AuthSession? authSession,
-  })  : _fantasyRepository = fantasyRepository ?? FantasyRepositoryImpl(),
-        _tournamentRepository =
-            tournamentRepository ?? TournamentRepositoryImpl(),
-        _authSession = authSession;
+  }) : _fantasyRepository = fantasyRepository ?? FantasyRepositoryImpl(),
+       _tournamentRepository =
+           tournamentRepository ?? TournamentRepositoryImpl(),
+       _authSession = authSession;
 
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
@@ -97,7 +98,8 @@ class FantasyHomeController extends GetxController {
       } else {
         globalRank.value = 0;
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.error('FantasyHomeController.loadHome', error, stackTrace);
       errorMessage.value = 'تعذر تحميل واجهة الفانتازي حالياً.';
     } finally {
       isLoading.value = false;

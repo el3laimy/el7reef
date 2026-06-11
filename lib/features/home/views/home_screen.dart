@@ -271,43 +271,6 @@ class _HomeTab extends StatelessWidget {
                           ],
                         ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.1),
                         const SizedBox(height: AppDimensions.md),
-                        if (FeatureFlags.fantasyUiEnabled) ...[
-                          Row(
-                            children: [
-                              _actionCard(
-                                '✨',
-                                'فانتازي\nليج',
-                                AppColors.secondary,
-                                () => Get.toNamed(AppRoutes.fantasyHome),
-                              ),
-                              const SizedBox(width: AppDimensions.md),
-                              Expanded(
-                                flex: 2,
-                                child: GlassmorphicContainer(
-                                  padding: const EdgeInsets.all(
-                                    AppDimensions.md,
-                                  ),
-                                  borderRadius: AppDimensions.radiusLg,
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'ابدأ فانتازي الحريف',
-                                        style: AppTextStyles.titleMedium,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'ابنِ تشكيلتك وادخل سباق النقاط في الدوري العالمي أو البطولات المفعّل عليها الفانتازي.',
-                                        style: AppTextStyles.bodySmall,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ).animate().fadeIn(delay: 560.ms).slideY(begin: 0.1),
-                        ],
                       ],
                     ),
                   ),
@@ -412,8 +375,11 @@ class _HomeTab extends StatelessWidget {
                           final match = liveMatches[index];
                           return GestureDetector(
                             onTap: () =>
-                                Get.toNamed('/match/lobby/${match.id}'),
-                            child: HomeLiveMatchCard(match: match, index: index),
+                                Get.toNamed(AppRoutes.matchLobbyById(match.id)),
+                            child: HomeLiveMatchCard(
+                              match: match,
+                              index: index,
+                            ),
                           );
                         },
                       ),
@@ -499,9 +465,13 @@ class _HomeTab extends StatelessWidget {
                             AppDimensions.sm,
                           ),
                           child: GestureDetector(
-                            onTap: () =>
-                                Get.toNamed('/match/lobby/${e.value.id}'),
-                            child: HomeMyMatchCard(match: e.value, index: e.key),
+                            onTap: () => Get.toNamed(
+                              AppRoutes.matchLobbyById(e.value.id),
+                            ),
+                            child: HomeMyMatchCard(
+                              match: e.value,
+                              index: e.key,
+                            ),
                           ),
                         );
                       }).toList(),

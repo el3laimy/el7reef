@@ -24,47 +24,54 @@ class TournamentGroupsScreen extends GetView<TournamentOperationsController> {
             message: 'ابدأ مرحلة المجموعات من dashboard أولاً.',
           );
         }
-        return ListView(
-          children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _MetricChip(
-                      label: 'Groups',
-                      value: controller.groups.length.toString(),
-                    ),
-                    _MetricChip(
-                      label: 'Fixtures',
-                      value: controller.groupStageFixtures
-                          .where(
-                            (fixture) => controller.canManageTournament ||
-                                fixture.fixtureStatus != FixtureStatus.draft,
-                          )
-                          .length
-                          .toString(),
-                    ),
-                    _MetricChip(
-                      label: 'Official',
-                      value: controller.groupStageFixtures
-                          .where(
-                            (fixture) => fixture.isOfficialTournamentResult,
-                          )
-                          .length
-                          .toString(),
-                    ),
-                  ],
+        return ListView.builder(
+          itemCount: controller.groups.length + 2,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _MetricChip(
+                        label: 'Groups',
+                        value: controller.groups.length.toString(),
+                      ),
+                      _MetricChip(
+                        label: 'Fixtures',
+                        value: controller.groupStageFixtures
+                            .where(
+                              (fixture) =>
+                                  controller.canManageTournament ||
+                                  fixture.fixtureStatus != FixtureStatus.draft,
+                            )
+                            .length
+                            .toString(),
+                      ),
+                      _MetricChip(
+                        label: 'Official',
+                        value: controller.groupStageFixtures
+                            .where(
+                              (fixture) => fixture.isOfficialTournamentResult,
+                            )
+                            .length
+                            .toString(),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...controller.groups.map(
-              (group) => _GroupCard(group: group, controller: controller),
-            ),
-          ],
+              );
+            }
+            if (index == 1) {
+              return const SizedBox(height: 12);
+            }
+            return _GroupCard(
+              group: controller.groups[index - 2],
+              controller: controller,
+            );
+          },
         );
       }),
     );
@@ -88,7 +95,8 @@ class _GroupCard extends StatelessWidget {
         controller.groupStageFixtures
             .where((fixture) => fixture.groupId == group.id)
             .where(
-              (fixture) => controller.canManageTournament ||
+              (fixture) =>
+                  controller.canManageTournament ||
                   fixture.fixtureStatus != FixtureStatus.draft,
             )
             .toList(growable: false)
@@ -153,10 +161,7 @@ class _GroupCard extends StatelessWidget {
                   label: 'مجدولة',
                   value: scheduledFixtures.toString(),
                 ),
-                _MetricChip(
-                  label: 'رسمية',
-                  value: officialFixtures.toString(),
-                ),
+                _MetricChip(label: 'رسمية', value: officialFixtures.toString()),
               ],
             ),
             const SizedBox(height: 12),
@@ -180,12 +185,12 @@ class _GroupCard extends StatelessWidget {
                           color: AppColors.success.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(999),
                         ),
-                          child: Text(
-                            'متأهل',
-                            style: AppTextStyles.labelSmall.copyWith(
-                              color: AppColors.success,
-                            ),
+                        child: Text(
+                          'متأهل',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.success,
                           ),
+                        ),
                       ),
                   ],
                 ),
@@ -227,10 +232,7 @@ class _ScaffoldListScreen extends StatelessWidget {
   final String title;
   final Widget child;
 
-  const _ScaffoldListScreen({
-    required this.title,
-    required this.child,
-  });
+  const _ScaffoldListScreen({required this.title, required this.child});
 
   @override
   Widget build(BuildContext context) {

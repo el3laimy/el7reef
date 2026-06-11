@@ -7,7 +7,6 @@ import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
-import '../../../core/constants/feature_flags.dart';
 import '../../../core/enums/tournament_enums.dart';
 import '../../../core/permissions/tournament_viewer_context.dart';
 import '../../../core/widgets/el7reef_badge.dart';
@@ -232,17 +231,6 @@ class TournamentDetailScreen extends GetView<TournamentDetailController> {
                           tournament.status ==
                               TournamentStatus.registration) ...[
                         _RegisterTeamButton(
-                          tournament: tournament,
-                        ).animate().fadeIn(
-                          duration: const Duration(milliseconds: 450),
-                        ),
-                        const SizedBox(height: AppDimensions.md),
-                      ],
-
-                      // ميزة الفانتازي
-                      if (FeatureFlags.fantasyUiEnabled &&
-                          tournament.isFantasyEnabled) ...[
-                        _FantasyLeagueButton(
                           tournament: tournament,
                         ).animate().fadeIn(
                           duration: const Duration(milliseconds: 450),
@@ -1021,27 +1009,6 @@ class _RegistrationProgress extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ── زر فتح الفانتازي ──
-class _FantasyLeagueButton extends StatelessWidget {
-  final Tournament tournament;
-
-  const _FantasyLeagueButton({required this.tournament});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppDimensions.md),
-      child: El7reefButton(
-        text: 'افتح فانتازي البطولة',
-        icon: Icons.auto_awesome_rounded,
-        onPressed: () {
-          Get.toNamed(AppRoutes.fantasyLeaderboardForLeague(tournament.id));
-        },
       ),
     );
   }

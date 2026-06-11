@@ -5,7 +5,6 @@ import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
-import '../../../core/constants/feature_flags.dart';
 import '../../../core/enums/tournament_enums.dart';
 import '../../../core/widgets/el7reef_button.dart';
 import '../../../core/widgets/el7reef_surface.dart';
@@ -632,31 +631,6 @@ class _TournamentCard extends StatelessWidget {
                 ),
               ],
             ),
-
-            // شارات الميزات الإضافية (مثل الفانتازي)
-            if (FeatureFlags.fantasyUiEnabled &&
-                tournament.isFantasyEnabled) ...[
-              const SizedBox(height: AppDimensions.sm),
-              const Divider(color: AppColors.surfaceBorder, height: 1),
-              const SizedBox(height: AppDimensions.xs),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.auto_awesome_rounded,
-                    color: AppColors.secondary,
-                    size: 14,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'دوري الفانتازي مفعَّل بصورة رسمية',
-                    style: AppTextStyles.labelSmall.copyWith(
-                      color: AppColors.secondary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ],
           ],
         ),
       ),

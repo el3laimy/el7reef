@@ -37,27 +37,30 @@ class FantasyLeaderboardController extends GetxController {
     TournamentRepositoryImpl? tournamentRepository,
     FantasyLifecycleService? lifecycleService,
     AuthSession? authSession,
-  })  : _fantasyRepository = fantasyRepository ?? FantasyRepositoryImpl(),
-        _playerRepository = playerRepository ?? PlayerRepositoryImpl(),
-        _tournamentRepository =
-            tournamentRepository ?? TournamentRepositoryImpl(),
-        _lifecycleService = lifecycleService ??
-            (Get.isRegistered<FantasyLifecycleService>()
-                ? Get.find<FantasyLifecycleService>()
-                : FantasyLifecycleService(
-                    lifecycleRepository:
-                        Get.isRegistered<FantasyLifecycleRepositoryImpl>()
-                            ? Get.find<FantasyLifecycleRepositoryImpl>()
-                            : null,
-                    tournamentRepository:
-                        tournamentRepository ?? TournamentRepositoryImpl(),
-                  )),
-        _authSession = authSession;
+  }) : _fantasyRepository = fantasyRepository ?? FantasyRepositoryImpl(),
+       _playerRepository = playerRepository ?? PlayerRepositoryImpl(),
+       _tournamentRepository =
+           tournamentRepository ?? TournamentRepositoryImpl(),
+       _lifecycleService =
+           lifecycleService ??
+           (Get.isRegistered<FantasyLifecycleService>()
+               ? Get.find<FantasyLifecycleService>()
+               : FantasyLifecycleService(
+                   lifecycleRepository:
+                       Get.isRegistered<FantasyLifecycleRepositoryImpl>()
+                       ? Get.find<FantasyLifecycleRepositoryImpl>()
+                       : null,
+                   tournamentRepository:
+                       tournamentRepository ?? TournamentRepositoryImpl(),
+                 )),
+       _authSession = authSession;
 
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
   final RxString leagueTitle = 'الدوري العالمي'.obs;
-  final Rx<FantasyLeagueLifecycle?> lifecycle = Rx<FantasyLeagueLifecycle?>(null);
+  final Rx<FantasyLeagueLifecycle?> lifecycle = Rx<FantasyLeagueLifecycle?>(
+    null,
+  );
   final Rx<FantasyTeam?> currentTeam = Rx<FantasyTeam?>(null);
   final RxList<FantasyLeaderboardEntry> entries =
       <FantasyLeaderboardEntry>[].obs;

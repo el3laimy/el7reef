@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../../../app/routes/app_routes.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/enums/fantasy_league_phase.dart';
+import '../../../../core/utils/app_logger.dart';
 import '../../services/chip_manager_service.dart';
 import '../../services/fantasy_lifecycle_service.dart';
 import '../../services/fantasy_market_service.dart';
@@ -46,37 +47,42 @@ class FantasyTeamController extends GetxController {
     FantasyTransferPolicyService? transferPolicyService,
     ChipManagerService? chipManagerService,
     AuthSession? authSession,
-  })  : _fantasyRepository = fantasyRepository ?? FantasyRepositoryImpl(),
-        _marketService = marketService ??
-            (Get.isRegistered<FantasyMarketService>()
-                ? Get.find<FantasyMarketService>()
-                : FantasyMarketService()),
-        _lifecycleService = lifecycleService ??
-            (Get.isRegistered<FantasyLifecycleService>()
-                ? Get.find<FantasyLifecycleService>()
-                : FantasyLifecycleService(
-                    lifecycleRepository:
-                        Get.isRegistered<FantasyLifecycleRepositoryImpl>()
-                            ? Get.find<FantasyLifecycleRepositoryImpl>()
-                            : null,
-                    tournamentRepository:
-                        Get.isRegistered<TournamentRepositoryImpl>()
-                            ? Get.find<TournamentRepositoryImpl>()
-                            : null,
-                  )),
-        _transferPolicyService =
-            transferPolicyService ?? const FantasyTransferPolicyService(),
-        _chipManagerService = chipManagerService ?? const ChipManagerService(),
-        _authSession = authSession;
+  }) : _fantasyRepository = fantasyRepository ?? FantasyRepositoryImpl(),
+       _marketService =
+           marketService ??
+           (Get.isRegistered<FantasyMarketService>()
+               ? Get.find<FantasyMarketService>()
+               : FantasyMarketService()),
+       _lifecycleService =
+           lifecycleService ??
+           (Get.isRegistered<FantasyLifecycleService>()
+               ? Get.find<FantasyLifecycleService>()
+               : FantasyLifecycleService(
+                   lifecycleRepository:
+                       Get.isRegistered<FantasyLifecycleRepositoryImpl>()
+                       ? Get.find<FantasyLifecycleRepositoryImpl>()
+                       : null,
+                   tournamentRepository:
+                       Get.isRegistered<TournamentRepositoryImpl>()
+                       ? Get.find<TournamentRepositoryImpl>()
+                       : null,
+                 )),
+       _transferPolicyService =
+           transferPolicyService ?? const FantasyTransferPolicyService(),
+       _chipManagerService = chipManagerService ?? const ChipManagerService(),
+       _authSession = authSession;
 
   final RxBool isLoading = false.obs;
   final RxBool isActivatingChip = false.obs;
   final RxString errorMessage = ''.obs;
-  final Rx<FantasyLeagueLifecycle?> lifecycle = Rx<FantasyLeagueLifecycle?>(null);
+  final Rx<FantasyLeagueLifecycle?> lifecycle = Rx<FantasyLeagueLifecycle?>(
+    null,
+  );
   final Rx<FantasyTeam?> team = Rx<FantasyTeam?>(null);
   final RxList<FantasySquadMember> starters = <FantasySquadMember>[].obs;
   final RxList<FantasySquadMember> bench = <FantasySquadMember>[].obs;
-  final RxList<TransferHistoryEntry> transferHistory = <TransferHistoryEntry>[].obs;
+  final RxList<TransferHistoryEntry> transferHistory =
+      <TransferHistoryEntry>[].obs;
 
   bool get isJoinedLeague => team.value?.leagueIds.contains(leagueId) ?? false;
   bool get isRoundLocked => lifecycle.value?.isLocked ?? false;
@@ -103,11 +109,11 @@ class FantasyTeamController extends GetxController {
       canOpenTransfers ? 'افتح الانتقالات' : 'الانتقالات مغلقة';
   int get currentGameweek => lifecycle.value?.currentGameweek ?? 0;
   List<ChipType> get availableChipTypes => const [
-        ChipType.tripleCaptain,
-        ChipType.benchBoost,
-        ChipType.wildcardGroups,
-        ChipType.wildcardKnockout,
-      ];
+    ChipType.tripleCaptain,
+    ChipType.benchBoost,
+    ChipType.wildcardGroups,
+    ChipType.wildcardKnockout,
+  ];
   List<ChipUsage> get chipHistory =>
       List<ChipUsage>.from(team.value?.chipUsages ?? const <ChipUsage>[])
         ..sort((a, b) => b.activatedAt.compareTo(a.activatedAt));
@@ -234,38 +240,44 @@ class FantasyTeamController extends GetxController {
         for (final player in marketPlayers) player.player.id: player,
       };
 
-      final members = loadedSlots
-          .where((slot) => marketById.containsKey(slot.playerId))
-          .map(
-            (slot) => FantasySquadMember(
-              slot: slot,
-              marketPlayer: marketById[slot.playerId]!,
-            ),
-          )
-          .toList()
-        ..sort((a, b) {
-          if (a.slot.isStartingXI != b.slot.isStartingXI) {
-            return a.slot.isStartingXI ? -1 : 1;
-          }
-          return a.slot.benchPriority.compareTo(b.slot.benchPriority);
-        });
+      final members =
+          loadedSlots
+              .where((slot) => marketById.containsKey(slot.playerId))
+              .map(
+                (slot) => FantasySquadMember(
+                  slot: slot,
+                  marketPlayer: marketById[slot.playerId]!,
+                ),
+              )
+              .toList()
+            ..sort((a, b) {
+              if (a.slot.isStartingXI != b.slot.isStartingXI) {
+                return a.slot.isStartingXI ? -1 : 1;
+              }
+              return a.slot.benchPriority.compareTo(b.slot.benchPriority);
+            });
 
       starters.assignAll(members.where((member) => member.slot.isStartingXI));
       bench.assignAll(members.where((member) => !member.slot.isStartingXI));
 
       final history = await _fantasyRepository.getTeamTransfers(syncedTeam.id);
       transferHistory.assignAll(
-        history.take(5).map(
-          (record) => TransferHistoryEntry(
-            record: record,
-            playerOutName: marketById[record.playerOutId]?.displayName ??
-                record.playerOutId,
-            playerInName:
-                marketById[record.playerInId]?.displayName ?? record.playerInId,
-          ),
-        ),
+        history
+            .take(5)
+            .map(
+              (record) => TransferHistoryEntry(
+                record: record,
+                playerOutName:
+                    marketById[record.playerOutId]?.displayName ??
+                    record.playerOutId,
+                playerInName:
+                    marketById[record.playerInId]?.displayName ??
+                    record.playerInId,
+              ),
+            ),
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.error('FantasyTeamController.loadTeam', error, stackTrace);
       errorMessage.value = 'تعذر تحميل تشكيلتك الآن.';
     } finally {
       isLoading.value = false;
@@ -324,10 +336,7 @@ class FantasyTeamController extends GetxController {
       return false;
     }
 
-    return currentTeam.hasActiveChip(
-      chipType,
-      gameweek: currentGameweek,
-    );
+    return currentTeam.hasActiveChip(chipType, gameweek: currentGameweek);
   }
 
   bool isChipConsumed(ChipType chipType) {

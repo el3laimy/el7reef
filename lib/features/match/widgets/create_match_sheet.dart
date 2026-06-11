@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
@@ -203,7 +204,7 @@ class _CreateMatchSheetState extends State<CreateMatchSheet> {
                   );
                   Get.back();
                   if (matchId != null) {
-                    Get.toNamed('/match/lobby/$matchId');
+                    Get.toNamed(AppRoutes.matchLobbyById(matchId));
                   }
                 },
               ),

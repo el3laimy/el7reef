@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../../../app/routes/app_routes.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/enums/tournament_enums.dart';
+import '../../../../core/utils/app_logger.dart';
 import '../../services/fantasy_lifecycle_service.dart';
 import '../../services/fantasy_market_service.dart';
 import '../../services/tier_system_engine.dart';
@@ -168,7 +169,12 @@ class FantasyCreateTeamController extends GetxController {
           ? 'فريق ${_authSession!.currentPlayer!.name}'
           : 'فريقي';
       slots.assignAll(_buildDefaultSlots(teamSize.value));
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'FantasyCreateTeamController.loadDraft',
+        error,
+        stackTrace,
+      );
       errorMessage.value = 'تعذر تحميل بناء التشكيلة حالياً.';
     } finally {
       isLoading.value = false;
@@ -389,7 +395,12 @@ class FantasyCreateTeamController extends GetxController {
         snackPosition: SnackPosition.BOTTOM,
       );
       Get.offNamed(AppRoutes.fantasyTeamForLeague(leagueId));
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'FantasyCreateTeamController.saveTeam',
+        error,
+        stackTrace,
+      );
       Get.snackbar(
         'فشل الحفظ',
         'تعذر حفظ التشكيلة حالياً.',

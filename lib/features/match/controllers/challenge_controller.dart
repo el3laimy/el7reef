@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
+import '../../../app/routes/app_routes.dart';
 import '../../../core/enums/challenge_status.dart';
 import '../../../core/enums/match_status.dart';
 import '../../../core/lineup/formation_library.dart';
@@ -200,7 +201,7 @@ class ChallengeController extends GetxController {
       );
 
       // 3. Go to Lobby
-      Get.toNamed('/match/lobby/$matchId');
+      Get.toNamed(AppRoutes.matchLobbyById(matchId));
     } catch (e) {
       AppLogger.error('ChallengeController.acceptChallenge', e);
       Get.snackbar('خطأ', 'فشل قبول التحدي');

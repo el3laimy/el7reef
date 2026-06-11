@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import '../../../app/routes/app_routes.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../domain/entities/player.dart';
 import '../../../data/repositories/player_repository_impl.dart';
@@ -79,7 +80,7 @@ class ProfileController extends GetxController {
   /// تسجيل الخروج
   Future<void> signOut() async {
     await _authService.signOut();
-    Get.offAllNamed('/login');
+    Get.offAllNamed(AppRoutes.login);
   }
 
   @override

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
-import '../../../core/constants/feature_flags.dart';
 import '../../../core/enums/tournament_enums.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
@@ -168,8 +167,7 @@ class TournamentController extends GetxController {
         visibility: selectedVisibility.value,
         discoverable: selectedVisibility.value == TournamentVisibility.public,
         status: TournamentStatus.registration,
-        isFantasyEnabled:
-            FeatureFlags.fantasyUiEnabled && isFantasyEnabled.value,
+        isFantasyEnabled: false,
         createdAt: DateTime.now(),
       );
 

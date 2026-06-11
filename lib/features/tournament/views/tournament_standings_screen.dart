@@ -31,17 +31,20 @@ class TournamentStandingsScreen
             ),
           );
         }
-        return ListView(
-          children: [
-            _StandingsHeader(snapshot: controller.standings.first),
-            const SizedBox(height: AppDimensions.md),
-            ...controller.standings.map(
-              (snapshot) => _GroupStandingPanel(
-                snapshot: snapshot,
-                controller: controller,
-              ),
-            ),
-          ],
+        return ListView.builder(
+          itemCount: controller.standings.length + 2,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return _StandingsHeader(snapshot: controller.standings.first);
+            }
+            if (index == 1) {
+              return const SizedBox(height: AppDimensions.md);
+            }
+            return _GroupStandingPanel(
+              snapshot: controller.standings[index - 2],
+              controller: controller,
+            );
+          },
         );
       }),
     );
@@ -373,10 +376,7 @@ class _ScaffoldListScreen extends StatelessWidget {
   final String title;
   final Widget child;
 
-  const _ScaffoldListScreen({
-    required this.title,
-    required this.child,
-  });
+  const _ScaffoldListScreen({required this.title, required this.child});
 
   @override
   Widget build(BuildContext context) {
