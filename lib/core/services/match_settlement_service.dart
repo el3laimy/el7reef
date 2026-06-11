@@ -9,6 +9,7 @@ import '../../domain/entities/player.dart';
 import '../../domain/entities/player_match_stats.dart';
 import '../../domain/entities/tournament.dart';
 import '../../data/models/tournament_model.dart';
+import 'cloud_sensitive_ops_service.dart';
 import 'official_match_roster_service.dart';
 import 'rating_engine.dart';
 import 'tournament_lifecycle_service.dart';
@@ -31,10 +32,12 @@ class MatchSettlementService {
   final FirebaseFirestore _firestore;
   final TournamentLifecycleService _tournamentLifecycleService;
   final OfficialMatchRosterService _officialRosterService;
+  final CloudSensitiveOpsService _cloudSensitiveOps;
 
   MatchSettlementService({
     FirebaseFirestore? firestore,
     TournamentLifecycleService? tournamentLifecycleService,
+    CloudSensitiveOpsService? cloudSensitiveOps,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _tournamentLifecycleService =
            tournamentLifecycleService ??
@@ -43,7 +46,8 @@ class MatchSettlementService {
            ),
        _officialRosterService = OfficialMatchRosterService(
          firestore: firestore ?? FirebaseFirestore.instance,
-       );
+       ),
+       _cloudSensitiveOps = cloudSensitiveOps ?? CloudSensitiveOpsService();
 
   Future<MatchSettlementResult> submitScore({
     required String matchId,
@@ -54,6 +58,18 @@ class MatchSettlementService {
     List<PlayerMatchStats> detailedStats = const [],
   }) async {
     _assertActor(actorId);
+    final remoteResult = await _tryRemoteSubmitScore(
+      matchId: matchId,
+      actorId: actorId,
+      scoreA: scoreA,
+      scoreB: scoreB,
+      mvpPlayerId: mvpPlayerId,
+      detailedStats: detailedStats,
+    );
+    if (remoteResult != null) {
+      return remoteResult;
+    }
+
     final officialRoster = await _officialRosterService.loadRegisteredRoster(
       matchId: matchId,
     );
@@ -151,6 +167,14 @@ class MatchSettlementService {
     required String actorId,
   }) async {
     _assertActor(actorId);
+    final remoteResult = await _tryRemoteApproveScore(
+      matchId: matchId,
+      actorId: actorId,
+    );
+    if (remoteResult != null) {
+      return remoteResult;
+    }
+
     final officialRoster = await _officialRosterService.loadRegisteredRoster(
       matchId: matchId,
     );
@@ -287,6 +311,76 @@ class MatchSettlementService {
     });
     await _refreshTournamentProgress(match: tournamentMatch);
     return result;
+  }
+
+  Future<MatchSettlementResult?> _tryRemoteSubmitScore({
+    required String matchId,
+    required String actorId,
+    required int scoreA,
+    required int scoreB,
+    String? mvpPlayerId,
+    required List<PlayerMatchStats> detailedStats,
+  }) async {
+    final response = await _cloudSensitiveOps.submitMatchSettlement({
+      'matchId': matchId,
+      'actorId': actorId,
+      'scoreA': scoreA,
+      'scoreB': scoreB,
+      'mvpPlayerId': mvpPlayerId,
+      'detailedStats': detailedStats.map(_playerMatchStatsToMap).toList(),
+    });
+    return _parseRemoteSettlementResult(response);
+  }
+
+  Future<MatchSettlementResult?> _tryRemoteApproveScore({
+    required String matchId,
+    required String actorId,
+  }) async {
+    final response = await _cloudSensitiveOps.approveMatchScore({
+      'matchId': matchId,
+      'actorId': actorId,
+    });
+    return _parseRemoteSettlementResult(response);
+  }
+
+  MatchSettlementResult? _parseRemoteSettlementResult(
+    Map<String, dynamic>? response,
+  ) {
+    if (response == null || response.isEmpty) {
+      return null;
+    }
+
+    final rawStatus = response['status'] as String?;
+    final status = rawStatus == null
+        ? MatchStatus.completed
+        : MatchStatus.values.firstWhere(
+            (candidate) => candidate.name == rawStatus,
+            orElse: () => MatchStatus.completed,
+          );
+
+    return MatchSettlementResult(
+      status: status,
+      ratingsApplied: response['ratingsApplied'] as bool? ?? false,
+      alreadySettled: response['alreadySettled'] as bool? ?? false,
+    );
+  }
+
+  Map<String, dynamic> _playerMatchStatsToMap(PlayerMatchStats stats) {
+    return {
+      'playerId': stats.playerId,
+      'matchId': stats.matchId,
+      'teamId': stats.teamId,
+      'played': stats.played,
+      'position': stats.position.name,
+      'goals': stats.goals,
+      'assists': stats.assists,
+      'saves': stats.saves,
+      'tackles': stats.tackles,
+      'cleanSheet': stats.cleanSheet,
+      'yellowCard': stats.yellowCard,
+      'redCard': stats.redCard,
+      'rating': stats.rating,
+    };
   }
 
   Future<void> _ensureFanVotingSession({
