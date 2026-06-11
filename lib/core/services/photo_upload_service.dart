@@ -11,11 +11,9 @@ class PhotoUploadService {
   final FirebaseStorage _storage;
   final ImagePicker _picker;
 
-  PhotoUploadService({
-    FirebaseStorage? storage,
-    ImagePicker? picker,
-  })  : _storage = storage ?? FirebaseStorage.instance,
-        _picker = picker ?? ImagePicker();
+  PhotoUploadService({FirebaseStorage? storage, ImagePicker? picker})
+    : _storage = storage ?? FirebaseStorage.instance,
+      _picker = picker ?? ImagePicker();
 
   /// اختيار صورة من المكتبة أو الكاميرا
   Future<File?> pickImage({bool fromCamera = false}) async {
@@ -33,8 +31,11 @@ class PhotoUploadService {
     }
   }
 
-  /// رفع الصورة: pick → upload (نسخة واحدة حالياً)
-  /// TODO: إضافة flutter_image_compress لإنشاء 3 نسخ مختلفة الحجم فعلياً
+  /// رفع الصورة: pick → upload.
+  ///
+  /// قرار V1: نرفع نسخة واحدة مضبوطة بالحجم والجودة من `ImagePicker` ونستخدم
+  /// نفس الرابط لكل المقاسات. إنشاء نسخ متعددة يحتاج dependency مخصص للضغط
+  /// ويُترك لدفعة أداء منفصلة حتى لا نضيف اعتماد جديد داخل إصلاح صغير.
   Future<PhotoUploadResult?> uploadProfilePhoto({
     required String userId,
     required File imageFile,
@@ -42,8 +43,6 @@ class PhotoUploadService {
     try {
       final bytes = await imageFile.readAsBytes();
 
-      // حالياً نرفع نسخة واحدة — pickImage بيعمل resize مبدئي (1200×1200, quality 85)
-      // لما نضيف flutter_image_compress نقدر ننشئ thumb (100px) و medium (300px) و full (600px)
       final fullUrl = await _uploadVersion(
         bytes: bytes,
         userId: userId,
@@ -53,8 +52,8 @@ class PhotoUploadService {
       if (fullUrl == null) return null;
 
       return PhotoUploadResult(
-        thumbUrl: fullUrl,   // مؤقتاً نفس الصورة
-        mediumUrl: fullUrl,  // مؤقتاً نفس الصورة
+        thumbUrl: fullUrl, // مؤقتاً نفس الصورة
+        mediumUrl: fullUrl, // مؤقتاً نفس الصورة
         fullUrl: fullUrl,
       );
     } catch (e) {
@@ -92,13 +91,17 @@ class PhotoUploadService {
     for (final version in ['thumb', 'medium', 'full']) {
       try {
         await _storage.ref('profiles/$userId/photo_$version.jpg').delete();
-      } catch (e) { AppLogger.error('PhotoUploadService.deleteOldPhotos.$version', e); }
+      } catch (e) {
+        AppLogger.error('PhotoUploadService.deleteOldPhotos.$version', e);
+      }
     }
   }
 
   /// Dialog لاختيار المصدر
-  static Future<File?> showPickerDialog(BuildContext context,
-      PhotoUploadService service) async {
+  static Future<File?> showPickerDialog(
+    BuildContext context,
+    PhotoUploadService service,
+  ) async {
     return showModalBottomSheet<File?>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -134,20 +137,28 @@ class PhotoUploadService {
             ),
             const SizedBox(height: 16),
             ListTile(
-              leading: const Icon(Icons.photo_library_outlined,
-                  color: Color(0xFF00B4FF)),
-              title: const Text('من المكتبة',
-                  style: TextStyle(color: Colors.white)),
+              leading: const Icon(
+                Icons.photo_library_outlined,
+                color: Color(0xFF00B4FF),
+              ),
+              title: const Text(
+                'من المكتبة',
+                style: TextStyle(color: Colors.white),
+              ),
               onTap: () async {
                 final file = await service.pickImage(fromCamera: false);
                 if (ctx.mounted) Navigator.pop(ctx, file);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.camera_alt_outlined,
-                  color: Color(0xFF00B4FF)),
-              title: const Text('التقط صورة',
-                  style: TextStyle(color: Colors.white)),
+              leading: const Icon(
+                Icons.camera_alt_outlined,
+                color: Color(0xFF00B4FF),
+              ),
+              title: const Text(
+                'التقط صورة',
+                style: TextStyle(color: Colors.white),
+              ),
               onTap: () async {
                 final file = await service.pickImage(fromCamera: true);
                 if (ctx.mounted) Navigator.pop(ctx, file);

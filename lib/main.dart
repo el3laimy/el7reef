@@ -64,11 +64,7 @@ void _configureErrorReporting() {
   PlatformDispatcher.instance.onError = (error, stackTrace) {
     AppLogger.error('PlatformDispatcher', error, stackTrace);
     unawaited(
-      FirebaseCrashlytics.instance.recordError(
-        error,
-        stackTrace,
-        fatal: true,
-      ),
+      FirebaseCrashlytics.instance.recordError(error, stackTrace, fatal: true),
     );
     return true;
   };

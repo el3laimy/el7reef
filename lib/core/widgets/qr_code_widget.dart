@@ -12,6 +12,7 @@ class QrCodeWidget extends StatelessWidget {
   final double size;
   final bool showBorder;
   final VoidCallback? onShare;
+  final ImageProvider? embeddedImage;
 
   const QrCodeWidget({
     super.key,
@@ -21,6 +22,7 @@ class QrCodeWidget extends StatelessWidget {
     this.size = 200,
     this.showBorder = true,
     this.onShare,
+    this.embeddedImage,
   });
 
   @override
@@ -57,7 +59,10 @@ class QrCodeWidget extends StatelessWidget {
               dataModuleShape: QrDataModuleShape.square,
               color: Colors.black,
             ),
-            // TODO: إضافة embeddedImage بعد إنشاء assets/images/qr_logo.png
+            embeddedImage: embeddedImage,
+            embeddedImageStyle: embeddedImage == null
+                ? null
+                : QrEmbeddedImageStyle(size: Size.square(size * 0.18)),
           ),
 
           const SizedBox(height: AppDimensions.md),
@@ -76,10 +81,7 @@ class QrCodeWidget extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               sublabel!,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.black54,
-              ),
+              style: const TextStyle(fontSize: 12, color: Colors.black54),
             ),
           ],
 
@@ -87,12 +89,17 @@ class QrCodeWidget extends StatelessWidget {
             const SizedBox(height: AppDimensions.md),
             TextButton.icon(
               onPressed: onShare,
-              icon: const Icon(Icons.share_outlined,
-                  color: AppColors.primary, size: 18),
-              label: Text('مشاركة الباركود',
-                  style: AppTextStyles.labelMedium.copyWith(
-                    color: AppColors.primary,
-                  )),
+              icon: const Icon(
+                Icons.share_outlined,
+                color: AppColors.primary,
+                size: 18,
+              ),
+              label: Text(
+                'مشاركة الباركود',
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: AppColors.primary,
+                ),
+              ),
             ),
           ],
         ],
@@ -146,10 +153,10 @@ class QrCodeDialog extends StatelessWidget {
           const SizedBox(height: AppDimensions.md),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('إغلاق',
-                style: AppTextStyles.labelMedium.copyWith(
-                  color: Colors.white70,
-                )),
+            child: Text(
+              'إغلاق',
+              style: AppTextStyles.labelMedium.copyWith(color: Colors.white70),
+            ),
           ),
         ],
       ),

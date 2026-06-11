@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'session_reset_coordinator.dart';
 import '../../../app/routes/app_routes.dart';
 import '../constants/app_constants.dart';
+import '../utils/app_logger.dart';
 import '../../data/repositories/player_repository_impl.dart';
 import '../../domain/entities/player.dart';
 
@@ -54,7 +55,7 @@ class AuthService extends GetxService {
   Future<void> _loadPlayerProfile(String uid) async {
     try {
       Player? player = await _playerRepo.getPlayer(uid);
-      
+
       // Auto-recovery: If Auth exists but Firestore profile is missing
       if (player == null && _auth.currentUser != null) {
         final firebaseUser = _auth.currentUser!;
@@ -81,8 +82,7 @@ class AuthService extends GetxService {
         Get.offAllNamed(AppRoutes.login);
       }
     } catch (e, stack) {
-      print('🔥 AuthService Error in _loadPlayerProfile: $e');
-      print(stack);
+      AppLogger.error('AuthService._loadPlayerProfile', e, stack);
       currentPlayer.value = null;
       await signOut(); // Force logout to escape broken session state
       Get.offAllNamed(AppRoutes.login);
