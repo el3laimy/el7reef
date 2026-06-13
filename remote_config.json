@@ -1,0 +1,89 @@
+{
+  "conditions": [],
+  "parameters": {
+    "fantasy_ui_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "V1 gate for fantasy routes and UI surfaces.",
+      "valueType": "BOOLEAN"
+    },
+    "activity_feed_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "V1 gate for activity feed UI.",
+      "valueType": "BOOLEAN"
+    },
+    "challenges_ui_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "V1 gate for challenge discovery and top-level UI.",
+      "valueType": "BOOLEAN"
+    },
+    "friendly_match_top_level_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "V1 gate for friendlies as a top-level home destination.",
+      "valueType": "BOOLEAN"
+    },
+    "social_ui_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "V1 gate for social and friends routes.",
+      "valueType": "BOOLEAN"
+    },
+    "organizer_advanced_ops_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "V1 gate for advanced organizer operations.",
+      "valueType": "BOOLEAN"
+    },
+    "golden_rating_ui_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "V1 gate for golden rating UI.",
+      "valueType": "BOOLEAN"
+    },
+    "profile_settings_ui_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "V1 gate for profile settings entry points.",
+      "valueType": "BOOLEAN"
+    },
+    "profile_sharing_ui_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "V1 gate for profile sharing entry points.",
+      "valueType": "BOOLEAN"
+    },
+    "guest_identity_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Enables guest identity, claim, and QR flows.",
+      "valueType": "BOOLEAN"
+    },
+    "hybrid_tournament_registration_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Enables mixed registered and guest tournament registration.",
+      "valueType": "BOOLEAN"
+    },
+    "matchday_ui_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Enables matchday tournament flow UI.",
+      "valueType": "BOOLEAN"
+    }
+  }
+}
