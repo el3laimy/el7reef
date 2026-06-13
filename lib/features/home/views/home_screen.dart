@@ -20,7 +20,18 @@ import '../widgets/home_live_match_card.dart';
 import '../widgets/home_my_match_card.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final bool? friendlyMatchTopLevelEnabled;
+
+  const HomeScreen({super.key, this.friendlyMatchTopLevelEnabled});
+
+  @visibleForTesting
+  static List<String> debugNavigationLabels({
+    required bool friendlyMatchTopLevelEnabled,
+  }) {
+    return _buildDestinationSpecs(
+      friendlyMatchTopLevelEnabled: friendlyMatchTopLevelEnabled,
+    ).map((destination) => destination.label).toList(growable: false);
+  }
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -28,31 +39,51 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  late final List<_HomeDestination> _destinations = _buildDestinations();
 
   @override
   void initState() {
     super.initState();
   }
 
-  late final List<Widget> _pages = [
-    if (FeatureFlags.friendlyMatchTopLevelEnabled)
-      _HomeTab(onNavigateToTab: (i) => setState(() => _currentIndex = i)),
-    if (FeatureFlags.friendlyMatchTopLevelEnabled)
-      const MatchDiscoverScreen()
-    else
-      const TournamentListScreen(),
-    if (FeatureFlags.friendlyMatchTopLevelEnabled)
-      const TournamentListScreen()
-    else
-      const MatchDiscoverScreen(),
-    const MyTeamsScreen(),
-    const ProfileScreen(),
-  ];
+  List<_HomeDestination> _buildDestinations() {
+    return _buildDestinationSpecs(
+          friendlyMatchTopLevelEnabled:
+              widget.friendlyMatchTopLevelEnabled ??
+              FeatureFlags.friendlyMatchTopLevelEnabled,
+        )
+        .map((spec) {
+          return _HomeDestination(
+            spec: spec,
+            page: switch (spec.key) {
+              _HomeDestinationKey.home => _HomeTab(
+                onNavigateToDestination: _selectDestination,
+              ),
+              _HomeDestinationKey.tournaments => const TournamentListScreen(),
+              _HomeDestinationKey.matches => const MatchDiscoverScreen(),
+              _HomeDestinationKey.teams => const MyTeamsScreen(),
+              _HomeDestinationKey.profile => const ProfileScreen(),
+            },
+          );
+        })
+        .toList(growable: false);
+  }
+
+  void _selectDestination(_HomeDestinationKey key) {
+    final index = _destinations.indexWhere(
+      (destination) => destination.spec.key == key,
+    );
+    if (index < 0 || index == _currentIndex) return;
+    setState(() => _currentIndex = index);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _pages),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [for (final destination in _destinations) destination.page],
+      ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: AppColors.surface,
@@ -69,32 +100,8 @@ class _HomeScreenState extends State<HomeScreen> {
           type: BottomNavigationBarType.fixed,
           elevation: 0,
           items: [
-            if (FeatureFlags.friendlyMatchTopLevelEnabled)
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.home_outlined),
-                activeIcon: Icon(Icons.home_rounded),
-                label: 'الرئيسية',
-              ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.emoji_events_outlined),
-              activeIcon: Icon(Icons.emoji_events_rounded),
-              label: 'البطولات',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.sports_soccer_outlined),
-              activeIcon: Icon(Icons.sports_soccer_rounded),
-              label: 'المباريات',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.group_outlined),
-              activeIcon: Icon(Icons.group_rounded),
-              label: 'الفرق',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person_rounded),
-              label: 'أنا',
-            ),
+            for (final destination in _destinations)
+              destination.spec.navigationItem,
           ],
         ),
       ),
@@ -102,9 +109,78 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+enum _HomeDestinationKey { home, tournaments, matches, teams, profile }
+
+class _HomeDestinationSpec {
+  final _HomeDestinationKey key;
+  final String label;
+  final IconData icon;
+  final IconData activeIcon;
+
+  const _HomeDestinationSpec({
+    required this.key,
+    required this.label,
+    required this.icon,
+    required this.activeIcon,
+  });
+
+  BottomNavigationBarItem get navigationItem {
+    return BottomNavigationBarItem(
+      icon: Icon(icon),
+      activeIcon: Icon(activeIcon),
+      label: label,
+    );
+  }
+}
+
+class _HomeDestination {
+  final _HomeDestinationSpec spec;
+  final Widget page;
+
+  const _HomeDestination({required this.spec, required this.page});
+}
+
+List<_HomeDestinationSpec> _buildDestinationSpecs({
+  required bool friendlyMatchTopLevelEnabled,
+}) {
+  return [
+    if (friendlyMatchTopLevelEnabled)
+      const _HomeDestinationSpec(
+        key: _HomeDestinationKey.home,
+        icon: Icons.home_outlined,
+        activeIcon: Icons.home_rounded,
+        label: 'الرئيسية',
+      ),
+    const _HomeDestinationSpec(
+      key: _HomeDestinationKey.tournaments,
+      icon: Icons.emoji_events_outlined,
+      activeIcon: Icons.emoji_events_rounded,
+      label: 'البطولات',
+    ),
+    const _HomeDestinationSpec(
+      key: _HomeDestinationKey.matches,
+      icon: Icons.sports_soccer_outlined,
+      activeIcon: Icons.sports_soccer_rounded,
+      label: 'المباريات',
+    ),
+    const _HomeDestinationSpec(
+      key: _HomeDestinationKey.teams,
+      icon: Icons.group_outlined,
+      activeIcon: Icons.group_rounded,
+      label: 'الفرق',
+    ),
+    const _HomeDestinationSpec(
+      key: _HomeDestinationKey.profile,
+      icon: Icons.person_outline,
+      activeIcon: Icons.person_rounded,
+      label: 'أنا',
+    ),
+  ];
+}
+
 class _HomeTab extends StatelessWidget {
-  final void Function(int index) onNavigateToTab;
-  const _HomeTab({required this.onNavigateToTab});
+  final void Function(_HomeDestinationKey key) onNavigateToDestination;
+  const _HomeTab({required this.onNavigateToDestination});
 
   @override
   Widget build(BuildContext context) {
@@ -252,21 +328,27 @@ class _HomeTab extends StatelessWidget {
                               '⚽',
                               'المباريات',
                               AppColors.primary,
-                              () => onNavigateToTab(1),
+                              () => onNavigateToDestination(
+                                _HomeDestinationKey.matches,
+                              ),
                             ),
                             const SizedBox(width: AppDimensions.md),
                             _actionCard(
                               '🏆',
                               'البطولات',
                               AppColors.secondary,
-                              () => onNavigateToTab(2),
+                              () => onNavigateToDestination(
+                                _HomeDestinationKey.tournaments,
+                              ),
                             ),
                             const SizedBox(width: AppDimensions.md),
                             _actionCard(
                               '👥',
                               'فرقي',
                               AppColors.accent,
-                              () => onNavigateToTab(3),
+                              () => onNavigateToDestination(
+                                _HomeDestinationKey.teams,
+                              ),
                             ),
                           ],
                         ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.1),
@@ -303,7 +385,9 @@ class _HomeTab extends StatelessWidget {
                         ).animate().fadeIn(delay: 500.ms),
                         const Spacer(),
                         GestureDetector(
-                          onTap: () => onNavigateToTab(1),
+                          onTap: () => onNavigateToDestination(
+                            _HomeDestinationKey.matches,
+                          ),
                           child: Text(
                             'عرض الكل',
                             style: AppTextStyles.labelMedium.copyWith(
