@@ -9,6 +9,7 @@ import 'package:get/get.dart';
 import 'app/theme/app_theme.dart';
 import 'app/routes/app_pages.dart';
 import 'core/auth/auth_service.dart';
+import 'core/services/feature_flag_service.dart';
 import 'core/utils/app_logger.dart';
 import 'firebase_options.dart';
 
@@ -25,6 +26,7 @@ void main() async {
       _configureErrorReporting();
 
       // ── تسجيل الخدمات الأساسية ──
+      await Get.putAsync(() => FeatureFlagService().init());
       await Get.putAsync(() => AuthService().init());
 
       // ── شاشة كاملة مع status bar شفاف ──

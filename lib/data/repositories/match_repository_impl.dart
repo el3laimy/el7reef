@@ -79,6 +79,15 @@ class MatchRepositoryImpl implements MatchRepository {
     });
   }
 
+  Future<void> updatePrideEventsPending({
+    required String matchId,
+    required bool isPending,
+  }) {
+    return FirebaseErrorHandler.guard(() {
+      return _matchesRef.doc(matchId).update({'prideEventsPending': isPending});
+    });
+  }
+
   @override
   Future<List<Match>> getPlayerMatches(
     String playerId, {

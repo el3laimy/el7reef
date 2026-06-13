@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
@@ -128,16 +129,7 @@ class ProfileScreen extends GetView<ProfileController> {
                 ),
                 onPressed: () => Get.back(),
               ),
-              if (FeatureFlags.profileSettingsUiEnabled)
-                IconButton(
-                  icon: const Icon(
-                    Icons.settings_outlined,
-                    color: AppColors.textMuted,
-                  ),
-                  onPressed: () {},
-                )
-              else
-                const SizedBox(width: 48),
+              const SizedBox(width: 48),
             ],
           ),
 
@@ -314,7 +306,7 @@ class ProfileScreen extends GetView<ProfileController> {
           icon: Icons.share_outlined,
           label: 'مشاركة',
           color: AppColors.success,
-          onTap: () {},
+          onTap: () => _shareProfile(player),
         ),
     ];
 
@@ -374,6 +366,17 @@ class ProfileScreen extends GetView<ProfileController> {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _shareProfile(Player player) {
+    final profileLink =
+        'https://el7reef.app${AppRoutes.playerProfileByKindAndId(kind: 'player', id: player.id)}';
+    final usernameLine = player.hasUsername
+        ? '\n${player.displayUsername}'
+        : '';
+    return Share.share(
+      'شوف بروفايل ${player.name} على El7reef$usernameLine\n$profileLink',
     );
   }
 

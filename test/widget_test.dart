@@ -14,6 +14,7 @@ import 'package:el7reef/data/repositories/fantasy_lifecycle_repository_impl.dart
 import 'package:el7reef/data/repositories/fantasy_repository_impl.dart';
 import 'package:el7reef/data/repositories/player_repository_impl.dart';
 import 'package:el7reef/data/repositories/tournament_repository_impl.dart';
+import 'package:el7reef/features/home/views/home_screen.dart';
 
 void main() {
   late FakeFirebaseFirestore firestore;
@@ -113,5 +114,49 @@ void main() {
     expect(find.text('إنشاء فريق فانتازي غير متاح'), findsWidgets);
     expect(find.text('الجولة مغلقة'), findsNothing);
     expect(find.widgetWithText(FilledButton, 'حفظ التشكيلة'), findsNothing);
+  });
+
+  testWidgets('social routes stay gated while social UI is disabled', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialRoute: AppRoutes.friends,
+        getPages: AppPages.routes,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(FeatureUnavailableScreen), findsOneWidget);
+    expect(find.text('الأصدقاء غير متاحين'), findsWidgets);
+    expect(find.text('الأصدقاء'), findsNothing);
+  });
+
+  testWidgets('social search route stays gated while social UI is disabled', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialRoute: AppRoutes.searchPlayers,
+        getPages: AppPages.routes,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(FeatureUnavailableScreen), findsOneWidget);
+    expect(find.text('البحث الاجتماعي غير متاح'), findsWidgets);
+    expect(find.text('البحث عن أصدقاء'), findsNothing);
+  });
+
+  test('home destinations keep navigation labels in page order', () {
+    expect(
+      HomeScreen.debugNavigationLabels(friendlyMatchTopLevelEnabled: false),
+      equals(['البطولات', 'المباريات', 'الفرق', 'أنا']),
+    );
+
+    expect(
+      HomeScreen.debugNavigationLabels(friendlyMatchTopLevelEnabled: true),
+      equals(['الرئيسية', 'البطولات', 'المباريات', 'الفرق', 'أنا']),
+    );
   });
 }

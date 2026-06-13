@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
@@ -28,16 +29,19 @@ class FriendsScreen extends GetView<FriendController> {
             style: AppTextStyles.headlineMedium,
           ).animate().fadeIn().slideY(begin: -0.2),
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary),
+            icon: const Icon(
+              Icons.arrow_back_ios_new,
+              color: AppColors.textPrimary,
+            ),
             onPressed: () => Get.back(),
           ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.person_add_alt_1, color: AppColors.primary),
-              onPressed: () {
-                // فتح شاشة البحث (Task 6.4.5)
-                Get.snackbar('بحث', 'البحث عن أصدقاء قيد التطوير');
-              },
+              icon: const Icon(
+                Icons.person_add_alt_1,
+                color: AppColors.primary,
+              ),
+              onPressed: () => Get.toNamed(AppRoutes.searchPlayers),
             ),
           ],
           bottom: TabBar(
@@ -52,17 +56,18 @@ class FriendsScreen extends GetView<FriendController> {
           ),
         ),
         body: Container(
-          decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+          decoration: const BoxDecoration(
+            gradient: AppColors.backgroundGradient,
+          ),
           child: Obx(() {
             if (controller.isLoading.value) {
-              return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+              return const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              );
             }
-            
+
             return TabBarView(
-              children: [
-                _buildFriendsList(),
-                _buildRequestsList(),
-              ],
+              children: [_buildFriendsList(), _buildRequestsList()],
             );
           }),
         ),
@@ -72,7 +77,7 @@ class FriendsScreen extends GetView<FriendController> {
 
   Widget _buildFriendsList() {
     final friends = controller.friends;
-    
+
     if (friends.isEmpty) {
       return _buildEmptyState(
         'لا يوجد أصدقاء بعد',
@@ -80,10 +85,10 @@ class FriendsScreen extends GetView<FriendController> {
         Icons.people_outline,
       );
     }
-    
+
     return ListView.builder(
       padding: EdgeInsets.only(
-        top: Get.mediaQuery.padding.top + 100, 
+        top: Get.mediaQuery.padding.top + 100,
         bottom: AppDimensions.xxl,
         left: AppDimensions.pagePadding,
         right: AppDimensions.pagePadding,
@@ -91,9 +96,11 @@ class FriendsScreen extends GetView<FriendController> {
       itemCount: friends.length,
       itemBuilder: (context, index) {
         final friendship = friends[index];
-        final otherUserId = friendship.getOtherUserId(controller.currentUserId!);
+        final otherUserId = friendship.getOtherUserId(
+          controller.currentUserId!,
+        );
         final profile = controller.friendProfiles[otherUserId];
-        
+
         return _buildFriendCard(profile, isRequest: false)
             .animate()
             .fadeIn(delay: Duration(milliseconds: 50 * index))
@@ -104,7 +111,7 @@ class FriendsScreen extends GetView<FriendController> {
 
   Widget _buildRequestsList() {
     final requests = controller.pendingRequests;
-    
+
     if (requests.isEmpty) {
       return _buildEmptyState(
         'لا توجد طلبات',
@@ -112,7 +119,7 @@ class FriendsScreen extends GetView<FriendController> {
         Icons.notifications_none,
       );
     }
-    
+
     return ListView.builder(
       padding: EdgeInsets.only(
         top: Get.mediaQuery.padding.top + 100,
@@ -123,9 +130,11 @@ class FriendsScreen extends GetView<FriendController> {
       itemCount: requests.length,
       itemBuilder: (context, index) {
         final friendship = requests[index];
-        final otherUserId = friendship.getOtherUserId(controller.currentUserId!);
+        final otherUserId = friendship.getOtherUserId(
+          controller.currentUserId!,
+        );
         final profile = controller.friendProfiles[otherUserId];
-        
+
         return _buildFriendCard(profile, isRequest: true)
             .animate()
             .fadeIn(delay: Duration(milliseconds: 50 * index))
@@ -142,7 +151,7 @@ class FriendsScreen extends GetView<FriendController> {
         child: const Center(child: CircularProgressIndicator()),
       );
     }
-    
+
     return GlassmorphicContainer(
       margin: const EdgeInsets.only(bottom: AppDimensions.md),
       padding: const EdgeInsets.all(AppDimensions.md),
@@ -155,28 +164,37 @@ class FriendsScreen extends GetView<FriendController> {
             height: 50,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.5), width: 2),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.5),
+                width: 2,
+              ),
             ),
             child: ClipOval(
               child: player.photoUrl != null
                   ? CachedNetworkImage(
                       imageUrl: player.photoUrl!,
                       fit: BoxFit.cover,
-                      placeholder: (ctx, url) => Container(color: AppColors.surface),
+                      placeholder: (ctx, url) =>
+                          Container(color: AppColors.surface),
                     )
                   : Container(
                       color: AppColors.primarySurface,
                       child: Center(
                         child: Text(
-                          player.name.isNotEmpty ? player.name[0].toUpperCase() : '?',
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+                          player.name.isNotEmpty
+                              ? player.name[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
                         ),
                       ),
                     ),
             ),
           ),
           const SizedBox(width: AppDimensions.md),
-          
+
           // Info
           Expanded(
             child: Column(
@@ -192,7 +210,9 @@ class FriendsScreen extends GetView<FriendController> {
                   const SizedBox(height: 2),
                   Text(
                     player.displayUsername,
-                    style: AppTextStyles.labelSmall.copyWith(color: AppColors.primary),
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColors.primary,
+                    ),
                   ),
                 ],
                 const SizedBox(height: 4),
@@ -200,13 +220,16 @@ class FriendsScreen extends GetView<FriendController> {
                   children: [
                     RankTierBadge(rating: player.rating, size: 14),
                     const SizedBox(width: 8),
-                    Text('${player.rating} pt', style: AppTextStyles.labelSmall),
+                    Text(
+                      '${player.rating} pt',
+                      style: AppTextStyles.labelSmall,
+                    ),
                   ],
                 ),
               ],
             ),
           ),
-          
+
           // Actions
           if (isRequest) ...[
             // Accept Button
@@ -236,7 +259,10 @@ class FriendsScreen extends GetView<FriendController> {
                   value: 'remove',
                   child: ListTile(
                     leading: Icon(Icons.person_remove, color: AppColors.error),
-                    title: Text('إزالة الصداقة', style: TextStyle(color: AppColors.error)),
+                    title: Text(
+                      'إزالة الصداقة',
+                      style: TextStyle(color: AppColors.error),
+                    ),
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
@@ -244,13 +270,16 @@ class FriendsScreen extends GetView<FriendController> {
                   value: 'block',
                   child: ListTile(
                     leading: Icon(Icons.block, color: AppColors.error),
-                    title: Text('حظر', style: TextStyle(color: AppColors.error)),
+                    title: Text(
+                      'حظر',
+                      style: TextStyle(color: AppColors.error),
+                    ),
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
               ],
             ),
-          ]
+          ],
         ],
       ),
     );
@@ -267,14 +296,20 @@ class FriendsScreen extends GetView<FriendController> {
               color: AppColors.surface,
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 60, color: AppColors.primary.withValues(alpha: 0.5)),
+            child: Icon(
+              icon,
+              size: 60,
+              color: AppColors.primary.withValues(alpha: 0.5),
+            ),
           ),
           const SizedBox(height: AppDimensions.lg),
           Text(title, style: AppTextStyles.headlineMedium),
           const SizedBox(height: AppDimensions.sm),
           Text(
             subtitle,
-            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textMuted),
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textMuted,
+            ),
             textAlign: TextAlign.center,
           ),
         ],

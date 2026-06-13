@@ -400,7 +400,13 @@ class AppPages {
     // ── Friends ──
     GetPage(
       name: AppRoutes.friends,
-      page: () => const FriendsScreen(),
+      page: () => FeatureFlags.socialUiEnabled
+          ? const FriendsScreen()
+          : const FeatureUnavailableScreen(
+              title: 'الأصدقاء غير متاحين',
+              message:
+                  'واجهة الأصدقاء متوقفة في هذا البناء حتى يتم تفعيل السطح الاجتماعي بشكل كامل.',
+            ),
       binding: FriendBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
@@ -408,7 +414,13 @@ class AppPages {
     // ── Search Players ──
     GetPage(
       name: AppRoutes.searchPlayers,
-      page: () => const SearchPlayersScreen(),
+      page: () => FeatureFlags.socialUiEnabled
+          ? const SearchPlayersScreen()
+          : const FeatureUnavailableScreen(
+              title: 'البحث الاجتماعي غير متاح',
+              message:
+                  'بحث الأصدقاء وإرسال الطلبات متوقفان في هذا البناء حتى تفعيل السطح الاجتماعي.',
+            ),
       binding: FriendBinding(),
       transition: Transition.fadeIn,
     ),
