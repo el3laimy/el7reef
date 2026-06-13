@@ -11,6 +11,7 @@ import 'package:el7reef/core/enums/team_membership_role.dart';
 import 'package:el7reef/core/services/match_event_service.dart';
 import 'package:el7reef/core/services/match_settlement_service.dart';
 import 'package:el7reef/core/services/official_match_roster_service.dart';
+import 'package:el7reef/core/services/pending_pride_events_service.dart';
 import 'package:el7reef/core/services/tournament_lifecycle_service.dart';
 import 'package:el7reef/data/repositories/match_event_repository_impl.dart';
 import 'package:el7reef/data/models/guest_player_model.dart';
@@ -1330,6 +1331,127 @@ void main() {
     );
 
     testWidgets(
+      'pending pride retry after reload uses persisted goal payload',
+      (tester) async {
+        await tester.pumpWidget(const GetMaterialApp(home: SizedBox.shrink()));
+        await _saveMatch(
+          firestore,
+          _match(
+            id: 'match-pride-retry-payload',
+            teamAPlayerIds: const ['player-a'],
+            teamBPlayerIds: const ['player-b'],
+            scoreTeamA: 1,
+            scoreTeamB: 0,
+            status: MatchStatus.completed,
+            prideEventsPending: true,
+          ),
+        );
+        await _savePlayer(firestore, _player(id: 'player-a', name: 'أحمد'));
+        await _savePlayer(firestore, _player(id: 'player-b', name: 'باسم'));
+        await firestore
+            .collection(FirebasePaths.matches)
+            .doc('match-pride-retry-payload')
+            .collection(PendingPrideEventsService.collectionName)
+            .doc(PendingPrideEventsService.currentDocumentId)
+            .set({
+              'version': 1,
+              'matchId': 'match-pride-retry-payload',
+              'scoreTeamA': 1,
+              'scoreTeamB': 0,
+              'goals': [
+                {
+                  'sideKey': 'A',
+                  'actor': {
+                    'kind': 'player',
+                    'id': 'player-a',
+                    'displayName': 'أحمد',
+                    'linkedPlayerId': null,
+                  },
+                  'goals': 1,
+                  'minute': null,
+                },
+              ],
+              'mvp': null,
+              'createdBy': 'organizer-1',
+              'createdAt': now.millisecondsSinceEpoch,
+            });
+        final controller = _controller(
+          firestore: firestore,
+          matchId: 'match-pride-retry-payload',
+        );
+        await controller.loadMatchAndPlayers();
+
+        final updatedMatch = await controller.submit();
+
+        expect(updatedMatch, isNotNull);
+        final goals = await _activeGoalEvents(
+          firestore,
+          'match-pride-retry-payload',
+        );
+        expect(goals, hasLength(1));
+        final savedMatch = await firestore
+            .collection(FirebasePaths.matches)
+            .doc('match-pride-retry-payload')
+            .get();
+        expect(savedMatch.data()?['prideEventsPending'], isFalse);
+        final payload = await firestore
+            .collection(FirebasePaths.matches)
+            .doc('match-pride-retry-payload')
+            .collection(PendingPrideEventsService.collectionName)
+            .doc(PendingPrideEventsService.currentDocumentId)
+            .get();
+        expect(payload.exists, isFalse);
+        await _drainSnackbars(tester);
+        controller.onClose();
+      },
+    );
+
+    testWidgets(
+      'pending pride retry without payload does not clear pending state',
+      (tester) async {
+        await tester.pumpWidget(const GetMaterialApp(home: SizedBox.shrink()));
+        await _saveMatch(
+          firestore,
+          _match(
+            id: 'match-pride-retry-missing-payload',
+            teamAPlayerIds: const ['player-a'],
+            teamBPlayerIds: const ['player-b'],
+            scoreTeamA: 1,
+            scoreTeamB: 0,
+            status: MatchStatus.completed,
+            prideEventsPending: true,
+          ),
+        );
+        await _savePlayer(firestore, _player(id: 'player-a', name: 'أحمد'));
+        await _savePlayer(firestore, _player(id: 'player-b', name: 'باسم'));
+        final controller = _controller(
+          firestore: firestore,
+          matchId: 'match-pride-retry-missing-payload',
+        );
+        await controller.loadMatchAndPlayers();
+
+        final updatedMatch = await controller.submit();
+
+        expect(updatedMatch, isNull);
+        expect(controller.pendingPrideEventRetry.value, isTrue);
+        final savedMatch = await firestore
+            .collection(FirebasePaths.matches)
+            .doc('match-pride-retry-missing-payload')
+            .get();
+        expect(savedMatch.data()?['prideEventsPending'], isTrue);
+        expect(
+          await _activeGoalEvents(
+            firestore,
+            'match-pride-retry-missing-payload',
+          ),
+          isEmpty,
+        );
+        await _drainSnackbars(tester);
+        controller.onClose();
+      },
+    );
+
+    testWidgets(
       'repeated submit does not create duplicate active goal MatchEvents',
       (tester) async {
         await tester.pumpWidget(const GetMaterialApp(home: SizedBox.shrink()));
@@ -1679,6 +1801,7 @@ ScoreSubmitController _controller({
     assistantPermissionRepository: TournamentAssistantPermissionRepositoryImpl(
       firestore: firestore,
     ),
+    pendingPrideEventsService: PendingPrideEventsService(firestore: firestore),
     currentUserIdProvider: () => 'organizer-1',
   );
 }

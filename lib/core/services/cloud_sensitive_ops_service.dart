@@ -8,6 +8,16 @@ import '../utils/app_logger.dart';
 /// إذا كانت الدالة غير متاحة أو لم يتم نشرها بعد، تُرجع `null` بهدوء
 /// كي يستمر المسار المحلي القديم كخطة احتياطية.
 class CloudSensitiveOpsService {
+  static const Set<String> fallbackableFunctionErrorCodes = {
+    'unavailable',
+    'not-found',
+    'deadline-exceeded',
+  };
+
+  static bool shouldFallbackForFunctionCode(String code) {
+    return fallbackableFunctionErrorCodes.contains(code);
+  }
+
   FirebaseFunctions? get _functions {
     if (Firebase.apps.isEmpty) {
       return null;
@@ -19,6 +29,7 @@ class CloudSensitiveOpsService {
     final result = await _invokeMap(
       functionName: 'recordAuditEvent',
       payload: payload,
+      fallbackForAnyFunctionError: true,
     );
     return result != null;
   }
@@ -48,6 +59,7 @@ class CloudSensitiveOpsService {
   Future<Map<String, dynamic>?> _invokeMap({
     required String functionName,
     required Map<String, dynamic> payload,
+    bool fallbackForAnyFunctionError = false,
   }) async {
     final functions = _functions;
     if (functions == null) {
@@ -61,6 +73,18 @@ class CloudSensitiveOpsService {
         return data.map((key, value) => MapEntry(key.toString(), value));
       }
       return null;
+    } on FirebaseFunctionsException catch (error, stackTrace) {
+      AppLogger.warning('CloudSensitiveOpsService.$functionName', error);
+      AppLogger.error(
+        'CloudSensitiveOpsService.$functionName',
+        error,
+        stackTrace,
+      );
+      if (fallbackForAnyFunctionError ||
+          shouldFallbackForFunctionCode(error.code)) {
+        return null;
+      }
+      rethrow;
     } catch (error, stackTrace) {
       AppLogger.warning('CloudSensitiveOpsService.$functionName', error);
       AppLogger.error(

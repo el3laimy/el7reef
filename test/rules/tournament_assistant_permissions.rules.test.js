@@ -98,6 +98,32 @@ function matchEventData(overrides = {}) {
   };
 }
 
+function pendingPridePayloadData(overrides = {}) {
+  return {
+    version: 1,
+    matchId: 'match-1',
+    scoreTeamA: 2,
+    scoreTeamB: 1,
+    goals: [
+      {
+        sideKey: 'A',
+        actor: {
+          kind: 'guestPlayer',
+          id: 'guest-player-1',
+          displayName: 'Guest One',
+          linkedPlayerId: null,
+        },
+        goals: 1,
+        minute: null,
+      },
+    ],
+    mvp: null,
+    createdBy: 'assistant-1',
+    createdAt: now,
+    ...overrides,
+  };
+}
+
 function tournamentParticipantData(overrides = {}) {
   return {
     tournamentId: 'tournament-1',
@@ -718,10 +744,75 @@ describe('tournament assistant permission Firestore rules', () => {
           scoreTeamA: 2,
           scoreTeamB: 1,
           mvpPlayerId: null,
+          prideEventsPending: true,
           completedAt: now + 1,
           isAnomaly: false,
           status: 'completed',
         }),
+      );
+    });
+
+    it('allows assistant with event permission to clear pride retry state only', async () => {
+      await seedTournament();
+      await seed(
+        'matches/match-1',
+        matchData({
+          status: 'completed',
+          scoreTeamA: 2,
+          scoreTeamB: 1,
+          mvpPlayerId: null,
+          prideEventsPending: true,
+          completedAt: now + 1,
+          isAnomaly: false,
+        }),
+      );
+      await seedAssistant({
+        permissions: {canRecordGoalsAndMvp: true},
+      });
+      const db = authedDb('assistant-1');
+
+      await assertSucceeds(
+        updateDoc(doc(db, 'matches', 'match-1'), {
+          prideEventsPending: false,
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(db, 'matches', 'match-1'), {
+          prideEventsPending: true,
+          scoreTeamA: 5,
+        }),
+      );
+    });
+
+    it('allows score assistant to persist pending pride payload', async () => {
+      await seedTournament();
+      await seed('matches/match-1', matchData({status: 'live'}));
+      await seedAssistant({
+        permissions: {canSubmitScore: true, canRecordGoalsAndMvp: true},
+      });
+      const db = authedDb('assistant-1');
+
+      await assertSucceeds(
+        setDoc(
+          doc(db, 'matches/match-1/pendingPrideEvents/current'),
+          pendingPridePayloadData(),
+        ),
+      );
+    });
+
+    it('denies pending pride payload writes without score and event permissions', async () => {
+      await seedTournament();
+      await seed('matches/match-1', matchData({status: 'live'}));
+      await seedAssistant({
+        permissions: {canSubmitScore: true, canRecordGoalsAndMvp: false},
+      });
+      const db = authedDb('assistant-1');
+
+      await assertFails(
+        setDoc(
+          doc(db, 'matches/match-1/pendingPrideEvents/current'),
+          pendingPridePayloadData(),
+        ),
       );
     });
 
@@ -869,6 +960,13 @@ describe('tournament assistant permission Firestore rules', () => {
       await assertFails(
         setDoc(doc(db, 'knockoutTies', 'tie-1'), knockoutTieData()),
       );
+    });
+
+    it('denies structural match operation writes', async () => {
+      await seedTournamentFixture();
+      await seedAssistant();
+      const db = authedDb('assistant-1');
+
       await assertFails(
         setDoc(doc(db, 'matchSides', 'match-1_A'), matchSideData()),
       );

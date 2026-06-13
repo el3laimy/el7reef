@@ -5,15 +5,31 @@ extension ScoreSubmitPrideEvents on ScoreSubmitController {
     required Match submittedMatch,
     required String actorId,
   }) async {
-    final normalizedSelectedMvpKey = selectedMvpKey.value.trim();
-    final resolvedMvp = _resolveMvpParticipant(normalizedSelectedMvpKey);
-    if (normalizedSelectedMvpKey.isNotEmpty && resolvedMvp == null) {
-      errorMessage.value = 'تعذر تحديد أفضل لاعب من قائمة المشاركين الحالية.';
-      return null;
-    }
-
     try {
       isLoading.value = true;
+      final persistedPayload = await _pendingPrideEventsService.loadPayload(
+        submittedMatch.id,
+      );
+      final resolvedMvp = persistedPayload == null
+          ? _resolveSelectedMvpForRetry()
+          : _restorePendingPridePayload(persistedPayload);
+      if (resolvedMvp == null && selectedMvpKey.value.trim().isNotEmpty) {
+        errorMessage.value = 'تعذر تحديد أفضل لاعب من قائمة المشاركين الحالية.';
+        return null;
+      }
+      if (persistedPayload == null &&
+          allGoalDrafts.isEmpty &&
+          selectedMvpKey.value.trim().isEmpty) {
+        errorMessage.value =
+            'لم نجد بيانات الهدافين المحفوظة. أعد إدخال الهدافين أو أفضل لاعب ثم حاول مرة أخرى.';
+        Get.snackbar(
+          'أكمل بيانات الفخر',
+          errorMessage.value,
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return null;
+      }
+
       await _recordPrideEventsOrThrow(
         submittedMatch: submittedMatch,
         resolvedMvp: resolvedMvp,
@@ -38,6 +54,40 @@ extension ScoreSubmitPrideEvents on ScoreSubmitController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  ({ParticipantRef actor, String sideKey})? _resolveSelectedMvpForRetry() {
+    final normalizedSelectedMvpKey = selectedMvpKey.value.trim();
+    final resolvedMvp = _resolveMvpParticipant(normalizedSelectedMvpKey);
+    if (normalizedSelectedMvpKey.isNotEmpty && resolvedMvp == null) {
+      return null;
+    }
+    return resolvedMvp;
+  }
+
+  ({ParticipantRef actor, String sideKey})? _restorePendingPridePayload(
+    PendingPrideEventsPayload payload,
+  ) {
+    goalDrafts.assignAll(
+      payload.goals.map(
+        (draft) => ScoreSubmitGoalDraft(
+          actor: draft.actor,
+          sideKey: draft.sideKey,
+          goals: draft.goals,
+          minute: draft.minute,
+        ),
+      ),
+    );
+    for (final draft in goalDrafts) {
+      _syncRegisteredGoalStat(draft.actor, draft.goals);
+    }
+    final mvp = payload.mvp;
+    if (mvp == null) {
+      selectedMvpKey.value = '';
+      return null;
+    }
+    selectedMvpKey.value = participantKey(mvp.actor);
+    return (actor: mvp.actor, sideKey: mvp.sideKey);
   }
 
   Future<void> _recordPrideEventsOrThrow({

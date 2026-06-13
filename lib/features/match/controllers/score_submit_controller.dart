@@ -5,6 +5,7 @@ import '../../../core/enums/match_status.dart';
 import '../../../core/services/match_event_service.dart';
 import '../../../core/services/match_settlement_service.dart';
 import '../../../core/services/official_match_roster_service.dart';
+import '../../../core/services/pending_pride_events_service.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../data/repositories/match_repository_impl.dart';
 import '../../../data/repositories/match_side_player_repository_impl.dart';
@@ -79,6 +80,7 @@ class ScoreSubmitController extends GetxController {
   final TeamRepositoryImpl _teamRepository;
   final TournamentRepositoryImpl _tournamentRepository;
   final TournamentAssistantPermissionRepositoryImpl _assistantPermissionRepo;
+  final PendingPrideEventsService _pendingPrideEventsService;
   final String? Function() _currentUserIdProvider;
 
   ScoreSubmitController({
@@ -92,6 +94,7 @@ class ScoreSubmitController extends GetxController {
     TeamRepositoryImpl? teamRepository,
     TournamentRepositoryImpl? tournamentRepository,
     TournamentAssistantPermissionRepositoryImpl? assistantPermissionRepository,
+    PendingPrideEventsService? pendingPrideEventsService,
     String? Function()? currentUserIdProvider,
   }) : _matchRepo = matchRepository ?? MatchRepositoryImpl(),
        _settlementService = settlementService ?? MatchSettlementService(),
@@ -107,6 +110,8 @@ class ScoreSubmitController extends GetxController {
        _assistantPermissionRepo =
            assistantPermissionRepository ??
            TournamentAssistantPermissionRepositoryImpl(),
+       _pendingPrideEventsService =
+           pendingPrideEventsService ?? PendingPrideEventsService(),
        _currentUserIdProvider =
            currentUserIdProvider ??
            (() => Get.find<AuthService>().currentUserId) {
@@ -491,8 +496,20 @@ class ScoreSubmitController extends GetxController {
       ),
     ];
 
+    var pendingPayloadSaved = false;
     try {
       isLoading.value = true;
+      await _pendingPrideEventsService.savePayload(
+        _buildPendingPridePayload(
+          matchId: currentMatch.id,
+          scoreA: scoreA,
+          scoreB: scoreB,
+          resolvedMvp: resolvedMvp,
+          actorId: actorId,
+        ),
+      );
+      pendingPayloadSaved = true;
+
       final result = await _settlementService.submitScore(
         matchId: currentMatch.id,
         actorId: actorId,
@@ -550,6 +567,9 @@ class ScoreSubmitController extends GetxController {
 
       return updatedMatch;
     } catch (error) {
+      if (pendingPayloadSaved) {
+        await _clearPendingPridePayloadQuietly(currentMatch.id);
+      }
       errorMessage.value = 'فشل حفظ النتيجة: ${_readableError(error)}';
       Get.snackbar(
         'خطأ',
@@ -580,7 +600,11 @@ class ScoreSubmitController extends GetxController {
   Future<void> _clearPrideEventRetryState(Match submittedMatch) async {
     final clearedMatch = submittedMatch.copyWith(prideEventsPending: false);
     try {
-      await _matchRepo.updateMatch(clearedMatch);
+      await _matchRepo.updatePrideEventsPending(
+        matchId: submittedMatch.id,
+        isPending: false,
+      );
+      await _clearPendingPridePayloadQuietly(submittedMatch.id);
       match.value = clearedMatch;
       pendingPrideEventRetry.value = false;
     } catch (error, stackTrace) {
@@ -591,6 +615,51 @@ class ScoreSubmitController extends GetxController {
       );
       match.value = submittedMatch.copyWith(prideEventsPending: true);
       pendingPrideEventRetry.value = true;
+    }
+  }
+
+  PendingPrideEventsPayload _buildPendingPridePayload({
+    required String matchId,
+    required int scoreA,
+    required int scoreB,
+    required ({ParticipantRef actor, String sideKey})? resolvedMvp,
+    required String actorId,
+  }) {
+    return PendingPrideEventsPayload(
+      matchId: matchId,
+      scoreTeamA: scoreA,
+      scoreTeamB: scoreB,
+      goals: allGoalDrafts
+          .where((draft) => draft.goals > 0)
+          .map(
+            (draft) => PendingPrideGoalDraft(
+              sideKey: draft.sideKey,
+              actor: draft.actor,
+              goals: draft.goals,
+              minute: draft.minute,
+            ),
+          )
+          .toList(growable: false),
+      mvp: resolvedMvp == null
+          ? null
+          : PendingPrideMvpDraft(
+              sideKey: resolvedMvp.sideKey,
+              actor: resolvedMvp.actor,
+            ),
+      createdBy: actorId,
+      createdAt: DateTime.now(),
+    );
+  }
+
+  Future<void> _clearPendingPridePayloadQuietly(String matchId) async {
+    try {
+      await _pendingPrideEventsService.clearPayload(matchId);
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'ScoreSubmitController._clearPendingPridePayloadQuietly',
+        error,
+        stackTrace,
+      );
     }
   }
 

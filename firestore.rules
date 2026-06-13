@@ -748,10 +748,6 @@ service cloud.firestore {
       return data.get(key, null) == null || data.get(key, null) is int;
     }
 
-    function nullableBool(data, key) {
-      return data.get(key, null) == null || data.get(key, null) is bool;
-    }
-
     function isAllowedAssistantPermissionName(permissionName) {
       return permissionName in [
         'canViewMatchday',
@@ -803,6 +799,7 @@ service cloud.firestore {
             'scoreTeamA',
             'scoreTeamB',
             'mvpPlayerId',
+            'prideEventsPending',
             'completedAt',
             'isAnomaly',
             'status'
@@ -811,8 +808,19 @@ service cloud.firestore {
         request.resource.data.scoreTeamA is int &&
         request.resource.data.scoreTeamB is int &&
         nullableString(request.resource.data, 'mvpPlayerId') &&
+        request.resource.data.prideEventsPending == true &&
         request.resource.data.isAnomaly is bool &&
         request.resource.data.completedAt is int;
+    }
+
+    function isAssistantPrideEventsPendingClear(matchId) {
+      return hasActiveAssistantPermissionForMatch(matchId, 'canRecordGoalsAndMvp') &&
+        resource.data.status in ['completed', 'pendingReview'] &&
+        resource.data.isFrozen != true &&
+        resource.data.prideEventsPending == true &&
+        request.resource.data.prideEventsPending == false &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['prideEventsPending']);
     }
 
     function isAssistantLineupSnapshotIdUpdate(matchId) {
@@ -1088,6 +1096,35 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/matches/$(matchId)) &&
         get(/databases/$(database)/documents/matches/$(matchId))
           .data.organizerId == request.auth.uid;
+    }
+
+    function canSubmitAndRecordForMatch(matchId) {
+      return isMatchOrganizerById(matchId) ||
+        (
+          hasActiveAssistantPermissionForMatch(matchId, 'canSubmitScore') &&
+          hasActiveAssistantPermissionForMatch(matchId, 'canRecordGoalsAndMvp')
+        );
+    }
+
+    function isValidPendingPridePayload(data, matchId) {
+      return data.keys().hasOnly([
+          'version',
+          'matchId',
+          'scoreTeamA',
+          'scoreTeamB',
+          'goals',
+          'mvp',
+          'createdBy',
+          'createdAt'
+        ]) &&
+        data.version is int &&
+        data.matchId == matchId &&
+        data.scoreTeamA is int &&
+        data.scoreTeamB is int &&
+        data.goals is list &&
+        (data.mvp == null || data.mvp is map) &&
+        data.createdBy == request.auth.uid &&
+        data.createdAt is int;
     }
 
     function isOptionalString(value) {
@@ -1701,7 +1738,8 @@ service cloud.firestore {
       allow update: if isMatchOrganizer() ||
         isAssistantLineupSnapshotIdUpdate(matchId) ||
         isAssistantScoreApprovalUpdate(matchId) ||
-        isAssistantScoreSubmissionUpdate(matchId);
+        isAssistantScoreSubmissionUpdate(matchId) ||
+        isAssistantPrideEventsPendingClear(matchId);
       allow delete: if false;
 
       match /player_stats/{playerId} {
@@ -1709,6 +1747,15 @@ service cloud.firestore {
         allow create, update: if isMatchOrganizerById(matchId) ||
           hasActiveAssistantPermissionForMatch(matchId, 'canSubmitScore');
         allow delete: if false;
+      }
+
+      match /pendingPrideEvents/{payloadId} {
+        allow read: if isAuthenticated();
+        allow create, update: if payloadId == 'current' &&
+          canSubmitAndRecordForMatch(matchId) &&
+          isValidPendingPridePayload(request.resource.data, matchId);
+        allow delete: if payloadId == 'current' &&
+          canSubmitAndRecordForMatch(matchId);
       }
     }
 
