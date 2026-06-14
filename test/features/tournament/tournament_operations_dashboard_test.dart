@@ -14,6 +14,8 @@ import 'package:el7reef/core/enums/tournament_enums.dart';
 import 'package:el7reef/core/enums/tournament_ops_enums.dart';
 import 'package:el7reef/core/services/match_event_service.dart';
 import 'package:el7reef/core/services/match_settlement_service.dart';
+import 'package:el7reef/core/services/guest_team_roster_service.dart';
+import 'package:el7reef/core/services/tournament_audit_emitter.dart';
 import 'package:el7reef/core/services/tournament_top_scorers_resolver.dart';
 import 'package:el7reef/core/services/tournament_fixture_service.dart';
 import 'package:el7reef/core/services/tournament_lifecycle_service.dart';
@@ -24,6 +26,7 @@ import 'package:el7reef/data/repositories/match_event_repository_impl.dart';
 import 'package:el7reef/data/models/match_check_in_model.dart';
 import 'package:el7reef/data/models/match_lineup_snapshot_model.dart';
 import 'package:el7reef/data/repositories/guest_team_repository_impl.dart';
+import 'package:el7reef/data/repositories/guest_player_repository_impl.dart';
 import 'package:el7reef/data/repositories/group_standing_snapshot_repository_impl.dart';
 import 'package:el7reef/data/repositories/knockout_bracket_repository_impl.dart';
 import 'package:el7reef/data/repositories/knockout_tie_repository_impl.dart';
@@ -33,6 +36,7 @@ import 'package:el7reef/data/repositories/tournament_group_repository_impl.dart'
 import 'package:el7reef/data/repositories/tournament_repository_impl.dart';
 import 'package:el7reef/domain/entities/player.dart';
 import 'package:el7reef/domain/entities/team.dart';
+import 'package:el7reef/domain/entities/guest_team.dart';
 import 'package:el7reef/domain/entities/tournament.dart';
 import 'package:el7reef/domain/entities/match.dart';
 import 'package:el7reef/domain/entities/match_check_in.dart';
@@ -41,7 +45,9 @@ import 'package:el7reef/domain/entities/match_lineup_snapshot.dart';
 import 'package:el7reef/domain/entities/participant_ref.dart';
 import 'package:el7reef/features/tournament/controllers/tournament_detail_controller.dart';
 import 'package:el7reef/features/tournament/controllers/tournament_operations_controller.dart';
+import 'package:el7reef/features/tournament/bindings/tournament_guest_team_roster_binding.dart';
 import 'package:el7reef/features/tournament/views/tournament_detail_screen.dart';
+import 'package:el7reef/features/tournament/views/tournament_guest_team_roster_screen.dart';
 import 'package:el7reef/features/tournament/views/tournament_organizer_guard.dart';
 import 'package:el7reef/features/tournament/views/tournament_operations_screens.dart';
 import 'package:el7reef/core/auth/auth_service.dart';
@@ -50,6 +56,8 @@ void main() {
   late FakeFirebaseFirestore firestore;
   late TournamentRepositoryImpl tournamentRepository;
   late TeamRepositoryImpl teamRepository;
+  late GuestTeamRepositoryImpl guestTeamRepository;
+  late GuestPlayerRepositoryImpl guestPlayerRepository;
   late TournamentRegistrationService registrationService;
   late _FakeAuthService authService;
 
@@ -58,12 +66,16 @@ void main() {
     firestore = FakeFirebaseFirestore();
     tournamentRepository = TournamentRepositoryImpl(db: firestore);
     teamRepository = TeamRepositoryImpl(firestore: firestore);
+    guestTeamRepository = GuestTeamRepositoryImpl(firestore: firestore);
+    guestPlayerRepository = GuestPlayerRepositoryImpl(firestore: firestore);
     registrationService = TournamentRegistrationService(firestore: firestore);
 
     Get.put<TournamentRepositoryImpl>(tournamentRepository, permanent: true);
     Get.put<TeamRepositoryImpl>(teamRepository, permanent: true);
-    Get.put<GuestTeamRepositoryImpl>(
-      GuestTeamRepositoryImpl(firestore: firestore),
+    Get.put<GuestTeamRepositoryImpl>(guestTeamRepository, permanent: true);
+    Get.put<GuestPlayerRepositoryImpl>(guestPlayerRepository, permanent: true);
+    Get.put<TournamentAuditEmitter>(
+      TournamentAuditEmitter(firestore: firestore),
       permanent: true,
     );
     Get.put<TournamentGroupRepositoryImpl>(
@@ -116,6 +128,15 @@ void main() {
       MatchSettlementService(
         firestore: firestore,
         tournamentLifecycleService: Get.find<TournamentLifecycleService>(),
+      ),
+      permanent: true,
+    );
+    Get.put<GuestTeamRosterService>(
+      GuestTeamRosterService(
+        guestPlayerRepository: guestPlayerRepository,
+        guestTeamRepository: guestTeamRepository,
+        tournamentRepository: tournamentRepository,
+        auditEmitter: Get.find<TournamentAuditEmitter>(),
       ),
       permanent: true,
     );
@@ -360,7 +381,9 @@ void main() {
     expect(find.text('هدافو البطولة'), findsOneWidget);
     expect(find.text('لم يتم تسجيل هدافين بعد'), findsOneWidget);
     expect(
-      find.text('بعد أول نتيجة بأهداف، ستظهر منصة الهدافين هنا ويصبح كارت المشاركة جاهزًا.'),
+      find.text(
+        'بعد أول نتيجة بأهداف، ستظهر منصة الهدافين هنا ويصبح كارت المشاركة جاهزًا.',
+      ),
       findsOneWidget,
     );
     expect(find.text('شارك لوحة الهدافين'), findsNothing);
@@ -875,6 +898,64 @@ void main() {
 
     expect(find.text('Green Falcons'), findsOneWidget);
   });
+
+  testWidgets('guest participant opens operational guest roster screen', (
+    tester,
+  ) async {
+    final now = DateTime(2026, 4, 20, 20);
+    await guestTeamRepository.createGuestTeam(
+      GuestTeam(
+        id: 'guest-team-1',
+        name: 'ضيوف الحارة',
+        normalizedName: 'ضيوف الحارة',
+        creatorId: 'organizer-1',
+        tournamentIds: const ['tournament-1'],
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await Get.find<TournamentParticipantService>().addManualParticipant(
+      tournamentId: 'tournament-1',
+      sourceType: TournamentParticipantSourceType.guestTeam,
+      sourceEntityId: 'guest-team-1',
+      actorId: 'organizer-1',
+      now: now.add(const Duration(minutes: 1)),
+    );
+
+    await tester.pumpWidget(
+      _buildOpsApp(AppRoutes.tournamentParticipantsById('tournament-1')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('ضيوف الحارة'), findsOneWidget);
+    final manageRosterButton = find.widgetWithText(
+      OutlinedButton,
+      'إدارة اللاعبين',
+    );
+    await tester.drag(find.byType(ListView).first, const Offset(0, -520));
+    await tester.pumpAndSettle();
+    await tester.tap(manageRosterButton);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TournamentGuestTeamRosterScreen), findsOneWidget);
+    expect(find.text('ضيوف الحارة'), findsOneWidget);
+    expect(find.text('إضافة أول لاعب'), findsOneWidget);
+
+    await tester.tap(find.text('إضافة أول لاعب'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).at(0), 'حسن الضيف');
+    await tester.enterText(find.byType(TextField).at(2), '9');
+    await tester.enterText(find.byType(TextField).at(3), 'مهاجم');
+    await tester.tap(find.text('إضافة اللاعب'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('حسن الضيف'), findsOneWidget);
+    expect(find.text('9'), findsOneWidget);
+    expect(find.textContaining('مهاجم'), findsOneWidget);
+    Get.closeAllSnackbars();
+    await tester.pumpAndSettle();
+  });
 }
 
 Widget _buildOpsApp(String initialRoute) {
@@ -931,6 +1012,11 @@ Widget _buildOpsApp(String initialRoute) {
         page: () =>
             const TournamentOrganizerGuard(child: TournamentBracketScreen()),
         binding: _TestTournamentOperationsBinding(),
+      ),
+      GetPage(
+        name: AppRoutes.tournamentGuestTeamRoster,
+        page: () => const TournamentGuestTeamRosterScreen(),
+        binding: TournamentGuestTeamRosterBinding(),
       ),
     ],
   );

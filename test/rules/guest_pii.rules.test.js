@@ -7,7 +7,7 @@ const {
   initializeTestEnvironment,
 } = require('@firebase/rules-unit-testing');
 
-const {doc, getDoc, setDoc} = require('firebase/firestore');
+const {doc, getDoc, setDoc, updateDoc} = require('firebase/firestore');
 
 const projectId = 'demo-no-project';
 const now = 1770000000000;
@@ -160,5 +160,42 @@ describe('guest PII Firestore rules', () => {
     assert.strictEqual(creatorSnapshot.exists(), true);
     assert.strictEqual(organizerSnapshot.exists(), true);
     assert.strictEqual(creatorSnapshot.data().contactPhone, '01111111111');
+  });
+
+  it('allows tournament organizer to update only guest team roster captain', async () => {
+    await seedTournament('tournament-1', {organizerId: 'organizer-1'});
+    await seedGuestTeam('guest-team-1', {
+      creatorId: 'guest-creator-1',
+      tournamentIds: ['tournament-1'],
+    });
+    await seedGuestPlayer('guest-player-1', {
+      teamId: null,
+      guestTeamId: 'guest-team-1',
+      tournamentId: 'tournament-1',
+      claimStatus: 'guest',
+      createdBy: 'guest-creator-1',
+    });
+
+    const organizerDb = testEnv.authenticatedContext('organizer-1').firestore();
+    const attackerDb = testEnv.authenticatedContext('attacker-1').firestore();
+
+    await assertSucceeds(
+      updateDoc(doc(organizerDb, 'guestTeams', 'guest-team-1'), {
+        captainGuestPlayerId: 'guest-player-1',
+        updatedAt: now + 1,
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(attackerDb, 'guestTeams', 'guest-team-1'), {
+        captainGuestPlayerId: null,
+        updatedAt: now + 2,
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(organizerDb, 'guestTeams', 'guest-team-1'), {
+        contactPhone: '01999999999',
+        updatedAt: now + 3,
+      }),
+    );
   });
 });

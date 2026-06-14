@@ -31,6 +31,8 @@ abstract class AppRoutes {
   static const String tournamentFixtures = '/tournament/:id/fixtures';
   static const String tournamentStandings = '/tournament/:id/standings';
   static const String tournamentAssistants = '/tournament/:id/assistants';
+  static const String tournamentGuestTeamRoster =
+      '/tournament/:id/guest-team/:guestTeamId/roster';
   static const String teamRegistration = '/tournament/:id/register';
   static const String tournamentGuestTeamCreate =
       '/tournament/:id/register/guest-team/create';
@@ -78,6 +80,10 @@ abstract class AppRoutes {
       '/tournament/$id/standings';
   static String tournamentAssistantsById(String id) =>
       '/tournament/$id/assistants';
+  static String tournamentGuestTeamRosterById({
+    required String tournamentId,
+    required String guestTeamId,
+  }) => '/tournament/$tournamentId/guest-team/$guestTeamId/roster';
   static String teamRegistrationForTournament(String tournamentId) =>
       '/tournament/$tournamentId/register';
   static String tournamentGuestTeamCreateForTournament(String tournamentId) =>

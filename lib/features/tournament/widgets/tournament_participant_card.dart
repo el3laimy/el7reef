@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
+import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/enums/tournament_ops_enums.dart';
 import '../../../core/widgets/el7reef_surface.dart';
 import '../../../domain/entities/tournament_participant.dart';
 import '../controllers/tournament_operations_controller.dart';
@@ -51,8 +54,7 @@ class TournamentParticipantCard extends StatelessWidget {
                     if (participant.replacedByParticipantId != null &&
                         participant.replacedByParticipantId!.isNotEmpty)
                       Padding(
-                        padding:
-                            const EdgeInsets.only(top: AppDimensions.xs),
+                        padding: const EdgeInsets.only(top: AppDimensions.xs),
                         child: Text(
                           'تم استبداله بواسطة: ${controller.participantLabelFor(participant.replacedByParticipantId)}',
                           style: AppTextStyles.bodySmall,
@@ -61,8 +63,7 @@ class TournamentParticipantCard extends StatelessWidget {
                     if (participant.replacementForParticipantId != null &&
                         participant.replacementForParticipantId!.isNotEmpty)
                       Padding(
-                        padding:
-                            const EdgeInsets.only(top: AppDimensions.xs),
+                        padding: const EdgeInsets.only(top: AppDimensions.xs),
                         child: Text(
                           'بديل عن: ${controller.participantLabelFor(participant.replacementForParticipantId)}',
                           style: AppTextStyles.bodySmall,
@@ -73,8 +74,7 @@ class TournamentParticipantCard extends StatelessWidget {
               ),
               TournamentStatusChip(
                 label: participantStatusLabel(participant.status),
-                backgroundColor:
-                    participantStatusColor(participant.status),
+                backgroundColor: participantStatusColor(participant.status),
               ),
             ],
           ),
@@ -90,8 +90,7 @@ class TournamentParticipantCard extends StatelessWidget {
               if (participant.seed != null)
                 TournamentStatusChip(
                   label: 'تصنيف ${participant.seed}',
-                  backgroundColor:
-                      AppColors.primary.withValues(alpha: 0.15),
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.15),
                 ),
             ],
           ),
@@ -103,22 +102,36 @@ class TournamentParticipantCard extends StatelessWidget {
               children: [
                 if (canEditSeed)
                   OutlinedButton.icon(
-                    onPressed: () => showSeedEditorDialog(
-                        context, controller, participant),
+                    onPressed: () =>
+                        showSeedEditorDialog(context, controller, participant),
                     icon: const Icon(Icons.tag, size: 16),
                     label: const Text('تعديل التصنيف'),
+                  ),
+                if (participant.sourceType ==
+                    TournamentParticipantSourceType.guestTeam)
+                  OutlinedButton.icon(
+                    onPressed: () => Get.toNamed(
+                      AppRoutes.tournamentGuestTeamRosterById(
+                        tournamentId: participant.tournamentId,
+                        guestTeamId: participant.sourceEntityId,
+                      ),
+                    ),
+                    icon: const Icon(Icons.groups_2_outlined, size: 16),
+                    label: const Text('إدارة اللاعبين'),
                   ),
                 if (canReplace)
                   OutlinedButton.icon(
                     onPressed: () => showReplaceParticipantDialog(
-                        context, controller, participant),
+                      context,
+                      controller,
+                      participant,
+                    ),
                     icon: const Icon(Icons.swap_horiz, size: 16),
                     label: const Text('استبدال'),
                   ),
                 OutlinedButton.icon(
                   onPressed: canWithdraw
-                      ? () =>
-                          controller.withdrawParticipant(participant.id)
+                      ? () => controller.withdrawParticipant(participant.id)
                       : null,
                   icon: const Icon(Icons.person_remove_alt_1, size: 16),
                   label: const Text('سحب'),
@@ -128,8 +141,7 @@ class TournamentParticipantCard extends StatelessWidget {
           ] else if (canReactivate) ...[
             const SizedBox(height: AppDimensions.md),
             OutlinedButton.icon(
-              onPressed: () =>
-                  controller.reactivateParticipant(participant.id),
+              onPressed: () => controller.reactivateParticipant(participant.id),
               icon: const Icon(Icons.settings_backup_restore, size: 16),
               label: const Text('إعادة تفعيل'),
             ),

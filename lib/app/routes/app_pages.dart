@@ -38,12 +38,14 @@ import '../../features/tournament/views/tournament_registration_screen.dart';
 import '../../features/tournament/views/tournament_guest_team_create_screen.dart';
 import '../../features/tournament/views/tournament_registration_review_screen.dart';
 import '../../features/tournament/views/tournament_assistants_screen.dart';
+import '../../features/tournament/views/tournament_guest_team_roster_screen.dart';
 import '../../features/tournament/views/tournament_operations_screens.dart';
 import '../../features/tournament/views/tournament_organizer_guard.dart';
 import '../../features/tournament/bindings/tournament_binding.dart';
 import '../../features/tournament/bindings/tournament_detail_binding.dart';
 import '../../features/tournament/bindings/tournament_registration_binding.dart';
 import '../../features/tournament/bindings/tournament_guest_team_create_binding.dart';
+import '../../features/tournament/bindings/tournament_guest_team_roster_binding.dart';
 import '../../features/tournament/bindings/tournament_registration_review_binding.dart';
 import '../../features/tournament/bindings/tournament_assistants_binding.dart';
 import '../../features/tournament/bindings/tournament_operations_binding.dart';
@@ -355,6 +357,13 @@ class AppPages {
       page: () =>
           const TournamentOrganizerGuard(child: TournamentAssistantsScreen()),
       binding: TournamentAssistantsBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    GetPage(
+      name: AppRoutes.tournamentGuestTeamRoster,
+      page: () => const TournamentGuestTeamRosterScreen(),
+      binding: TournamentGuestTeamRosterBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
 

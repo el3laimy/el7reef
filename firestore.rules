@@ -117,6 +117,32 @@ service cloud.firestore {
         data.creatorId == request.auth.uid;
     }
 
+    function canOrganizerUpdateGuestTeamRosterCaptain(guestTeamId) {
+      return isAuthenticated() &&
+        resource.data.tournamentIds is list &&
+        canReadGuestTeamByTournamentIds(resource.data.tournamentIds) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['captainGuestPlayerId', 'updatedAt']) &&
+        request.resource.data.creatorId == resource.data.creatorId &&
+        request.resource.data.tournamentIds == resource.data.tournamentIds &&
+        request.resource.data.updatedAt is int &&
+        (
+          request.resource.data.captainGuestPlayerId == null ||
+          (
+            request.resource.data.captainGuestPlayerId is string &&
+            exists(
+              /databases/$(database)/documents/guestPlayers/$(request.resource.data.captainGuestPlayerId)
+            ) &&
+            get(
+              /databases/$(database)/documents/guestPlayers/$(request.resource.data.captainGuestPlayerId)
+            ).data.guestTeamId == guestTeamId &&
+            get(
+              /databases/$(database)/documents/guestPlayers/$(request.resource.data.captainGuestPlayerId)
+            ).data.claimStatus != 'archived'
+          )
+        );
+    }
+
     function canReadGuestTeam(data) {
       return isAuthenticated() &&
         (
@@ -1728,7 +1754,8 @@ service cloud.firestore {
       allow update: if (
         canManageGuestTeam(resource.data) &&
         request.resource.data.creatorId == resource.data.creatorId
-      ) || canSelfClaimGuestTeam(guestTeamId);
+      ) || canSelfClaimGuestTeam(guestTeamId) ||
+        canOrganizerUpdateGuestTeamRosterCaptain(guestTeamId);
       allow delete: if false;
     }
 
