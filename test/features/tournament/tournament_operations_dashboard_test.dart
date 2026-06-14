@@ -32,6 +32,7 @@ import 'package:el7reef/data/repositories/knockout_bracket_repository_impl.dart'
 import 'package:el7reef/data/repositories/knockout_tie_repository_impl.dart';
 import 'package:el7reef/data/repositories/match_repository_impl.dart';
 import 'package:el7reef/data/repositories/team_repository_impl.dart';
+import 'package:el7reef/data/repositories/tournament_assistant_permission_repository_impl.dart';
 import 'package:el7reef/data/repositories/tournament_group_repository_impl.dart';
 import 'package:el7reef/data/repositories/tournament_repository_impl.dart';
 import 'package:el7reef/domain/entities/player.dart';
@@ -58,6 +59,8 @@ void main() {
   late TeamRepositoryImpl teamRepository;
   late GuestTeamRepositoryImpl guestTeamRepository;
   late GuestPlayerRepositoryImpl guestPlayerRepository;
+  late TournamentAssistantPermissionRepositoryImpl
+  assistantPermissionRepository;
   late TournamentRegistrationService registrationService;
   late _FakeAuthService authService;
 
@@ -68,6 +71,9 @@ void main() {
     teamRepository = TeamRepositoryImpl(firestore: firestore);
     guestTeamRepository = GuestTeamRepositoryImpl(firestore: firestore);
     guestPlayerRepository = GuestPlayerRepositoryImpl(firestore: firestore);
+    assistantPermissionRepository = TournamentAssistantPermissionRepositoryImpl(
+      firestore: firestore,
+    );
     registrationService = TournamentRegistrationService(firestore: firestore);
 
     Get.put<TournamentRepositoryImpl>(tournamentRepository, permanent: true);
@@ -136,6 +142,7 @@ void main() {
         guestPlayerRepository: guestPlayerRepository,
         guestTeamRepository: guestTeamRepository,
         tournamentRepository: tournamentRepository,
+        assistantPermissionRepository: assistantPermissionRepository,
         auditEmitter: Get.find<TournamentAuditEmitter>(),
       ),
       permanent: true,

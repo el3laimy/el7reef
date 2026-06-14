@@ -8,6 +8,7 @@ import '../../../core/services/tournament_audit_emitter.dart';
 import '../../../core/services/tournament_permission_service.dart';
 import '../../../data/repositories/guest_player_repository_impl.dart';
 import '../../../data/repositories/guest_team_repository_impl.dart';
+import '../../../data/repositories/tournament_assistant_permission_repository_impl.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
 import '../controllers/tournament_guest_team_roster_controller.dart';
 
@@ -23,6 +24,11 @@ class TournamentGuestTeamRosterBinding extends Bindings {
     if (!Get.isRegistered<GuestPlayerRepositoryImpl>()) {
       Get.lazyPut<GuestPlayerRepositoryImpl>(() => GuestPlayerRepositoryImpl());
     }
+    if (!Get.isRegistered<TournamentAssistantPermissionRepositoryImpl>()) {
+      Get.lazyPut<TournamentAssistantPermissionRepositoryImpl>(
+        () => TournamentAssistantPermissionRepositoryImpl(),
+      );
+    }
     if (!Get.isRegistered<TournamentAuditEmitter>()) {
       Get.lazyPut<TournamentAuditEmitter>(() => TournamentAuditEmitter());
     }
@@ -37,6 +43,8 @@ class TournamentGuestTeamRosterBinding extends Bindings {
           guestPlayerRepository: Get.find<GuestPlayerRepositoryImpl>(),
           guestTeamRepository: Get.find<GuestTeamRepositoryImpl>(),
           tournamentRepository: Get.find<TournamentRepositoryImpl>(),
+          assistantPermissionRepository:
+              Get.find<TournamentAssistantPermissionRepositoryImpl>(),
           tournamentPermissionService: Get.find<TournamentPermissionService>(),
           auditEmitter: Get.find<TournamentAuditEmitter>(),
         ),

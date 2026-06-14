@@ -97,7 +97,15 @@ service cloud.firestore {
         (data.createdBy is string && data.createdBy == request.auth.uid) ||
         (data.teamId is string && canManageTeamById(data.teamId)) ||
         (data.guestTeamId is string && ownsGuestTeamById(data.guestTeamId)) ||
-        (data.tournamentId is string && organizesTournamentById(data.tournamentId))
+        (data.tournamentId is string && organizesTournamentById(data.tournamentId)) ||
+        (
+          data.guestTeamId is string &&
+          data.tournamentId is string &&
+          hasGuestRosterAssistantPermissionForGuestTeam(
+            data.guestTeamId,
+            data.tournamentId
+          )
+        )
       );
     }
 
@@ -107,7 +115,15 @@ service cloud.firestore {
         (
           (data.teamId is string && canManageTeamById(data.teamId)) ||
           (data.guestTeamId is string && ownsGuestTeamById(data.guestTeamId)) ||
-          (data.tournamentId is string && organizesTournamentById(data.tournamentId))
+          (data.tournamentId is string && organizesTournamentById(data.tournamentId)) ||
+          (
+            data.guestTeamId is string &&
+            data.tournamentId is string &&
+            hasGuestRosterAssistantPermissionForGuestTeam(
+              data.guestTeamId,
+              data.tournamentId
+            )
+          )
         );
     }
 
@@ -117,10 +133,13 @@ service cloud.firestore {
         data.creatorId == request.auth.uid;
     }
 
-    function canOrganizerUpdateGuestTeamRosterCaptain(guestTeamId) {
+    function canUpdateGuestTeamRosterCaptain(guestTeamId) {
       return isAuthenticated() &&
         resource.data.tournamentIds is list &&
-        canReadGuestTeamByTournamentIds(resource.data.tournamentIds) &&
+        (
+          canReadGuestTeamByTournamentIds(resource.data.tournamentIds) ||
+          canManageGuestRosterByTournamentIds(resource.data.tournamentIds)
+        ) &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['captainGuestPlayerId', 'updatedAt']) &&
         request.resource.data.creatorId == resource.data.creatorId &&
@@ -147,7 +166,8 @@ service cloud.firestore {
       return isAuthenticated() &&
         (
           (data.creatorId is string && data.creatorId == request.auth.uid) ||
-          canReadGuestTeamByTournamentIds(data.tournamentIds)
+          canReadGuestTeamByTournamentIds(data.tournamentIds) ||
+          canManageGuestRosterByTournamentIds(data.tournamentIds)
         );
     }
 
@@ -179,6 +199,71 @@ service cloud.firestore {
             tournamentIds[4] is string &&
             organizesTournamentById(tournamentIds[4])
           )
+        );
+    }
+
+    function canManageGuestRosterByTournamentIds(tournamentIds) {
+      return tournamentIds is list &&
+        (
+          (
+            tournamentIds.size() > 0 &&
+            tournamentIds[0] is string &&
+            hasActiveTournamentAssistantPermission(
+              tournamentIds[0],
+              'canManageGuestRoster'
+            )
+          ) ||
+          (
+            tournamentIds.size() > 1 &&
+            tournamentIds[1] is string &&
+            hasActiveTournamentAssistantPermission(
+              tournamentIds[1],
+              'canManageGuestRoster'
+            )
+          ) ||
+          (
+            tournamentIds.size() > 2 &&
+            tournamentIds[2] is string &&
+            hasActiveTournamentAssistantPermission(
+              tournamentIds[2],
+              'canManageGuestRoster'
+            )
+          ) ||
+          (
+            tournamentIds.size() > 3 &&
+            tournamentIds[3] is string &&
+            hasActiveTournamentAssistantPermission(
+              tournamentIds[3],
+              'canManageGuestRoster'
+            )
+          ) ||
+          (
+            tournamentIds.size() > 4 &&
+            tournamentIds[4] is string &&
+            hasActiveTournamentAssistantPermission(
+              tournamentIds[4],
+              'canManageGuestRoster'
+            )
+          )
+        );
+    }
+
+    function hasGuestRosterAssistantPermissionForGuestTeam(
+      guestTeamId,
+      tournamentId
+    ) {
+      return isAuthenticated() &&
+        guestTeamId is string &&
+        tournamentId is string &&
+        exists(/databases/$(database)/documents/guestTeams/$(guestTeamId)) &&
+        get(/databases/$(database)/documents/guestTeams/$(guestTeamId))
+          .data.tournamentIds is list &&
+        tournamentId in
+          get(/databases/$(database)/documents/guestTeams/$(guestTeamId))
+            .data.tournamentIds &&
+        hasActiveTournamentAssistantPermission(
+          tournamentId,
+          'canManageGuestRoster'
         );
     }
 
@@ -781,7 +866,8 @@ service cloud.firestore {
         'canSubmitScore',
         'canRecordGoalsAndMvp',
         'canApproveScore',
-        'canDeclareForfeit'
+        'canDeclareForfeit',
+        'canManageGuestRoster'
       ];
     }
 
@@ -967,7 +1053,8 @@ service cloud.firestore {
           'canSubmitScore',
           'canRecordGoalsAndMvp',
           'canApproveScore',
-          'canDeclareForfeit'
+          'canDeclareForfeit',
+          'canManageGuestRoster'
         ]) &&
         permissions.keys().hasAll([
           'canViewMatchday',
@@ -975,14 +1062,16 @@ service cloud.firestore {
           'canSubmitScore',
           'canRecordGoalsAndMvp',
           'canApproveScore',
-          'canDeclareForfeit'
+          'canDeclareForfeit',
+          'canManageGuestRoster'
         ]) &&
         permissions.canViewMatchday is bool &&
         permissions.canStartMatch is bool &&
         permissions.canSubmitScore is bool &&
         permissions.canRecordGoalsAndMvp is bool &&
         permissions.canApproveScore is bool &&
-        permissions.canDeclareForfeit is bool;
+        permissions.canDeclareForfeit is bool &&
+        permissions.canManageGuestRoster is bool;
     }
 
     function validAssistantPermissionLifecycle(data) {
@@ -1755,7 +1844,7 @@ service cloud.firestore {
         canManageGuestTeam(resource.data) &&
         request.resource.data.creatorId == resource.data.creatorId
       ) || canSelfClaimGuestTeam(guestTeamId) ||
-        canOrganizerUpdateGuestTeamRosterCaptain(guestTeamId);
+        canUpdateGuestTeamRosterCaptain(guestTeamId);
       allow delete: if false;
     }
 

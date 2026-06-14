@@ -461,6 +461,7 @@ describe('tournament permission Firestore rules', () => {
           canRecordGoalsAndMvp: false,
           canApproveScore: false,
           canDeclareForfeit: false,
+          canManageGuestRoster: false,
         },
         createdAt: now,
         updatedAt: now,

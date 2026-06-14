@@ -539,6 +539,7 @@ Future<void> _seedAssistantPermission(
           'canRecordGoalsAndMvp': canRecordGoalsAndMvp,
           'canApproveScore': false,
           'canDeclareForfeit': false,
+          'canManageGuestRoster': false,
         },
         'createdAt': timestamp,
         'updatedAt': timestamp,

@@ -235,6 +235,46 @@ function matchSidePlayerData(overrides = {}) {
   };
 }
 
+function guestTeamData(overrides = {}) {
+  return {
+    name: 'Guest Team',
+    normalizedName: 'guest team',
+    creatorId: 'guest-creator-1',
+    contactName: 'Guest Captain',
+    contactPhone: '01111111111',
+    logoUrl: null,
+    tournamentIds: ['tournament-1'],
+    captainGuestPlayerId: null,
+    claimCode: null,
+    createdAt: now,
+    updatedAt: now,
+    claimStatus: 'guest',
+    linkedTeamId: null,
+    ...overrides,
+  };
+}
+
+function guestPlayerData(overrides = {}) {
+  return {
+    displayName: 'Guest Player',
+    normalizedName: 'guest player',
+    phoneNumber: null,
+    jerseyNumber: 7,
+    preferredPosition: 'مهاجم',
+    teamId: null,
+    guestTeamId: 'guest-team-1',
+    tournamentId: 'tournament-1',
+    createdBy: 'assistant-1',
+    createdAt: now,
+    updatedAt: now,
+    claimStatus: 'guest',
+    claimCode: null,
+    linkedPlayerId: null,
+    notes: null,
+    ...overrides,
+  };
+}
+
 function permissionMap(overrides = {}) {
   return {
     canViewMatchday: true,
@@ -243,6 +283,7 @@ function permissionMap(overrides = {}) {
     canRecordGoalsAndMvp: true,
     canApproveScore: false,
     canDeclareForfeit: false,
+    canManageGuestRoster: false,
     ...overrides,
   };
 }
@@ -932,6 +973,64 @@ describe('tournament assistant permission Firestore rules', () => {
           status: 'live',
           updatedAt: now + 1,
         }),
+      );
+    });
+  });
+
+  describe('assistant guest roster permissions', () => {
+    it('allows canManageGuestRoster assistant to manage guest players and captain only', async () => {
+      await seedTournament();
+      await seed('guestTeams/guest-team-1', guestTeamData());
+      await seedAssistant({
+        permissions: {
+          canViewMatchday: false,
+          canSubmitScore: false,
+          canRecordGoalsAndMvp: false,
+          canManageGuestRoster: true,
+        },
+      });
+      const db = authedDb('assistant-1');
+
+      await assertSucceeds(getDoc(doc(db, 'guestTeams', 'guest-team-1')));
+      await assertSucceeds(
+        setDoc(
+          doc(db, 'guestPlayers', 'guest-player-1'),
+          guestPlayerData(),
+        ),
+      );
+      await assertSucceeds(
+        updateDoc(doc(db, 'guestTeams', 'guest-team-1'), {
+          captainGuestPlayerId: 'guest-player-1',
+          updatedAt: now + 1,
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(db, 'guestTeams', 'guest-team-1'), {
+          contactPhone: '01999999999',
+          updatedAt: now + 2,
+        }),
+      );
+    });
+
+    it('denies guest roster writes without canManageGuestRoster', async () => {
+      await seedTournament();
+      await seed('guestTeams/guest-team-1', guestTeamData());
+      await seedAssistant({
+        permissions: {
+          canViewMatchday: true,
+          canSubmitScore: true,
+          canRecordGoalsAndMvp: true,
+          canManageGuestRoster: false,
+        },
+      });
+      const db = authedDb('assistant-1');
+
+      await assertFails(getDoc(doc(db, 'guestTeams', 'guest-team-1')));
+      await assertFails(
+        setDoc(
+          doc(db, 'guestPlayers', 'guest-player-denied-1'),
+          guestPlayerData({displayName: 'Denied Guest'}),
+        ),
       );
     });
   });

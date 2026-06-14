@@ -8,10 +8,12 @@ import 'package:el7reef/core/services/tournament_audit_emitter.dart';
 import 'package:el7reef/core/services/tournament_permission_service.dart';
 import 'package:el7reef/data/repositories/guest_player_repository_impl.dart';
 import 'package:el7reef/data/repositories/guest_team_repository_impl.dart';
+import 'package:el7reef/data/repositories/tournament_assistant_permission_repository_impl.dart';
 import 'package:el7reef/data/repositories/tournament_repository_impl.dart';
 import 'package:el7reef/domain/entities/guest_team.dart';
 import 'package:el7reef/domain/entities/tournament.dart';
 import 'package:el7reef/domain/entities/tournament_assistant.dart';
+import 'package:el7reef/domain/entities/tournament_assistant_permission.dart';
 
 void main() {
   group('GuestTeamRosterService', () {
@@ -19,6 +21,8 @@ void main() {
     late GuestPlayerRepositoryImpl guestPlayerRepository;
     late GuestTeamRepositoryImpl guestTeamRepository;
     late TournamentRepositoryImpl tournamentRepository;
+    late TournamentAssistantPermissionRepositoryImpl
+    assistantPermissionRepository;
     late GuestTeamRosterService service;
     late DateTime now;
 
@@ -27,10 +31,13 @@ void main() {
       guestPlayerRepository = GuestPlayerRepositoryImpl(firestore: firestore);
       guestTeamRepository = GuestTeamRepositoryImpl(firestore: firestore);
       tournamentRepository = TournamentRepositoryImpl(db: firestore);
+      assistantPermissionRepository =
+          TournamentAssistantPermissionRepositoryImpl(firestore: firestore);
       service = GuestTeamRosterService(
         guestPlayerRepository: guestPlayerRepository,
         guestTeamRepository: guestTeamRepository,
         tournamentRepository: tournamentRepository,
+        assistantPermissionRepository: assistantPermissionRepository,
         tournamentPermissionService: TournamentPermissionService(),
         auditEmitter: TournamentAuditEmitter(firestore: firestore),
       );
@@ -82,6 +89,43 @@ void main() {
         ),
       );
     });
+
+    test(
+      'allows assistant permission doc with canManageGuestRoster without legacy role',
+      () async {
+        await assistantPermissionRepository.createAssistantPermission(
+          TournamentAssistantPermission.customLimited(
+            tournamentId: 'tournament-1',
+            userId: 'roster-assistant-1',
+            addedBy: 'organizer-1',
+            permissions: const {
+              TournamentAssistantPermissionKey.canManageGuestRoster: true,
+            },
+            createdAt: now,
+          ),
+        );
+
+        final created = await service.createGuestPlayer(
+          tournamentId: 'tournament-1',
+          guestTeamId: 'guest-team-1',
+          actorId: 'roster-assistant-1',
+          displayName: 'Roster Assistant Guest',
+          jerseyNumber: 7,
+          now: now.add(const Duration(minutes: 1)),
+        );
+        final updatedTeam = await service.setCaptain(
+          tournamentId: 'tournament-1',
+          guestTeamId: 'guest-team-1',
+          actorId: 'roster-assistant-1',
+          guestPlayerId: created.id,
+          now: now.add(const Duration(minutes: 2)),
+        );
+
+        expect(created.createdBy, 'roster-assistant-1');
+        expect(created.guestTeamId, 'guest-team-1');
+        expect(updatedTeam.captainGuestPlayerId, created.id);
+      },
+    );
 
     test(
       'creates, updates, archives, and assigns captain for guest roster',

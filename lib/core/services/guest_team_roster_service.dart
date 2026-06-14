@@ -3,10 +3,13 @@ import 'package:uuid/uuid.dart';
 import '../../core/enums/guest_claim_status.dart';
 import '../../data/repositories/guest_player_repository_impl.dart';
 import '../../data/repositories/guest_team_repository_impl.dart';
+import '../../data/repositories/tournament_assistant_permission_repository_impl.dart';
 import '../../data/repositories/tournament_repository_impl.dart';
 import '../../domain/entities/guest_player.dart';
 import '../../domain/entities/guest_team.dart';
 import '../../domain/entities/tournament.dart';
+import '../../domain/entities/tournament_assistant_permission.dart';
+import '../../domain/repositories/tournament_assistant_permission_repository.dart';
 import '../../domain/repositories/guest_player_repository.dart';
 import '../../domain/repositories/guest_team_repository.dart';
 import '../../domain/repositories/tournament_repository.dart';
@@ -17,6 +20,7 @@ class GuestTeamRosterService {
   final GuestPlayerRepository _guestPlayerRepository;
   final GuestTeamRepository _guestTeamRepository;
   final TournamentRepository _tournamentRepository;
+  final TournamentAssistantPermissionRepository _assistantPermissionRepository;
   final TournamentPermissionService _tournamentPermissionService;
   final TournamentAuditEmitter _auditEmitter;
   final Uuid _uuid;
@@ -25,6 +29,7 @@ class GuestTeamRosterService {
     GuestPlayerRepository? guestPlayerRepository,
     GuestTeamRepository? guestTeamRepository,
     TournamentRepository? tournamentRepository,
+    TournamentAssistantPermissionRepository? assistantPermissionRepository,
     TournamentPermissionService? tournamentPermissionService,
     TournamentAuditEmitter? auditEmitter,
     Uuid? uuid,
@@ -33,6 +38,9 @@ class GuestTeamRosterService {
        _guestTeamRepository = guestTeamRepository ?? GuestTeamRepositoryImpl(),
        _tournamentRepository =
            tournamentRepository ?? TournamentRepositoryImpl(),
+       _assistantPermissionRepository =
+           assistantPermissionRepository ??
+           TournamentAssistantPermissionRepositoryImpl(),
        _tournamentPermissionService =
            tournamentPermissionService ?? TournamentPermissionService(),
        _auditEmitter = auditEmitter ?? TournamentAuditEmitter(),
@@ -297,14 +305,31 @@ class GuestTeamRosterService {
       throw Exception('الفريق الضيف لا ينتمي إلى البطولة المطلوبة.');
     }
 
+    final hasAssistantPermission = await _hasGuestRosterAssistantPermission(
+      tournamentId,
+      actorId,
+    );
     final canManage =
         guestTeam.creatorId == actorId ||
+        hasAssistantPermission ||
         _tournamentPermissionService.canManageGuestRoster(tournament, actorId);
     if (!canManage) {
       throw Exception('لا تملك صلاحية إدارة roster هذا الفريق الضيف.');
     }
 
     return _GuestRosterContext(tournament: tournament, guestTeam: guestTeam);
+  }
+
+  Future<bool> _hasGuestRosterAssistantPermission(
+    String tournamentId,
+    String actorId,
+  ) async {
+    final assistantPermission = await _assistantPermissionRepository
+        .getAssistantPermission(tournamentId, actorId);
+    return assistantPermission?.hasPermission(
+          TournamentAssistantPermissionKey.canManageGuestRoster,
+        ) ??
+        false;
   }
 
   Future<GuestPlayer> _requireGuestPlayer({

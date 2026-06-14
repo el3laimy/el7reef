@@ -14,6 +14,7 @@ enum TournamentAssistantPermissionKey {
   canRecordGoalsAndMvp,
   canApproveScore,
   canDeclareForfeit,
+  canManageGuestRoster,
 }
 
 class TournamentAssistantPermission {
