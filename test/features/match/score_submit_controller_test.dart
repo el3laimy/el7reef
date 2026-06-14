@@ -1407,6 +1407,142 @@ void main() {
     );
 
     testWidgets(
+      'pending pride retry completes guest goal and MVP after event failure reload',
+      (tester) async {
+        await tester.pumpWidget(const GetMaterialApp(home: SizedBox.shrink()));
+        await _saveTournament(firestore, 'tournament-pride-retry-guest');
+        await _saveMatch(
+          firestore,
+          _match(
+            id: 'match-pride-retry-guest',
+            tournamentId: 'tournament-pride-retry-guest',
+          ),
+        );
+        await _saveGuestPlayer(
+          firestore,
+          GuestPlayer(
+            id: 'guest-pride-retry',
+            displayName: 'ضيف الريمونتادا',
+            normalizedName: 'ضيف الريمونتادا',
+            createdBy: 'organizer-1',
+            createdAt: now,
+            updatedAt: now,
+            linkedPlayerId: 'claimed-pride-retry',
+          ),
+        );
+        await _saveLineupSnapshot(
+          firestore,
+          _snapshot(
+            id: 'snapshot-pride-retry-guest',
+            matchId: 'match-pride-retry-guest',
+            sideKey: 'A',
+            entries: [
+              _entry(
+                attendanceId: 'attendance-pride-retry-guest',
+                guestPlayerId: 'guest-pride-retry',
+                displayName: 'ضيف الريمونتادا',
+              ),
+            ],
+          ),
+        );
+        final failingController = _controller(
+          firestore: firestore,
+          matchId: 'match-pride-retry-guest',
+          matchEventService: _FailingMatchEventService(firestore: firestore),
+        );
+        await failingController.loadMatchAndPlayers();
+        final guest = failingController.teamAParticipants.single;
+        failingController.setParticipantGoals(guest, 1);
+        failingController.selectMvp(failingController.participantKey(guest));
+
+        final failedSubmit = await failingController.submit();
+
+        expect(failedSubmit, isNull);
+        expect(failingController.pendingPrideEventRetry.value, isTrue);
+        final savedAfterFailure = await firestore
+            .collection(FirebasePaths.matches)
+            .doc('match-pride-retry-guest')
+            .get();
+        expect(savedAfterFailure.data()?['prideEventsPending'], isTrue);
+        final persistedPayload = await firestore
+            .collection(FirebasePaths.matches)
+            .doc('match-pride-retry-guest')
+            .collection(PendingPrideEventsService.collectionName)
+            .doc(PendingPrideEventsService.currentDocumentId)
+            .get();
+        expect(persistedPayload.exists, isTrue);
+        expect(persistedPayload.data()?['scoreTeamA'], 1);
+        final payloadGoals = persistedPayload.data()?['goals'] as List<dynamic>;
+        final payloadGoal = Map<String, dynamic>.from(
+          payloadGoals.single as Map,
+        );
+        final payloadGoalActor = Map<String, dynamic>.from(
+          payloadGoal['actor'] as Map,
+        );
+        final payloadMvp = Map<String, dynamic>.from(
+          persistedPayload.data()?['mvp'] as Map,
+        );
+        final payloadMvpActor = Map<String, dynamic>.from(
+          payloadMvp['actor'] as Map,
+        );
+        expect(payloadGoalActor['kind'], 'guestPlayer');
+        expect(payloadGoalActor['id'], 'guest-pride-retry');
+        expect(payloadMvpActor['kind'], 'guestPlayer');
+        expect(payloadMvpActor['id'], 'guest-pride-retry');
+        await _expectNoGoalEvents(firestore, 'match-pride-retry-guest');
+        failingController.onClose();
+
+        final retryController = _controller(
+          firestore: firestore,
+          matchId: 'match-pride-retry-guest',
+        );
+        await retryController.loadMatchAndPlayers();
+
+        final retriedMatch = await retryController.submit();
+
+        expect(retriedMatch?.scoreTeamA, 1);
+        expect(retryController.pendingPrideEventRetry.value, isFalse);
+        expect(retryController.match.value?.prideEventsPending, isFalse);
+        final goals = await _activeGoalEvents(
+          firestore,
+          'match-pride-retry-guest',
+        );
+        expect(goals, hasLength(1));
+        expect(
+          goals.single['id'],
+          'goal-match-pride-retry-guest-A-guestPlayer-guest-pride-retry-1',
+        );
+        expect(goals.single['tournamentId'], 'tournament-pride-retry-guest');
+        final goalActor = goals.single['actor'] as Map<String, dynamic>;
+        expect(goalActor['kind'], 'guestPlayer');
+        expect(goalActor['id'], 'guest-pride-retry');
+        expect(goalActor['linkedPlayerId'], 'claimed-pride-retry');
+        final mvpEvents = await _activeMvpEvents(
+          firestore,
+          'match-pride-retry-guest',
+        );
+        expect(mvpEvents, hasLength(1));
+        final mvpActor = mvpEvents.single['actor'] as Map<String, dynamic>;
+        expect(mvpActor['kind'], 'guestPlayer');
+        expect(mvpActor['id'], 'guest-pride-retry');
+        final savedAfterRetry = await firestore
+            .collection(FirebasePaths.matches)
+            .doc('match-pride-retry-guest')
+            .get();
+        expect(savedAfterRetry.data()?['prideEventsPending'], isFalse);
+        final clearedPayload = await firestore
+            .collection(FirebasePaths.matches)
+            .doc('match-pride-retry-guest')
+            .collection(PendingPrideEventsService.collectionName)
+            .doc(PendingPrideEventsService.currentDocumentId)
+            .get();
+        expect(clearedPayload.exists, isFalse);
+        await _drainSnackbars(tester);
+        retryController.onClose();
+      },
+    );
+
+    testWidgets(
       'pending pride retry without payload does not clear pending state',
       (tester) async {
         await tester.pumpWidget(const GetMaterialApp(home: SizedBox.shrink()));
