@@ -800,6 +800,59 @@ describe('tournament assistant permission Firestore rules', () => {
       );
     });
 
+    it('allows score assistant to submit score, persist payload, and clear retry state', async () => {
+      await seedTournament();
+      await seed('matches/match-1', matchData({status: 'live'}));
+      await seedAssistant({
+        permissions: {canSubmitScore: true, canRecordGoalsAndMvp: true},
+      });
+      const db = authedDb('assistant-1');
+      const matchRef = doc(db, 'matches', 'match-1');
+      const payloadRef = doc(
+        db,
+        'matches/match-1/pendingPrideEvents/current',
+      );
+
+      await assertSucceeds(
+        updateDoc(matchRef, {
+          scoreTeamA: 2,
+          scoreTeamB: 1,
+          mvpPlayerId: 'guest-player-1',
+          prideEventsPending: true,
+          completedAt: now + 1,
+          isAnomaly: false,
+          status: 'completed',
+        }),
+      );
+      await assertSucceeds(
+        setDoc(
+          payloadRef,
+          pendingPridePayloadData({
+            mvp: {
+              sideKey: 'A',
+              actor: {
+                kind: 'guestPlayer',
+                id: 'guest-player-1',
+                displayName: 'Guest One',
+                linkedPlayerId: null,
+              },
+            },
+          }),
+        ),
+      );
+      await assertSucceeds(
+        updateDoc(matchRef, {
+          prideEventsPending: false,
+        }),
+      );
+      await assertSucceeds(deleteDoc(payloadRef));
+
+      const payloadAfterCleanup = await getDoc(payloadRef);
+      if (payloadAfterCleanup.exists()) {
+        throw new Error('pending pride payload should be deleted');
+      }
+    });
+
     it('denies pending pride payload writes without score and event permissions', async () => {
       await seedTournament();
       await seed('matches/match-1', matchData({status: 'live'}));
