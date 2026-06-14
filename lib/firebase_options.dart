@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCG0kojRrJ4WCFfaFsFAMpcE_mGPbZ4JXs',
-    appId: '1:807857485912:android:4105280c0a74c585d8f22d',
+    appId: '1:807857485912:android:a0d2caccaebd4ea2d8f22d',
     messagingSenderId: '807857485912',
     projectId: 'el7reef-app-2026',
     storageBucket: 'el7reef-app-2026.firebasestorage.app',
