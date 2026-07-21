@@ -1,4 +1,5 @@
 import 'package:el7reef/data/models/match_model.dart';
+import 'package:el7reef/core/enums/tournament_ops_enums.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -44,6 +45,17 @@ void main() {
 
       expect(model.toEntity().prideEventsPending, isTrue);
       expect(model.toJson()['prideEventsPending'], isTrue);
+    });
+
+    test('round-trips the optional knockout match role', () {
+      final model = MatchModel.fromJson({
+        'organizerId': 'organizer-1',
+        'knockoutMatchRole': 'thirdPlace',
+        'createdAt': DateTime(2026, 7, 18).millisecondsSinceEpoch,
+      }, 'match-103');
+
+      expect(model.toEntity().knockoutMatchRole, KnockoutMatchRole.thirdPlace);
+      expect(model.toJson()['knockoutMatchRole'], 'thirdPlace');
     });
   });
 }

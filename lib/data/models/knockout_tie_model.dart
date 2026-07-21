@@ -1,3 +1,4 @@
+import '../../core/enums/tournament_ops_enums.dart';
 import '../../domain/entities/knockout_tie.dart';
 
 class KnockoutTieModel {
@@ -11,6 +12,7 @@ class KnockoutTieModel {
   final String? winnerParticipantId;
   final String? matchId;
   final String? nextTieId;
+  final String resolutionType;
   final int createdAt;
   final int updatedAt;
 
@@ -25,6 +27,7 @@ class KnockoutTieModel {
     this.winnerParticipantId,
     this.matchId,
     this.nextTieId,
+    this.resolutionType = 'pending',
     required this.createdAt,
     required this.updatedAt,
   });
@@ -41,6 +44,12 @@ class KnockoutTieModel {
       winnerParticipantId: json['winnerParticipantId'] as String?,
       matchId: json['matchId'] as String?,
       nextTieId: json['nextTieId'] as String?,
+      resolutionType:
+          json['resolutionType'] as String? ??
+          ((json['winnerParticipantId'] as String?) != null &&
+                  json['matchId'] == null
+              ? KnockoutTieResolution.bye.name
+              : KnockoutTieResolution.pending.name),
       createdAt:
           (json['createdAt'] as num?)?.toInt() ??
           DateTime.now().millisecondsSinceEpoch,
@@ -61,6 +70,7 @@ class KnockoutTieModel {
       'winnerParticipantId': winnerParticipantId,
       'matchId': matchId,
       'nextTieId': nextTieId,
+      'resolutionType': resolutionType,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
     };
@@ -78,6 +88,10 @@ class KnockoutTieModel {
       winnerParticipantId: winnerParticipantId,
       matchId: matchId,
       nextTieId: nextTieId,
+      resolutionType: KnockoutTieResolution.values.firstWhere(
+        (value) => value.name == resolutionType,
+        orElse: () => KnockoutTieResolution.pending,
+      ),
       createdAt: DateTime.fromMillisecondsSinceEpoch(createdAt),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(updatedAt),
     );
@@ -95,6 +109,7 @@ class KnockoutTieModel {
       winnerParticipantId: entity.winnerParticipantId,
       matchId: entity.matchId,
       nextTieId: entity.nextTieId,
+      resolutionType: entity.resolutionType.name,
       createdAt: entity.createdAt.millisecondsSinceEpoch,
       updatedAt: entity.updatedAt.millisecondsSinceEpoch,
     );

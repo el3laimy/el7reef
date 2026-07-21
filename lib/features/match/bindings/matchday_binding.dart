@@ -15,6 +15,7 @@ import '../../../data/repositories/player_repository_impl.dart';
 import '../../../data/repositories/team_membership_repository_impl.dart';
 import '../../../data/repositories/team_repository_impl.dart';
 import '../../../data/repositories/tournament_assistant_permission_repository_impl.dart';
+import '../../../data/repositories/tournament_participant_repository_impl.dart';
 import '../../../data/repositories/tournament_registration_repository_impl.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
 import '../../../core/auth/auth_service.dart';
@@ -37,6 +38,11 @@ class MatchdayBinding extends Bindings {
     if (!Get.isRegistered<TournamentRegistrationRepositoryImpl>()) {
       Get.lazyPut<TournamentRegistrationRepositoryImpl>(
         () => TournamentRegistrationRepositoryImpl(),
+      );
+    }
+    if (!Get.isRegistered<TournamentParticipantRepositoryImpl>()) {
+      Get.lazyPut<TournamentParticipantRepositoryImpl>(
+        () => TournamentParticipantRepositoryImpl(),
       );
     }
     if (!Get.isRegistered<TournamentAssistantPermissionRepositoryImpl>()) {
@@ -101,6 +107,7 @@ class MatchdayBinding extends Bindings {
         matchdayService: Get.find<MatchdayService>(),
         matchRepository: Get.find<MatchRepositoryImpl>(),
         tournamentRepository: Get.find<TournamentRepositoryImpl>(),
+        participantRepository: Get.find<TournamentParticipantRepositoryImpl>(),
         registrationRepository:
             Get.find<TournamentRegistrationRepositoryImpl>(),
         teamRepository: Get.find<TeamRepositoryImpl>(),

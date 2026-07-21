@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../app/routes/app_routes.dart';
-import '../../../core/permissions/tournament_viewer_context.dart';
-import '../../../data/repositories/tournament_repository_impl.dart';
 import '../../../domain/entities/player.dart';
 import '../../../core/auth/auth_service.dart';
+import '../services/tournament_organizer_access_service.dart';
 
 class TournamentOrganizerGuard extends StatefulWidget {
   static const accessDeniedMessage = 'لا تملك صلاحية إدارة هذه البطولة.';
@@ -21,7 +20,7 @@ class TournamentOrganizerGuard extends StatefulWidget {
 
 class _TournamentOrganizerGuardState extends State<TournamentOrganizerGuard> {
   late final AuthService _authService;
-  late final TournamentRepositoryImpl _tournamentRepository;
+  late final TournamentOrganizerAccessService _accessService;
   Worker? _authWorker;
   Future<bool>? _accessFuture;
   String? _accessKey;
@@ -31,9 +30,7 @@ class _TournamentOrganizerGuardState extends State<TournamentOrganizerGuard> {
   void initState() {
     super.initState();
     _authService = Get.find<AuthService>();
-    _tournamentRepository = Get.isRegistered<TournamentRepositoryImpl>()
-        ? Get.find<TournamentRepositoryImpl>()
-        : TournamentRepositoryImpl();
+    _accessService = TournamentOrganizerAccessService.fromDependencies();
     _authWorker = ever<Player?>(_authService.currentPlayer, (_) {
       _resetAccessCheck();
     });
@@ -89,14 +86,10 @@ class _TournamentOrganizerGuardState extends State<TournamentOrganizerGuard> {
         actorId.trim().isEmpty) {
       return false;
     }
-    final tournament = await _tournamentRepository.getTournament(tournamentId);
-    if (tournament == null) {
-      return false;
-    }
-    return TournamentViewerContext.fromTournament(
-      tournament: tournament,
-      userId: actorId,
-    ).canViewAdminDashboard;
+    return _accessService.canAccess(
+      tournamentId: tournamentId,
+      actorId: actorId,
+    );
   }
 
   void _resetAccessCheck() {

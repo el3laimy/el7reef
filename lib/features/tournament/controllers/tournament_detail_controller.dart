@@ -5,6 +5,7 @@ import '../../../core/auth/auth_service.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
 import '../../../core/services/tournament_participant_service.dart';
 import '../../../core/services/tournament_top_scorers_resolver.dart';
+import '../../shareables/services/pride_identity_image_resolver.dart';
 import '../../../domain/entities/tournament.dart';
 
 class TournamentDetailController extends GetxController {
@@ -12,18 +13,22 @@ class TournamentDetailController extends GetxController {
   final TournamentParticipantService _participantService;
   final TournamentTopScorersResolver _topScorersResolver;
   final AuthService _authService;
+  final PrideIdentityImageResolver _identityImageResolver;
 
   TournamentDetailController({
     TournamentRepositoryImpl? repository,
     TournamentParticipantService? participantService,
     TournamentTopScorersResolver? topScorersResolver,
     AuthService? authService,
+    PrideIdentityImageResolver? identityImageResolver,
   }) : _repository = repository ?? TournamentRepositoryImpl(),
        _participantService =
            participantService ?? TournamentParticipantService(),
        _topScorersResolver =
            topScorersResolver ?? TournamentTopScorersResolver(),
-       _authService = authService ?? Get.find<AuthService>();
+       _authService = authService ?? Get.find<AuthService>(),
+       _identityImageResolver =
+           identityImageResolver ?? PrideIdentityImageResolver();
 
   final Rx<Tournament?> tournament = Rx<Tournament?>(null);
   final RxBool isLoading = false.obs;
@@ -31,6 +36,7 @@ class TournamentDetailController extends GetxController {
   final RxString winnerDisplayName = ''.obs;
   final RxList<TournamentTopScorerEntry> topScorers =
       <TournamentTopScorerEntry>[].obs;
+  final RxInt officialTournamentResultCount = 0.obs;
   final RxBool isLoadingTopScorers = false.obs;
   final RxString topScorersErrorMessage = ''.obs;
   final RxBool isFollowing = false.obs;
@@ -59,6 +65,7 @@ class TournamentDetailController extends GetxController {
         errorMessage.value = 'تعذر العثور على الدورة';
         winnerDisplayName.value = '';
         topScorers.clear();
+        officialTournamentResultCount.value = 0;
         topScorersErrorMessage.value = '';
       } else {
         await _loadFollowingState(tournament.value!);
@@ -109,6 +116,7 @@ class TournamentDetailController extends GetxController {
     final id = tournament.value?.id ?? tournamentId;
     if (id == null || id.isEmpty) {
       topScorers.clear();
+      officialTournamentResultCount.value = 0;
       topScorersErrorMessage.value = '';
       return;
     }
@@ -116,14 +124,26 @@ class TournamentDetailController extends GetxController {
     try {
       isLoadingTopScorers.value = true;
       topScorersErrorMessage.value = '';
-      topScorers.value = await _topScorersResolver.getTopScorers(id, limit: 5);
+      final snapshot = await _topScorersResolver.getTopScorersSnapshot(
+        id,
+        limit: 5,
+      );
+      topScorers.value = snapshot.scorers;
+      officialTournamentResultCount.value = snapshot.officialMatchCount;
     } catch (error) {
       AppLogger.error('TournamentDetailController.loadTopScorers', error);
       topScorers.clear();
+      officialTournamentResultCount.value = 0;
       topScorersErrorMessage.value = 'تعذر تحميل هدافي البطولة الآن.';
     } finally {
       isLoadingTopScorers.value = false;
     }
+  }
+
+  Future<Map<String, String?>> topScorerPhotoUrls() {
+    return _identityImageResolver.imageUrlsFor(
+      topScorers.map((entry) => entry.actor),
+    );
   }
 
   Future<void> _loadWinnerDisplayName(Tournament tournament) async {

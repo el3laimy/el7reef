@@ -5,7 +5,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/services/username_service.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../core/widgets/el7reef_button.dart';
 import '../../profile/controllers/profile_controller.dart';
 
@@ -85,8 +85,11 @@ class _UsernameScreenState extends State<UsernameScreen> {
             Get.back();
           } else {
             Get.back();
-            Get.snackbar('تم ✅', '@$text تم حفظه بنجاح',
-                snackPosition: SnackPosition.BOTTOM);
+            Get.snackbar(
+              'تم ✅',
+              '@$text تم حفظه بنجاح',
+              snackPosition: SnackPosition.BOTTOM,
+            );
           }
           break;
         case UsernameSetResult.taken:
@@ -94,8 +97,11 @@ class _UsernameScreenState extends State<UsernameScreen> {
           break;
         case UsernameSetResult.validationFailed:
         case UsernameSetResult.error:
-          Get.snackbar('خطأ', 'فشل الحفظ، حاول مجدداً',
-              snackPosition: SnackPosition.BOTTOM);
+          Get.snackbar(
+            'خطأ',
+            'فشل الحفظ، حاول مجدداً',
+            snackPosition: SnackPosition.BOTTOM,
+          );
       }
     } finally {
       setState(() => _saving = false);
@@ -109,8 +115,7 @@ class _UsernameScreenState extends State<UsernameScreen> {
           ? null
           : AppBar(title: const Text('تعديل Username')),
       body: Container(
-        decoration:
-            const BoxDecoration(gradient: AppColors.backgroundGradient),
+        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppDimensions.pagePadding),
@@ -141,9 +146,10 @@ class _UsernameScreenState extends State<UsernameScreen> {
                 const SizedBox(height: AppDimensions.xxl),
 
                 // ── Input ──
-                GlassmorphicContainer(
+                El7reefGlassSurface(
+                  variant: El7reefGlassVariant.base,
                   padding: const EdgeInsets.all(AppDimensions.lg),
-                  borderRadius: AppDimensions.radiusLg,
+                  radius: AppDimensions.radiusLg,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -159,8 +165,9 @@ class _UsernameScreenState extends State<UsernameScreen> {
                           hintText: 'harefa_7',
                           border: InputBorder.none,
                           prefixText: '@',
-                          prefixStyle: AppTextStyles.headlineMedium
-                              .copyWith(color: AppColors.primary),
+                          prefixStyle: AppTextStyles.headlineMedium.copyWith(
+                            color: AppColors.primary,
+                          ),
                           suffixIcon: _buildSuffixIcon(),
                         ),
                         onEditingComplete: _checkAvailability,
@@ -181,9 +188,7 @@ class _UsernameScreenState extends State<UsernameScreen> {
                 const SizedBox(height: AppDimensions.md),
 
                 // ── قواعد ──
-                _RulesCard()
-                    .animate()
-                    .fadeIn(delay: 300.ms),
+                _RulesCard().animate().fadeIn(delay: 300.ms),
 
                 const SizedBox(height: AppDimensions.xxl),
 
@@ -267,8 +272,7 @@ class _UsernameScreenState extends State<UsernameScreen> {
           key: const ValueKey('available'),
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.check_circle,
-                color: AppColors.success, size: 16),
+            const Icon(Icons.check_circle, color: AppColors.success, size: 16),
             const SizedBox(width: 6),
             Text(
               '@${_controller.text.trim()} متاح! ✅',
@@ -288,9 +292,7 @@ class _UsernameScreenState extends State<UsernameScreen> {
             const SizedBox(width: 6),
             Text(
               'هذا الـ Username مأخوذ',
-              style: AppTextStyles.labelMedium.copyWith(
-                color: AppColors.error,
-              ),
+              style: AppTextStyles.labelMedium.copyWith(color: AppColors.error),
             ),
           ],
         );
@@ -306,15 +308,12 @@ class _UsernameScreenState extends State<UsernameScreen> {
       key: const ValueKey('error'),
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(Icons.warning_rounded,
-            color: AppColors.error, size: 16),
+        const Icon(Icons.warning_rounded, color: AppColors.error, size: 16),
         const SizedBox(width: 6),
         Flexible(
           child: Text(
             _localResult?.message ?? '',
-            style: AppTextStyles.labelSmall.copyWith(
-              color: AppColors.error,
-            ),
+            style: AppTextStyles.labelSmall.copyWith(color: AppColors.error),
             textAlign: TextAlign.center,
           ),
         ),
@@ -332,9 +331,10 @@ class _UsernameScreenState extends State<UsernameScreen> {
 class _RulesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return GlassmorphicContainer(
+    return El7reefGlassSurface(
+      variant: El7reefGlassVariant.base,
       padding: const EdgeInsets.all(AppDimensions.md),
-      borderRadius: AppDimensions.radiusMd,
+      radius: AppDimensions.radiusMd,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -346,18 +346,17 @@ class _RulesCard extends StatelessWidget {
             'لا يبدأ أو ينتهي بـ _ أو .',
             'لا يمكن تكرار _ .. معاً',
             'يمكن التغيير مرة مجانية — ثم ٣٠ يوماً انتظار',
-          ].map((rule) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  children: [
-                    const Text('• ',
-                        style: TextStyle(color: AppColors.primary)),
-                    Expanded(
-                        child: Text(rule,
-                            style: AppTextStyles.bodySmall)),
-                  ],
-                ),
-              )),
+          ].map(
+            (rule) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  const Text('• ', style: TextStyle(color: AppColors.primary)),
+                  Expanded(child: Text(rule, style: AppTextStyles.bodySmall)),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

@@ -4,14 +4,18 @@ import 'package:get/get.dart';
 import '../../../app/routes/app_routes.dart';
 import '../../../core/constants/feature_flags.dart';
 import '../../../core/enums/claim_target_type.dart';
+import '../../../core/navigation/app_link_route_parser.dart';
 import '../../../core/services/analytics_service.dart';
+import '../../../core/services/pride_share_attribution.dart';
 import '../../../core/auth/auth_service.dart';
+import '../../../domain/entities/share_payload.dart';
+import '../../shareables/services/guest_mvp_claim_link_service.dart';
 
 class ClaimEntryController extends GetxController {
   final AnalyticsService _analyticsService;
 
   ClaimEntryController({AnalyticsService? analyticsService})
-      : _analyticsService = analyticsService ?? AnalyticsService();
+    : _analyticsService = analyticsService ?? AnalyticsService();
   final isLoading = true.obs;
   final errorMessage = ''.obs;
 
@@ -36,6 +40,23 @@ class ClaimEntryController extends GetxController {
 
     final resolvedTargetType = _parseTargetType(targetTypeValue);
     final resolvedTargetId = targetId;
+    final pridePayload = PrideShareAttribution.fromQueryParameters(
+      Get.parameters,
+      targetUrl: Uri(
+        scheme: 'https',
+        host: AppLinkRouteParser.pilotWebHost,
+        path: AppRoutes.claimEntry,
+      ),
+    );
+
+    if (pridePayload != null &&
+        _isGuestPrideAttributionForTarget(
+          pridePayload: pridePayload,
+          targetType: resolvedTargetType,
+          targetId: resolvedTargetId,
+        )) {
+      _analyticsService.trackShareLinkOpened(pridePayload);
+    }
 
     if (resolvedTargetType != null && resolvedTargetId != null) {
       if (Get.isRegistered<AuthService>() &&
@@ -51,7 +72,9 @@ class ClaimEntryController extends GetxController {
       isLoading.value = false;
       return;
     }
-    if (resolvedTargetType == null || resolvedTargetId == null || resolvedTargetId.isEmpty) {
+    if (resolvedTargetType == null ||
+        resolvedTargetId == null ||
+        resolvedTargetId.isEmpty) {
       errorMessage.value = 'رابط الـ claim غير مكتمل أو غير مدعوم.';
       isLoading.value = false;
       return;
@@ -94,5 +117,18 @@ class ClaimEntryController extends GetxController {
       }
     }
     return null;
+  }
+
+  bool _isGuestPrideAttributionForTarget({
+    required SharePayload? pridePayload,
+    required ClaimTargetType? targetType,
+    required String? targetId,
+  }) {
+    return GuestMvpClaimLinkService.claimableCardTypes.contains(
+          pridePayload?.cardType,
+        ) &&
+        pridePayload?.entityType == ShareEntityType.guestPlayer &&
+        pridePayload?.entityId == targetId &&
+        targetType == ClaimTargetType.guestPlayer;
   }
 }

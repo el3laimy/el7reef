@@ -1,0 +1,9 @@
+# Copy this file to android/key.properties on the release machine only.
+# Never commit android/key.properties or the release keystore.
+#
+# Create the release keystore, then set storeFile to its path relative to
+# android/app/build.gradle.kts, or to an absolute path.
+storePassword=CHANGE_ME
+keyPassword=CHANGE_ME
+keyAlias=el7reef_release
+storeFile=../release/el7reef-release.jks

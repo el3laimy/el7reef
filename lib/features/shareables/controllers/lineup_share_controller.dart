@@ -13,6 +13,7 @@ import '../../../domain/entities/match_lineup_entry.dart';
 import '../../../domain/entities/match_lineup_snapshot.dart';
 import '../../lineup/widgets/lineup_player_display.dart';
 import '../models/lineup_share_data.dart';
+import '../services/pride_share_payload_builder.dart';
 
 class LineupShareController {
   final MatchLineupSnapshotRepositoryImpl snapshotRepository;
@@ -24,6 +25,8 @@ class LineupShareController {
     required this.teamRepository,
     required this.matchSideRepository,
   });
+
+  static const _payloadBuilder = PrideSharePayloadBuilder();
 
   Future<LineupShareData> buildOfficialTeamLineup({
     required String matchId,
@@ -114,7 +117,10 @@ class LineupShareController {
       benchPlayers: snapshot.bench.map(_benchPlayer).toList(growable: false),
       statusLabel: 'التشكيلة المعتمدة',
       updatedLabel: intl.DateFormat('yyyy/MM/dd').format(snapshot.lockedAt),
-      tacticalNotes: _generateTacticalNotes(formationCode, pitchPlayers),
+      sharePayload: _payloadBuilder.lineup(
+        matchId: snapshot.matchId,
+        lineupId: snapshot.id,
+      ),
     );
   }
 
@@ -169,11 +175,12 @@ class LineupShareController {
       slotX: entry.slotX ?? fallbackSlot?.x ?? 50,
       slotY: entry.slotY ?? fallbackSlot?.y ?? 50,
       isTemporary: entry.matchSidePlayerId != null,
+      shirtNumber: entry.shirtNumber,
       positionLabel: _positionLabelForRole(
         role,
         entry.slotX ?? fallbackSlot?.x ?? 50,
       ),
-      shortName: _generateShortName(entry.displayName),
+      shortName: _shortDisplayName(entry.displayName),
     );
   }
 
@@ -183,6 +190,7 @@ class LineupShareController {
       id: entry.participantId,
       displayName: displayName,
       initials: lineupInitialsFromName(displayName),
+      shirtNumber: entry.shirtNumber,
       isTemporary: entry.matchSidePlayerId != null,
     );
   }
@@ -252,8 +260,6 @@ class LineupShareController {
     return trimmed;
   }
 
-  // ── New helpers for redesigned card ──
-
   String _positionLabelForRole(SlotRole role, double slotX) {
     // slotX: 0=left of pitch, 100=right. In RTL context:
     // slotX < 35 = right side, slotX > 65 = left side, middle = center.
@@ -262,65 +268,35 @@ class LineupShareController {
 
     return switch (role) {
       SlotRole.gk => 'حارس مرمى',
-      SlotRole.def => isRight
-          ? 'ظهير أيمن'
-          : isLeft
-              ? 'ظهير أيسر'
-              : 'قلب دفاع',
-      SlotRole.mid => isRight
-          ? 'جناح أيمن'
-          : isLeft
-              ? 'جناح أيسر'
-              : 'نص ملعب',
-      SlotRole.att => isRight
-          ? 'جناح أيمن'
-          : isLeft
-              ? 'جناح أيسر'
-              : 'مهاجم صريح',
+      SlotRole.def =>
+        isRight
+            ? 'ظهير أيمن'
+            : isLeft
+            ? 'ظهير أيسر'
+            : 'قلب دفاع',
+      SlotRole.mid =>
+        isRight
+            ? 'جناح أيمن'
+            : isLeft
+            ? 'جناح أيسر'
+            : 'نص ملعب',
+      SlotRole.att =>
+        isRight
+            ? 'جناح أيمن'
+            : isLeft
+            ? 'جناح أيسر'
+            : 'مهاجم صريح',
     };
   }
 
-  String _generateShortName(String fullName) {
+  String _shortDisplayName(String fullName) {
     final parts = fullName
         .trim()
         .split(RegExp(r'\s+'))
         .where((part) => part.isNotEmpty)
         .toList(growable: false);
-    if (parts.isEmpty) return 'PLAYER';
-    if (parts.length == 1) return parts.first.toUpperCase();
-    // First initial + last name: "احمد اشرف" → "A ASHRAF"
-    final firstInitial = parts.first.characters.first.toUpperCase();
-    final lastName = parts.last.toUpperCase();
-    return '$firstInitial $lastName';
-  }
-
-  List<String> _generateTacticalNotes(
-    String formationCode,
-    List<LineupSharePlayerData> players,
-  ) {
-    final notes = <String>[];
-    notes.add('تنظيم $formationCode');
-
-    final defCount = players.where((p) => p.slotRole == SlotRole.def).length;
-    final midCount = players.where((p) => p.slotRole == SlotRole.mid).length;
-    final attCount = players.where((p) => p.slotRole == SlotRole.att).length;
-
-    if (defCount >= 4) {
-      notes.add('استقرار دفاعي');
-    } else if (defCount <= 2 && attCount >= 3) {
-      notes.add('دعم هجومي');
-    } else {
-      notes.add('توازن بين الخطوط');
-    }
-
-    if (attCount >= 3) {
-      notes.add('ضغط عالي');
-    }
-    if (midCount >= 3) {
-      notes.add('تحكم في الوسط');
-    }
-
-    notes.add('انتشار جيد');
-    return notes;
+    if (parts.isEmpty) return '';
+    if (parts.length == 1) return parts.first;
+    return '${parts.first} ${parts.last}';
   }
 }

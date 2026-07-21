@@ -4,7 +4,9 @@ import '../../../core/lineup/formation_engine.dart';
 import '../../../core/lineup/formation_library.dart';
 import '../../../core/lineup/lineup_types.dart';
 import '../../../core/lineup/lineup_utils.dart';
+import '../../../core/services/claimed_participant_identity_resolver.dart';
 import '../../../core/services/match_event_service.dart';
+import '../../shareables/services/pride_identity_image_resolver.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../data/repositories/match_lineup_snapshot_repository_impl.dart';
 import '../../../data/repositories/match_repository_impl.dart';
@@ -45,6 +47,8 @@ class MatchResultLineupController extends GetxController {
   final MatchSidePlayerRepositoryImpl _matchSidePlayerRepository;
   final MatchEventService _matchEventService;
   final TournamentRepositoryImpl _tournamentRepository;
+  final PrideIdentityImageResolver _identityImageResolver;
+  final ClaimedParticipantIdentityResolver _claimedIdentityResolver;
 
   MatchResultLineupController({
     required MatchRepositoryImpl matchRepository,
@@ -54,13 +58,19 @@ class MatchResultLineupController extends GetxController {
     required MatchSidePlayerRepositoryImpl matchSidePlayerRepository,
     required MatchEventService matchEventService,
     required TournamentRepositoryImpl tournamentRepository,
+    PrideIdentityImageResolver? identityImageResolver,
+    ClaimedParticipantIdentityResolver? claimedIdentityResolver,
   }) : _matchRepository = matchRepository,
        _teamRepository = teamRepository,
        _snapshotRepository = snapshotRepository,
        _matchSideRepository = matchSideRepository,
        _matchSidePlayerRepository = matchSidePlayerRepository,
        _matchEventService = matchEventService,
-       _tournamentRepository = tournamentRepository;
+       _tournamentRepository = tournamentRepository,
+       _identityImageResolver =
+           identityImageResolver ?? PrideIdentityImageResolver(),
+       _claimedIdentityResolver =
+           claimedIdentityResolver ?? ClaimedParticipantIdentityResolver();
 
   final RxBool isLoading = true.obs;
   final RxString errorMessage = ''.obs;
@@ -70,6 +80,7 @@ class MatchResultLineupController extends GetxController {
   final RxList<MatchSidePlayer> matchSidePlayers = <MatchSidePlayer>[].obs;
   final RxList<MatchLineupSnapshot> snapshots = <MatchLineupSnapshot>[].obs;
   final Rx<MatchEvent?> mvpEvent = Rx<MatchEvent?>(null);
+  final RxList<MatchEvent> goalEvents = <MatchEvent>[].obs;
   final RxString tournamentName = ''.obs;
 
   String get matchId => Get.parameters['matchId'] ?? Get.parameters['id'] ?? '';
@@ -135,6 +146,17 @@ class MatchResultLineupController extends GetxController {
           ? await _matchSidePlayerRepository.getMatchPlayers(loadedMatch.id)
           : <MatchSidePlayer>[];
       final loadedMvpEvent = await _loadMvpEventSafely(loadedMatch.id);
+      final loadedGoalEvents = await _loadGoalEventsSafely(loadedMatch.id);
+      final canonicalMvpEvent = loadedMvpEvent?.copyWith(
+        actor: await _claimedIdentityResolver.resolve(loadedMvpEvent.actor),
+      );
+      final canonicalGoalEvents = await Future.wait(
+        loadedGoalEvents.map(
+          (event) async => event.copyWith(
+            actor: await _claimedIdentityResolver.resolve(event.actor),
+          ),
+        ),
+      );
       final loadedTournamentName = await _loadTournamentNameSafely(
         loadedMatch.tournamentId,
       );
@@ -144,7 +166,8 @@ class MatchResultLineupController extends GetxController {
       teams.assignAll({for (final team in loadedTeams) team.id: team});
       matchSides.assignAll(loadedSides);
       matchSidePlayers.assignAll(loadedSidePlayers);
-      mvpEvent.value = loadedMvpEvent;
+      mvpEvent.value = canonicalMvpEvent;
+      goalEvents.assignAll(canonicalGoalEvents);
       tournamentName.value = loadedTournamentName;
     } catch (error) {
       errorMessage.value = _readableError(error);
@@ -157,6 +180,22 @@ class MatchResultLineupController extends GetxController {
     if (mvpEvent.value != null) return true;
     final mvpPlayerId = match.value?.mvpPlayerId?.trim();
     return mvpPlayerId != null && mvpPlayerId.isNotEmpty;
+  }
+
+  Future<String?> mvpPhotoUrl() async {
+    final event = mvpEvent.value;
+    if (event != null) {
+      return _identityImageResolver.imageUrlFor(event.actor);
+    }
+    final target = mvpProfileTarget;
+    if (target == null) return null;
+    return _identityImageResolver.imageUrlFor(
+      ParticipantRef(kind: target.kind, id: target.id, displayName: target.id),
+    );
+  }
+
+  Future<String?> participantPhotoUrl(ParticipantRef actor) {
+    return _identityImageResolver.imageUrlFor(actor);
   }
 
   MvpPublicProfileTarget? get mvpProfileTarget {
@@ -403,6 +442,21 @@ class MatchResultLineupController extends GetxController {
         error,
       );
       return null;
+    }
+  }
+
+  Future<List<MatchEvent>> _loadGoalEventsSafely(String matchId) async {
+    try {
+      final events = await _matchEventService.getMatchEvents(matchId);
+      return events
+          .where((event) => event.isActive && event.isGoal)
+          .toList(growable: false);
+    } catch (error) {
+      AppLogger.warning(
+        'MatchResultLineupController._loadGoalEventsSafely',
+        error,
+      );
+      return const <MatchEvent>[];
     }
   }
 

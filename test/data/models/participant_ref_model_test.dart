@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:el7reef/data/models/participant_ref_model.dart';
@@ -5,6 +8,25 @@ import 'package:el7reef/domain/entities/participant_ref.dart';
 
 void main() {
   group('ParticipantRefModel', () {
+    test('matches the shared participant identity contract', () {
+      final rawFixture = File(
+        'test/fixtures/participant_identity_contract.json',
+      ).readAsStringSync();
+      final fixture = jsonDecode(rawFixture) as Map<String, dynamic>;
+      final participants = fixture['validParticipants'] as List<dynamic>;
+
+      for (final rawParticipant in participants) {
+        final json = rawParticipant as Map<String, dynamic>;
+        final participant = ParticipantRefModel.fromJson(json).toEntity();
+        expect(
+          '${participant.kind.name}:${participant.id}',
+          json['identityKey'],
+        );
+        expect(participant.displayName, json['displayName']);
+        expect(participant.linkedPlayerId, json['linkedPlayerId']);
+      }
+    });
+
     test('round-trips registered player refs', () {
       const ref = ParticipantRef(
         kind: ParticipantRefKind.player,
@@ -49,16 +71,23 @@ void main() {
       expect(parsed.linkedPlayerId, ref.linkedPlayerId);
     });
 
-    test('defaults unknown kind safely to registered player', () {
-      final parsed = ParticipantRefModel.fromJson(const {
-        'kind': 'unknown',
-        'id': 'player-1',
-        'displayName': 'Known Player',
-      }).toEntity();
+    test('rejects every invalid participant in the shared contract', () {
+      final rawFixture = File(
+        'test/fixtures/participant_identity_contract.json',
+      ).readAsStringSync();
+      final fixture = jsonDecode(rawFixture) as Map<String, dynamic>;
+      final invalidParticipants = fixture['invalidParticipants'] as List;
 
-      expect(parsed.kind, ParticipantRefKind.player);
-      expect(parsed.id, 'player-1');
-      expect(parsed.displayName, 'Known Player');
+      for (final invalid in invalidParticipants) {
+        final entry = invalid as Map<String, dynamic>;
+        expect(
+          () => ParticipantRefModel.fromJson(
+            Map<String, dynamic>.from(entry['actor'] as Map),
+          ),
+          throwsFormatException,
+          reason: entry['label'] as String,
+        );
+      }
     });
   });
 }

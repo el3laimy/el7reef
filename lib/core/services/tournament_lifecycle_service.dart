@@ -22,6 +22,7 @@ import 'knockout_builder.dart';
 import 'participant_finalization_policy.dart';
 import 'tournament_audit_emitter.dart';
 import 'tournament_completion_policy.dart';
+import 'tournament_lifecycle_planners.dart';
 import 'tournament_participant_service.dart';
 
 class TournamentLifecycleService {
@@ -30,7 +31,8 @@ class TournamentLifecycleService {
   final ParticipantFinalizationPolicy _participantFinalizationPolicy;
   final GroupStageBuilder _groupStageBuilder;
   final KnockoutBuilder _knockoutBuilder;
-  final TournamentCompletionPolicy _completionPolicy;
+  final TournamentStandingsRefreshPlanner _standingsRefreshPlanner;
+  final TournamentCompletionPlanner _completionPlanner;
   final TournamentAuditEmitter _auditEmitter;
 
   TournamentLifecycleService({
@@ -40,6 +42,8 @@ class TournamentLifecycleService {
     GroupStageBuilder? groupStageBuilder,
     KnockoutBuilder? knockoutBuilder,
     TournamentCompletionPolicy? completionPolicy,
+    TournamentStandingsRefreshPlanner? standingsRefreshPlanner,
+    TournamentCompletionPlanner? completionPlanner,
     TournamentAuditEmitter? auditEmitter,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _participantService =
@@ -50,8 +54,17 @@ class TournamentLifecycleService {
            const ParticipantFinalizationPolicy(),
        _groupStageBuilder = groupStageBuilder ?? const GroupStageBuilder(),
        _knockoutBuilder = knockoutBuilder ?? const KnockoutBuilder(),
-       _completionPolicy =
-           completionPolicy ?? const TournamentCompletionPolicy(),
+       _standingsRefreshPlanner =
+           standingsRefreshPlanner ??
+           TournamentStandingsRefreshPlanner(
+             groupStageBuilder: groupStageBuilder ?? const GroupStageBuilder(),
+           ),
+       _completionPlanner =
+           completionPlanner ??
+           TournamentCompletionPlanner(
+             completionPolicy:
+                 completionPolicy ?? const TournamentCompletionPolicy(),
+           ),
        _auditEmitter =
            auditEmitter ?? TournamentAuditEmitter(firestore: firestore);
 
@@ -261,16 +274,35 @@ class TournamentLifecycleService {
       );
     }
 
+    final groupStageId = tournament.currentGroupStageId;
+    final hasGroupStage = groupStageId != null && groupStageId.isNotEmpty;
+    if (hasGroupStage) {
+      final groupFixtures = await _loadMatches(
+        tournamentId: tournamentId,
+        stageType: TournamentStageType.groupStage,
+        groupStageId: groupStageId,
+      );
+      if (groupFixtures.isEmpty ||
+          !groupFixtures.every(
+            (fixture) => fixture.isOfficialTournamentResult,
+          )) {
+        throw Exception(
+          'لا يمكن بدء الإقصائيات قبل اعتماد كل مباريات دور '
+          'المجموعات.',
+        );
+      }
+    }
+
     final participants = await _participantService.getTournamentParticipants(
       tournamentId,
     );
-    final groups = tournament.currentGroupStageId == null
+    final groups = !hasGroupStage
         ? const <TournamentGroup>[]
         : await _loadGroups(
             tournamentId: tournamentId,
-            groupStageId: tournament.currentGroupStageId!,
+            groupStageId: groupStageId,
           );
-    final standings = tournament.currentGroupStageId == null
+    final standings = !hasGroupStage
         ? const <GroupStandingSnapshot>[]
         : await refreshGroupStandings(
             tournamentId: tournamentId,
@@ -316,6 +348,9 @@ class TournamentLifecycleService {
       actorId: actorId,
       bracketId: buildResult.bracket.id,
       tiesCount: buildResult.ties.length,
+      seedingMethod: buildResult.bracket.seedingMethod,
+      qualifierParticipantIds: buildResult.bracket.qualifierParticipantIds,
+      byeParticipantIds: buildResult.bracket.byeParticipantIds,
     );
     return buildResult;
   }
@@ -353,53 +388,30 @@ class TournamentLifecycleService {
 
     final groups = await groupsFuture;
     final participants = await participantsFuture;
-    final participantsById = {
-      for (final participant in participants) participant.id: participant,
-    };
     final fixtures = await fixturesFuture;
     final existingSnapshots = await existingSnapshotsFuture;
-    final existingById = {
-      for (final snapshot in existingSnapshots) snapshot.id: snapshot,
-    };
-    final snapshots = <GroupStandingSnapshot>[];
-    final changedSnapshots = <GroupStandingSnapshot>[];
+    final plan = _standingsRefreshPlanner.plan(
+      tournament: tournament,
+      groups: groups,
+      participants: participants,
+      fixtures: fixtures,
+      existingSnapshots: existingSnapshots,
+      now: effectiveNow,
+    );
 
-    for (final group in groups) {
-      final recalculated = _groupStageBuilder.recalculateSnapshot(
-        tournament: tournament,
-        group: group,
-        participantsById: participantsById,
-        matches: fixtures.where((match) => match.groupId == group.id).toList(),
-        now: effectiveNow,
-      );
-      final existing = existingById[recalculated.id];
-      if (existing != null &&
-          _isEquivalentStandingSnapshot(existing, recalculated)) {
-        snapshots.add(existing);
-        continue;
-      }
-
-      final snapshotToPersist = recalculated.copyWith(
-        createdAt: existing?.createdAt ?? recalculated.createdAt,
-        updatedAt: effectiveNow,
-      );
-      snapshots.add(snapshotToPersist);
-      changedSnapshots.add(snapshotToPersist);
-    }
-
-    if (changedSnapshots.isEmpty) {
-      return snapshots;
+    if (plan.changedSnapshots.isEmpty) {
+      return plan.snapshots;
     }
 
     final batch = _firestore.batch();
-    for (final snapshot in changedSnapshots) {
+    for (final snapshot in plan.changedSnapshots) {
       batch.set(
         _standingsRef.doc(snapshot.id),
         GroupStandingSnapshotModel.fromEntity(snapshot).toJson(),
       );
     }
     await batch.commit();
-    return snapshots;
+    return plan.snapshots;
   }
 
   Future<KnockoutProgressResult?> refreshKnockoutProgress({
@@ -548,15 +560,12 @@ class TournamentLifecycleService {
     final standings = tournament.currentGroupStageId == null
         ? const <GroupStandingSnapshot>[]
         : await _loadStandings(tournament.currentGroupStageId!);
-    final winnerParticipantId = _completionPolicy.determineWinnerParticipantId(
+    final updatedTournament = _completionPlanner.complete(
       tournament: tournament,
       bracket: bracket,
       standings: standings,
     );
-    final updatedTournament = tournament.copyWith(
-      status: TournamentStatus.completed,
-      winnerParticipantId: winnerParticipantId,
-    );
+    final winnerParticipantId = updatedTournament.winnerParticipantId;
     if (tournament.status == TournamentStatus.completed &&
         tournament.winnerParticipantId == winnerParticipantId) {
       return tournament;
@@ -698,11 +707,13 @@ class TournamentLifecycleService {
   ) {
     return left.tournamentId == right.tournamentId &&
         left.format == right.format &&
+        left.seedingMethod == right.seedingMethod &&
         left.championParticipantId == right.championParticipantId &&
         _stringListsEqual(
           left.qualifierParticipantIds,
           right.qualifierParticipantIds,
-        );
+        ) &&
+        _stringListsEqual(left.byeParticipantIds, right.byeParticipantIds);
   }
 
   bool _isEquivalentKnockoutTie(KnockoutTie left, KnockoutTie right) {
@@ -714,7 +725,8 @@ class TournamentLifecycleService {
         left.participantBId == right.participantBId &&
         left.winnerParticipantId == right.winnerParticipantId &&
         left.matchId == right.matchId &&
-        left.nextTieId == right.nextTieId;
+        left.nextTieId == right.nextTieId &&
+        left.resolutionType == right.resolutionType;
   }
 
   bool _isEquivalentMatch(Match left, Match right) {
@@ -728,6 +740,9 @@ class TournamentLifecycleService {
         left.status == right.status &&
         left.scoreTeamA == right.scoreTeamA &&
         left.scoreTeamB == right.scoreTeamB &&
+        left.penaltyScoreTeamA == right.penaltyScoreTeamA &&
+        left.penaltyScoreTeamB == right.penaltyScoreTeamB &&
+        left.knockoutDecision == right.knockoutDecision &&
         left.mvpPlayerId == right.mvpPlayerId &&
         left.location == right.location &&
         left.latitude == right.latitude &&
@@ -753,62 +768,7 @@ class TournamentLifecycleService {
         left.completedAt == right.completedAt;
   }
 
-  bool _isEquivalentStandingSnapshot(
-    GroupStandingSnapshot left,
-    GroupStandingSnapshot right,
-  ) {
-    if (left.tournamentId != right.tournamentId ||
-        left.groupStageId != right.groupStageId ||
-        left.groupId != right.groupId) {
-      return false;
-    }
-    if (!_stringListsEqual(
-      left.qualifierParticipantIds,
-      right.qualifierParticipantIds,
-    )) {
-      return false;
-    }
-    if (!_metricListsEqual(left.tiebreakerOrder, right.tiebreakerOrder)) {
-      return false;
-    }
-    if (left.entries.length != right.entries.length) {
-      return false;
-    }
-    for (int index = 0; index < left.entries.length; index++) {
-      final leftEntry = left.entries[index];
-      final rightEntry = right.entries[index];
-      if (leftEntry.participantId != rightEntry.participantId ||
-          leftEntry.displayName != rightEntry.displayName ||
-          leftEntry.played != rightEntry.played ||
-          leftEntry.wins != rightEntry.wins ||
-          leftEntry.draws != rightEntry.draws ||
-          leftEntry.losses != rightEntry.losses ||
-          leftEntry.goalsFor != rightEntry.goalsFor ||
-          leftEntry.goalsAgainst != rightEntry.goalsAgainst ||
-          leftEntry.rank != rightEntry.rank ||
-          leftEntry.randomDrawOrder != rightEntry.randomDrawOrder) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   bool _stringListsEqual(List<String> left, List<String> right) {
-    if (left.length != right.length) {
-      return false;
-    }
-    for (int index = 0; index < left.length; index++) {
-      if (left[index] != right[index]) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  bool _metricListsEqual(
-    List<GroupStandingsMetric> left,
-    List<GroupStandingsMetric> right,
-  ) {
     if (left.length != right.length) {
       return false;
     }

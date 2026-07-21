@@ -16,6 +16,38 @@ val keystoreProperties = Properties()
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
+val localDebugKeystoreFile = rootProject.file("app/debug-el7reef-v2.keystore")
+val requestedReleaseBuild = gradle.startParameter.taskNames.any {
+    it.lowercase().contains("release")
+}
+
+fun releaseKeystoreProperty(name: String): String {
+    val value = keystoreProperties[name] as String?
+    if (value.isNullOrBlank()) {
+        throw GradleException(
+            "Missing '$name' in android/key.properties. " +
+                "Release builds must use the real release keystore."
+        )
+    }
+    return value
+}
+
+fun releaseKeystoreFile(): java.io.File {
+    val storeFile = file(releaseKeystoreProperty("storeFile"))
+    if (!storeFile.exists()) {
+        throw GradleException(
+            "Release keystore file does not exist: ${storeFile.path}. " +
+                "Update 'storeFile' in android/key.properties before building release artifacts."
+        )
+    }
+    if (storeFile.canonicalFile == localDebugKeystoreFile.canonicalFile) {
+        throw GradleException(
+            "Release builds must not use android/app/debug-el7reef-v2.keystore. " +
+                "Create a separate Play Store release keystore and register its SHA-1/SHA-256 in Firebase."
+        )
+    }
+    return storeFile
+}
 
 android {
     namespace = "com.el7reef.app"
@@ -38,27 +70,44 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     signingConfigs {
+        create("el7reefDebug") {
+            if (localDebugKeystoreFile.exists()) {
+                keyAlias = "el7reefdebugv2"
+                keyPassword = "android"
+                storeFile = localDebugKeystoreFile
+                storePassword = "android"
+            }
+        }
         create("release") {
             if (keystorePropertiesFile.exists()) {
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = releaseKeystoreProperty("keyAlias")
+                keyPassword = releaseKeystoreProperty("keyPassword")
+                storeFile = releaseKeystoreFile()
+                storePassword = releaseKeystoreProperty("storePassword")
             }
         }
     }
 
     buildTypes {
+        debug {
+            if (localDebugKeystoreFile.exists()) {
+                signingConfig = signingConfigs.getByName("el7reefDebug")
+            }
+        }
         release {
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
-            } else {
-                signingConfig = signingConfigs.getByName("debug")
+            } else if (requestedReleaseBuild) {
+                throw GradleException(
+                    "Release signing is not configured. Create android/key.properties " +
+                        "and a release keystore before building release artifacts."
+                )
             }
         }
     }
@@ -66,4 +115,14 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("androidx.media3:media3-common:1.9.2")
+    implementation("androidx.media3:media3-effect:1.9.2")
+    implementation("androidx.media3:media3-transformer:1.9.2")
+
+    androidTestImplementation("androidx.test:core:1.7.0")
+    androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
 }

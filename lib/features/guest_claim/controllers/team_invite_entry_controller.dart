@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 
 import '../../../app/routes/app_routes.dart';
 import '../../../core/auth/auth_session.dart';
+import '../../../core/navigation/pending_deep_link_service.dart';
 import '../../../core/services/analytics_service.dart';
 import '../../../core/services/team_invite_service.dart';
 import '../../../domain/entities/team.dart';
@@ -15,9 +16,9 @@ class TeamInviteEntryController extends GetxController {
     required AuthSession authSession,
     required TeamInviteService teamInviteService,
     AnalyticsService? analyticsService,
-  })  : _authSession = authSession,
-        _teamInviteService = teamInviteService,
-        _analyticsService = analyticsService ?? AnalyticsService();
+  }) : _authSession = authSession,
+       _teamInviteService = teamInviteService,
+       _analyticsService = analyticsService ?? AnalyticsService();
 
   final team = Rxn<Team>();
   final isLoading = true.obs;
@@ -57,10 +58,7 @@ class TeamInviteEntryController extends GetxController {
       );
       team.value = preview.team;
       if (isLoggedIn) {
-        _analyticsService.trackClaimOpen(
-          type: 'team_invite',
-          targetId: teamId,
-        );
+        _analyticsService.trackClaimOpen(type: 'team_invite', targetId: teamId);
       }
     } catch (e) {
       errorMessage.value = e.toString().replaceFirst('Exception: ', '');
@@ -71,7 +69,8 @@ class TeamInviteEntryController extends GetxController {
 
   Future<void> acceptInvite() async {
     if (!isLoggedIn) {
-      // Redirect to login, then back here
+      final query = Map<String, String?>.from(Get.parameters);
+      _pendingDeepLinkService().store(AppRoutes.inviteEntryWithQuery(query));
       Get.toNamed(AppRoutes.login);
       return;
     }
@@ -112,5 +111,11 @@ class TeamInviteEntryController extends GetxController {
     } finally {
       isSubmitting.value = false;
     }
+  }
+
+  PendingDeepLinkService _pendingDeepLinkService() {
+    return Get.isRegistered<PendingDeepLinkService>()
+        ? Get.find<PendingDeepLinkService>()
+        : Get.put(PendingDeepLinkService(), permanent: true);
   }
 }

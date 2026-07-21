@@ -15,6 +15,204 @@ extension MatchdaySideDiscovery on MatchdayController {
       tournament: tournament,
       actorId: actorId,
     );
+    final participantSides = await _discoverParticipantFixtureSides(
+      match: match,
+      tournament: tournament,
+      actorId: actorId,
+      organizerLevel: organizerLevel,
+    );
+    if (participantSides != null) {
+      return participantSides;
+    }
+
+    return _discoverLegacyManagedSides(
+      match: match,
+      actorId: actorId,
+      organizerLevel: organizerLevel,
+    );
+  }
+
+  Future<List<MatchdayManagedSide>?> _discoverParticipantFixtureSides({
+    required Match match,
+    required Tournament? tournament,
+    required String actorId,
+    required bool organizerLevel,
+  }) async {
+    if (tournament == null) {
+      return null;
+    }
+
+    final participants = await _participantRepository.getTournamentParticipants(
+      tournament.id,
+    );
+    if (participants.isEmpty) {
+      return null;
+    }
+
+    final participantsById = {
+      for (final participant in participants) participant.id: participant,
+    };
+    final participantsBySourceId = <String, TournamentParticipant>{};
+    for (final participant in participants) {
+      participantsBySourceId.putIfAbsent(
+        participant.sourceEntityId,
+        () => participant,
+      );
+    }
+
+    final fixtureSlots = <({String? participantId, String? sourceEntityId})>[
+      (
+        participantId: _nonEmpty(match.teamAParticipantId),
+        sourceEntityId: _nonEmpty(match.teamAId),
+      ),
+      (
+        participantId: _nonEmpty(match.teamBParticipantId),
+        sourceEntityId: _nonEmpty(match.teamBId),
+      ),
+    ];
+    final hasParticipantReferences = fixtureSlots.any(
+      (slot) => slot.participantId != null,
+    );
+    final assignedSlotCount = fixtureSlots
+        .where((slot) => slot.sourceEntityId != null)
+        .length;
+    final fixtureParticipants = <TournamentParticipant>[];
+    final displayNamesBySide = <String, String>{};
+    for (var slotIndex = 0; slotIndex < fixtureSlots.length; slotIndex += 1) {
+      final slot = fixtureSlots[slotIndex];
+      final participant = switch (slot.participantId) {
+        final participantId? => participantsById[participantId],
+        null =>
+          slot.sourceEntityId == null
+              ? null
+              : participantsBySourceId[slot.sourceEntityId!],
+      };
+      if (participant == null) {
+        if (slot.participantId != null) {
+          throw Exception('تعذر التحقق من مشارك طرف المباراة.');
+        }
+        continue;
+      }
+      if (participant.tournamentId != tournament.id ||
+          (slot.sourceEntityId != null &&
+              participant.sourceEntityId != slot.sourceEntityId)) {
+        throw Exception('بيانات طرف المباراة لا تطابق مشارك البطولة.');
+      }
+      displayNamesBySide[slotIndex == 0 ? 'A' : 'B'] = participant.displayName;
+      fixtureParticipants.add(participant);
+    }
+    if (fixtureParticipants.isEmpty) {
+      return null;
+    }
+    if (!hasParticipantReferences &&
+        (assignedSlotCount < 2 ||
+            fixtureParticipants.length != assignedSlotCount)) {
+      return null;
+    }
+    _applyTournamentFixtureDisplayNames(displayNamesBySide);
+
+    final registeredTeamIds = fixtureParticipants
+        .where(
+          (participant) =>
+              participant.sourceType ==
+              TournamentParticipantSourceType.registeredTeam,
+        )
+        .map((participant) => participant.sourceEntityId)
+        .toSet()
+        .toList(growable: false);
+    final guestTeamIds = fixtureParticipants
+        .where(
+          (participant) =>
+              participant.sourceType ==
+              TournamentParticipantSourceType.guestTeam,
+        )
+        .map((participant) => participant.sourceEntityId)
+        .toSet()
+        .toList(growable: false);
+    final results = await Future.wait<dynamic>([
+      _teamRepository.getTeamsByIds(registeredTeamIds),
+      _guestTeamRepository.getGuestTeamsByIds(guestTeamIds),
+    ]);
+    final registeredTeams = results[0] as List<Team>;
+    final guestTeams = results[1] as List<GuestTeam>;
+    final registeredTeamsById = {
+      for (final team in registeredTeams) team.id: team,
+    };
+    final guestTeamsById = {
+      for (final guestTeam in guestTeams) guestTeam.id: guestTeam,
+    };
+
+    final sides = <MatchdayManagedSide>[];
+    final seenKeys = <String>{};
+    for (final participant in fixtureParticipants) {
+      switch (participant.sourceType) {
+        case TournamentParticipantSourceType.registeredTeam:
+          final team = registeredTeamsById[participant.sourceEntityId];
+          if (team == null) {
+            throw Exception('تعذر تحميل الفريق المسجل المرتبط بطرف المباراة.');
+          }
+          if (!organizerLevel && !_canManageRegisteredTeam(team, actorId)) {
+            continue;
+          }
+          final key = 'team::${team.id}';
+          if (!seenKeys.add(key)) {
+            continue;
+          }
+          sides.add(
+            MatchdayManagedSide(
+              key: key,
+              kind: MatchdayManagedSideKind.registeredTeam,
+              label: team.name,
+              subtitle: 'فريق مسجل',
+              accessLabel: organizerLevel ? 'منظم' : 'قائد/نائب',
+              teamId: team.id,
+            ),
+          );
+        case TournamentParticipantSourceType.guestTeam:
+          final guestTeam = guestTeamsById[participant.sourceEntityId];
+          if (guestTeam == null) {
+            throw Exception('تعذر تحميل الفريق الضيف المرتبط بطرف المباراة.');
+          }
+          if (!organizerLevel && guestTeam.creatorId != actorId) {
+            continue;
+          }
+          final key = 'guest::${guestTeam.id}';
+          if (!seenKeys.add(key)) {
+            continue;
+          }
+          sides.add(
+            MatchdayManagedSide(
+              key: key,
+              kind: MatchdayManagedSideKind.guestTeam,
+              label: guestTeam.name,
+              subtitle: 'فريق ضيف',
+              accessLabel: organizerLevel ? 'منظم' : 'منشئ الفريق',
+              guestTeamId: guestTeam.id,
+            ),
+          );
+      }
+    }
+    return sides;
+  }
+
+  void _applyTournamentFixtureDisplayNames(
+    Map<String, String> displayNamesBySide,
+  ) {
+    final sideAName = displayNamesBySide['A']?.trim();
+    final sideBName = displayNamesBySide['B']?.trim();
+    if (sideAName != null && sideAName.isNotEmpty) {
+      sideADisplayName.value = sideAName;
+    }
+    if (sideBName != null && sideBName.isNotEmpty) {
+      sideBDisplayName.value = sideBName;
+    }
+  }
+
+  Future<List<MatchdayManagedSide>> _discoverLegacyManagedSides({
+    required Match match,
+    required String actorId,
+    required bool organizerLevel,
+  }) async {
     final sides = <MatchdayManagedSide>[];
     final seenKeys = <String>{};
     final assignedTeamIds = <String>[
@@ -141,6 +339,11 @@ extension MatchdaySideDiscovery on MatchdayController {
     }
 
     return sides;
+  }
+
+  String? _nonEmpty(String? value) {
+    final normalized = value?.trim();
+    return normalized == null || normalized.isEmpty ? null : normalized;
   }
 
   Future<void> _loadFriendlySideDisplayNames(Match loadedMatch) async {

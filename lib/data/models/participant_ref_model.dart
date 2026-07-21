@@ -14,11 +14,18 @@ class ParticipantRefModel {
   });
 
   factory ParticipantRefModel.fromJson(Map<String, dynamic> json) {
+    final kind = _parseKindValue(json['kind']);
+    final id = _requiredString(json['id'], 'id');
+    final displayName = _requiredString(json['displayName'], 'displayName');
+    final linkedPlayerId = _optionalString(
+      json['linkedPlayerId'],
+      'linkedPlayerId',
+    );
     return ParticipantRefModel(
-      kind: json['kind'] as String? ?? ParticipantRefKind.player.name,
-      id: json['id'] as String? ?? '',
-      displayName: json['displayName'] as String? ?? '',
-      linkedPlayerId: json['linkedPlayerId'] as String?,
+      kind: kind.name,
+      id: id,
+      displayName: displayName,
+      linkedPlayerId: linkedPlayerId,
     );
   }
 
@@ -50,9 +57,33 @@ class ParticipantRefModel {
   }
 
   static ParticipantRefKind _parseKind(String value) {
-    return ParticipantRefKind.values.firstWhere(
-      (entry) => entry.name == value,
-      orElse: () => ParticipantRefKind.player,
-    );
+    return _parseKindValue(value);
+  }
+
+  static ParticipantRefKind _parseKindValue(Object? value) {
+    if (value is! String) {
+      throw const FormatException('ParticipantRef.kind is required.');
+    }
+    final normalized = value.trim();
+    for (final kind in ParticipantRefKind.values) {
+      if (kind.name == normalized) return kind;
+    }
+    throw FormatException('Unknown ParticipantRef.kind: $normalized');
+  }
+
+  static String _requiredString(Object? value, String fieldName) {
+    if (value is! String || value.trim().isEmpty) {
+      throw FormatException('ParticipantRef.$fieldName is required.');
+    }
+    return value.trim();
+  }
+
+  static String? _optionalString(Object? value, String fieldName) {
+    if (value == null) return null;
+    if (value is! String) {
+      throw FormatException('ParticipantRef.$fieldName must be a string.');
+    }
+    final normalized = value.trim();
+    return normalized.isEmpty ? null : normalized;
   }
 }

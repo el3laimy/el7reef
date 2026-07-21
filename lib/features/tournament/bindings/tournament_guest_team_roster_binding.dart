@@ -60,6 +60,7 @@ class TournamentGuestTeamRosterBinding extends Bindings {
     Get.lazyPut<TournamentGuestTeamRosterController>(
       () => TournamentGuestTeamRosterController(
         authSession: authSession,
+        guestPlayerRepository: Get.find<GuestPlayerRepositoryImpl>(),
         guestTeamRepository: Get.find<GuestTeamRepositoryImpl>(),
         tournamentRepository: Get.find<TournamentRepositoryImpl>(),
         rosterService: Get.find<GuestTeamRosterService>(),

@@ -8,7 +8,9 @@ import 'package:el7reef/core/enums/match_attendance_status.dart';
 import 'package:el7reef/core/enums/match_status.dart';
 import 'package:el7reef/core/enums/team_member_availability.dart';
 import 'package:el7reef/core/enums/team_membership_role.dart';
+import 'package:el7reef/core/services/claimed_participant_identity_resolver.dart';
 import 'package:el7reef/core/services/match_event_service.dart';
+import 'package:el7reef/data/repositories/guest_player_repository_impl.dart';
 import 'package:el7reef/data/repositories/match_event_repository_impl.dart';
 import 'package:el7reef/data/repositories/match_lineup_snapshot_repository_impl.dart';
 import 'package:el7reef/data/repositories/match_repository_impl.dart';
@@ -330,6 +332,23 @@ void main() {
       expect(find.text('شارك كارت نجم المباراة'), findsOneWidget);
       expect(find.text('افتح بروفايل النجم'), findsNothing);
     });
+
+    testWidgets('pending review hides result and MVP pride actions', (
+      tester,
+    ) async {
+      final controller = _screenController();
+      controller.match.value = _match(status: MatchStatus.pendingReview);
+      controller.mvpEvent.value = _mvpEvent(displayName: 'Pending MVP');
+      controller.isLoading.value = false;
+      Get.put<MatchResultLineupController>(controller);
+
+      await tester.pumpWidget(_buildScreenApp());
+      await tester.pumpAndSettle();
+
+      expect(find.text('شارك كارت النتيجة'), findsNothing);
+      expect(find.text('شارك كارت نجم المباراة'), findsNothing);
+      expect(find.text('شارك هداف المباراة'), findsNothing);
+    });
   });
 }
 
@@ -348,6 +367,9 @@ MatchResultLineupController _controller() {
       firestore: firestore,
     ),
     tournamentRepository: TournamentRepositoryImpl(db: firestore),
+    claimedIdentityResolver: ClaimedParticipantIdentityResolver(
+      guestPlayerRepository: GuestPlayerRepositoryImpl(firestore: firestore),
+    ),
   );
 }
 
@@ -366,6 +388,9 @@ _NoopMatchResultLineupController _screenController() {
       firestore: firestore,
     ),
     tournamentRepository: TournamentRepositoryImpl(db: firestore),
+    claimedIdentityResolver: ClaimedParticipantIdentityResolver(
+      guestPlayerRepository: GuestPlayerRepositoryImpl(firestore: firestore),
+    ),
   );
 }
 
@@ -394,9 +419,12 @@ class _NoopMatchResultLineupController extends MatchResultLineupController {
     required super.matchSidePlayerRepository,
     required super.matchEventService,
     required super.tournamentRepository,
+    super.claimedIdentityResolver,
   });
 
   @override
+  // This test double intentionally suppresses route-driven loading.
+  // ignore: must_call_super
   void onInit() {}
 }
 
@@ -405,13 +433,14 @@ Match _match({
   String? teamAId = 'team-a',
   String? teamBId = 'team-b',
   String? mvpPlayerId,
+  MatchStatus status = MatchStatus.settled,
 }) {
   return Match(
     id: id,
     organizerId: 'organizer-1',
     teamAId: teamAId,
     teamBId: teamBId,
-    status: MatchStatus.completed,
+    status: status,
     scoreTeamA: 2,
     scoreTeamB: 1,
     mvpPlayerId: mvpPlayerId,

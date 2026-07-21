@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../models/pride_card_format.dart';
 import '../models/top_scorers_share_data.dart';
+import 'pride_card_shell.dart';
+import 'pride_card_text_scale.dart';
+import 'pride_identity_avatar.dart';
 
 class TopScorersShareCard extends StatelessWidget {
   static const double exportLogicalWidth = 360;
@@ -10,53 +14,38 @@ class TopScorersShareCard extends StatelessWidget {
 
   final TopScorersShareData data;
   final bool exportMode;
+  final PrideCardFormat format;
 
   const TopScorersShareCard({
     super.key,
     required this.data,
     this.exportMode = false,
+    this.format = PrideCardFormat.feed4x5,
   });
 
   @override
   Widget build(BuildContext context) {
-    final content = Directionality(
-      textDirection: TextDirection.rtl,
-      child: Container(
-        width: exportMode ? exportLogicalWidth : null,
-        height: exportMode ? exportLogicalHeight : null,
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          color: AppColors.backgroundDeep,
-          borderRadius: BorderRadius.circular(exportMode ? 20 : 28),
-          border: Border.all(
-            color: AppColors.textPrimaryTinted.withValues(alpha: 0.12),
+    final cardBody = ClipRRect(
+      borderRadius: BorderRadius.circular(exportMode ? 16 : 22),
+      child: Stack(
+        children: [
+          const Positioned.fill(child: _TopScorersBackground()),
+          _TopScorersContent(
+            data: data,
+            exportMode: exportMode,
+            format: format,
           ),
-          boxShadow: exportMode
-              ? null
-              : [
-                  BoxShadow(
-                    color: AppColors.backgroundDeep.withValues(alpha: 0.35),
-                    blurRadius: 24,
-                    offset: const Offset(0, 14),
-                  ),
-                ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(exportMode ? 16 : 22),
-          child: Stack(
-            children: [
-              const Positioned.fill(child: _TopScorersBackground()),
-              _TopScorersContent(data: data, exportMode: exportMode),
-            ],
-          ),
-        ),
+        ],
       ),
     );
-
-    if (exportMode) {
-      return Material(color: Colors.transparent, child: content);
-    }
-    return AspectRatio(aspectRatio: 4 / 5, child: content);
+    return PrideCardShell.framed(
+      exportMode: exportMode,
+      format: format,
+      semanticsLabel: 'بطاقة ترتيب هدافي البطولة',
+      payload: data.sharePayload,
+      exportPadding: EdgeInsets.all(format.isStory ? 22 : 12),
+      child: cardBody,
+    );
   }
 }
 
@@ -94,12 +83,26 @@ class _TopScorersBackground extends StatelessWidget {
 class _TopScorersContent extends StatelessWidget {
   final TopScorersShareData data;
   final bool exportMode;
+  final PrideCardFormat format;
 
-  const _TopScorersContent({required this.data, required this.exportMode});
+  const _TopScorersContent({
+    required this.data,
+    required this.exportMode,
+    required this.format,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final titleStyle = exportMode
+    final dense = PrideCardTextScale.usesDenseLayout(context);
+    final compact =
+        format == PrideCardFormat.square1x1 || format.isLandscape || dense;
+    final titleStyle = dense
+        ? const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+          )
+        : exportMode
         ? const TextStyle(
             color: AppColors.textPrimary,
             fontSize: 24,
@@ -109,7 +112,13 @@ class _TopScorersContent extends StatelessWidget {
             color: AppColors.textPrimary,
             fontWeight: FontWeight.w900,
           );
-    final tournamentStyle = exportMode
+    final tournamentStyle = dense
+        ? TextStyle(
+            color: AppColors.textSecondaryTinted.withValues(alpha: 0.76),
+            fontSize: 8,
+            fontWeight: FontWeight.w700,
+          )
+        : exportMode
         ? TextStyle(
             color: AppColors.textSecondaryTinted.withValues(alpha: 0.76),
             fontSize: 13,
@@ -120,18 +129,30 @@ class _TopScorersContent extends StatelessWidget {
           );
 
     return Padding(
-      padding: EdgeInsets.all(exportMode ? 18 : 18),
+      padding: EdgeInsets.all(dense ? 8 : (compact ? 12 : 18)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              _BrandMark(label: data.brandLabel, exportMode: exportMode),
-              const Spacer(),
-              _MetaChip(label: 'أفضل 5', exportMode: exportMode),
+              Expanded(
+                child: _BrandMark(
+                  label: data.brandLabel,
+                  exportMode: exportMode,
+                  dense: dense,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: _MetaChip(
+                  label: 'أفضل 5',
+                  exportMode: exportMode,
+                  dense: dense,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 22),
+          SizedBox(height: dense ? 4 : (compact ? 8 : 22)),
           Text(
             data.title,
             style: titleStyle,
@@ -139,7 +160,7 @@ class _TopScorersContent extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: dense ? 1 : (compact ? 2 : 6)),
           Text(
             data.tournamentName,
             style: tournamentStyle,
@@ -147,24 +168,33 @@ class _TopScorersContent extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: dense ? 4 : (compact ? 8 : 24)),
           Expanded(
             child: Column(
               children: [
                 for (final scorer in data.scorers)
-                  _ShareScorerRow(scorer: scorer, exportMode: exportMode),
+                  _ShareScorerRow(
+                    scorer: scorer,
+                    exportMode: exportMode,
+                    compact: compact,
+                    dense: dense,
+                  ),
               ],
             ),
           ),
           Text(
             'سجّل أهدافك وخلي اسمك يظهر',
             style:
-                (exportMode
+                (dense
+                        ? const TextStyle(fontSize: 7)
+                        : exportMode
                         ? const TextStyle(fontSize: 10)
                         : AppTextStyles.labelSmall)
                     .copyWith(
-              color: AppColors.textSecondaryTinted.withValues(alpha: 0.62),
-            ),
+                      color: AppColors.textSecondaryTinted.withValues(
+                        alpha: 0.62,
+                      ),
+                    ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -176,19 +206,38 @@ class _TopScorersContent extends StatelessWidget {
 class _ShareScorerRow extends StatelessWidget {
   final TopScorersShareEntryData scorer;
   final bool exportMode;
+  final bool compact;
+  final bool dense;
 
-  const _ShareScorerRow({required this.scorer, required this.exportMode});
+  const _ShareScorerRow({
+    required this.scorer,
+    required this.exportMode,
+    required this.compact,
+    required this.dense,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final nameStyle = exportMode
+    final nameStyle = dense
+        ? const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
+          )
+        : exportMode
         ? const TextStyle(
             color: AppColors.textPrimary,
             fontSize: 15,
             fontWeight: FontWeight.w800,
           )
         : AppTextStyles.titleMedium.copyWith(color: AppColors.textPrimary);
-    final goalStyle = exportMode
+    final goalStyle = dense
+        ? const TextStyle(
+            color: AppColors.primary,
+            fontSize: 9,
+            fontWeight: FontWeight.w900,
+          )
+        : exportMode
         ? const TextStyle(
             color: AppColors.primary,
             fontSize: 13,
@@ -197,8 +246,11 @@ class _ShareScorerRow extends StatelessWidget {
         : AppTextStyles.labelLarge.copyWith(color: AppColors.primary);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      margin: EdgeInsets.only(bottom: dense ? 3 : (compact ? 5 : 10)),
+      padding: EdgeInsets.symmetric(
+        horizontal: dense ? 6 : (compact ? 8 : 12),
+        vertical: dense ? 3 : (compact ? 5 : 10),
+      ),
       decoration: BoxDecoration(
         color: AppColors.textPrimaryTinted.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
@@ -208,28 +260,43 @@ class _ShareScorerRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _RankBadge(rank: scorer.rank, exportMode: exportMode),
-          const SizedBox(width: 10),
+          _RankBadge(rank: scorer.rank, exportMode: exportMode, dense: dense),
+          SizedBox(width: dense ? 4 : (compact ? 6 : 10)),
+          PrideIdentityAvatar(
+            imageUrl: scorer.photoUrl,
+            initials: scorer.initials,
+            size: dense ? 20 : (compact ? 24 : (exportMode ? 30 : 34)),
+            accent: scorer.isGuest ? AppColors.secondary : AppColors.primary,
+          ),
+          SizedBox(width: dense ? 4 : (compact ? 5 : 8)),
           Expanded(
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Flexible(
-                  child: Text(
-                    scorer.displayName,
-                    style: nameStyle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                Text(
+                  scorer.displayName,
+                  style: nameStyle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                if (scorer.isGuest) ...[
-                  const SizedBox(width: 8),
-                  _GuestBadge(exportMode: exportMode),
-                ],
+                if (scorer.isGuest)
+                  Text(
+                    'ضيف',
+                    style: TextStyle(
+                      color: AppColors.secondary,
+                      fontSize: dense ? 7 : (compact ? 8 : 9),
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
               ],
             ),
           ),
-          const SizedBox(width: 10),
-          Text(scorer.goalLabel, style: goalStyle),
+          SizedBox(width: dense ? 4 : (compact ? 5 : 10)),
+          Text(
+            compact ? '${scorer.goals}' : scorer.goalLabel,
+            style: goalStyle,
+          ),
         ],
       ),
     );
@@ -239,14 +306,19 @@ class _ShareScorerRow extends StatelessWidget {
 class _RankBadge extends StatelessWidget {
   final int rank;
   final bool exportMode;
+  final bool dense;
 
-  const _RankBadge({required this.rank, required this.exportMode});
+  const _RankBadge({
+    required this.rank,
+    required this.exportMode,
+    required this.dense,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 30,
-      height: 30,
+      width: dense ? 22 : 30,
+      height: dense ? 22 : 30,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: AppColors.primary.withValues(alpha: 0.18),
@@ -256,33 +328,8 @@ class _RankBadge extends StatelessWidget {
         '$rank',
         style: TextStyle(
           color: AppColors.primary,
-          fontSize: exportMode ? 13 : 12,
+          fontSize: dense ? 8 : (exportMode ? 13 : 12),
           fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
-  }
-}
-
-class _GuestBadge extends StatelessWidget {
-  final bool exportMode;
-
-  const _GuestBadge({required this.exportMode});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: BoxDecoration(
-        color: AppColors.secondary.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        'ضيف',
-        style: TextStyle(
-          color: AppColors.secondary,
-          fontSize: exportMode ? 9 : 10,
-          fontWeight: FontWeight.w800,
         ),
       ),
     );
@@ -292,8 +339,13 @@ class _GuestBadge extends StatelessWidget {
 class _BrandMark extends StatelessWidget {
   final String label;
   final bool exportMode;
+  final bool dense;
 
-  const _BrandMark({required this.label, required this.exportMode});
+  const _BrandMark({
+    required this.label,
+    required this.exportMode,
+    required this.dense,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -301,9 +353,11 @@ class _BrandMark extends StatelessWidget {
       label,
       style: TextStyle(
         color: AppColors.textPrimary,
-        fontSize: exportMode ? 13 : 12,
+        fontSize: dense ? 8 : (exportMode ? 13 : 12),
         fontWeight: FontWeight.w900,
       ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }
@@ -311,13 +365,21 @@ class _BrandMark extends StatelessWidget {
 class _MetaChip extends StatelessWidget {
   final String label;
   final bool exportMode;
+  final bool dense;
 
-  const _MetaChip({required this.label, required this.exportMode});
+  const _MetaChip({
+    required this.label,
+    required this.exportMode,
+    required this.dense,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: EdgeInsets.symmetric(
+        horizontal: dense ? 6 : 10,
+        vertical: dense ? 3 : 5,
+      ),
       decoration: BoxDecoration(
         color: AppColors.textPrimaryTinted.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
@@ -326,9 +388,11 @@ class _MetaChip extends StatelessWidget {
         label,
         style: TextStyle(
           color: AppColors.textPrimary,
-          fontSize: exportMode ? 9 : 10,
+          fontSize: dense ? 7 : (exportMode ? 9 : 10),
           fontWeight: FontWeight.w900,
         ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

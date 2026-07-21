@@ -198,6 +198,15 @@ class LineupPlayer {
   static String matchSidePlayerKey(String id) => 'sidePlayer:$id';
 }
 
+class LineupDragPayload {
+  final LineupPlayer player;
+  final String? sourceSlotId;
+
+  const LineupDragPayload({required this.player, this.sourceSlotId});
+
+  bool get fromBench => sourceSlotId == null;
+}
+
 class LineupGuestPlayer {
   final String id;
   final String name;

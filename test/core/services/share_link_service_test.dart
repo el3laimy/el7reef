@@ -92,6 +92,15 @@ void main() {
         expect(generated.appUri.scheme, ShareLinkService.appScheme);
         expect(generated.webUri.host, ShareLinkService.webHost);
         expect(generated.qrData, generated.webUri.toString());
+        expect(generated.payload.subjectName, isNull);
+        expect(
+          generated.appUri.queryParameters.containsKey('subjectName'),
+          isFalse,
+        );
+        expect(
+          generated.webUri.queryParameters.containsKey('subjectName'),
+          isFalse,
+        );
         expect(updatedGuest?.claimStatus, GuestClaimStatus.invited);
         expect(updatedGuest?.claimCode, generated.claimCode.code);
         expect(claimCode?.status, ClaimCodeStatus.active);
@@ -131,6 +140,25 @@ void main() {
         expect(viceLink.claimCode.createdBy, 'vice-1');
         expect(viceLink.claimCode.targetId, ownerLink.claimCode.targetId);
         expect(viceLink.claimCode.status, ClaimCodeStatus.active);
+      },
+    );
+
+    test(
+      'rejects a guest player claim URL request from an unauthorized actor',
+      () async {
+        await expectLater(
+          () => service.createGuestPlayerClaimUrl(
+            guestPlayerId: 'guest-player-1',
+            actorId: 'outsider-1',
+          ),
+          throwsA(
+            isA<Exception>().having(
+              (error) => error.toString(),
+              'message',
+              contains('لا تملك صلاحية'),
+            ),
+          ),
+        );
       },
     );
 

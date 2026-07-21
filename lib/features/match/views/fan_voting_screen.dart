@@ -4,8 +4,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
 import '../../../core/widgets/el7reef_button.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../domain/entities/player.dart';
 import '../controllers/fan_voting_controller.dart';
 
@@ -124,10 +124,11 @@ class FanVotingScreen extends StatelessWidget {
   }
 
   Widget _buildTimerHeader(FanVotingController controller) {
-    return GlassmorphicContainer(
+    return El7reefGlassSurface(
+      variant: El7reefGlassVariant.base,
       margin: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
       padding: const EdgeInsets.all(AppDimensions.lg),
-      borderRadius: AppDimensions.radiusLg,
+      radius: AppDimensions.radiusLg,
       child: Column(
         children: [
           Text('الوقت المتبقي لغلق التصويت', style: AppTextStyles.labelLarge),
@@ -151,9 +152,10 @@ class FanVotingScreen extends StatelessWidget {
   }
 
   Widget _buildPlayerCard(Player player, FanVotingController controller) {
-    return GlassmorphicContainer(
+    return El7reefGlassSurface(
+      variant: El7reefGlassVariant.base,
       padding: const EdgeInsets.all(AppDimensions.md),
-      borderRadius: AppDimensions.radiusMd,
+      radius: AppDimensions.radiusMd,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -220,10 +222,11 @@ class FanVotingScreen extends StatelessWidget {
     required String message,
   }) {
     return Center(
-      child: GlassmorphicContainer(
+      child: El7reefGlassSurface(
+        variant: El7reefGlassVariant.base,
         margin: const EdgeInsets.all(AppDimensions.pagePadding),
         padding: const EdgeInsets.all(AppDimensions.xl),
-        borderRadius: AppDimensions.radiusLg,
+        radius: AppDimensions.radiusLg,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

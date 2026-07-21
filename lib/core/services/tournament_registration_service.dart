@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/firebase_paths.dart';
 import '../../core/enums/tournament_registration_mode.dart';
 import '../../core/enums/tournament_registration_status.dart';
-import '../../core/enums/tournament_enums.dart';
 import '../../data/models/guest_team_model.dart';
 import '../../data/models/team_model.dart';
 import '../../data/models/tournament_model.dart';
@@ -13,6 +12,7 @@ import '../../domain/entities/team.dart';
 import '../../domain/entities/tournament.dart';
 import '../../domain/entities/tournament_registration.dart';
 import 'tournament_participant_service.dart';
+import 'tournament_registration_policy.dart';
 
 enum TournamentRegistrationOutcome {
   approved,
@@ -45,9 +45,14 @@ class TournamentRegistrationResult {
 class TournamentRegistrationService {
   final FirebaseFirestore _firestore;
   late final TournamentParticipantService _participantService;
+  final TournamentRegistrationPolicy _registrationPolicy;
 
-  TournamentRegistrationService({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance {
+  TournamentRegistrationService({
+    FirebaseFirestore? firestore,
+    TournamentRegistrationPolicy registrationPolicy =
+        const TournamentRegistrationPolicy(),
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _registrationPolicy = registrationPolicy {
     _participantService = TournamentParticipantService(firestore: _firestore);
   }
 
@@ -104,7 +109,10 @@ class TournamentRegistrationService {
       if (!isOrganizer && !ownsTeam) {
         throw Exception('لا تملك صلاحية تسجيل هذا الفريق في الدورة.');
       }
-      _ensureRegistrationIsOpen(tournament, currentTime: effectiveNow);
+      _registrationPolicy.assertRegistrationOpen(
+        tournament,
+        currentTime: effectiveNow,
+      );
 
       final registrationSnapshot = await transaction.get(registrationRef);
       final existingRegistration =
@@ -115,13 +123,13 @@ class TournamentRegistrationService {
             ).toEntity()
           : null;
 
-      final targetStatus = _resolveRegisteredTeamTargetStatus(
+      final targetStatus = _registrationPolicy.registeredTeamTargetStatus(
         mode: mode,
         isOrganizer: isOrganizer,
       );
-      _assertCapacityAvailable(
+      _registrationPolicy.assertCapacityAvailable(
         tournament: tournament,
-        policyRegistrations: policyRegistrations,
+        registrations: policyRegistrations,
         registrationId: registrationRef.id,
         nextStatus: targetStatus,
       );
@@ -283,14 +291,17 @@ class TournamentRegistrationService {
       if (!isOrganizer && !ownsGuestTeam) {
         throw Exception('لا تملك صلاحية تسجيل هذا الفريق الضيف في الدورة.');
       }
-      _ensureRegistrationIsOpen(tournament, currentTime: effectiveNow);
-      _ensureGuestTeamModeEligibility(
+      _registrationPolicy.assertRegistrationOpen(
+        tournament,
+        currentTime: effectiveNow,
+      );
+      _registrationPolicy.assertGuestTeamEligible(
         guestTeam: guestTeam,
         mode: mode,
         isOrganizer: isOrganizer,
       );
 
-      final targetStatus = _resolveGuestTeamTargetStatus(
+      final targetStatus = _registrationPolicy.guestTeamTargetStatus(
         mode: mode,
         isOrganizer: isOrganizer,
       );
@@ -303,9 +314,9 @@ class TournamentRegistrationService {
               registrationSnapshot.id,
             ).toEntity()
           : null;
-      _assertCapacityAvailable(
+      _registrationPolicy.assertCapacityAvailable(
         tournament: tournament,
-        policyRegistrations: policyRegistrations,
+        registrations: policyRegistrations,
         registrationId: registrationRef.id,
         nextStatus: targetStatus,
       );
@@ -526,15 +537,15 @@ class TournamentRegistrationService {
         );
       }
 
-      _ensureRegistrationIsOpen(
+      _registrationPolicy.assertRegistrationOpen(
         tournament,
         currentTime: effectiveNow,
         errorMessage: 'لا يمكن اعتماد التسجيل بعد إغلاق نافذة التسجيل.',
       );
 
-      _assertCapacityAvailable(
+      _registrationPolicy.assertCapacityAvailable(
         tournament: tournament,
-        policyRegistrations: policyRegistrations,
+        registrations: policyRegistrations,
         registrationId: registration.id,
         nextStatus: TournamentRegistrationStatus.approved,
       );
@@ -585,7 +596,7 @@ class TournamentRegistrationService {
         guestTeamSnapshot.data()!,
         guestTeamSnapshot.id,
       ).toEntity();
-      _ensureGuestTeamModeEligibility(
+      _registrationPolicy.assertGuestTeamEligible(
         guestTeam: guestTeam,
         mode: approvedRegistration.mode,
         isOrganizer: true,
@@ -699,77 +710,6 @@ class TournamentRegistrationService {
     return 'guest::$tournamentId::$guestTeamId';
   }
 
-  TournamentRegistrationStatus _resolveRegisteredTeamTargetStatus({
-    required TournamentRegistrationMode mode,
-    required bool isOrganizer,
-  }) {
-    return switch (mode) {
-      TournamentRegistrationMode.quick || TournamentRegistrationMode.hybrid =>
-        TournamentRegistrationStatus.approved,
-      TournamentRegistrationMode.verified when isOrganizer =>
-        TournamentRegistrationStatus.approved,
-      TournamentRegistrationMode.verified =>
-        TournamentRegistrationStatus.pending,
-    };
-  }
-
-  TournamentRegistrationStatus _resolveGuestTeamTargetStatus({
-    required TournamentRegistrationMode mode,
-    required bool isOrganizer,
-  }) {
-    return switch (mode) {
-      TournamentRegistrationMode.quick when isOrganizer =>
-        TournamentRegistrationStatus.approved,
-      TournamentRegistrationMode.quick => TournamentRegistrationStatus.pending,
-      TournamentRegistrationMode.hybrid => TournamentRegistrationStatus.pending,
-      TournamentRegistrationMode.verified when isOrganizer =>
-        TournamentRegistrationStatus.approved,
-      TournamentRegistrationMode.verified =>
-        TournamentRegistrationStatus.pending,
-    };
-  }
-
-  void _ensureRegistrationIsOpen(
-    Tournament tournament, {
-    required DateTime currentTime,
-    String errorMessage = 'التسجيل في هذه الدورة مغلق حاليًا.',
-  }) {
-    if (tournament.status != TournamentStatus.registration) {
-      throw Exception(errorMessage);
-    }
-
-    final deadline = tournament.registrationDeadline;
-    if (deadline != null && currentTime.isAfter(deadline)) {
-      throw Exception(errorMessage);
-    }
-  }
-
-  void _ensureGuestTeamModeEligibility({
-    required GuestTeam guestTeam,
-    required TournamentRegistrationMode mode,
-    required bool isOrganizer,
-  }) {
-    if (mode == TournamentRegistrationMode.quick && !isOrganizer) {
-      throw Exception('الوضع السريع لإضافة الفرق الضيفة مخصص للمنظم فقط.');
-    }
-
-    if (mode != TournamentRegistrationMode.verified) {
-      return;
-    }
-
-    final hasContactName =
-        guestTeam.contactName != null &&
-        guestTeam.contactName!.trim().isNotEmpty;
-    final hasContactPhone =
-        guestTeam.contactPhone != null &&
-        guestTeam.contactPhone!.trim().isNotEmpty;
-    if (!hasContactName || !hasContactPhone) {
-      throw Exception(
-        'الوضع الموثق يتطلب اسم مسؤول التواصل ورقم هاتف صالح للفريق الضيف.',
-      );
-    }
-  }
-
   Future<TournamentRegistration> _getRegistrationForPolicy(
     String registrationId,
   ) async {
@@ -797,63 +737,6 @@ class TournamentRegistrationService {
           ).toEntity(),
         )
         .toList(growable: false);
-  }
-
-  void _assertCapacityAvailable({
-    required Tournament tournament,
-    required List<TournamentRegistration> policyRegistrations,
-    required String registrationId,
-    required TournamentRegistrationStatus nextStatus,
-  }) {
-    if (!_statusConsumesCapacity(nextStatus)) {
-      return;
-    }
-
-    final activeRegistrations = policyRegistrations
-        .where((registration) => _statusConsumesCapacity(registration.status))
-        .toList(growable: false);
-    final pendingReservations = activeRegistrations
-        .where(
-          (registration) =>
-              registration.status == TournamentRegistrationStatus.pending,
-        )
-        .length;
-    final approvedRegistrations = activeRegistrations
-        .where(
-          (registration) =>
-              registration.status == TournamentRegistrationStatus.approved,
-        )
-        .length;
-
-    // Prefer canonical participant summary, then approved registrations,
-    // and only fall back to legacy registeredTeamIds when the canonical
-    // participant count is not available yet.
-    var approvedReservedSlots = approvedRegistrations;
-    final canonicalApprovedSlots = tournament.activeParticipantCount;
-    if (canonicalApprovedSlots != null &&
-        canonicalApprovedSlots > approvedReservedSlots) {
-      approvedReservedSlots = canonicalApprovedSlots;
-    } else if (canonicalApprovedSlots == null &&
-        tournament.registeredTeamIds.length > approvedReservedSlots) {
-      approvedReservedSlots = tournament.registeredTeamIds.length;
-    }
-
-    final reservedSlots = approvedReservedSlots + pendingReservations;
-    final currentRegistrationAlreadyReservesSlot = policyRegistrations.any(
-      (registration) =>
-          registration.id == registrationId &&
-          _statusConsumesCapacity(registration.status),
-    );
-
-    if (!currentRegistrationAlreadyReservesSlot &&
-        reservedSlots >= tournament.maxTeams) {
-      throw Exception('اكتملت سعة التسجيل لهذه الدورة.');
-    }
-  }
-
-  bool _statusConsumesCapacity(TournamentRegistrationStatus status) {
-    return status == TournamentRegistrationStatus.approved ||
-        status == TournamentRegistrationStatus.pending;
   }
 
   _RegistrationSyncResult _syncApprovedRegisteredTeam({

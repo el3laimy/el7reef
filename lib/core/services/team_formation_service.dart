@@ -54,21 +54,33 @@ class TeamFormationService {
     TeamRosterSnapshotRepository? snapshotRepository,
     TeamRosterPolicy? policy,
     Uuid? uuid,
-  })  : _teamRepository = teamRepository ?? TeamRepositoryImpl(),
-        _membershipRepository =
-            membershipRepository ?? TeamMembershipRepositoryImpl(),
-        _playerRepository = playerRepository ?? PlayerRepositoryImpl(),
-        _guestPlayerRepository =
-            guestPlayerRepository ?? GuestPlayerRepositoryImpl(),
-        _templateRepository =
-            templateRepository ?? TeamFormationTemplateRepositoryImpl(),
-        _snapshotRepository =
-            snapshotRepository ?? TeamRosterSnapshotRepositoryImpl(),
-        _policy = policy ?? const TeamRosterPolicy(),
-        _uuid = uuid ?? const Uuid();
+  }) : _teamRepository = teamRepository ?? TeamRepositoryImpl(),
+       _membershipRepository =
+           membershipRepository ?? TeamMembershipRepositoryImpl(),
+       _playerRepository = playerRepository ?? PlayerRepositoryImpl(),
+       _guestPlayerRepository =
+           guestPlayerRepository ?? GuestPlayerRepositoryImpl(),
+       _templateRepository =
+           templateRepository ?? TeamFormationTemplateRepositoryImpl(),
+       _snapshotRepository =
+           snapshotRepository ?? TeamRosterSnapshotRepositoryImpl(),
+       _policy = policy ?? const TeamRosterPolicy(),
+       _uuid = uuid ?? const Uuid();
 
   Future<List<TeamFormationTemplate>> getTeamTemplates(String teamId) {
-    return _templateRepository.getTeamTemplates(teamId);
+    return _templateRepository
+        .getTeamTemplates(teamId)
+        .then(
+          (templates) => templates
+              .where(
+                (template) => template.id != _currentLineupTemplateId(teamId),
+              )
+              .toList(growable: false),
+        );
+  }
+
+  Future<TeamFormationTemplate?> getCurrentLineupState(String teamId) {
+    return _templateRepository.getTemplate(_currentLineupTemplateId(teamId));
   }
 
   Future<List<TeamRosterSnapshot>> getRecentSnapshots(
@@ -83,6 +95,7 @@ class TeamFormationService {
     required String actorId,
     required String name,
     String? formationLabel,
+    List<TeamFormationEntry>? entries,
     DateTime? now,
   }) async {
     final effectiveName = name.trim();
@@ -94,13 +107,13 @@ class TeamFormationService {
     final team = await _requireTeam(teamId);
     _assertCanManage(team, actorId);
 
-    final entries = await _captureCurrentEntries(teamId);
+    final capturedEntries = entries ?? await _captureCurrentEntries(teamId);
     final template = TeamFormationTemplate(
       id: _uuid.v4(),
       teamId: teamId,
       name: effectiveName,
       formationLabel: _normalizeOptionalText(formationLabel),
-      entries: entries,
+      entries: capturedEntries,
       createdBy: actorId,
       createdAt: effectiveNow,
       updatedAt: effectiveNow,
@@ -110,12 +123,49 @@ class TeamFormationService {
     return template;
   }
 
+  Future<TeamFormationTemplate> saveCurrentLineupState({
+    required String teamId,
+    required String actorId,
+    required String formationLabel,
+    required List<TeamFormationEntry> entries,
+    DateTime? now,
+  }) async {
+    if (entries.isEmpty) {
+      throw Exception('لا يمكن حفظ خطة فريق بلا لاعبين.');
+    }
+
+    final effectiveNow = now ?? DateTime.now();
+    final team = await _requireTeam(teamId);
+    _assertCanManage(team, actorId);
+
+    final id = _currentLineupTemplateId(teamId);
+    final existing = await _templateRepository.getTemplate(id);
+    final template = TeamFormationTemplate(
+      id: id,
+      teamId: teamId,
+      name: '__current_lineup__',
+      formationLabel: _normalizeOptionalText(formationLabel),
+      entries: entries,
+      createdBy: existing?.createdBy ?? actorId,
+      createdAt: existing?.createdAt ?? effectiveNow,
+      updatedAt: effectiveNow,
+    );
+
+    if (existing == null) {
+      await _templateRepository.createTemplate(template);
+    } else {
+      await _templateRepository.updateTemplate(template);
+    }
+    return template;
+  }
+
   Future<TeamRosterSnapshot> createRosterSnapshot({
     required String teamId,
     required String actorId,
     required String label,
     String? formationLabel,
     String? sourceTemplateId,
+    List<TeamFormationEntry>? entries,
     DateTime? now,
   }) async {
     final effectiveLabel = label.trim();
@@ -127,14 +177,14 @@ class TeamFormationService {
     final team = await _requireTeam(teamId);
     _assertCanManage(team, actorId);
 
-    final entries = await _captureCurrentEntries(teamId);
+    final capturedEntries = entries ?? await _captureCurrentEntries(teamId);
     final snapshot = TeamRosterSnapshot(
       id: _uuid.v4(),
       teamId: teamId,
       label: effectiveLabel,
       formationLabel: _normalizeOptionalText(formationLabel),
       sourceTemplateId: _normalizeOptionalText(sourceTemplateId),
-      entries: entries,
+      entries: capturedEntries,
       createdBy: actorId,
       createdAt: effectiveNow,
     );
@@ -198,6 +248,14 @@ class TeamFormationService {
       }
     }
 
+    await saveCurrentLineupState(
+      teamId: teamId,
+      actorId: actorId,
+      formationLabel: template.summaryLabel,
+      entries: template.entries,
+      now: effectiveNow,
+    );
+
     return ApplyTeamFormationResult(
       template: template,
       matchedMembers: matchedMembers,
@@ -255,8 +313,9 @@ class TeamFormationService {
       );
     }
 
-    final guestPlayer =
-        await _guestPlayerRepository.getGuestPlayer(membership.guestPlayerId!);
+    final guestPlayer = await _guestPlayerRepository.getGuestPlayer(
+      membership.guestPlayerId!,
+    );
     return TeamFormationEntry(
       guestPlayerId: membership.guestPlayerId,
       role: TeamMembershipRole.player,
@@ -281,14 +340,16 @@ class TeamFormationService {
       TeamMembershipRole.player: 4,
     };
 
-    final statusCompare =
-        (statusOrder[a.status] ?? 99).compareTo(statusOrder[b.status] ?? 99);
+    final statusCompare = (statusOrder[a.status] ?? 99).compareTo(
+      statusOrder[b.status] ?? 99,
+    );
     if (statusCompare != 0) {
       return statusCompare;
     }
 
-    final roleCompare =
-        (roleOrder[a.role] ?? 99).compareTo(roleOrder[b.role] ?? 99);
+    final roleCompare = (roleOrder[a.role] ?? 99).compareTo(
+      roleOrder[b.role] ?? 99,
+    );
     if (roleCompare != 0) {
       return roleCompare;
     }
@@ -302,10 +363,7 @@ class TeamFormationService {
         : 'guest:${membership.guestPlayerId}';
   }
 
-  bool _shouldUpdateMembership(
-    TeamMembership current,
-    TeamMembership updated,
-  ) {
+  bool _shouldUpdateMembership(TeamMembership current, TeamMembership updated) {
     return current.status != updated.status ||
         current.availability != updated.availability;
   }
@@ -330,5 +388,9 @@ class TeamFormationService {
       return null;
     }
     return trimmed;
+  }
+
+  String _currentLineupTemplateId(String teamId) {
+    return '__current_lineup__${teamId.replaceAll('/', '_')}';
   }
 }

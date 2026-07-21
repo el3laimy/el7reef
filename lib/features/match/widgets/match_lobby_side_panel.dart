@@ -4,7 +4,7 @@ import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../domain/entities/match_side_player.dart';
 import '../../../domain/entities/player.dart';
 import '../models/friendly_match_side_view.dart';
@@ -88,9 +88,9 @@ class _CollapsibleTeamSectionState extends State<CollapsibleTeamSection> {
       padding: const EdgeInsets.symmetric(
         horizontal: AppDimensions.pagePadding,
       ),
-      child: GlassmorphicContainer(
+      child: El7reefGlassSurface(
+        variant: El7reefGlassVariant.base,
         padding: const EdgeInsets.all(AppDimensions.md),
-        borderRadius: AppDimensions.radiusLg,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

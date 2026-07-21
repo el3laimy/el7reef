@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../controllers/matchday_controller.dart';
 
 class MatchdayNoManagedSideCard extends StatelessWidget {
@@ -20,11 +20,11 @@ class MatchdayNoManagedSideCard extends StatelessWidget {
     final message = isFriendlyHostWithoutFormalSides
         ? 'يمكنك إدارة الدعوات وبدء هذه المباراة من اللوبي كمنظم للمباراة.'
         : controller.isLoggedIn
-            ? 'لا توجد أطراف تملك صلاحية إدارتها في هذه المباراة من حسابك الحالي.'
-            : 'سجّل الدخول أولًا حتى تظهر لك أطراف المباراة التي يمكنك إدارتها.';
-    return GlassmorphicContainer(
+        ? 'لا توجد أطراف تملك صلاحية إدارتها في هذه المباراة من حسابك الحالي.'
+        : 'سجّل الدخول أولًا حتى تظهر لك أطراف المباراة التي يمكنك إدارتها.';
+    return El7reefGlassSurface(
+      variant: El7reefGlassVariant.base,
       padding: const EdgeInsets.all(AppDimensions.lg),
-      borderRadius: AppDimensions.radiusLg,
       child: Column(
         children: [
           const Icon(Icons.sports_soccer_outlined, size: 42),

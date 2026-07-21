@@ -12,6 +12,11 @@ class FormationControlBar extends StatelessWidget {
   final ValueChanged<String> onFormationChanged;
   final VoidCallback onReset;
   final VoidCallback? onShareMode;
+  final bool isDirty;
+  final VoidCallback? onSave;
+  final VoidCallback? onCancel;
+  final String? selectedPlayerName;
+  final String? helperText;
   final bool enabled;
   final bool allowPlayerCountChange;
 
@@ -23,6 +28,11 @@ class FormationControlBar extends StatelessWidget {
     required this.onFormationChanged,
     required this.onReset,
     this.onShareMode,
+    this.isDirty = false,
+    this.onSave,
+    this.onCancel,
+    this.selectedPlayerName,
+    this.helperText,
     this.enabled = true,
     this.allowPlayerCountChange = false,
   });
@@ -36,53 +46,255 @@ class FormationControlBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
         border: Border.all(color: AppColors.surfaceBorder),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            if (allowPlayerCountChange && onPlayerCountChanged != null)
-              _MenuChip<int>(
-                icon: Icons.groups_2_rounded,
-                label: '${playerCount}v$playerCount',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                flex: 4,
+                child: allowPlayerCountChange && onPlayerCountChanged != null
+                    ? _MenuChip<int>(
+                        key: const ValueKey('squad-player-count-menu'),
+                        icon: Icons.groups_2_rounded,
+                        label: '${playerCount}v$playerCount',
+                        enabled: enabled,
+                        values: supportedPlayerCounts,
+                        selectedValue: playerCount,
+                        itemLabel: (count) => '$count لاعبين • ${count}v$count',
+                        onSelected: onPlayerCountChanged!,
+                      )
+                    : _StaticControlChip(
+                        icon: Icons.groups_2_rounded,
+                        label: '${playerCount}v$playerCount',
+                      ),
+              ),
+              const SizedBox(width: AppDimensions.xs),
+              Expanded(
+                flex: 5,
+                child: _MenuChip<String>(
+                  key: const ValueKey('squad-formation-menu'),
+                  icon: Icons.grid_view_rounded,
+                  label: formationCode,
+                  enabled: enabled,
+                  values: getAvailableFormations(playerCount),
+                  selectedValue: formationCode,
+                  itemLabel: (code) => '$code • ${formationStyleLabel(code)}',
+                  onSelected: onFormationChanged,
+                ),
+              ),
+              const SizedBox(width: AppDimensions.xs),
+              _IconControlButton(
+                icon: Icons.refresh_rounded,
+                tooltip: 'إعادة ترتيب الخطة',
                 enabled: enabled,
-                values: supportedPlayerCounts,
-                selectedValue: playerCount,
-                itemLabel: (count) => '${count}v$count',
-                onSelected: onPlayerCountChanged!,
-              )
-            else
-              _StaticControlChip(
-                icon: Icons.groups_2_rounded,
-                label: '${playerCount}v$playerCount',
+                onPressed: onReset,
               ),
-            const SizedBox(width: AppDimensions.sm),
-            _MenuChip<String>(
-              icon: Icons.grid_view_rounded,
-              label: formationCode,
-              enabled: enabled,
-              values: getAvailableFormations(playerCount),
-              selectedValue: formationCode,
-              itemLabel: (code) => '$code - ${formationStyleLabel(code)}',
-              onSelected: onFormationChanged,
-            ),
-            const SizedBox(width: AppDimensions.sm),
-            _ControlButton(
-              icon: Icons.refresh_rounded,
-              label: 'إعادة ترتيب',
-              enabled: enabled,
-              onPressed: onReset,
-            ),
-            if (onShareMode != null) ...[
-              const SizedBox(width: AppDimensions.sm),
-              _ControlButton(
-                icon: Icons.ios_share_rounded,
-                label: 'المشاركة',
-                enabled: true,
-                onPressed: onShareMode!,
-              ),
+              if (onShareMode != null) ...[
+                const SizedBox(width: AppDimensions.xs),
+                _IconControlButton(
+                  icon: Icons.ios_share_rounded,
+                  tooltip: 'مشاركة التشكيلة',
+                  enabled: true,
+                  onPressed: onShareMode!,
+                ),
+              ],
             ],
+          ),
+          if (isDirty && onSave != null) ...[
+            const SizedBox(height: AppDimensions.sm),
+            _DirtyActionsRow(
+              enabled: enabled,
+              onSave: onSave!,
+              onCancel: onCancel,
+            ),
           ],
-        ),
+          if ((selectedPlayerName ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: AppDimensions.sm),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+                border: Border.all(
+                  color: AppColors.primaryLight.withValues(alpha: 0.35),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.touch_app_rounded,
+                    size: 17,
+                    color: AppColors.primaryLight,
+                  ),
+                  const SizedBox(width: AppDimensions.sm),
+                  Expanded(
+                    child: Text(
+                      'مختار: ${selectedPlayerName!.trim()}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: AppColors.primaryLight,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ),
+                  Flexible(
+                    child: Text(
+                      'اختر خانة للنقل أو التبديل',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColors.textSecondaryTinted,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else if ((helperText ?? '').trim().isNotEmpty ||
+              (!isDirty && onSave != null)) ...[
+            const SizedBox(height: AppDimensions.sm),
+            Row(
+              children: [
+                if (!isDirty && onSave != null) ...[
+                  Container(
+                    key: const ValueKey('squad-tactics-saved'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.09),
+                      borderRadius: BorderRadius.circular(
+                        AppDimensions.radiusFull,
+                      ),
+                      border: Border.all(
+                        color: AppColors.primaryLight.withValues(alpha: 0.34),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.check_circle_rounded,
+                          size: 14,
+                          color: AppColors.primaryLight,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'محفوظة',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.primaryLight,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppDimensions.sm),
+                ] else ...[
+                  const Icon(
+                    Icons.touch_app_outlined,
+                    size: 16,
+                    color: AppColors.textMuted,
+                  ),
+                  const SizedBox(width: AppDimensions.sm),
+                ],
+                Expanded(
+                  child: Text(
+                    (helperText ?? '').trim(),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSecondaryTinted,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DirtyActionsRow extends StatelessWidget {
+  final bool enabled;
+  final VoidCallback onSave;
+  final VoidCallback? onCancel;
+
+  const _DirtyActionsRow({
+    required this.enabled,
+    required this.onSave,
+    this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const ValueKey('squad-tactics-dirty-actions'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppDimensions.xs),
+      decoration: BoxDecoration(
+        color: AppColors.secondary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+        border: Border.all(color: AppColors.secondary.withValues(alpha: 0.38)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.edit_note_rounded,
+            size: 19,
+            color: AppColors.secondaryLight,
+          ),
+          const SizedBox(width: AppDimensions.xs),
+          Expanded(
+            child: Text(
+              'تعديلات غير محفوظة',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.secondaryLight,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0,
+              ),
+            ),
+          ),
+          if (onCancel != null) ...[
+            _IconControlButton(
+              icon: Icons.close_rounded,
+              tooltip: 'إلغاء تعديلات التشكيلة',
+              foregroundColor: AppColors.error,
+              enabled: enabled,
+              onPressed: onCancel!,
+            ),
+            const SizedBox(width: AppDimensions.xs),
+          ],
+          FilledButton.icon(
+            key: const ValueKey('squad-tactics-save'),
+            onPressed: enabled ? onSave : null,
+            icon: const Icon(Icons.save_rounded, size: 17),
+            label: const Text('حفظ'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.textOnPrimary,
+              minimumSize: const Size(82, 38),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              textStyle: AppTextStyles.labelMedium.copyWith(
+                fontWeight: FontWeight.w900,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -98,6 +310,7 @@ class _MenuChip<T> extends StatelessWidget {
   final ValueChanged<T> onSelected;
 
   const _MenuChip({
+    super.key,
     required this.icon,
     required this.label,
     required this.enabled,
@@ -129,7 +342,14 @@ class _MenuChip<T> extends StatelessWidget {
                         : AppColors.textMuted,
                   ),
                   const SizedBox(width: AppDimensions.sm),
-                  Text(itemLabel(value), style: AppTextStyles.bodyMedium),
+                  Expanded(
+                    child: Text(
+                      itemLabel(value),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.bodyMedium,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -145,25 +365,42 @@ class _MenuChip<T> extends StatelessWidget {
   }
 }
 
-class _ControlButton extends StatelessWidget {
+class _IconControlButton extends StatelessWidget {
   final IconData icon;
-  final String label;
+  final String tooltip;
   final bool enabled;
   final VoidCallback onPressed;
+  final Color? foregroundColor;
 
-  const _ControlButton({
+  const _IconControlButton({
     required this.icon,
-    required this.label,
+    required this.tooltip,
     required this.enabled,
     required this.onPressed,
+    this.foregroundColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: enabled ? onPressed : null,
-      borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-      child: _ControlButtonSurface(icon: icon, label: label, enabled: enabled),
+    return IconButton(
+      onPressed: enabled ? onPressed : null,
+      tooltip: tooltip,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints.tightFor(width: 42, height: 38),
+      style: IconButton.styleFrom(
+        foregroundColor: foregroundColor ?? AppColors.primaryLight,
+        backgroundColor: AppColors.surfaceBorder,
+        disabledForegroundColor: AppColors.textMuted,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+          side: BorderSide(
+            color: (foregroundColor ?? AppColors.primary).withValues(
+              alpha: 0.28,
+            ),
+          ),
+        ),
+      ),
+      icon: Icon(icon, size: 18),
     );
   }
 }
@@ -209,16 +446,19 @@ class _ControlButtonSurface extends StatelessWidget {
         ),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: AppColors.primaryLight, size: 16),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: AppTextStyles.labelMedium.copyWith(
-              color: foreground,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0,
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.labelMedium.copyWith(
+                color: foreground,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0,
+              ),
             ),
           ),
           if (trailingIcon != null) ...[

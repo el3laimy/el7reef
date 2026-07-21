@@ -7,7 +7,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/widgets/el7reef_button.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../controllers/team_invite_entry_controller.dart';
 
 class TeamInviteEntryScreen extends GetView<TeamInviteEntryController> {
@@ -24,7 +24,9 @@ class TeamInviteEntryScreen extends GetView<TeamInviteEntryController> {
               padding: const EdgeInsets.all(AppDimensions.xl),
               child: Obx(() {
                 if (controller.isLoading.value) {
-                  return const CircularProgressIndicator(color: AppColors.primary);
+                  return const CircularProgressIndicator(
+                    color: AppColors.primary,
+                  );
                 }
 
                 if (controller.errorMessage.value.isNotEmpty) {
@@ -34,9 +36,10 @@ class TeamInviteEntryScreen extends GetView<TeamInviteEntryController> {
                 final team = controller.team.value;
                 if (team == null) return const SizedBox.shrink();
 
-                return GlassmorphicContainer(
+                return El7reefGlassSurface(
+                  variant: El7reefGlassVariant.base,
                   padding: const EdgeInsets.all(AppDimensions.xl),
-                  borderRadius: AppDimensions.radiusXl,
+                  radius: AppDimensions.radiusXl,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -47,7 +50,9 @@ class TeamInviteEntryScreen extends GetView<TeamInviteEntryController> {
                           shape: BoxShape.circle,
                           gradient: AppColors.primaryGradient,
                           border: Border.all(
-                            color: AppColors.textPrimaryTinted.withValues(alpha: 0.2),
+                            color: AppColors.textPrimaryTinted.withValues(
+                              alpha: 0.2,
+                            ),
                             width: 2,
                           ),
                           boxShadow: [
@@ -67,9 +72,9 @@ class TeamInviteEntryScreen extends GetView<TeamInviteEntryController> {
                           ),
                         ),
                       ).animate().scale(
-                            duration: 500.ms,
-                            curve: Curves.easeOutBack,
-                          ),
+                        duration: 500.ms,
+                        curve: Curves.easeOutBack,
+                      ),
                       const SizedBox(height: AppDimensions.xl),
                       Text(
                         'دعوة للانضمام',
@@ -114,9 +119,10 @@ class TeamInviteEntryScreen extends GetView<TeamInviteEntryController> {
   }
 
   Widget _buildErrorState() {
-    return GlassmorphicContainer(
+    return El7reefGlassSurface(
+      variant: El7reefGlassVariant.base,
       padding: const EdgeInsets.all(AppDimensions.xl),
-      borderRadius: AppDimensions.radiusXl,
+      radius: AppDimensions.radiusXl,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -128,7 +134,9 @@ class TeamInviteEntryScreen extends GetView<TeamInviteEntryController> {
           const SizedBox(height: AppDimensions.lg),
           Text(
             'عذراً',
-            style: AppTextStyles.headlineMedium.copyWith(color: AppColors.error),
+            style: AppTextStyles.headlineMedium.copyWith(
+              color: AppColors.error,
+            ),
           ),
           const SizedBox(height: AppDimensions.sm),
           Text(

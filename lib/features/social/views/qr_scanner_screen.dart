@@ -54,8 +54,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         if (parts.length >= 2) {
           // فتح بروفايل اللاعب
           Get.back();
-          Get.toNamed(AppRoutes.profile,
-              arguments: {'playerId': parts[1]});
+          Get.toNamed(AppRoutes.profile, arguments: {'playerId': parts[1]});
         }
         break;
 
@@ -63,8 +62,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         if (parts.length >= 3 && parts[2] == 'join') {
           // طلب انضمام للفريق
           Get.back();
-          Get.toNamed(AppRoutes.myTeams,
-              arguments: {'joinTeamId': parts[1]});
+          Get.toNamed(AppRoutes.myTeams, arguments: {'joinTeamId': parts[1]});
         }
         break;
 
@@ -72,14 +70,19 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         if (parts.length >= 3 && parts[2] == 'register') {
           // تسجيل في الدورة
           Get.back();
-          Get.toNamed(AppRoutes.tournaments,
-              arguments: {'tournamentId': parts[1]});
+          Get.toNamed(
+            AppRoutes.tournaments,
+            arguments: {'tournamentId': parts[1]},
+          );
         }
         break;
 
       default:
-        Get.snackbar('تعذّر الفتح', 'باركود غير معروف',
-            snackPosition: SnackPosition.BOTTOM);
+        Get.snackbar(
+          'تعذّر الفتح',
+          'باركود غير معروف',
+          snackPosition: SnackPosition.BOTTOM,
+        );
     }
   }
 
@@ -129,6 +132,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           MobileScanner(
             controller: _controller,
             onDetect: _onDetect,
+            errorBuilder: (context, error, child) =>
+                _ScannerErrorState(onRetry: _controller.start),
           ),
 
           // ── إطار المسح ──
@@ -137,12 +142,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               width: 250,
               height: 250,
               decoration: BoxDecoration(
-                border: Border.all(
-                  color: AppColors.primary,
-                  width: 3,
-                ),
-                borderRadius:
-                    BorderRadius.circular(AppDimensions.radiusLg),
+                border: Border.all(color: AppColors.primary, width: 3),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
               ),
               child: Stack(
                 children: [
@@ -186,6 +187,52 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   }
 }
 
+class _ScannerErrorState extends StatelessWidget {
+  final Future<void> Function() onRetry;
+
+  const _ScannerErrorState({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppDimensions.pagePadding),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.no_photography_outlined,
+              color: AppColors.textSecondary,
+              size: 48,
+            ),
+            const SizedBox(height: AppDimensions.md),
+            Text(
+              'تعذر تشغيل الكاميرا',
+              style: AppTextStyles.titleLarge,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppDimensions.xs),
+            Text(
+              'اسمح للحريف باستخدام الكاميرا لمسح QR، ثم حاول مرة أخرى.',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppDimensions.md),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('إعادة المحاولة'),
+              style: FilledButton.styleFrom(minimumSize: const Size(160, 48)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// زوايا إطار المسح
 class _Corner extends StatelessWidget {
   final bool top;
@@ -218,14 +265,10 @@ class _Corner extends StatelessWidget {
                 : BorderSide.none,
           ),
           borderRadius: BorderRadius.only(
-            topLeft:
-                top && left ? const Radius.circular(4) : Radius.zero,
-            topRight:
-                top && !left ? const Radius.circular(4) : Radius.zero,
-            bottomLeft:
-                !top && left ? const Radius.circular(4) : Radius.zero,
-            bottomRight:
-                !top && !left ? const Radius.circular(4) : Radius.zero,
+            topLeft: top && left ? const Radius.circular(4) : Radius.zero,
+            topRight: top && !left ? const Radius.circular(4) : Radius.zero,
+            bottomLeft: !top && left ? const Radius.circular(4) : Radius.zero,
+            bottomRight: !top && !left ? const Radius.circular(4) : Radius.zero,
           ),
         ),
       ),

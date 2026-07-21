@@ -9,11 +9,9 @@ extension TournamentFixtureOps on TournamentOperationsController {
     final actorId = _currentTournamentManagerActorId();
     if (actorId == null) return;
     await _runAction(
-      message: 'تم نشر fixtures البطولة.',
-      action: () => _lifecycleService.publishFixtures(
-        tournamentId: id,
-        actorId: actorId,
-      ),
+      message: 'تم نشر مباريات البطولة.',
+      action: () =>
+          _lifecycleService.publishFixtures(tournamentId: id, actorId: actorId),
       onSuccess: (publishedFixtures) async {
         fixtures.assignAll(publishedFixtures);
       },
@@ -28,7 +26,7 @@ extension TournamentFixtureOps on TournamentOperationsController {
     final actorId = _currentTournamentManagerActorId();
     if (actorId == null) return;
     await _runAction(
-      message: 'تم تحديث موعد الـ fixture.',
+      message: 'تم تحديث موعد المباراة.',
       action: () => _fixtureService.scheduleFixture(
         matchId: fixtureId,
         actorId: actorId,
@@ -59,10 +57,8 @@ extension TournamentFixtureOps on TournamentOperationsController {
     if (actorId == null) return;
     await _runAction(
       message: 'تم اعتماد نتيجة المباراة وتحديث البطولة.',
-      action: () => _settlementService.approveScore(
-        matchId: fixtureId,
-        actorId: actorId,
-      ),
+      action: () =>
+          _settlementService.approveScore(matchId: fixtureId, actorId: actorId),
     );
   }
 }

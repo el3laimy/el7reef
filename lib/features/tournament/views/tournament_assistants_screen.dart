@@ -4,11 +4,12 @@ import 'package:get/get.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../domain/entities/tournament_assistant_permission.dart';
 import '../controllers/tournament_assistants_controller.dart';
 
-class TournamentAssistantsScreen extends GetView<TournamentAssistantsController> {
+class TournamentAssistantsScreen
+    extends GetView<TournamentAssistantsController> {
   const TournamentAssistantsScreen({super.key});
 
   @override
@@ -16,20 +17,29 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text('إدارة مساعدي البطولة', style: AppTextStyles.headlineMedium),
+        title: Text(
+          'إدارة مساعدي البطولة',
+          style: AppTextStyles.headlineMedium,
+        ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: AppColors.textPrimary,
+          ),
           onPressed: () => Get.back(),
         ),
       ),
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
         child: Obx(() {
-          if (controller.isLoading.value && controller.currentTournament.value == null) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+          if (controller.isLoading.value &&
+              controller.currentTournament.value == null) {
+            return const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            );
           }
 
           final tournament = controller.currentTournament.value;
@@ -43,7 +53,11 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.error_outline, color: AppColors.error, size: 64),
+                    const Icon(
+                      Icons.error_outline,
+                      color: AppColors.error,
+                      size: 64,
+                    ),
                     const SizedBox(height: AppDimensions.md),
                     Text(
                       controller.errorMessage.value.isEmpty
@@ -60,29 +74,39 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
 
           return Column(
             children: [
-              SizedBox(height: Get.mediaQuery.padding.top + kToolbarHeight + 20),
-              
+              SizedBox(
+                height: Get.mediaQuery.padding.top + kToolbarHeight + 20,
+              ),
+
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppDimensions.pagePadding,
+                ),
                 child: Text(
                   'أضف مساعدين لتسهيل إدارة "${tournament.name}". يمكنك منحهم صلاحيات مختلفة بحدود معينة حسب الثقة.',
-                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textMuted),
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textMuted,
+                  ),
                   textAlign: TextAlign.center,
                 ).animate().fadeIn(),
               ),
-              
+
               const SizedBox(height: AppDimensions.lg),
 
               Expanded(
                 child: assistants.isEmpty
                     ? _buildEmptyState()
                     : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppDimensions.pagePadding,
+                        ),
                         itemCount: assistants.length,
                         itemBuilder: (context, index) {
                           final assistant = assistants[index];
                           return _buildAssistantCard(assistant, controller)
-                            .animate().fadeIn(delay: (40 * index).ms).slideY(begin: 0.1);
+                              .animate()
+                              .fadeIn(delay: (40 * index).ms)
+                              .slideY(begin: 0.1);
                         },
                       ),
               ),
@@ -97,7 +121,10 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
         },
         backgroundColor: AppColors.primary,
         icon: const Icon(Icons.person_add, color: AppColors.background),
-        label: Text('إضافة مساعد', style: AppTextStyles.buttonText.copyWith(color: AppColors.background)),
+        label: Text(
+          'إضافة مساعد',
+          style: AppTextStyles.buttonText.copyWith(color: AppColors.background),
+        ),
       ).animate().scale(delay: 400.ms),
     );
   }
@@ -107,13 +134,19 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.shield_outlined, size: 80, color: AppColors.primary.withValues(alpha: 0.3)),
+          Icon(
+            Icons.shield_outlined,
+            size: 80,
+            color: AppColors.primary.withValues(alpha: 0.3),
+          ),
           const SizedBox(height: AppDimensions.lg),
           Text('لا يوجد مساعدين بعد', style: AppTextStyles.headlineMedium),
           const SizedBox(height: AppDimensions.sm),
           Text(
             'قم بتعيين مساعدين لمساعدتك في إدخال النتائج\nوإدارة الفرق وتنظيم المسابقة.',
-            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textMuted),
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textMuted,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 100), // padding for FAB
@@ -122,7 +155,10 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
     );
   }
 
-  Widget _buildAssistantCard(TournamentAssistantPermission assistant, TournamentAssistantsController controller) {
+  Widget _buildAssistantCard(
+    TournamentAssistantPermission assistant,
+    TournamentAssistantsController controller,
+  ) {
     String roleName = 'مساعد';
     Color roleColor = AppColors.primary;
 
@@ -145,10 +181,11 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
         break;
     }
 
-    return GlassmorphicContainer(
+    return El7reefGlassSurface(
+      variant: El7reefGlassVariant.base,
       margin: const EdgeInsets.only(bottom: AppDimensions.md),
       padding: const EdgeInsets.all(AppDimensions.md),
-      borderRadius: AppDimensions.radiusLg,
+      radius: AppDimensions.radiusLg,
       child: Row(
         children: [
           Container(
@@ -164,11 +201,19 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('User: ${_shortUserId(assistant.userId)}', style: AppTextStyles.titleMedium),
+                Text(
+                  'User: ${_shortUserId(assistant.userId)}',
+                  style: AppTextStyles.titleMedium,
+                ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Text(roleName, style: AppTextStyles.labelSmall.copyWith(color: roleColor)),
+                    Text(
+                      roleName,
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: roleColor,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -185,16 +230,23 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
     );
   }
 
-  void _showAddAssistantBottomSheet(BuildContext context, TournamentAssistantsController controller) {
+  void _showAddAssistantBottomSheet(
+    BuildContext context,
+    TournamentAssistantsController controller,
+  ) {
     final TextEditingController idController = TextEditingController();
-    TournamentAssistantPermissionPreset selectedPreset = TournamentAssistantPermissionPreset.resultsAssistant;
+    TournamentAssistantPermissionPreset selectedPreset =
+        TournamentAssistantPermissionPreset.resultsAssistant;
 
     Get.bottomSheet(
       StatefulBuilder(
         builder: (context, setModalState) {
-          return GlassmorphicContainer(
+          return El7reefGlassSurface(
+            variant: El7reefGlassVariant.sheet,
             padding: const EdgeInsets.all(AppDimensions.xl),
-            borderRadius: AppDimensions.radiusXl,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppDimensions.radiusXl),
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -206,7 +258,11 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
                     labelText: 'User ID',
                     filled: true,
                     fillColor: AppColors.surface,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppDimensions.radiusMd)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(
+                        AppDimensions.radiusMd,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: AppDimensions.lg),
@@ -222,10 +278,26 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
                     isExpanded: true,
                     underline: const SizedBox(),
                     items: const [
-                      DropdownMenuItem(value: TournamentAssistantPermissionPreset.resultsAssistant, child: Text('إدخال النتائج والأهداف')),
-                      DropdownMenuItem(value: TournamentAssistantPermissionPreset.matchdayAssistant, child: Text('إدارة يوم المباراة')),
-                      DropdownMenuItem(value: TournamentAssistantPermissionPreset.scoreApprover, child: Text('اعتماد النتائج فقط')),
-                      DropdownMenuItem(value: TournamentAssistantPermissionPreset.customLimited, child: Text('مشاهدة يوم المباراة فقط')),
+                      DropdownMenuItem(
+                        value: TournamentAssistantPermissionPreset
+                            .resultsAssistant,
+                        child: Text('إدخال النتائج والأهداف'),
+                      ),
+                      DropdownMenuItem(
+                        value: TournamentAssistantPermissionPreset
+                            .matchdayAssistant,
+                        child: Text('إدارة يوم المباراة'),
+                      ),
+                      DropdownMenuItem(
+                        value:
+                            TournamentAssistantPermissionPreset.scoreApprover,
+                        child: Text('اعتماد النتائج فقط'),
+                      ),
+                      DropdownMenuItem(
+                        value:
+                            TournamentAssistantPermissionPreset.customLimited,
+                        child: Text('مشاهدة يوم المباراة فقط'),
+                      ),
                     ],
                     onChanged: (val) {
                       if (val != null) {
@@ -241,21 +313,35 @@ class TournamentAssistantsScreen extends GetView<TournamentAssistantsController>
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppDimensions.radiusMd)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          AppDimensions.radiusMd,
+                        ),
+                      ),
                     ),
                     onPressed: () {
                       if (idController.text.isNotEmpty) {
-                        controller.addAssistant(idController.text.trim(), selectedPreset);
+                        controller.addAssistant(
+                          idController.text.trim(),
+                          selectedPreset,
+                        );
                       }
                     },
-                    child: Text('منح الصلاحية', style: AppTextStyles.buttonText.copyWith(color: AppColors.background)),
+                    child: Text(
+                      'منح الصلاحية',
+                      style: AppTextStyles.buttonText.copyWith(
+                        color: AppColors.background,
+                      ),
+                    ),
                   ),
                 ),
-                SizedBox(height: MediaQuery.of(context).viewInsets.bottom), // Prevent keyboard overlap
+                SizedBox(
+                  height: MediaQuery.of(context).viewInsets.bottom,
+                ), // Prevent keyboard overlap
               ],
             ),
           );
-        }
+        },
       ),
       isScrollControlled: true,
     );

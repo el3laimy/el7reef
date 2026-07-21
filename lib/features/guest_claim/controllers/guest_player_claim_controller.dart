@@ -1,30 +1,39 @@
 import 'package:get/get.dart';
 
+import '../../../app/routes/app_routes.dart';
 import '../../../core/auth/auth_session.dart';
 import '../../../core/enums/guest_claim_status.dart';
+import '../../../core/navigation/app_link_route_parser.dart';
+import '../../../core/services/analytics_service.dart';
 import '../../../core/services/guest_claim_service.dart';
+import '../../../core/services/pride_share_attribution.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../domain/entities/guest_player.dart';
 import '../../../domain/entities/player.dart';
+import '../../../domain/entities/share_payload.dart';
 import '../../../domain/entities/team.dart';
 import '../../../domain/repositories/guest_player_repository.dart';
 import '../../../domain/repositories/team_repository.dart';
+import '../../shareables/services/guest_mvp_claim_link_service.dart';
 
 class GuestPlayerClaimController extends GetxController {
   final AuthSession _authSession;
   final GuestPlayerRepository _guestPlayerRepository;
   final TeamRepository _teamRepository;
   final GuestClaimService _guestClaimService;
+  final AnalyticsService _analyticsService;
 
   GuestPlayerClaimController({
     required AuthSession authSession,
     required GuestPlayerRepository guestPlayerRepository,
     required TeamRepository teamRepository,
     required GuestClaimService guestClaimService,
+    AnalyticsService? analyticsService,
   }) : _authSession = authSession,
        _guestPlayerRepository = guestPlayerRepository,
        _teamRepository = teamRepository,
-       _guestClaimService = guestClaimService;
+       _guestClaimService = guestClaimService,
+       _analyticsService = analyticsService ?? AnalyticsService();
 
   final guestPlayer = Rxn<GuestPlayer>();
   final linkedTeam = Rxn<Team>();
@@ -40,6 +49,32 @@ class GuestPlayerClaimController extends GetxController {
   String? get claimTournamentId => Get.parameters['tournamentId'];
   Player? get currentPlayer => _authSession.currentPlayer;
   String? get currentUserId => _authSession.currentUserId;
+  SharePayload? get pridePayload {
+    final payload = PrideShareAttribution.fromQueryParameters(
+      Get.parameters,
+      targetUrl: Uri(
+        scheme: 'https',
+        host: AppLinkRouteParser.pilotWebHost,
+        path: AppRoutes.claimEntry,
+      ),
+    );
+    return GuestMvpClaimLinkService.claimableCardTypes.contains(
+              payload?.cardType,
+            ) &&
+            payload?.entityType == ShareEntityType.guestPlayer &&
+            payload?.entityId == guestPlayerId
+        ? payload
+        : null;
+  }
+
+  bool get hasSuccessfulClaim {
+    final outcome = claimResult.value?.outcome;
+    return outcome == GuestPlayerClaimOutcome.claimed ||
+        outcome == GuestPlayerClaimOutcome.alreadyClaimed;
+  }
+
+  String? get claimedPlayerId =>
+      hasSuccessfulClaim ? claimResult.value?.playerId : null;
 
   bool get isAuthenticated =>
       currentUserId != null && currentUserId!.isNotEmpty;
@@ -112,11 +147,19 @@ class GuestPlayerClaimController extends GetxController {
 
     isSubmitting.value = true;
     errorMessage.value = '';
+    final sourcePayload = pridePayload;
+    if (sourcePayload != null) {
+      _analyticsService.trackClaimStartedFromCard(sourcePayload);
+    }
     try {
       claimResult.value = await _guestClaimService.claimGuestPlayer(
         claimCode: code,
         playerId: userId,
       );
+      if (claimResult.value?.outcome == GuestPlayerClaimOutcome.claimed &&
+          sourcePayload != null) {
+        _analyticsService.trackClaimCompletedFromCard(sourcePayload);
+      }
       await loadClaimTarget();
     } catch (error) {
       errorMessage.value = _normalizeError(error);

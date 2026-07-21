@@ -6,6 +6,8 @@ import 'package:get/get.dart';
 import 'package:el7reef/app/routes/app_pages.dart';
 import 'package:el7reef/app/routes/app_routes.dart';
 import 'package:el7reef/core/auth/auth_session.dart';
+import 'package:el7reef/core/auth/auth_service.dart';
+import 'package:el7reef/core/navigation/pending_deep_link_service.dart';
 import 'package:el7reef/core/services/guest_claim_service.dart';
 import 'package:el7reef/core/services/share_link_service.dart';
 import 'package:el7reef/data/repositories/claim_code_repository_impl.dart';
@@ -31,18 +33,30 @@ void main() {
     Get.testMode = true;
     firestore = FakeFirebaseFirestore();
 
-    Get.put<TeamRepositoryImpl>(TeamRepositoryImpl(firestore: firestore));
-    Get.put<PlayerRepositoryImpl>(PlayerRepositoryImpl(firestore: firestore));
+    Get.put<TeamRepositoryImpl>(
+      TeamRepositoryImpl(firestore: firestore),
+      permanent: true,
+    );
+    Get.put<PlayerRepositoryImpl>(
+      PlayerRepositoryImpl(firestore: firestore),
+      permanent: true,
+    );
     Get.put<GuestPlayerRepositoryImpl>(
       GuestPlayerRepositoryImpl(firestore: firestore),
+      permanent: true,
     );
     Get.put<GuestTeamRepositoryImpl>(
       GuestTeamRepositoryImpl(firestore: firestore),
+      permanent: true,
     );
     Get.put<ClaimCodeRepositoryImpl>(
       ClaimCodeRepositoryImpl(firestore: firestore),
+      permanent: true,
     );
-    Get.put<GuestClaimService>(GuestClaimService(firestore: firestore));
+    Get.put<GuestClaimService>(
+      GuestClaimService(firestore: firestore),
+      permanent: true,
+    );
 
     shareLinkService = ShareLinkService(
       claimCodeRepository: Get.find<ClaimCodeRepositoryImpl>(),
@@ -127,8 +141,9 @@ void main() {
 
   tearDown(Get.reset);
 
-  testWidgets('generic claim route redirects to guest player claim screen',
-      (WidgetTester tester) async {
+  testWidgets('generic claim route redirects to guest player claim screen', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
       _buildApp(
         initialRoute: AppRoutes.claimEntryWithQuery({
@@ -146,44 +161,108 @@ void main() {
     expect(find.text('سجّل الدخول أولاً حتى تستلم مكانك.'), findsOneWidget);
   });
 
-  testWidgets('logged-in player can complete guest player claim from the screen',
-      (WidgetTester tester) async {
-    Get.put<AuthSession>(
-      _FakeAuthSession(
-        currentUserId: 'player-1',
-        currentPlayer: Player(
-          id: 'player-1',
-          name: 'Mahmoud Salem',
-          createdAt: DateTime(2026, 4, 16, 10),
-          lastActiveAt: DateTime(2026, 4, 16, 10),
-        ),
-      ),
+  testWidgets('guest player login action preserves the claim route', (
+    WidgetTester tester,
+  ) async {
+    final pendingDeepLinkService = Get.put(PendingDeepLinkService());
+    final route = AppRoutes.guestPlayerClaimById(
+      'guest-1',
+      queryParameters: {'code': playerClaimLink.claimCode.code},
+    );
+
+    await tester.pumpWidget(_buildApp(initialRoute: route));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'تسجيل الدخول'));
+
+    expect(pendingDeepLinkService.take(), route);
+  });
+
+  testWidgets('guest player claim route resumes after Google sign-in', (
+    WidgetTester tester,
+  ) async {
+    final signedInPlayer = Player(
+      id: 'player-1',
+      name: 'Mahmoud Salem',
+      createdAt: DateTime(2026, 4, 16, 10),
+      lastActiveAt: DateTime(2026, 4, 16, 10),
+    );
+    Get.put<AuthService>(
+      _FakeAuthService(googleSignInResult: signedInPlayer),
+      permanent: true,
     );
 
     await tester.pumpWidget(
       _buildApp(
-        initialRoute: AppRoutes.guestPlayerClaimById(
-          'guest-1',
-          queryParameters: {'code': playerClaimLink.claimCode.code},
-        ),
+        initialRoute: AppRoutes.claimEntryWithQuery({
+          'code': playerClaimLink.claimCode.code,
+          'type': 'guestPlayer',
+          'targetId': 'guest-1',
+          'requiresApproval': '0',
+        }),
       ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(FilledButton, 'استلم مكاني'));
+    await tester.tap(find.widgetWithText(FilledButton, 'تسجيل الدخول'));
     await tester.pumpAndSettle();
 
-    expect(find.text('تم استلام مكانك بنجاح'), findsOneWidget);
-    expect(
-      find.text(
-        'تم ربط بيانات اللاعب الضيف بحسابك الحالي مع الحفاظ على سجلاته السابقة.',
-      ),
-      findsOneWidget,
+    expect(find.text('سجّل دخولك بـ Google'), findsOneWidget);
+
+    await tester.tap(find.text('أوافق على قواعد المجتمع وسياسة الخصوصية'));
+    await tester.pump();
+    await tester.tap(
+      find.widgetWithText(ElevatedButton, 'سجّل دخولك بـ Google'),
     );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(GuestPlayerClaimScreen), findsOneWidget);
+    expect(find.text('Mahmoud Guest'), findsOneWidget);
+    expect(find.text('سيتم ربط هذا المكان بحسابك الحالي.'), findsOneWidget);
   });
 
-  testWidgets('expired guest player claim links are blocked in the UI',
-      (WidgetTester tester) async {
+  testWidgets(
+    'logged-in player can complete guest player claim from the screen',
+    (WidgetTester tester) async {
+      Get.put<AuthSession>(
+        _FakeAuthSession(
+          currentUserId: 'player-1',
+          currentPlayer: Player(
+            id: 'player-1',
+            name: 'Mahmoud Salem',
+            createdAt: DateTime(2026, 4, 16, 10),
+            lastActiveAt: DateTime(2026, 4, 16, 10),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          initialRoute: AppRoutes.guestPlayerClaimById(
+            'guest-1',
+            queryParameters: {'code': playerClaimLink.claimCode.code},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(FilledButton, 'استلم مكاني'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('تم استلام مكانك بنجاح'), findsOneWidget);
+      expect(
+        find.text(
+          'تم ربط بيانات اللاعب الضيف بحسابك الحالي مع الحفاظ على سجلاته السابقة.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('افتح بروفايلك'), findsOneWidget);
+    },
+  );
+
+  testWidgets('expired guest player claim links are blocked in the UI', (
+    WidgetTester tester,
+  ) async {
     await Get.find<ClaimCodeRepositoryImpl>().updateClaimCode(
       playerClaimLink.claimCode.copyWith(
         expiresAt: DateTime(2000, 1, 1),
@@ -219,8 +298,9 @@ void main() {
     expect(find.text('انتهت صلاحية رابط الاستلام.'), findsOneWidget);
   });
 
-  testWidgets('player claim conflicts are surfaced in the claim screen',
-      (WidgetTester tester) async {
+  testWidgets('player claim conflicts are surfaced in the claim screen', (
+    WidgetTester tester,
+  ) async {
     await Get.find<PlayerRepositoryImpl>().createPlayer(
       Player(
         id: 'player-name-dup',
@@ -261,18 +341,81 @@ void main() {
     );
   });
 
-  testWidgets('logged-in captain can submit a guest team claim request from the screen',
-      (WidgetTester tester) async {
-    Get.put<AuthSession>(
-      _FakeAuthSession(
-        currentUserId: 'owner-2',
-        currentPlayer: Player(
-          id: 'owner-2',
-          name: 'Captain Two',
-          createdAt: DateTime(2026, 4, 16, 10),
-          lastActiveAt: DateTime(2026, 4, 16, 10),
+  testWidgets(
+    'logged-in captain can submit a guest team claim request from the screen',
+    (WidgetTester tester) async {
+      Get.put<AuthSession>(
+        _FakeAuthSession(
+          currentUserId: 'owner-2',
+          currentPlayer: Player(
+            id: 'owner-2',
+            name: 'Captain Two',
+            createdAt: DateTime(2026, 4, 16, 10),
+            lastActiveAt: DateTime(2026, 4, 16, 10),
+          ),
         ),
-      ),
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          initialRoute: AppRoutes.claimEntryWithQuery({
+            'code': teamClaimLink.claimCode.code,
+            'type': 'guestTeam',
+            'targetId': 'guest-team-1',
+            'requiresApproval': '1',
+          }),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(GuestTeamClaimScreen), findsOneWidget);
+      expect(find.text('Blue Sharks'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'إرسال طلب الاستلام'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('تم إرسال طلب الاستلام'), findsOneWidget);
+      expect(
+        find.text(
+          'تم حفظ طلب الـ claim. سيحتاج الرابط الآن إلى موافقة منشئ الفريق الضيف لإكمال الربط.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('guest team login action preserves the claim route', (
+    WidgetTester tester,
+  ) async {
+    final pendingDeepLinkService = Get.put(PendingDeepLinkService());
+    final route = AppRoutes.guestTeamClaimById(
+      'guest-team-1',
+      queryParameters: {
+        'code': teamClaimLink.claimCode.code,
+        'requiresApproval': '1',
+      },
+    );
+
+    await tester.pumpWidget(_buildApp(initialRoute: route));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'تسجيل الدخول'));
+
+    expect(pendingDeepLinkService.take(), route);
+  });
+
+  testWidgets('guest team claim route resumes after Google sign-in', (
+    WidgetTester tester,
+  ) async {
+    final signedInCaptain = Player(
+      id: 'owner-2',
+      name: 'Captain Two',
+      createdAt: DateTime(2026, 4, 16, 10),
+      lastActiveAt: DateTime(2026, 4, 16, 10),
+    );
+    Get.put<AuthService>(
+      _FakeAuthService(googleSignInResult: signedInCaptain),
+      permanent: true,
     );
 
     await tester.pumpWidget(
@@ -287,69 +430,79 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.tap(find.widgetWithText(FilledButton, 'تسجيل الدخول'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('سجّل دخولك بـ Google'), findsOneWidget);
+
+    await tester.tap(find.text('أوافق على قواعد المجتمع وسياسة الخصوصية'));
+    await tester.pump();
+    await tester.tap(
+      find.widgetWithText(ElevatedButton, 'سجّل دخولك بـ Google'),
+    );
+    await tester.pumpAndSettle();
+
     expect(find.byType(GuestTeamClaimScreen), findsOneWidget);
+    expect(find.text('Guest Falcons'), findsOneWidget);
     expect(find.text('Blue Sharks'), findsOneWidget);
-
-    await tester.tap(find.widgetWithText(FilledButton, 'إرسال طلب الاستلام'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('تم إرسال طلب الاستلام'), findsOneWidget);
     expect(
-      find.text(
-        'تم حفظ طلب الـ claim. سيحتاج الرابط الآن إلى موافقة منشئ الفريق الضيف لإكمال الربط.',
-      ),
+      find.text('اختر فريقك المسجل الذي تريد ربطه بهذا الفريق الضيف.'),
       findsOneWidget,
     );
   });
 
-  testWidgets('guest team creator can complete a pending approval request from the screen',
-      (WidgetTester tester) async {
-    await Get.find<GuestClaimService>().claimGuestTeam(
-      claimCode: teamClaimLink.claimCode.code,
-      teamId: 'team-2',
-      actorId: 'owner-2',
-      now: DateTime(2026, 4, 16, 11),
-    );
-    Get.put<AuthSession>(
-      _FakeAuthSession(
-        currentUserId: 'owner-1',
-        currentPlayer: Player(
-          id: 'owner-1',
-          name: 'Organizer One',
-          createdAt: DateTime(2026, 4, 16, 10),
-          lastActiveAt: DateTime(2026, 4, 16, 10),
+  testWidgets(
+    'guest team creator can complete a pending approval request from the screen',
+    (WidgetTester tester) async {
+      await Get.find<GuestClaimService>().claimGuestTeam(
+        claimCode: teamClaimLink.claimCode.code,
+        teamId: 'team-2',
+        actorId: 'owner-2',
+        now: DateTime(2026, 4, 16, 11),
+      );
+      Get.put<AuthSession>(
+        _FakeAuthSession(
+          currentUserId: 'owner-1',
+          currentPlayer: Player(
+            id: 'owner-1',
+            name: 'Organizer One',
+            createdAt: DateTime(2026, 4, 16, 10),
+            lastActiveAt: DateTime(2026, 4, 16, 10),
+          ),
         ),
-      ),
-    );
+      );
 
-    await tester.pumpWidget(
-      _buildApp(
-        initialRoute: AppRoutes.guestTeamClaimById(
-          'guest-team-1',
-          queryParameters: {
-            'code': teamClaimLink.claimCode.code,
-            'requiresApproval': '1',
-          },
+      await tester.pumpWidget(
+        _buildApp(
+          initialRoute: AppRoutes.guestTeamClaimById(
+            'guest-team-1',
+            queryParameters: {
+              'code': teamClaimLink.claimCode.code,
+              'requiresApproval': '1',
+            },
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byType(GuestTeamClaimScreen), findsOneWidget);
-    expect(find.text('يوجد طلب claim معلق'), findsOneWidget);
-    expect(find.textContaining('Blue Sharks'), findsWidgets);
+      expect(find.byType(GuestTeamClaimScreen), findsOneWidget);
+      expect(find.text('يوجد طلب claim معلق'), findsOneWidget);
+      expect(find.textContaining('Blue Sharks'), findsWidgets);
 
-    await tester.tap(find.widgetWithText(FilledButton, 'موافقة المنظم وإتمام الربط'));
-    await tester.pumpAndSettle();
+      await tester.tap(
+        find.widgetWithText(FilledButton, 'موافقة المنظم وإتمام الربط'),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('تم ربط الفريق بنجاح'), findsOneWidget);
-    expect(
-      find.text(
-        'تم ربط الفريق الضيف بالفريق المسجل مع الحفاظ على تاريخ البطولات الحالي.',
-      ),
-      findsOneWidget,
-    );
-  });
+      expect(find.text('تم ربط الفريق بنجاح'), findsOneWidget);
+      expect(
+        find.text(
+          'تم ربط الفريق الضيف بالفريق المسجل مع الحفاظ على تاريخ البطولات الحالي.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 }
 
 class _FakeAuthSession implements AuthSession {
@@ -365,9 +518,59 @@ class _FakeAuthSession implements AuthSession {
   });
 }
 
+class _FakeAuthService extends GetxService implements AuthService {
+  final Player? googleSignInResult;
+  final Rx<Player?> _currentPlayer = Rx<Player?>(null);
+  final RxBool _isLoading = false.obs;
+  final Rx<AuthProfileStatus> _profileStatus =
+      AuthProfileStatus.unauthenticated.obs;
+  final RxString _profileErrorMessage = ''.obs;
+
+  _FakeAuthService({required this.googleSignInResult});
+
+  @override
+  Rx<Player?> get currentPlayer => _currentPlayer;
+
+  @override
+  String? get currentUserId => _currentPlayer.value?.id;
+
+  @override
+  bool get isLoggedIn => _currentPlayer.value != null;
+
+  @override
+  RxBool get isLoading => _isLoading;
+
+  @override
+  Rx<AuthProfileStatus> get profileStatus => _profileStatus;
+
+  @override
+  RxString get profileErrorMessage => _profileErrorMessage;
+
+  @override
+  Future<AuthService> init() async => this;
+
+  @override
+  Future<void> refreshProfile() async {}
+
+  @override
+  Future<Player?> signInWithGoogle() async {
+    _currentPlayer.value = googleSignInResult;
+    _profileStatus.value = googleSignInResult == null
+        ? AuthProfileStatus.repairRequired
+        : AuthProfileStatus.ready;
+    return googleSignInResult;
+  }
+
+  @override
+  Future<void> reauthenticateWithGoogle() async {}
+
+  @override
+  Future<void> signOut() async {
+    _currentPlayer.value = null;
+    _profileStatus.value = AuthProfileStatus.unauthenticated;
+  }
+}
+
 Widget _buildApp({required String initialRoute}) {
-  return GetMaterialApp(
-    initialRoute: initialRoute,
-    getPages: AppPages.routes,
-  );
+  return GetMaterialApp(initialRoute: initialRoute, getPages: AppPages.routes);
 }

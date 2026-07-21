@@ -1,0 +1,17 @@
+{
+  "projectId": "el7reef-app",
+  "capturedAt": "2026-07-14",
+  "requiredSignatures": [
+    "COLLECTION|challenges|challengedId:ASCENDING,createdAt:DESCENDING",
+    "COLLECTION|challenges|challengerId:ASCENDING,createdAt:DESCENDING",
+    "COLLECTION|matches|status:ASCENDING,createdAt:DESCENDING",
+    "COLLECTION|matches|teamAPlayerIds:CONTAINS,createdAt:DESCENDING",
+    "COLLECTION|matches|teamBPlayerIds:CONTAINS,createdAt:DESCENDING",
+    "COLLECTION|matchInvitations|matchId:ASCENDING,createdAt:DESCENDING",
+    "COLLECTION|teamFormationTemplates|teamId:ASCENDING,updatedAt:DESCENDING",
+    "COLLECTION|teamMemberships|teamId:ASCENDING,joinedAt:ASCENDING",
+    "COLLECTION|teamRosterSnapshots|teamId:ASCENDING,createdAt:DESCENDING",
+    "COLLECTION|tournaments|organizerId:ASCENDING,createdAt:DESCENDING",
+    "COLLECTION|tournaments|status:ASCENDING,createdAt:DESCENDING"
+  ]
+}

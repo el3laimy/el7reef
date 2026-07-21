@@ -17,9 +17,11 @@ class TournamentGuestTeamRosterScreen
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('لاعبو الفريق الضيف')),
+      appBar: AppBar(title: const Text('قائمة الفريق')),
       floatingActionButton: Obx(() {
-        if (controller.isLoading.value || controller.errorMessage.isNotEmpty) {
+        if (!controller.canManageRoster.value ||
+            controller.isLoading.value ||
+            controller.errorMessage.isNotEmpty) {
           return const SizedBox.shrink();
         }
         return FloatingActionButton.extended(
@@ -69,13 +71,16 @@ class TournamentGuestTeamRosterScreen
                       const SizedBox(height: AppDimensions.md),
                       if (controller.activePlayers.isEmpty)
                         _GuestRosterEmptyState(
-                          onAddPressed: () => _showPlayerForm(context),
+                          onAddPressed: controller.canManageRoster.value
+                              ? () => _showPlayerForm(context)
+                              : null,
                         )
                       else
                         _GuestRosterSection(
                           title: 'القائمة النشطة',
                           players: controller.activePlayers,
                           controller: controller,
+                          canManage: controller.canManageRoster.value,
                           onEdit: (player) =>
                               _showPlayerForm(context, player: player),
                         ),
@@ -85,6 +90,7 @@ class TournamentGuestTeamRosterScreen
                           title: 'المؤرشفون',
                           players: controller.archivedPlayers,
                           controller: controller,
+                          canManage: controller.canManageRoster.value,
                           onEdit: (player) =>
                               _showPlayerForm(context, player: player),
                         ),
@@ -175,12 +181,14 @@ class _GuestRosterSection extends StatelessWidget {
   final String title;
   final List<GuestPlayer> players;
   final TournamentGuestTeamRosterController controller;
+  final bool canManage;
   final ValueChanged<GuestPlayer> onEdit;
 
   const _GuestRosterSection({
     required this.title,
     required this.players,
     required this.controller,
+    required this.canManage,
     required this.onEdit,
   });
 
@@ -197,6 +205,7 @@ class _GuestRosterSection extends StatelessWidget {
             child: _GuestPlayerCard(
               player: player,
               controller: controller,
+              canManage: canManage,
               onEdit: () => onEdit(player),
             ),
           ),
@@ -209,11 +218,13 @@ class _GuestRosterSection extends StatelessWidget {
 class _GuestPlayerCard extends StatelessWidget {
   final GuestPlayer player;
   final TournamentGuestTeamRosterController controller;
+  final bool canManage;
   final VoidCallback onEdit;
 
   const _GuestPlayerCard({
     required this.player,
     required this.controller,
+    required this.canManage,
     required this.onEdit,
   });
 
@@ -251,52 +262,56 @@ class _GuestPlayerCard extends StatelessWidget {
                 ),
             ],
           ),
-          if (player.notes != null && player.notes!.trim().isNotEmpty) ...[
+          if (canManage &&
+              player.notes != null &&
+              player.notes!.trim().isNotEmpty) ...[
             const SizedBox(height: AppDimensions.sm),
             Text(player.notes!, style: AppTextStyles.bodySmall),
           ],
-          const SizedBox(height: AppDimensions.md),
-          Wrap(
-            spacing: AppDimensions.sm,
-            runSpacing: AppDimensions.sm,
-            children: [
-              TournamentStatusChip(
-                label: _claimStatusLabel(player.claimStatus),
-                backgroundColor: isArchived
-                    ? AppColors.errorSurface
-                    : AppColors.primarySurface,
-              ),
-              if (player.hasLinkedPlayer)
-                const TournamentStatusChip(
-                  label: 'مرتبط بحساب',
-                  backgroundColor: AppColors.infoSurface,
+          if (canManage) ...[
+            const SizedBox(height: AppDimensions.md),
+            Wrap(
+              spacing: AppDimensions.sm,
+              runSpacing: AppDimensions.sm,
+              children: [
+                TournamentStatusChip(
+                  label: _claimStatusLabel(player.claimStatus),
+                  backgroundColor: isArchived
+                      ? AppColors.errorSurface
+                      : AppColors.primarySurface,
                 ),
-            ],
-          ),
-          const SizedBox(height: AppDimensions.md),
-          Wrap(
-            spacing: AppDimensions.sm,
-            runSpacing: AppDimensions.sm,
-            children: [
-              OutlinedButton.icon(
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit, size: 16),
-                label: const Text('تعديل'),
-              ),
-              if (!isArchived && !isCaptain)
+                if (player.hasLinkedPlayer)
+                  const TournamentStatusChip(
+                    label: 'مرتبط بحساب',
+                    backgroundColor: AppColors.infoSurface,
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppDimensions.md),
+            Wrap(
+              spacing: AppDimensions.sm,
+              runSpacing: AppDimensions.sm,
+              children: [
                 OutlinedButton.icon(
-                  onPressed: () => controller.setCaptain(player),
-                  icon: const Icon(Icons.military_tech, size: 16),
-                  label: const Text('قائد'),
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit, size: 16),
+                  label: const Text('تعديل'),
                 ),
-              if (!isArchived)
-                OutlinedButton.icon(
-                  onPressed: () => _confirmArchive(context),
-                  icon: const Icon(Icons.archive_outlined, size: 16),
-                  label: const Text('أرشفة'),
-                ),
-            ],
-          ),
+                if (!isArchived && !isCaptain)
+                  OutlinedButton.icon(
+                    onPressed: () => controller.setCaptain(player),
+                    icon: const Icon(Icons.military_tech, size: 16),
+                    label: const Text('قائد'),
+                  ),
+                if (!isArchived)
+                  OutlinedButton.icon(
+                    onPressed: () => _confirmArchive(context),
+                    icon: const Icon(Icons.archive_outlined, size: 16),
+                    label: const Text('أرشفة'),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -458,7 +473,7 @@ class _GuestPlayerFormSheet extends StatelessWidget {
 }
 
 class _GuestRosterEmptyState extends StatelessWidget {
-  final VoidCallback onAddPressed;
+  final VoidCallback? onAddPressed;
 
   const _GuestRosterEmptyState({required this.onAddPressed});
 
@@ -471,15 +486,19 @@ class _GuestRosterEmptyState extends StatelessWidget {
           Text('لاعبو الفريق لسه ما اتسجلوش', style: AppTextStyles.titleLarge),
           const SizedBox(height: AppDimensions.xs),
           Text(
-            'أضف اللاعبين الضيوف هنا عشان يظهروا في matchday وتسجيل النتيجة.',
+            onAddPressed == null
+                ? 'لم تُنشر قائمة لاعبي هذا الفريق بعد.'
+                : 'أضف اللاعبين الضيوف هنا عشان يظهروا في matchday وتسجيل النتيجة.',
             style: AppTextStyles.bodySmall,
           ),
-          const SizedBox(height: AppDimensions.md),
-          FilledButton.icon(
-            onPressed: onAddPressed,
-            icon: const Icon(Icons.person_add_alt_1),
-            label: const Text('إضافة أول لاعب'),
-          ),
+          if (onAddPressed != null) ...[
+            const SizedBox(height: AppDimensions.md),
+            FilledButton.icon(
+              onPressed: onAddPressed,
+              icon: const Icon(Icons.person_add_alt_1),
+              label: const Text('إضافة أول لاعب'),
+            ),
+          ],
         ],
       ),
     );

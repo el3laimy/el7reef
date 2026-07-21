@@ -3,7 +3,11 @@ import 'dart:typed_data';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../app/theme/app_colors.dart';
+import '../../app/theme/app_dimensions.dart';
+import '../../app/theme/app_text_styles.dart';
 import '../utils/app_logger.dart';
+import '../widgets/el7reef_glass_surface.dart';
 
 /// خدمة رفع الصورة الشخصية — Task 6.3.2
 /// الوثيقة: ضغط → قص مربع → 3 نسخ → رفع Storage
@@ -104,68 +108,73 @@ class PhotoUploadService {
   ) async {
     return showModalBottomSheet<File?>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        margin: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A2035),
-          borderRadius: BorderRadius.circular(20),
+      builder: (ctx) => El7reefGlassSurface(
+        variant: El7reefGlassVariant.sheet,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppDimensions.radiusXl),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                'اختر صورتك الشخصية',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+        padding: EdgeInsets.only(
+          left: AppDimensions.lg,
+          right: AppDimensions.lg,
+          top: AppDimensions.md,
+          bottom: MediaQuery.of(ctx).padding.bottom + AppDimensions.lg,
+        ),
+        child: SafeArea(
+          top: false,
+          bottom: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: const Icon(
-                Icons.photo_library_outlined,
-                color: Color(0xFF00B4FF),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppDimensions.md,
+                ),
+                child: Text(
+                  'اختر صورتك الشخصية',
+                  style: AppTextStyles.titleLarge,
+                ),
               ),
-              title: const Text(
-                'من المكتبة',
-                style: TextStyle(color: Colors.white),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(
+                  Icons.photo_library_outlined,
+                  color: AppColors.primary,
+                ),
+                title: Text('من المكتبة', style: AppTextStyles.titleMedium),
+                onTap: () async {
+                  final file = await service.pickImage(fromCamera: false);
+                  if (ctx.mounted) Navigator.pop(ctx, file);
+                },
               ),
-              onTap: () async {
-                final file = await service.pickImage(fromCamera: false);
-                if (ctx.mounted) Navigator.pop(ctx, file);
-              },
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.camera_alt_outlined,
-                color: Color(0xFF00B4FF),
+              ListTile(
+                leading: const Icon(
+                  Icons.camera_alt_outlined,
+                  color: AppColors.primary,
+                ),
+                title: Text('التقط صورة', style: AppTextStyles.titleMedium),
+                subtitle: const Text(
+                  'سيُطلب إذن الكاميرا فقط عند اختيار هذا الإجراء.',
+                ),
+                onTap: () async {
+                  final file = await service.pickImage(fromCamera: true);
+                  if (ctx.mounted) Navigator.pop(ctx, file);
+                },
               ),
-              title: const Text(
-                'التقط صورة',
-                style: TextStyle(color: Colors.white),
-              ),
-              onTap: () async {
-                final file = await service.pickImage(fromCamera: true);
-                if (ctx.mounted) Navigator.pop(ctx, file);
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );

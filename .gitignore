@@ -31,6 +31,7 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/android/build/
 /coverage/
 
 # Symbolication related
@@ -45,6 +46,10 @@ app.*.map.json
 /android/app/release
 node_modules/
 package-lock.json
+!functions/package-lock.json
+
+# Local audit/tool output
+/.impeccable/critique/
 
 # Secure Keys & Configurations Exclusions
 key.properties
@@ -52,3 +57,7 @@ key.properties
 **/*.jks
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
+
+# Tracked Firebase/debug Android config for the active dev project.
+!android/app/google-services.json
+!android/app/debug-el7reef-v2.keystore

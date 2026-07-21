@@ -42,6 +42,8 @@ class MatchSideLineupEditorController extends GetxController {
 
   final RxBool isLoading = true.obs;
   final RxBool isSaving = false.obs;
+  final RxBool isLineupDirty = false.obs;
+  final Rxn<LineupDragPayload> selectedLineupPayload = Rxn<LineupDragPayload>();
   final RxString errorMessage = ''.obs;
 
   final Rx<Match?> match = Rx<Match?>(null);
@@ -63,9 +65,11 @@ class MatchSideLineupEditorController extends GetxController {
   bool get isConfirmed => confirmedSnapshot.value != null;
   bool get canEdit {
     final status = match.value?.status;
-    final isMatchActive = status == MatchStatus.open || status == MatchStatus.full;
+    final isMatchActive =
+        status == MatchStatus.open || status == MatchStatus.full;
     return isMatchActive && !isSaving.value;
   }
+
   String get sideName => matchSide.value?.displayName ?? 'فريق $sideKey';
 
   Map<String, LineupPlayer> get playersByKey => {
@@ -96,6 +100,15 @@ class MatchSideLineupEditorController extends GetxController {
         .where((id) => !starters.contains(id))
         .toList(growable: false);
   }
+
+  String? get selectedLineupPlayerKey =>
+      selectedLineupPayload.value?.player.key;
+
+  String? get selectedLineupPlayerName =>
+      selectedLineupPayload.value?.player.name;
+
+  bool get selectedLineupPlayerCanMoveToBench =>
+      selectedLineupPayload.value?.sourceSlotId != null;
 
   @override
   void onInit() {
@@ -175,6 +188,8 @@ class MatchSideLineupEditorController extends GetxController {
       playersByKey: playersByKey,
     );
     slots.assignAll(result.slots);
+    isLineupDirty.value = true;
+    selectedLineupPayload.value = null;
   }
 
   void resetLayout() {
@@ -192,6 +207,8 @@ class MatchSideLineupEditorController extends GetxController {
       starters: currentStarters,
     );
     slots.assignAll(assigned.slots);
+    isLineupDirty.value = true;
+    selectedLineupPayload.value = null;
   }
 
   void assignPlayerToSlot(LineupPlayer player, FormationSlot slot) {
@@ -203,46 +220,21 @@ class MatchSideLineupEditorController extends GetxController {
         slotId: slot.id,
       ),
     );
+    isLineupDirty.value = true;
+    selectedLineupPayload.value = null;
   }
 
-  void dropPlayerOnSlot(LineupPlayer draggedPlayer, FormationSlot targetSlot) {
+  void dropPlayerOnSlot(LineupDragPayload payload, FormationSlot targetSlot) {
     if (!canEdit) return;
-    final currentSlots = slots.toList(growable: false);
-    final draggedKey = draggedPlayer.key;
-    final sourceIndex = currentSlots.indexWhere(
-      (slot) => slot.occupantKey == draggedKey,
+    _assignUniqueSlots(
+      LineupUtils.movePlayerToSlot(
+        slots: slots,
+        payload: payload,
+        targetSlotId: targetSlot.id,
+      ),
     );
-    final targetIndex = currentSlots.indexWhere(
-      (slot) => slot.id == targetSlot.id,
-    );
-    if (targetIndex == -1 || sourceIndex == targetIndex) return;
-
-    final updatedSlots = currentSlots.toList(growable: true);
-    final oldTargetSlot = updatedSlots[targetIndex];
-    if (sourceIndex == -1) {
-      updatedSlots[targetIndex] = oldTargetSlot.assignPlayer(draggedPlayer);
-      _assignUniqueSlots(updatedSlots);
-      return;
-    }
-
-    final oldSourceSlot = updatedSlots[sourceIndex];
-    if (oldTargetSlot.isEmpty) {
-      updatedSlots[sourceIndex] = oldSourceSlot.clearPlayer();
-      updatedSlots[targetIndex] = oldTargetSlot.assignPlayer(draggedPlayer);
-      _assignUniqueSlots(updatedSlots);
-      return;
-    }
-
-    final targetMatchSidePlayerId = oldTargetSlot.matchSidePlayerId;
-    final targetIsCaptain = oldTargetSlot.isCaptain;
-    updatedSlots[targetIndex] = oldTargetSlot.assignPlayer(draggedPlayer);
-    updatedSlots[sourceIndex] = oldSourceSlot.copyWith(
-      playerId: null,
-      guestPlayerId: null,
-      matchSidePlayerId: targetMatchSidePlayerId,
-      isCaptain: targetIsCaptain,
-    );
-    _assignUniqueSlots(updatedSlots);
+    isLineupDirty.value = true;
+    selectedLineupPayload.value = null;
   }
 
   void movePlayerToBench(LineupPlayer player) {
@@ -250,6 +242,44 @@ class MatchSideLineupEditorController extends GetxController {
     slots.assignAll(
       LineupUtils.removePlayerFromSlots(slots: slots, player: player),
     );
+    isLineupDirty.value = true;
+    selectedLineupPayload.value = null;
+  }
+
+  void selectLineupPlayer(LineupPlayer player, {String? sourceSlotId}) {
+    if (!canEdit) return;
+    final current = selectedLineupPayload.value;
+    if (current?.player.key == player.key &&
+        current?.sourceSlotId == sourceSlotId) {
+      selectedLineupPayload.value = null;
+      return;
+    }
+    selectedLineupPayload.value = LineupDragPayload(
+      player: player,
+      sourceSlotId: sourceSlotId,
+    );
+  }
+
+  bool moveSelectedLineupPlayerToSlot(FormationSlot targetSlot) {
+    final payload = selectedLineupPayload.value;
+    if (!canEdit || payload == null) return false;
+    if (payload.sourceSlotId == targetSlot.id) {
+      selectedLineupPayload.value = null;
+      return true;
+    }
+    dropPlayerOnSlot(payload, targetSlot);
+    selectedLineupPayload.value = null;
+    return true;
+  }
+
+  bool moveSelectedLineupPlayerToBench() {
+    final payload = selectedLineupPayload.value;
+    if (!canEdit || payload == null || payload.fromBench) {
+      return false;
+    }
+    movePlayerToBench(payload.player);
+    selectedLineupPayload.value = null;
+    return true;
   }
 
   Future<bool> saveConfirmedLineup() async {
@@ -305,6 +335,8 @@ class MatchSideLineupEditorController extends GetxController {
       starters: roster.take(count).toList(growable: false),
     );
     slots.assignAll(assigned.slots);
+    isLineupDirty.value = false;
+    selectedLineupPayload.value = null;
   }
 
   void _seedFromSnapshot(MatchLineupSnapshot snapshot) {
@@ -345,6 +377,8 @@ class MatchSideLineupEditorController extends GetxController {
         }
       }
       slots.assignAll(slotMap.values.toList());
+      isLineupDirty.value = false;
+      selectedLineupPayload.value = null;
       return;
     }
 
@@ -357,6 +391,8 @@ class MatchSideLineupEditorController extends GetxController {
       starters: snapshot.starters.map(_lineupPlayerFromEntry).toList(),
     );
     slots.assignAll(assigned.slots);
+    isLineupDirty.value = false;
+    selectedLineupPayload.value = null;
   }
 
   LineupPlayer _lineupPlayerFromSidePlayer(MatchSidePlayer player) {

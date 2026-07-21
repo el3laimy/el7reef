@@ -5,7 +5,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/constants/feature_flags.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../controllers/activity_feed_controller.dart';
 import '../../../core/services/activity_feed_service.dart';
 
@@ -32,10 +32,7 @@ class ActivityFeedWidget extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'آخر الأنشطة',
-                  style: AppTextStyles.titleLarge,
-                ),
+                Text('آخر الأنشطة', style: AppTextStyles.titleLarge),
                 GestureDetector(
                   onTap: controller.loadFeed,
                   child: Text(
@@ -60,7 +57,8 @@ class ActivityFeedWidget extends StatelessWidget {
           else if (controller.items.isEmpty)
             _buildInfoState(
               title: 'لا توجد أنشطة بعد',
-              subtitle: 'ابدأ بإضافة أصدقاء أو متابعة منظمين لتظهر تحركاتهم هنا.',
+              subtitle:
+                  'ابدأ بإضافة أصدقاء أو متابعة منظمين لتظهر تحركاتهم هنا.',
             )
           else
             SizedBox(
@@ -92,16 +90,21 @@ class ActivityFeedWidget extends StatelessWidget {
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        padding:
-            const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppDimensions.pagePadding,
+        ),
         itemCount: 3,
         itemBuilder: (context, index) {
           return Container(
             width: 260,
-            margin: const EdgeInsetsDirectional.only(start: AppDimensions.md, bottom: 8),
-            child: const GlassmorphicContainer(
+            margin: const EdgeInsetsDirectional.only(
+              start: AppDimensions.md,
+              bottom: 8,
+            ),
+            child: const El7reefGlassSurface(
+              variant: El7reefGlassVariant.base,
               padding: EdgeInsets.all(AppDimensions.md),
-              borderRadius: AppDimensions.radiusLg,
+              radius: AppDimensions.radiusLg,
               child: Center(
                 child: CircularProgressIndicator(color: AppColors.primary),
               ),
@@ -112,16 +115,15 @@ class ActivityFeedWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoState({
-    required String title,
-    required String subtitle,
-  }) {
+  Widget _buildInfoState({required String title, required String subtitle}) {
     return Padding(
-      padding:
-          const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
-      child: GlassmorphicContainer(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimensions.pagePadding,
+      ),
+      child: El7reefGlassSurface(
+        variant: El7reefGlassVariant.base,
         padding: const EdgeInsets.all(AppDimensions.lg),
-        borderRadius: AppDimensions.radiusLg,
+        radius: AppDimensions.radiusLg,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -142,10 +144,14 @@ class ActivityFeedWidget extends StatelessWidget {
   Widget _buildActivityCard(ActivityFeedEntry item) {
     return Container(
       width: 260,
-      margin: const EdgeInsetsDirectional.only(start: AppDimensions.md, bottom: 8), // Shadow space
-      child: GlassmorphicContainer(
+      margin: const EdgeInsetsDirectional.only(
+        start: AppDimensions.md,
+        bottom: 8,
+      ), // Shadow space
+      child: El7reefGlassSurface(
+        variant: El7reefGlassVariant.base,
         padding: const EdgeInsets.all(AppDimensions.md),
-        borderRadius: AppDimensions.radiusLg,
+        radius: AppDimensions.radiusLg,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -173,12 +179,18 @@ class ActivityFeedWidget extends StatelessWidget {
                       children: [
                         TextSpan(
                           text: '${item.actorName} ',
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
                         ),
                         TextSpan(text: '${item.actionText} '),
                         TextSpan(
                           text: item.highlightText,
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.accent),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.accent,
+                          ),
                         ),
                       ],
                     ),
@@ -186,7 +198,9 @@ class ActivityFeedWidget extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     item.timeAgo(),
-                    style: AppTextStyles.labelSmall.copyWith(color: AppColors.textMuted),
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColors.textMuted,
+                    ),
                   ),
                 ],
               ),

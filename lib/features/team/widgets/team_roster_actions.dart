@@ -5,7 +5,7 @@ import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/constants/feature_flags.dart';
 import '../../../core/widgets/el7reef_button.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../match/widgets/send_challenge_sheet.dart';
 import '../controllers/team_roster_controller.dart';
 import 'team_roster_dialogs.dart';
@@ -18,7 +18,8 @@ class TeamRosterActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!controller.canManageRoster) {
-      return GlassmorphicContainer(
+      return El7reefGlassSurface(
+        variant: El7reefGlassVariant.base,
         padding: const EdgeInsets.all(AppDimensions.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

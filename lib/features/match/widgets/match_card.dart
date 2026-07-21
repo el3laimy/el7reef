@@ -8,7 +8,7 @@ import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/constants/feature_flags.dart';
 import '../../../core/enums/match_status.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../domain/entities/match.dart';
 import '../controllers/match_controller.dart';
 import 'match_status_badge.dart';
@@ -37,9 +37,10 @@ class MatchCard extends StatelessWidget {
     final canOpenMatchday = isOrganizer || isParticipant;
     final hasResult = match.scoreTeamA != null && match.scoreTeamB != null;
 
-    return GlassmorphicContainer(
+    return El7reefGlassSurface(
+          variant: El7reefGlassVariant.base,
           padding: const EdgeInsets.all(AppDimensions.md),
-          borderRadius: AppDimensions.radiusLg,
+          radius: AppDimensions.radiusLg,
           margin: const EdgeInsets.only(bottom: AppDimensions.sm),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

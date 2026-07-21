@@ -5,6 +5,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/constants/feature_flags.dart';
+import '../../../core/widgets/el7reef_brand_mark.dart';
 import '../../../core/widgets/el7reef_button.dart';
 import '../controllers/match_controller.dart';
 import '../controllers/challenge_controller.dart';
@@ -25,7 +26,7 @@ class MatchDiscoverScreen extends GetView<MatchController> {
         appBar: AppBar(
           title: Row(
             children: [
-              Image.asset('assets/images/logo_icon.png', height: 28),
+              const El7reefBrandMark(size: 28),
               const SizedBox(width: AppDimensions.sm),
               const Text('المباريات'),
             ],
@@ -171,10 +172,43 @@ class _DiscoverTab extends GetView<MatchController> {
             const SliverToBoxAdapter(child: SizedBox(height: AppDimensions.md)),
             if (controller.liveMatches.isEmpty)
               SliverFillRemaining(
+                hasScrollBody: false,
                 child: Center(
-                  child: Text(
-                    'لا توجد مباريات جارية حالياً',
-                    style: AppTextStyles.bodyLarge,
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppDimensions.pagePadding),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 360),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.sports_soccer_rounded,
+                            size: 64,
+                            color: AppColors.primary.withValues(alpha: 0.72),
+                          ),
+                          const SizedBox(height: AppDimensions.md),
+                          Text(
+                            'لا توجد مباريات جارية حالياً',
+                            style: AppTextStyles.headlineMedium,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: AppDimensions.sm),
+                          Text(
+                            'افتح ماتش جديد، اجمع اللاعبين، وسجّل النتيجة عشان تتحول لكارت فخر يتشارك.',
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              height: 1.5,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: AppDimensions.lg),
+                          El7reefButton(
+                            text: 'أنشئ مباراة مفتوحة',
+                            icon: Icons.add_circle_outline_rounded,
+                            onPressed: showCreateMatchSheetGlobal,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               )

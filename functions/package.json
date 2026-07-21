@@ -1,0 +1,21 @@
+{
+  "name": "el7reef-functions",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": "20"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.0.0"
+  },
+  "scripts": {
+    "import:world-cup-2026": "node scripts/import_world_cup_2026.js",
+    "publish:world-cup-2026": "node scripts/publish_world_cup_2026.js",
+    "seed:world-cup-organizer-auth": "node scripts/seed_world_cup_organizer_auth.js",
+    "verify:world-cup-2026": "node scripts/verify_world_cup_2026_import.js",
+    "verify:world-cup-2026-publication": "node scripts/verify_world_cup_2026_publication.js",
+    "migration:tournament-memberships": "node scripts/migrate_tournament_memberships.js",
+    "audit:participant-identities": "node scripts/audit_participant_identity_kinds.js"
+  }
+}

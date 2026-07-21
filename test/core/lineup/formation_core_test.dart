@@ -83,4 +83,117 @@ void main() {
       );
     });
   });
+
+  group('Lineup drag moves', () {
+    const keeper = LineupPlayer(
+      id: 'keeper',
+      name: 'Keeper',
+      preferredPosition: 'GK',
+      isRegistered: true,
+    );
+    const defender = LineupPlayer(
+      id: 'defender',
+      name: 'Defender',
+      preferredPosition: 'DEF',
+      isRegistered: true,
+    );
+    const benchGuest = LineupPlayer(
+      id: 'guest-1',
+      name: 'Guest',
+      preferredPosition: 'MID',
+      isRegistered: false,
+    );
+
+    test('swaps two occupied pitch slots in one move', () {
+      final slots = [
+        const FormationSlot(
+          id: 'gk',
+          role: SlotRole.gk,
+          lineIndex: 0,
+          slotIndex: 0,
+          x: 50,
+          y: 92,
+          playerId: 'keeper',
+        ),
+        const FormationSlot(
+          id: 'def-1',
+          role: SlotRole.def,
+          lineIndex: 1,
+          slotIndex: 0,
+          x: 35,
+          y: 70,
+          playerId: 'defender',
+        ),
+      ];
+
+      final moved = LineupUtils.movePlayerToSlot(
+        slots: slots,
+        payload: const LineupDragPayload(player: keeper, sourceSlotId: 'gk'),
+        targetSlotId: 'def-1',
+      );
+
+      expect(moved.first.playerId, 'defender');
+      expect(moved.last.playerId, 'keeper');
+    });
+
+    test('moves a pitch player into an empty slot and clears source', () {
+      final slots = [
+        const FormationSlot(
+          id: 'def-1',
+          role: SlotRole.def,
+          lineIndex: 1,
+          slotIndex: 0,
+          x: 35,
+          y: 70,
+          playerId: 'defender',
+        ),
+        const FormationSlot(
+          id: 'mid-1',
+          role: SlotRole.mid,
+          lineIndex: 2,
+          slotIndex: 0,
+          x: 50,
+          y: 52,
+        ),
+      ];
+
+      final moved = LineupUtils.movePlayerToSlot(
+        slots: slots,
+        payload: const LineupDragPayload(
+          player: defender,
+          sourceSlotId: 'def-1',
+        ),
+        targetSlotId: 'mid-1',
+      );
+
+      expect(moved.first.isEmpty, isTrue);
+      expect(moved.last.playerId, 'defender');
+    });
+
+    test(
+      'bench player dropped onto occupied slot replaces current starter',
+      () {
+        final slots = [
+          const FormationSlot(
+            id: 'mid-1',
+            role: SlotRole.mid,
+            lineIndex: 2,
+            slotIndex: 0,
+            x: 50,
+            y: 52,
+            playerId: 'defender',
+          ),
+        ];
+
+        final moved = LineupUtils.movePlayerToSlot(
+          slots: slots,
+          payload: const LineupDragPayload(player: benchGuest),
+          targetSlotId: 'mid-1',
+        );
+
+        expect(moved.single.playerId, isNull);
+        expect(moved.single.guestPlayerId, 'guest-1');
+      },
+    );
+  });
 }

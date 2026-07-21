@@ -11,6 +11,12 @@ class TeamFormationEntryModel {
   final TeamMemberAvailability availability;
   final String displayName;
   final String? position;
+  final String? slotId;
+  final String? slotRole;
+  final int? lineIndex;
+  final int? slotIndex;
+  final double? slotX;
+  final double? slotY;
 
   const TeamFormationEntryModel({
     this.playerId,
@@ -20,6 +26,12 @@ class TeamFormationEntryModel {
     required this.availability,
     required this.displayName,
     this.position,
+    this.slotId,
+    this.slotRole,
+    this.lineIndex,
+    this.slotIndex,
+    this.slotX,
+    this.slotY,
   });
 
   factory TeamFormationEntryModel.fromJson(Map<String, dynamic> json) {
@@ -27,21 +39,32 @@ class TeamFormationEntryModel {
       playerId: json['playerId'] as String?,
       guestPlayerId: json['guestPlayerId'] as String?,
       role: TeamMembershipRole.values.firstWhere(
-        (value) => value.name == (json['role'] as String? ?? TeamMembershipRole.player.name),
+        (value) =>
+            value.name ==
+            (json['role'] as String? ?? TeamMembershipRole.player.name),
         orElse: () => TeamMembershipRole.player,
       ),
       status: TeamMembershipStatus.values.firstWhere(
         (value) =>
-            value.name == (json['status'] as String? ?? TeamMembershipStatus.bench.name),
+            value.name ==
+            (json['status'] as String? ?? TeamMembershipStatus.bench.name),
         orElse: () => TeamMembershipStatus.bench,
       ),
       availability: TeamMemberAvailability.values.firstWhere(
-        (value) => value.name ==
-            (json['availability'] as String? ?? TeamMemberAvailability.available.name),
+        (value) =>
+            value.name ==
+            (json['availability'] as String? ??
+                TeamMemberAvailability.available.name),
         orElse: () => TeamMemberAvailability.available,
       ),
       displayName: json['displayName'] as String? ?? '',
       position: json['position'] as String?,
+      slotId: json['slotId'] as String?,
+      slotRole: json['slotRole'] as String?,
+      lineIndex: (json['lineIndex'] as num?)?.toInt(),
+      slotIndex: (json['slotIndex'] as num?)?.toInt(),
+      slotX: (json['slotX'] as num?)?.toDouble(),
+      slotY: (json['slotY'] as num?)?.toDouble(),
     );
   }
 
@@ -54,6 +77,12 @@ class TeamFormationEntryModel {
       'availability': availability.name,
       'displayName': displayName,
       'position': position,
+      'slotId': slotId,
+      'slotRole': slotRole,
+      'lineIndex': lineIndex,
+      'slotIndex': slotIndex,
+      'slotX': slotX,
+      'slotY': slotY,
     };
   }
 
@@ -66,6 +95,12 @@ class TeamFormationEntryModel {
       availability: availability,
       displayName: displayName,
       position: position,
+      slotId: slotId,
+      slotRole: slotRole,
+      lineIndex: lineIndex,
+      slotIndex: slotIndex,
+      slotX: slotX,
+      slotY: slotY,
     );
   }
 
@@ -78,6 +113,12 @@ class TeamFormationEntryModel {
       availability: entry.availability,
       displayName: entry.displayName,
       position: entry.position,
+      slotId: entry.slotId,
+      slotRole: entry.slotRole,
+      lineIndex: entry.lineIndex,
+      slotIndex: entry.slotIndex,
+      slotX: entry.slotX,
+      slotY: entry.slotY,
     );
   }
 }

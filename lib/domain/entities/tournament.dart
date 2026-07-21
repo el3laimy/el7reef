@@ -1,4 +1,5 @@
 import '../../core/enums/tournament_enums.dart';
+import 'tournament_group_advancement_config.dart';
 import 'tournament_group_standings_config.dart';
 import 'tournament_assistant.dart';
 
@@ -14,6 +15,8 @@ class Tournament {
   final int maxTeams;
   final TournamentVisibility visibility;
   final bool discoverable;
+  final bool isFeatured;
+  final int featuredPriority;
   final List<String> participantViewerIds;
   final int? prizePool;
   final String? prizeDescription;
@@ -32,6 +35,7 @@ class Tournament {
   final String? currentKnockoutBracketId;
   final String? winnerParticipantId;
   final bool needsManualOpsMigration;
+  final TournamentGroupAdvancementConfig groupAdvancementConfig;
   final TournamentGroupStandingsConfig groupStandingsConfig;
   final DateTime createdAt;
 
@@ -46,6 +50,8 @@ class Tournament {
     required this.maxTeams,
     this.visibility = TournamentVisibility.public,
     this.discoverable = true,
+    this.isFeatured = false,
+    this.featuredPriority = 1000,
     this.participantViewerIds = const [],
     this.prizePool,
     this.prizeDescription,
@@ -54,7 +60,7 @@ class Tournament {
     this.assistants = const [],
     this.groupRoundIds = const [],
     this.knockoutRoundIds = const [],
-    this.isFantasyEnabled = true,
+    this.isFantasyEnabled = false,
     this.registrationDeadline,
     this.startDate,
     this.endDate,
@@ -64,6 +70,7 @@ class Tournament {
     this.currentKnockoutBracketId,
     this.winnerParticipantId,
     this.needsManualOpsMigration = false,
+    this.groupAdvancementConfig = const TournamentGroupAdvancementConfig(),
     this.groupStandingsConfig = const TournamentGroupStandingsConfig(),
     required this.createdAt,
   });
@@ -97,6 +104,8 @@ class Tournament {
     int? maxTeams,
     TournamentVisibility? visibility,
     bool? discoverable,
+    bool? isFeatured,
+    int? featuredPriority,
     List<String>? participantViewerIds,
     int? prizePool,
     String? prizeDescription,
@@ -115,6 +124,7 @@ class Tournament {
     String? currentKnockoutBracketId,
     String? winnerParticipantId,
     bool? needsManualOpsMigration,
+    TournamentGroupAdvancementConfig? groupAdvancementConfig,
     TournamentGroupStandingsConfig? groupStandingsConfig,
     DateTime? createdAt,
   }) {
@@ -129,6 +139,8 @@ class Tournament {
       maxTeams: maxTeams ?? this.maxTeams,
       visibility: visibility ?? this.visibility,
       discoverable: discoverable ?? this.discoverable,
+      isFeatured: isFeatured ?? this.isFeatured,
+      featuredPriority: featuredPriority ?? this.featuredPriority,
       participantViewerIds: participantViewerIds ?? this.participantViewerIds,
       prizePool: prizePool ?? this.prizePool,
       prizeDescription: prizeDescription ?? this.prizeDescription,
@@ -151,6 +163,8 @@ class Tournament {
       winnerParticipantId: winnerParticipantId ?? this.winnerParticipantId,
       needsManualOpsMigration:
           needsManualOpsMigration ?? this.needsManualOpsMigration,
+      groupAdvancementConfig:
+          groupAdvancementConfig ?? this.groupAdvancementConfig,
       groupStandingsConfig: groupStandingsConfig ?? this.groupStandingsConfig,
       createdAt: createdAt ?? this.createdAt,
     );

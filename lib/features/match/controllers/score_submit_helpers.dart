@@ -1,46 +1,24 @@
 part of 'score_submit_controller.dart';
 
 extension ScoreSubmitHelpers on ScoreSubmitController {
-  int? _validatedScoreForSide({
-    required String rawValue,
-    required String sideName,
-    required String sideKey,
-  }) {
-    final trimmed = rawValue.trim();
-    if (trimmed.isEmpty) {
-      return _attributedGoalsForSide(sideKey);
-    }
-    final parsed = int.tryParse(trimmed);
-    if (parsed == null || parsed < 0) {
-      final message = 'أدخل نتيجة صحيحة وغير سالبة لـ $sideName.';
-      errorMessage.value = message;
-      Get.snackbar(
-        'نتيجة غير صحيحة',
-        message,
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return null;
-    }
-    return parsed;
-  }
+  ScoreSubmitValidationResult _validateScores() {
+    final result = ScoreSubmitPreparation.validateScores(
+      rawScoreA: teamAScoreController.text,
+      rawScoreB: teamBScoreController.text,
+      sideAName: teamASideName.value,
+      sideBName: teamBSideName.value,
+      attributedGoalsA: _attributedGoalsForSide('A'),
+      attributedGoalsB: _attributedGoalsForSide('B'),
+    );
+    if (result.isValid) return result;
 
-  bool _validateAttributedGoalsWithinScore({
-    required int scoreA,
-    required int scoreB,
-  }) {
-    final attributedA = _attributedGoalsForSide('A');
-    final attributedB = _attributedGoalsForSide('B');
-    if (attributedA <= scoreA && attributedB <= scoreB) {
-      return true;
-    }
-
-    errorMessage.value = ScoreSubmitController.attributionOverScoreMessage;
+    errorMessage.value = result.errorMessage!;
     Get.snackbar(
-      'نتيجة غير متسقة',
+      result.errorTitle!,
       errorMessage.value,
       snackPosition: SnackPosition.BOTTOM,
     );
-    return false;
+    return result;
   }
 
   ScoreSideGoalSummary _goalSummaryForSide(String sideKey) {
@@ -51,10 +29,9 @@ extension ScoreSubmitHelpers on ScoreSubmitController {
         ? teamBScoreText.value
         : '';
     final attributedGoals = _attributedGoalsForSide(normalizedSideKey);
-    final parsedScore = _parsedTeamScore(scoreText);
-    return ScoreSideGoalSummary(
+    return ScoreSubmitPreparation.goalSummary(
       sideKey: normalizedSideKey,
-      teamScore: parsedScore ?? attributedGoals,
+      rawScore: scoreText,
       attributedGoals: attributedGoals,
     );
   }
@@ -137,12 +114,72 @@ extension ScoreSubmitHelpers on ScoreSubmitController {
     }
   }
 
+  void _setPenaltyScoreControllerText({
+    required String sideKey,
+    required String text,
+  }) {
+    final normalizedSideKey = sideKey.trim().toUpperCase();
+    if (normalizedSideKey == 'A') {
+      teamAPenaltyScoreController.text = text;
+      teamAPenaltyScoreText.value = text;
+    } else if (normalizedSideKey == 'B') {
+      teamBPenaltyScoreController.text = text;
+      teamBPenaltyScoreText.value = text;
+    }
+  }
+
   void _handleTeamAScoreTextChanged() {
     teamAScoreText.value = teamAScoreController.text;
+    _markDraftChanged();
   }
 
   void _handleTeamBScoreTextChanged() {
     teamBScoreText.value = teamBScoreController.text;
+    _markDraftChanged();
+  }
+
+  void _handleTeamAPenaltyScoreTextChanged() {
+    teamAPenaltyScoreText.value = teamAPenaltyScoreController.text;
+    _markDraftChanged();
+  }
+
+  void _handleTeamBPenaltyScoreTextChanged() {
+    teamBPenaltyScoreText.value = teamBPenaltyScoreController.text;
+    _markDraftChanged();
+  }
+
+  bool _validatePenaltyShootout({required int scoreA, required int scoreB}) {
+    if (!isKnockoutMatch || scoreA != scoreB) return true;
+    final penaltyScoreA = _parsedTeamScore(teamAPenaltyScoreController.text);
+    final penaltyScoreB = _parsedTeamScore(teamBPenaltyScoreController.text);
+    final shootout = penaltyScoreA == null || penaltyScoreB == null
+        ? null
+        : PenaltyShootoutResult(
+            scoreTeamA: penaltyScoreA,
+            scoreTeamB: penaltyScoreB,
+          );
+    if (shootout?.isValid == true) return true;
+
+    errorMessage.value = penaltyScoreA != null && penaltyScoreA == penaltyScoreB
+        ? 'ركلات الترجيح لا يمكن أن تنتهي بالتعادل.'
+        : 'أدخل نتيجة ركلات ترجيح صحيحة بين 0 و99 لتحديد المتأهل.';
+    Get.snackbar(
+      'احسم المتأهل',
+      errorMessage.value,
+      snackPosition: SnackPosition.BOTTOM,
+    );
+    return false;
+  }
+
+  PenaltyShootoutResult? _penaltyShootoutForSubmission({
+    required int scoreA,
+    required int scoreB,
+  }) {
+    if (!isKnockoutMatch || scoreA != scoreB) return null;
+    return PenaltyShootoutResult(
+      scoreTeamA: int.parse(teamAPenaltyScoreController.text.trim()),
+      scoreTeamB: int.parse(teamBPenaltyScoreController.text.trim()),
+    );
   }
 
   int? _parsedTeamScore(String rawValue) {
@@ -157,45 +194,13 @@ extension ScoreSubmitHelpers on ScoreSubmitController {
       return raw.substring('Exception: '.length);
     }
     if (raw.startsWith('Bad state: ')) {
-      return raw.substring('Bad state: '.length);
+      final message = raw.substring('Bad state: '.length);
+      if (message == 'settlement failed') {
+        return 'تعذر تسجيل نتيجة المباراة الآن. حاول مرة أخرى.';
+      }
+      return message;
     }
     return raw;
-  }
-
-  PlayerMatchStats _buildDetailedStats({
-    required Player player,
-    required String teamId,
-    required bool cleanSheet,
-  }) {
-    final stats = playerStats[player.id]!;
-    return PlayerMatchStats(
-      playerId: player.id,
-      matchId: matchId,
-      teamId: teamId,
-      played: stats['played'] as bool,
-      position: _mapPosition(player.position),
-      goals: stats['goals'] as int,
-      assists: stats['assists'] as int,
-      saves: stats['saves'] as int,
-      yellowCard: stats['yellowCard'] as bool,
-      redCard: stats['redCard'] as bool,
-      cleanSheet: cleanSheet,
-    );
-  }
-
-  MatchPosition _mapPosition(String? position) {
-    switch (position) {
-      case 'GK':
-        return MatchPosition.goalkeeper;
-      case 'DEF':
-        return MatchPosition.defender;
-      case 'MID':
-        return MatchPosition.midfielder;
-      case 'FWD':
-        return MatchPosition.forward;
-      default:
-        return MatchPosition.mixed;
-    }
   }
 
   int _sumGoals(List<Player> players) {

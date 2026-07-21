@@ -1,4 +1,5 @@
 import '../../domain/entities/match_event.dart';
+import '../../core/firestore/firestore_date_adapter.dart';
 import 'participant_ref_model.dart';
 
 class MatchEventModel {
@@ -36,7 +37,7 @@ class MatchEventModel {
       sideKey: json['sideKey'] as String? ?? '',
       actor: actorJson is Map<String, dynamic>
           ? ParticipantRefModel.fromJson(actorJson)
-          : const ParticipantRefModel(kind: 'player', id: '', displayName: ''),
+          : throw const FormatException('MatchEvent.actor is required.'),
       minute: (json['minute'] as num?)?.toInt(),
       createdBy: json['createdBy'] as String? ?? '',
       createdAt: _dateFromMs(json['createdAt']),
@@ -53,7 +54,7 @@ class MatchEventModel {
       'actor': actor.toJson(),
       'minute': minute,
       'createdBy': createdBy,
-      'createdAt': createdAt.millisecondsSinceEpoch,
+      'createdAt': FirestoreDateAdapter.write(createdAt),
       'status': status,
     };
   }
@@ -103,9 +104,6 @@ class MatchEventModel {
   }
 
   static DateTime _dateFromMs(Object? value) {
-    if (value is num) {
-      return DateTime.fromMillisecondsSinceEpoch(value.toInt());
-    }
-    return DateTime.now();
+    return FirestoreDateAdapter.readOr(value, DateTime.now());
   }
 }

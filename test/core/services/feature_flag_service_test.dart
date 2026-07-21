@@ -12,6 +12,12 @@ void main() {
     () {
       expect(FeatureFlags.socialUiEnabled, isFalse);
       expect(FeatureFlags.guestIdentityEnabled, isTrue);
+      expect(FeatureFlags.prideGrowthLinksEnabled, isFalse);
+      expect(FeatureFlags.postMatchPrideHubEnabled, isFalse);
+      expect(FeatureFlags.functionalGlassEnabled, isFalse);
+      expect(FeatureFlags.prideShareCatalogV2Enabled, isFalse);
+      expect(FeatureFlags.prideVideoExportEnabled, isFalse);
+      expect(FeatureFlags.reduceGlassBlurEnabled, isFalse);
     },
   );
 
@@ -37,6 +43,30 @@ void main() {
     expect(
       FeatureFlagService.remoteDefaults,
       containsPair('guest_identity_enabled', true),
+    );
+    expect(
+      FeatureFlagService.remoteDefaults,
+      containsPair('pride_growth_links_enabled', false),
+    );
+    expect(
+      FeatureFlagService.remoteDefaults,
+      containsPair('post_match_pride_hub_enabled', false),
+    );
+    expect(
+      FeatureFlagService.remoteDefaults,
+      containsPair('reduce_glass_blur_enabled', false),
+    );
+    expect(
+      FeatureFlagService.remoteDefaults,
+      containsPair('functional_glass_enabled', false),
+    );
+    expect(
+      FeatureFlagService.remoteDefaults,
+      containsPair('pride_share_catalog_v2_enabled', false),
+    );
+    expect(
+      FeatureFlagService.remoteDefaults,
+      containsPair('pride_video_export_enabled', false),
     );
   });
 }

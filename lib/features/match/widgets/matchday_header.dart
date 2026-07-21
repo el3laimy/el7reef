@@ -22,11 +22,7 @@ class MatchdayHeader extends StatelessWidget {
       padding: const EdgeInsets.all(AppDimensions.md),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.surfaceSunken, AppColors.surface],
-        ),
+        color: AppColors.surface,
         border: Border.all(color: AppColors.surfaceBorder, width: 0.5),
         boxShadow: [
           BoxShadow(
@@ -43,7 +39,7 @@ class MatchdayHeader extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: AppColors.secondary.withValues(alpha: 0.15),
+                color: AppColors.surfaceRaised,
                 borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
               ),
               child: Row(
@@ -52,13 +48,13 @@ class MatchdayHeader extends StatelessWidget {
                   const Icon(
                     Icons.emoji_events_rounded,
                     size: 14,
-                    color: AppColors.secondary,
+                    color: AppColors.textSecondary,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     tournament.name,
                     style: AppTextStyles.labelSmall.copyWith(
-                      color: AppColors.secondary,
+                      color: AppColors.textSecondary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -80,18 +76,10 @@ class MatchdayHeader extends StatelessWidget {
             children: [
               // Team A
               Expanded(
-                child: Column(
-                  children: [
-                    _TeamBadge(label: 'A', color: AppColors.accent),
-                    const SizedBox(height: 6),
-                    Text(
-                      controller.sideADisplayName.value,
-                      style: AppTextStyles.labelMedium,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                child: _TeamIdentity(
+                  sideLabel: 'A',
+                  displayName: controller.sideADisplayName.value,
+                  color: AppColors.accent,
                 ),
               ),
 
@@ -119,18 +107,10 @@ class MatchdayHeader extends StatelessWidget {
 
               // Team B
               Expanded(
-                child: Column(
-                  children: [
-                    _TeamBadge(label: 'B', color: AppColors.error),
-                    const SizedBox(height: 6),
-                    Text(
-                      controller.sideBDisplayName.value,
-                      style: AppTextStyles.labelMedium,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                child: _TeamIdentity(
+                  sideLabel: 'B',
+                  displayName: controller.sideBDisplayName.value,
+                  color: AppColors.surfaceBorderStrong,
                 ),
               ),
             ],
@@ -206,6 +186,57 @@ class MatchdayHeader extends StatelessWidget {
     MatchStatus.cancelled => 'ملغاة',
     _ => 'غير معروفة',
   };
+}
+
+class _TeamIdentity extends StatelessWidget {
+  static final RegExp _trailingCodePattern = RegExp(
+    r'^(.+?)\s*\(([A-Za-z0-9]{2,4})\)$',
+  );
+
+  final String sideLabel;
+  final String displayName;
+  final Color color;
+
+  const _TeamIdentity({
+    required this.sideLabel,
+    required this.displayName,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final identity = _identityParts(displayName);
+    return Column(
+      children: [
+        _TeamBadge(label: sideLabel, color: color),
+        const SizedBox(height: 6),
+        Text(
+          identity.name,
+          style: AppTextStyles.labelMedium,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        if (identity.code != null)
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: Text(
+              '(${identity.code})',
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.textMuted,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  ({String name, String? code}) _identityParts(String rawDisplayName) {
+    final normalizedName = rawDisplayName.trim();
+    final match = _trailingCodePattern.firstMatch(normalizedName);
+    if (match == null) return (name: normalizedName, code: null);
+    return (name: match.group(1)!.trim(), code: match.group(2));
+  }
 }
 
 class _TeamBadge extends StatelessWidget {
@@ -441,7 +472,11 @@ class _StepDot extends StatelessWidget {
           ),
           child: Center(
             child: done
-                ? const Icon(Icons.check, size: 16, color: AppColors.textPrimary)
+                ? const Icon(
+                    Icons.check,
+                    size: 16,
+                    color: AppColors.textPrimary,
+                  )
                 : active
                 ? Container(
                     width: 8,

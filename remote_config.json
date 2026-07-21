@@ -84,6 +84,48 @@
       },
       "description": "Enables matchday tournament flow UI.",
       "valueType": "BOOLEAN"
+    },
+    "pride_growth_links_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "Adds safe pride-card links while preserving image sharing when disabled.",
+      "valueType": "BOOLEAN"
+    },
+    "post_match_pride_hub_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "Enables the post-match pride hub after a successful score submission.",
+      "valueType": "BOOLEAN"
+    },
+    "functional_glass_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "Enables the single functional glass controls layer after Android performance QA.",
+      "valueType": "BOOLEAN"
+    },
+    "pride_share_catalog_v2_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "Enables verified-data Pride V2 card entry points.",
+      "valueType": "BOOLEAN"
+    },
+    "pride_video_export_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "Enables Android video export only after encoder and sonic-brand approval.",
+      "valueType": "BOOLEAN"
+    },
+    "reduce_glass_blur_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "Emergency kill switch that replaces functional blur with an opaque surface.",
+      "valueType": "BOOLEAN"
     }
   }
 }

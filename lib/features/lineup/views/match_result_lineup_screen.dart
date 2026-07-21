@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -5,21 +7,32 @@ import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/auth/auth_service.dart';
+import '../../../core/constants/feature_flags.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../core/widgets/el7reef_badge.dart';
 import '../../../core/widgets/el7reef_surface.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/entities/match_lineup_snapshot.dart';
+import '../../../domain/entities/participant_ref.dart';
+import '../../../domain/entities/share_payload.dart';
 import '../../shareables/controllers/lineup_share_controller.dart';
 import '../../shareables/controllers/match_result_share_controller.dart';
 import '../../shareables/controllers/mvp_share_controller.dart';
+import '../../shareables/controllers/player_moment_share_controller.dart';
 import '../../shareables/models/lineup_share_data.dart';
 import '../../shareables/models/match_result_share_data.dart';
 import '../../shareables/models/mvp_share_data.dart';
+import '../../shareables/models/player_moment_share_data.dart';
+import '../../shareables/models/pride_export.dart';
 import '../../shareables/services/share_card_capture_service.dart';
+import '../../shareables/services/guest_mvp_claim_link_service.dart';
 import '../../shareables/widgets/lineup_share_card.dart';
 import '../../shareables/widgets/match_result_share_card.dart';
 import '../../shareables/widgets/mvp_share_card.dart';
+import '../../shareables/widgets/player_moment_share_card.dart';
+import '../../shareables/widgets/pride_card_format_picker.dart';
+import '../../shareables/widgets/pride_share_composer_sheet.dart';
 import '../controllers/match_result_lineup_controller.dart';
 import '../widgets/bench_bar.dart';
 import '../widgets/professional_match_header.dart';
@@ -30,6 +43,7 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
 
   static const _shareBuilder = MatchResultShareController();
   static const _mvpShareBuilder = MvpShareController();
+  static const _playerMomentShareBuilder = PlayerMomentShareController();
   static const _captureService = ShareCardCaptureService();
 
   @override
@@ -70,6 +84,9 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
             final match = controller.match.value;
             final home = controller.homeSide;
             final away = controller.awaySide;
+            final goalScorers = match == null
+                ? const <GoalScorerShareData>[]
+                : _goalScorerCards(match);
 
             return RefreshIndicator(
               color: AppColors.primary,
@@ -92,14 +109,19 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
                         ? () => _shareResult(context)
                         : null,
                   ),
-                  if (_hasShareableScore || _hasShareableMvp) ...[
+                  if (_hasShareableScore ||
+                      _hasShareableMvp ||
+                      goalScorers.isNotEmpty) ...[
                     const SizedBox(height: AppDimensions.md),
                     _PrideSharePanel(
                       canShareScore: _hasShareableScore,
                       canShareMvp: _hasShareableMvp,
+                      canShareGoalScorer: goalScorers.isNotEmpty,
                       canOpenMvpProfile: _mvpProfileTarget != null,
                       onShareScore: () => _shareResult(context),
                       onShareMvp: () => _shareMvp(context),
+                      onShareGoalScorer: () =>
+                          _shareGoalScorer(context, goalScorers),
                       onOpenMvpProfile: _openMvpProfile,
                     ),
                   ],
@@ -168,10 +190,12 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
 
   bool get _hasShareableScore {
     final match = controller.match.value;
-    return match?.scoreTeamA != null && match?.scoreTeamB != null;
+    return match?.isOfficialTournamentResult ?? false;
   }
 
-  bool get _hasShareableMvp => controller.hasShareableMvp;
+  bool get _hasShareableMvp =>
+      (controller.match.value?.isOfficialTournamentResult ?? false) &&
+      controller.hasShareableMvp;
 
   MvpPublicProfileTarget? get _mvpProfileTarget => controller.mvpProfileTarget;
 
@@ -185,29 +209,61 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
 
   Future<void> _shareResult(BuildContext context) async {
     final match = controller.match.value;
-    if (match == null || match.scoreTeamA == null || match.scoreTeamB == null) {
-      Get.snackbar('تعذر المشاركة', 'لا توجد نتيجة لمشاركتها بعد.');
+    if (match == null || !match.isOfficialTournamentResult) {
+      Get.snackbar('تعذر المشاركة', 'تظهر بطاقة النتيجة بعد اعتمادها رسميًا.');
       return;
     }
 
     final shareData = _buildShareData(match);
+    final selection = await showPrideShareComposer(
+      context: context,
+      cardType: ShareCardType.matchResult,
+      previewBuilder: (format) => MatchResultShareCard(
+        data: shareData,
+        exportMode: true,
+        format: format,
+      ),
+    );
+    if (selection == null || !context.mounted) return;
     try {
-      await _captureService.captureAndShareWidget(
+      final outcome = await _captureService.exportAndShareWidget(
         context: context,
-        widget: MatchResultShareCard(data: shareData, exportMode: true),
-        fileName: 'el7reef_match_${match.id}',
-        text: 'نتيجة المباراة على الحريف',
-        onBeforeCapture: () => _precacheShareLogos(context, shareData),
+        shareRequest: PrideWidgetShareRequest(
+          widget: MatchResultShareCard(
+            data: shareData,
+            exportMode: true,
+            format: selection.format,
+          ),
+          exportRequest: PrideExportRequest(
+            cardType: ShareCardType.matchResult,
+            format: selection.format,
+            mediaType: selection.mediaType,
+            fileName: 'el7reef_match_${match.id}',
+            includeAudio: selection.includeAudio,
+          ),
+          text: 'نتيجة المباراة على الحريف',
+          payload: shareData.sharePayload,
+          onBeforeCapture: () => _precacheShareLogos(context, shareData),
+        ),
       );
-    } catch (error) {
-      Get.snackbar('تعذر المشاركة', _readableShareError(error));
+      if (context.mounted) showPrideShareFallbackNotice(context, outcome);
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'MatchResultLineupScreen._shareResult',
+        error,
+        stackTrace,
+      );
+      Get.snackbar('تعذر المشاركة', 'تعذر تجهيز كارت النتيجة.');
     }
   }
 
   Future<void> _shareMvp(BuildContext context) async {
     final match = controller.match.value;
-    if (match == null) {
-      Get.snackbar('تعذر المشاركة', 'لا توجد بيانات مباراة لمشاركتها.');
+    if (match == null || !match.isOfficialTournamentResult) {
+      Get.snackbar(
+        'تعذر المشاركة',
+        'تظهر بطاقة نجم المباراة بعد اعتماد النتيجة رسميًا.',
+      );
       return;
     }
 
@@ -218,14 +274,125 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
     }
 
     try {
-      await _captureService.captureAndShareWidget(
-        context: context,
-        widget: MvpShareCard(data: shareData, exportMode: true),
-        fileName: 'el7reef_mvp_${match.id}',
-        text: 'نجم المباراة على الحريف',
+      final photoUrl = await _mvpPhotoUrl();
+      if (!context.mounted) return;
+      final enrichedShareData = _buildMvpShareData(match, photoUrl: photoUrl);
+      if (enrichedShareData == null) return;
+      final payload = await _claimablePridePayload(
+        enrichedShareData.sharePayload,
       );
-    } catch (error) {
-      Get.snackbar('تعذر المشاركة', _readableShareError(error));
+      if (!context.mounted) return;
+      final claimableShareData = enrichedShareData.copyWith(
+        sharePayload: payload,
+      );
+      final selection = await showPrideShareComposer(
+        context: context,
+        cardType: ShareCardType.mvp,
+        previewBuilder: (format) => MvpShareCard(
+          data: claimableShareData,
+          exportMode: true,
+          format: format,
+        ),
+      );
+      if (selection == null || !context.mounted) return;
+      final outcome = await _captureService.exportAndShareWidget(
+        context: context,
+        shareRequest: PrideWidgetShareRequest(
+          widget: MvpShareCard(
+            data: claimableShareData,
+            exportMode: true,
+            format: selection.format,
+          ),
+          exportRequest: PrideExportRequest(
+            cardType: ShareCardType.mvp,
+            format: selection.format,
+            mediaType: selection.mediaType,
+            fileName: 'el7reef_mvp_${match.id}',
+            includeAudio: selection.includeAudio,
+          ),
+          text: 'نجم المباراة على الحريف',
+          payload: claimableShareData.sharePayload,
+        ),
+      );
+      if (context.mounted) showPrideShareFallbackNotice(context, outcome);
+    } catch (error, stackTrace) {
+      AppLogger.error('MatchResultLineupScreen._shareMvp', error, stackTrace);
+      Get.snackbar('تعذر المشاركة', 'تعذر تجهيز كارت نجم المباراة.');
+    }
+  }
+
+  Future<void> _shareGoalScorer(
+    BuildContext context,
+    List<GoalScorerShareData> goalScorers,
+  ) async {
+    if (goalScorers.isEmpty) {
+      Get.snackbar(
+        'كارت الهداف غير متاح',
+        'يظهر الكارت بعد اعتماد النتيجة وتسجيل الهدافين.',
+      );
+      return;
+    }
+
+    final selected = goalScorers.length == 1
+        ? goalScorers.single
+        : await showModalBottomSheet<GoalScorerShareData>(
+            context: context,
+            useSafeArea: true,
+            showDragHandle: true,
+            builder: (_) => _GoalScorerPickerSheet(scorers: goalScorers),
+          );
+    if (selected == null || !context.mounted) return;
+
+    final photoUrl = await _participantPhotoUrl(selected.actor);
+    if (!context.mounted) return;
+    var shareData = selected.copyWith(photoUrl: photoUrl);
+    final payload = await _claimablePridePayload(shareData.sharePayload);
+    if (!context.mounted) return;
+    shareData = shareData.copyWith(sharePayload: payload);
+
+    final selection = await showPrideShareComposer(
+      context: context,
+      cardType: shareData.sharePayload.cardType,
+      previewBuilder: (format) => PlayerMomentShareCard(
+        data: shareData,
+        format: format,
+        includeGrowthLink: FeatureFlags.prideGrowthLinksEnabled,
+      ),
+    );
+    if (selection == null || !context.mounted) return;
+
+    try {
+      final outcome = await _captureService.exportAndShareWidget(
+        context: context,
+        shareRequest: PrideWidgetShareRequest(
+          widget: PlayerMomentShareCard(
+            data: shareData,
+            exportMode: true,
+            format: selection.format,
+            includeGrowthLink: FeatureFlags.prideGrowthLinksEnabled,
+          ),
+          exportRequest: PrideExportRequest(
+            cardType: shareData.sharePayload.cardType,
+            format: selection.format,
+            mediaType: selection.mediaType,
+            fileName:
+                'el7reef_goal_scorer_${shareData.sharePayload.matchId}_${shareData.actor.id}',
+            includeAudio: selection.includeAudio,
+          ),
+          text: shareData.isHatTrick
+              ? 'هاتريك ${shareData.playerName} على الحريف'
+              : '${shareData.playerName} هز الشباك على الحريف',
+          payload: shareData.sharePayload,
+        ),
+      );
+      if (context.mounted) showPrideShareFallbackNotice(context, outcome);
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'MatchResultLineupScreen._shareGoalScorer',
+        error,
+        stackTrace,
+      );
+      Get.snackbar('تعذر المشاركة', 'تعذر تجهيز كارت هداف المباراة.');
     }
   }
 
@@ -249,12 +416,19 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
       accentColor: accentColor,
     );
 
+    final format = await showPrideCardFormatPicker(context);
+    if (format == null || !context.mounted) return;
     try {
       await _captureService.captureAndShareWidget(
         context: context,
-        widget: LineupShareCard(data: shareData, exportMode: true),
+        widget: LineupShareCard(
+          data: shareData,
+          exportMode: true,
+          format: format,
+        ),
         fileName: 'el7reef_lineup_${shareData.matchId}_${shareData.ownerId}',
         text: 'تشكيلة ${shareData.teamName} على الحريف',
+        payload: shareData.sharePayload,
         onBeforeCapture: () => _precacheLineupLogo(context, shareData),
       );
     } catch (error) {
@@ -273,7 +447,66 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
       teamBFormation: controller.formationForSnapshot(away.snapshot),
       tournamentName: controller.tournamentName.value,
       mvpName: _mvpNameForResultShare(match),
+      scorers: _goalScorersForResultShare(),
     );
+  }
+
+  List<GoalScorerShareData> _goalScorerCards(Match match) {
+    if (!FeatureFlags.prideShareCatalogV2Enabled ||
+        !match.isOfficialTournamentResult) {
+      return const <GoalScorerShareData>[];
+    }
+
+    final actorsByIdentity = <String, ParticipantRef>{};
+    for (final event in controller.goalEvents) {
+      if (!event.isActive || !event.isGoal) continue;
+      final actor = event.actor;
+      if (actor.kind == ParticipantRefKind.matchSidePlayer) continue;
+      actorsByIdentity['${actor.kind.name}:${actor.id}'] = actor;
+    }
+
+    final home = controller.homeSide;
+    final away = controller.awaySide;
+    final cards = actorsByIdentity.values
+        .map(
+          (actor) => _playerMomentShareBuilder.buildGoalScorerIfEligible(
+            match: match,
+            events: controller.goalEvents,
+            actor: actor,
+            tournamentName: controller.tournamentName.value,
+            teamAName: home.label,
+            teamBName: away.label,
+          ),
+        )
+        .whereType<GoalScorerShareData>()
+        .toList();
+    cards.sort((left, right) {
+      final goalComparison = right.goalsInMatch.compareTo(left.goalsInMatch);
+      if (goalComparison != 0) return goalComparison;
+      return left.playerName.compareTo(right.playerName);
+    });
+    return cards;
+  }
+
+  List<MatchResultScorerData> _goalScorersForResultShare() {
+    final grouped = <String, MatchResultScorerData>{};
+    for (final event in controller.goalEvents) {
+      final actor = event.actor;
+      final key = '${actor.kind.name}:${actor.id}';
+      final current = grouped[key];
+      grouped[key] = MatchResultScorerData(
+        displayName: actor.displayName,
+        sideKey: event.sideKey,
+        goals: (current?.goals ?? 0) + 1,
+      );
+    }
+    final scorers = grouped.values.toList();
+    scorers.sort((left, right) {
+      final goalCompare = right.goals.compareTo(left.goals);
+      if (goalCompare != 0) return goalCompare;
+      return left.displayName.compareTo(right.displayName);
+    });
+    return scorers;
   }
 
   String? _mvpNameForResultShare(Match match) {
@@ -284,7 +517,7 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
     return controller.displayNameForParticipantId(mvpPlayerId);
   }
 
-  MvpShareData? _buildMvpShareData(Match match) {
+  MvpShareData? _buildMvpShareData(Match match, {String? photoUrl}) {
     final home = controller.homeSide;
     final away = controller.awaySide;
     final event = controller.mvpEvent.value;
@@ -295,6 +528,7 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
         tournamentName: controller.tournamentName.value,
         teamALabel: home.label,
         teamBLabel: away.label,
+        photoUrl: photoUrl,
       );
     }
 
@@ -309,6 +543,71 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
       tournamentName: controller.tournamentName.value,
       teamALabel: home.label,
       teamBLabel: away.label,
+      actor: _mvpActorForPayload(mvpPlayerId),
+      photoUrl: photoUrl,
+    );
+  }
+
+  Future<String?> _mvpPhotoUrl() async {
+    try {
+      return await controller.mvpPhotoUrl();
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'MatchResultLineupScreen._mvpPhotoUrl',
+        error,
+        stackTrace,
+      );
+      return null;
+    }
+  }
+
+  Future<String?> _participantPhotoUrl(ParticipantRef actor) async {
+    try {
+      return await controller
+          .participantPhotoUrl(actor)
+          .timeout(sharePreparationTimeout);
+    } on TimeoutException {
+      return null;
+    } catch (error) {
+      AppLogger.warning('MatchResultLineupScreen._participantPhotoUrl', error);
+      return null;
+    }
+  }
+
+  Future<SharePayload?> _claimablePridePayload(SharePayload? payload) async {
+    if (payload == null || !FeatureFlags.prideGrowthLinksEnabled) {
+      return payload;
+    }
+    if (!Get.isRegistered<GuestMvpClaimLinkService>()) return payload;
+    final actorId = Get.isRegistered<AuthService>()
+        ? Get.find<AuthService>().currentUserId
+        : null;
+    try {
+      return await Get.find<GuestMvpClaimLinkService>()
+          .attachClaimUrl(payload: payload, actorId: actorId)
+          .timeout(sharePreparationTimeout);
+    } on TimeoutException {
+      return payload;
+    } catch (error) {
+      AppLogger.warning(
+        'MatchResultLineupScreen._claimablePridePayload',
+        error,
+      );
+      return payload;
+    }
+  }
+
+  ParticipantRef? _mvpActorForPayload(String mvpPlayerId) {
+    final target = controller.mvpProfileTarget;
+    if (target == null) return null;
+    final displayName = controller
+        .displayNameForParticipantId(mvpPlayerId)
+        ?.trim();
+    if (displayName == null || displayName.isEmpty) return null;
+    return ParticipantRef(
+      kind: target.kind,
+      id: target.id,
+      displayName: displayName,
     );
   }
 
@@ -373,17 +672,21 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
 class _PrideSharePanel extends StatelessWidget {
   final bool canShareScore;
   final bool canShareMvp;
+  final bool canShareGoalScorer;
   final bool canOpenMvpProfile;
   final VoidCallback onShareScore;
   final VoidCallback onShareMvp;
+  final VoidCallback onShareGoalScorer;
   final VoidCallback onOpenMvpProfile;
 
   const _PrideSharePanel({
     required this.canShareScore,
     required this.canShareMvp,
+    required this.canShareGoalScorer,
     required this.canOpenMvpProfile,
     required this.onShareScore,
     required this.onShareMvp,
+    required this.onShareGoalScorer,
     required this.onOpenMvpProfile,
   });
 
@@ -424,6 +727,14 @@ class _PrideSharePanel extends StatelessWidget {
               label: const Text('شارك كارت نجم المباراة'),
             ),
           ],
+          if (canShareGoalScorer) ...[
+            const SizedBox(height: AppDimensions.sm),
+            OutlinedButton.icon(
+              onPressed: onShareGoalScorer,
+              icon: const Icon(Icons.sports_soccer_rounded),
+              label: const Text('شارك هداف المباراة'),
+            ),
+          ],
           if (canOpenMvpProfile) ...[
             const SizedBox(height: AppDimensions.xs),
             Align(
@@ -438,6 +749,88 @@ class _PrideSharePanel extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _GoalScorerPickerSheet extends StatelessWidget {
+  final List<GoalScorerShareData> scorers;
+
+  const _GoalScorerPickerSheet({required this.scorers});
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppDimensions.lg,
+          0,
+          AppDimensions.lg,
+          AppDimensions.lg,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('اختار الهداف', style: AppTextStyles.headlineSmall),
+            const SizedBox(height: AppDimensions.xs),
+            Text(
+              'كل لاعب هنا له أهداف مسجلة في النتيجة المعتمدة.',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textSecondaryTinted,
+              ),
+            ),
+            const SizedBox(height: AppDimensions.md),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * 0.5,
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: scorers.length,
+                separatorBuilder: (_, _) =>
+                    Divider(height: 1, color: AppColors.surfaceBorder),
+                itemBuilder: (context, index) {
+                  final scorer = scorers[index];
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    minTileHeight: 56,
+                    leading: CircleAvatar(
+                      backgroundColor: AppColors.primary.withValues(
+                        alpha: 0.16,
+                      ),
+                      foregroundColor: AppColors.primaryLight,
+                      child: Text(
+                        '${scorer.goalsInMatch}',
+                        style: AppTextStyles.titleMedium.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      scorer.playerName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      '${_goalCountLabel(scorer.goalsInMatch)}${scorer.isHatTrick ? '، هاتريك' : ''}',
+                    ),
+                    trailing: const Icon(Icons.chevron_left_rounded),
+                    onTap: () => Navigator.of(context).pop(scorer),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _goalCountLabel(int count) {
+    if (count == 1) return 'هدف واحد';
+    if (count == 2) return 'هدفان';
+    return '$count أهداف';
   }
 }
 

@@ -1,0 +1,5 @@
+{
+  "score": 5,
+  "summary": "Featured tournament promotion is backend-only: authenticated organizers can create only isFeatured=false with featuredPriority=1000, and both fields are immutable in client updates. Public discovery requires explicit public and discoverable fields, signed-out reads are denied, and the World Cup public roster is served from a separate read-only collection that omits phone numbers, notes, and claim codes. The focused Firestore emulator suite passed all 105 tournament permission tests, including featured create/update bypass, signed-in discovery, signed-out denial, sanitized roster access, ownership, and extra-field validation.",
+  "findings": []
+}

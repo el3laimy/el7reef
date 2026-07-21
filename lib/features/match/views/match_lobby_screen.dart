@@ -7,7 +7,7 @@ import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/enums/match_status.dart';
 import '../../../core/lineup/formation_library.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../core/widgets/qr_code_widget.dart';
 import '../../../domain/entities/match_side_player.dart';
 import '../controllers/match_lobby_controller.dart';
@@ -105,9 +105,13 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                                         color: AppColors.textMuted,
                                       ),
                                       const SizedBox(width: 4),
-                                      Text(
-                                        match.location!,
-                                        style: AppTextStyles.bodySmall,
+                                      Expanded(
+                                        child: Text(
+                                          match.location!,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: AppTextStyles.bodySmall,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -144,9 +148,9 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppDimensions.pagePadding,
                         ),
-                        child: GlassmorphicContainer(
+                        child: El7reefGlassSurface(
+                          variant: El7reefGlassVariant.base,
                           padding: const EdgeInsets.all(AppDimensions.lg),
-                          borderRadius: AppDimensions.radiusLg,
                           child: Column(
                             children: [
                               Text(
@@ -660,8 +664,6 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
   }
 }
 
-
-
 FriendlyMatchSideView? _sideViewFor(
   Iterable<FriendlyMatchSideView> sides,
   String sideKey,
@@ -671,8 +673,6 @@ FriendlyMatchSideView? _sideViewFor(
   }
   return null;
 }
-
-
 
 /// ── Settings Sheet ──
 class _MatchSettingsSheet extends StatelessWidget {

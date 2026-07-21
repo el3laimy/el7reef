@@ -15,6 +15,7 @@ class MatchLineupEntry {
   final MatchAttendanceStatus attendanceStatus;
   final String displayName;
   final String? position;
+  final int? shirtNumber;
   final bool ratingEligible;
 
   // ── Slot assignment (nullable for backward compatibility) ──
@@ -37,6 +38,7 @@ class MatchLineupEntry {
     required this.attendanceStatus,
     required this.displayName,
     this.position,
+    this.shirtNumber,
     this.ratingEligible = true,
     this.slotId,
     this.slotRole,
@@ -50,6 +52,10 @@ class MatchLineupEntry {
                  (matchSidePlayerId == null ? 0 : 1) ==
              1,
          'Exactly one of playerId, guestPlayerId, or matchSidePlayerId must be set.',
+       ),
+       assert(
+         shirtNumber == null || (shirtNumber >= 0 && shirtNumber <= 99),
+         'Shirt number must be between 0 and 99.',
        );
 
   bool get isGuest => guestPlayerId != null;
@@ -72,6 +78,7 @@ class MatchLineupEntry {
     MatchAttendanceStatus? attendanceStatus,
     String? displayName,
     Object? position = _unset,
+    Object? shirtNumber = _unset,
     bool? ratingEligible,
     Object? slotId = _unset,
     Object? slotRole = _unset,
@@ -104,6 +111,9 @@ class MatchLineupEntry {
       position: identical(position, _unset)
           ? this.position
           : position as String?,
+      shirtNumber: identical(shirtNumber, _unset)
+          ? this.shirtNumber
+          : shirtNumber as int?,
       ratingEligible: ratingEligible ?? this.ratingEligible,
       slotId: identical(slotId, _unset) ? this.slotId : slotId as String?,
       slotRole: identical(slotRole, _unset)

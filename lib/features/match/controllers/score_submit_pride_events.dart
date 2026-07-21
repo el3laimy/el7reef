@@ -29,20 +29,58 @@ extension ScoreSubmitPrideEvents on ScoreSubmitController {
         );
         return null;
       }
+      final scoreA = persistedPayload?.scoreTeamA ?? submittedMatch.scoreTeamA;
+      final scoreB = persistedPayload?.scoreTeamB ?? submittedMatch.scoreTeamB;
+      if (scoreA == null || scoreB == null) {
+        errorMessage.value = 'لا يمكن إعادة الإرسال بدون نتيجة محفوظة.';
+        return null;
+      }
 
-      await _recordPrideEventsOrThrow(
-        submittedMatch: submittedMatch,
-        resolvedMvp: resolvedMvp,
-        actorId: actorId,
+      final detailedStats = ScoreSubmitPreparation.detailedStats(
+        matchId: submittedMatch.id,
+        teamAId: submittedMatch.teamAId ?? 'A',
+        teamBId: submittedMatch.teamBId ?? 'B',
+        teamAPlayers: teamAPlayers,
+        teamBPlayers: teamBPlayers,
+        playerStats: playerStats,
+        teamACleanSheet: scoreB == 0,
+        teamBCleanSheet: scoreA == 0,
       );
-      await _clearPrideEventRetryState(submittedMatch);
+      final result = await _settlementService.submitScore(
+        matchId: submittedMatch.id,
+        actorId: actorId,
+        scoreA: scoreA,
+        scoreB: scoreB,
+        mvpPlayerId: resolvedMvp?.actor.id,
+        detailedStats: detailedStats,
+        goalDrafts: _settlementGoalDrafts(),
+        mvpDraft: resolvedMvp == null
+            ? null
+            : MatchSettlementMvpDraft(
+                sideKey: resolvedMvp.sideKey,
+                actor: resolvedMvp.actor,
+              ),
+        penaltyShootout:
+            submittedMatch.stageType == TournamentStageType.knockoutStage &&
+                scoreA == scoreB
+            ? submittedMatch.penaltyShootoutResult
+            : null,
+      );
+      final refreshed = await _matchRepo.getMatch(submittedMatch.id);
+      final completedMatch = (refreshed ?? submittedMatch).copyWith(
+        prideEventsPending: false,
+        status: result.status,
+      );
+      match.value = completedMatch;
+      pendingPrideEventRetry.value = false;
+      await _clearDraftAfterSubmit(completedMatch);
       errorMessage.value = '';
       Get.snackbar(
         'تم الحفظ',
         'تم تسجيل أحداث المباراة ويمكن مشاركة النتيجة الآن.',
         snackPosition: SnackPosition.BOTTOM,
       );
-      return submittedMatch;
+      return completedMatch;
     } catch (error, stackTrace) {
       AppLogger.error(
         'ScoreSubmitController._retryPrideEventWrites',
@@ -90,22 +128,6 @@ extension ScoreSubmitPrideEvents on ScoreSubmitController {
     return (actor: mvp.actor, sideKey: mvp.sideKey);
   }
 
-  Future<void> _recordPrideEventsOrThrow({
-    required Match submittedMatch,
-    required ({ParticipantRef actor, String sideKey})? resolvedMvp,
-    required String actorId,
-  }) async {
-    await _recordMvpMatchEventIfPossible(
-      submittedMatch: submittedMatch,
-      resolvedMvp: resolvedMvp,
-      actorId: actorId,
-    );
-    await _recordGoalMatchEventsIfPossible(
-      submittedMatch: submittedMatch,
-      actorId: actorId,
-    );
-  }
-
   bool _hasSubmittedScore(Match currentMatch) {
     return currentMatch.scoreTeamA != null && currentMatch.scoreTeamB != null;
   }
@@ -117,66 +139,6 @@ extension ScoreSubmitPrideEvents on ScoreSubmitController {
       'لم يكتمل التسجيل',
       errorMessage.value,
       snackPosition: SnackPosition.BOTTOM,
-    );
-  }
-
-  Future<void> _recordGoalMatchEventsIfPossible({
-    required Match submittedMatch,
-    required String actorId,
-  }) async {
-    final activeEvents = await _matchEventService.getMatchEvents(
-      submittedMatch.id,
-    );
-    for (final event in activeEvents) {
-      if (event.isGoal) {
-        await _matchEventService.voidEvent(event.id);
-      }
-    }
-
-    final drafts = allGoalDrafts.where((draft) => draft.goals > 0).toList();
-    if (drafts.isEmpty) return;
-
-    for (final draft in drafts) {
-      for (var index = 1; index <= draft.goals; index += 1) {
-        await _matchEventService.recordGoal(
-          eventId: _goalEventId(
-            matchId: submittedMatch.id,
-            draft: draft,
-            index: index,
-          ),
-          matchId: submittedMatch.id,
-          tournamentId: submittedMatch.tournamentId,
-          sideKey: draft.sideKey,
-          actor: draft.actor,
-          createdBy: actorId,
-        );
-      }
-    }
-  }
-
-  Future<void> _recordMvpMatchEventIfPossible({
-    required Match submittedMatch,
-    required ({ParticipantRef actor, String sideKey})? resolvedMvp,
-    required String actorId,
-  }) async {
-    if (resolvedMvp == null) return;
-
-    final eventId = _mvpEventId(submittedMatch.id);
-    final activeEvents = await _matchEventService.getMatchEvents(
-      submittedMatch.id,
-    );
-    for (final event in activeEvents) {
-      if (event.isMvp && event.id != eventId) {
-        await _matchEventService.voidEvent(event.id);
-      }
-    }
-    await _matchEventService.recordMvp(
-      eventId: eventId,
-      matchId: submittedMatch.id,
-      tournamentId: submittedMatch.tournamentId,
-      sideKey: resolvedMvp.sideKey,
-      actor: resolvedMvp.actor,
-      createdBy: actorId,
     );
   }
 
@@ -202,28 +164,6 @@ extension ScoreSubmitPrideEvents on ScoreSubmitController {
     ];
     if (matches.length != 1) return null;
     return matches.single;
-  }
-
-  String _mvpEventId(String matchId) => 'mvp-$matchId';
-
-  String _goalEventId({
-    required String matchId,
-    required ScoreSubmitGoalDraft draft,
-    required int index,
-  }) {
-    return [
-      'goal',
-      _safeEventIdSegment(matchId),
-      draft.sideKey,
-      draft.actor.kind.name,
-      _safeEventIdSegment(draft.actor.id),
-      index.toString(),
-    ].join('-');
-  }
-
-  String _safeEventIdSegment(String value) {
-    final encoded = Uri.encodeComponent(value.trim());
-    return encoded.isEmpty ? 'unknown' : encoded;
   }
 
   ParticipantRef? _rosterParticipantFor(

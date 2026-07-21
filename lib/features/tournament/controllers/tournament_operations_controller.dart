@@ -3,12 +3,14 @@ import 'package:get/get.dart';
 import '../../../core/enums/match_status.dart';
 import '../../../core/enums/tournament_enums.dart';
 import '../../../core/enums/tournament_ops_enums.dart';
+import '../../../app/routes/app_routes.dart';
 import '../../../core/permissions/tournament_viewer_context.dart';
 import '../../../core/services/match_settlement_service.dart';
 import '../../../core/services/tournament_fixture_service.dart';
 import '../../../core/services/tournament_lifecycle_service.dart';
 import '../../../core/services/tournament_ops_migration_service.dart';
 import '../../../core/services/tournament_participant_service.dart';
+import '../../../core/utils/app_logger.dart';
 import '../../../domain/entities/group_standing_snapshot.dart';
 import '../../../domain/entities/knockout_bracket.dart';
 import '../../../domain/entities/knockout_tie.dart';
@@ -16,6 +18,9 @@ import '../../../domain/entities/match.dart';
 import '../../../domain/entities/tournament.dart';
 import '../../../domain/entities/tournament_group.dart';
 import '../../../domain/entities/tournament_participant.dart';
+import '../../shareables/controllers/champion_share_controller.dart';
+import '../../shareables/models/champion_share_data.dart';
+import '../../shareables/widgets/champion_celebration_sheet.dart';
 import '../../../domain/repositories/guest_team_repository.dart';
 import '../../../domain/repositories/group_standing_snapshot_repository.dart';
 import '../../../domain/repositories/knockout_bracket_repository.dart';
@@ -25,6 +30,9 @@ import '../../../domain/repositories/team_repository.dart';
 import '../../../domain/repositories/tournament_group_repository.dart';
 import '../../../domain/repositories/tournament_repository.dart';
 import '../../../core/auth/auth_service.dart';
+import '../models/tournament_operations_read_model.dart';
+
+export '../models/tournament_operations_read_model.dart';
 
 part 'tournament_participant_ops.dart';
 part 'tournament_stage_ops.dart';
@@ -140,6 +148,8 @@ class TournamentOperationsController extends GetxController {
   final Map<String, _ParticipantCandidateCacheEntry> _participantSearchCache =
       <String, _ParticipantCandidateCacheEntry>{};
 
+  static const _championShareController = ChampionShareController();
+
   String? get tournamentId =>
       Get.parameters['tournamentId'] ?? Get.parameters['id'];
 
@@ -206,12 +216,10 @@ class TournamentOperationsController extends GetxController {
       .toList(growable: false);
 
   bool get hasPublishedGroupFixtures => groupStageFixtures.any(
-    (fixture) => fixture.fixtureStatus == FixtureStatus.published,
+    (fixture) => fixture.fixtureStatus != FixtureStatus.draft,
   );
 
-  bool get hasPublishedFixtures => fixtures.any(
-    (fixture) => fixture.fixtureStatus == FixtureStatus.published,
-  );
+  bool get hasPublishedFixtures => releasedFixturesCount > 0;
 
   bool get hasSubmittedGroupResults => groupStageFixtures.any(
     (fixture) =>
@@ -241,11 +249,7 @@ class TournamentOperationsController extends GetxController {
   }
 
   bool get canPublishFixtures =>
-      canManageTournament &&
-      fixtures.isNotEmpty &&
-      fixtures.any(
-        (fixture) => fixture.fixtureStatus != FixtureStatus.published,
-      );
+      canManageTournament && fixtures.isNotEmpty && draftFixturesCount > 0;
 
   bool get canFinalizeParticipantsAction {
     final currentTournament = tournament.value;
@@ -351,19 +355,27 @@ class TournamentOperationsController extends GetxController {
       )
       .length;
 
-  int get draftFixturesCount => fixtures
-      .where((fixture) => fixture.fixtureStatus == FixtureStatus.draft)
-      .length;
+  TournamentOperationsReadModel get operationsReadModel =>
+      TournamentOperationsReadModel(fixtures: fixtures.toList(growable: false));
 
-  int get publishedFixturesCount => fixtures
-      .where((fixture) => fixture.fixtureStatus == FixtureStatus.published)
-      .length;
+  int get draftFixturesCount => operationsReadModel.draftFixturesCount;
+  int get publishedFixturesCount => operationsReadModel.publishedFixturesCount;
+  int get releasedFixturesCount => operationsReadModel.releasedFixturesCount;
+  int get scheduledFixturesCount => operationsReadModel.scheduledFixturesCount;
+  int get officialResultsCount => operationsReadModel.officialResultsCount;
+  Match? get urgentOperationalFixture => operationsReadModel.urgentFixture;
 
-  int get scheduledFixturesCount =>
-      fixtures.where((fixture) => fixture.scheduledAt != null).length;
-
-  int get officialResultsCount =>
-      fixtures.where((fixture) => fixture.isOfficialTournamentResult).length;
+  TournamentOpsNextAction? get nextOperationalAction =>
+      operationsReadModel.nextAction(
+        activeParticipantsCount: activeParticipantsCount,
+        canAddParticipants: canManualAddParticipants,
+        canFinalizeParticipants: canFinalizeParticipantsAction,
+        canStartGroupStage: canStartGroupStageAction,
+        canPublishFixtures: canPublishFixtures,
+        canStartKnockout: canStartKnockoutAction,
+        canCompleteTournament: canCompleteTournamentAction,
+        fixtureTeamLabel: fixtureTeamLabel,
+      );
 
   String statusLabelFor(TournamentStatus status) => switch (status) {
     TournamentStatus.upcoming => 'لم تبدأ بعد',
@@ -374,6 +386,60 @@ class TournamentOperationsController extends GetxController {
     TournamentStatus.completed => 'مكتملة',
     TournamentStatus.cancelled => 'ملغاة',
   };
+
+  Future<void> showChampionCelebration(Tournament updatedTournament) async {
+    final data = await _buildChampionShareData(updatedTournament);
+    if (data == null || Get.testMode) return;
+    Get.bottomSheet(
+      ChampionCelebrationSheet(
+        data: data,
+        onViewTournament: () {
+          Get.back();
+          Get.offAllNamed(AppRoutes.tournamentDetailById(updatedTournament.id));
+        },
+      ),
+      isScrollControlled: true,
+    );
+  }
+
+  Future<ChampionShareData?> _buildChampionShareData(
+    Tournament updatedTournament,
+  ) async {
+    final winnerParticipantId = updatedTournament.winnerParticipantId?.trim();
+    if (winnerParticipantId == null || winnerParticipantId.isEmpty) {
+      return null;
+    }
+    var champion = _participantById[winnerParticipantId];
+    champion ??= await _participantService.getParticipantById(
+      winnerParticipantId,
+    );
+    if (champion == null) return null;
+
+    String? logoUrl;
+    try {
+      switch (champion.sourceType) {
+        case TournamentParticipantSourceType.registeredTeam:
+          logoUrl = await _teamRepository
+              .getTeam(champion.sourceEntityId)
+              .then((team) => team?.logoUrl);
+        case TournamentParticipantSourceType.guestTeam:
+          logoUrl = await _guestTeamRepository
+              .getGuestTeam(champion.sourceEntityId)
+              .then((team) => team?.logoUrl);
+      }
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'TournamentOperationsController._buildChampionShareData',
+        error,
+        stackTrace,
+      );
+    }
+    return _championShareController.build(
+      tournament: updatedTournament,
+      champion: champion,
+      logoUrl: logoUrl,
+    );
+  }
 
   List<TournamentOpsChecklistItem> get readinessChecklist {
     final currentTournament = tournament.value;
@@ -387,8 +453,8 @@ class TournamentOperationsController extends GetxController {
         detail: currentTournament.participantListFinalizedAt != null
             ? 'تم قفل القائمة وجاهزة للتشغيل.'
             : activeParticipantsCount >= 2
-                ? 'يمكن قفل القائمة الآن.'
-                : 'تحتاج على الأقل مشاركين نشطين.',
+            ? 'يمكن قفل القائمة الآن.'
+            : 'تحتاج على الأقل مشاركين نشطين.',
       ),
       TournamentOpsChecklistItem(
         label: 'مرحلة المجموعات',
@@ -396,10 +462,10 @@ class TournamentOperationsController extends GetxController {
         detail: hasGroupStage
             ? 'تم إنشاء المجموعات والمباريات الخاصة بها.'
             : canStartGroupStageAction
-                ? 'جاهزة للبدء من لوحة التشغيل.'
-                : currentTournament.format == TournamentFormat.knockoutOnly
-                    ? 'غير مطلوبة في هذا النوع من البطولات.'
-                    : 'تنتظر قفل قائمة المشاركين أولًا.',
+            ? 'جاهزة للبدء من لوحة التشغيل.'
+            : currentTournament.format == TournamentFormat.knockoutOnly
+            ? 'غير مطلوبة في هذا النوع من البطولات.'
+            : 'تنتظر قفل قائمة المشاركين أولًا.',
       ),
       TournamentOpsChecklistItem(
         label: 'نشر المباريات',
@@ -407,23 +473,23 @@ class TournamentOperationsController extends GetxController {
         detail: hasPublishedFixtures
             ? 'تم نشر جزء من المباريات بالفعل.'
             : canPublishFixtures
-                ? 'توجد مباريات مسودة جاهزة للنشر.'
-                : fixtures.isEmpty
-                    ? 'لم تُولد مباريات بعد.'
-                    : 'كل المباريات الحالية منشورة بالفعل.',
+            ? 'توجد مباريات مسودة جاهزة للنشر.'
+            : fixtures.isEmpty
+            ? 'لم تُولد مباريات بعد.'
+            : 'كل المباريات الحالية منشورة بالفعل.',
       ),
       TournamentOpsChecklistItem(
         label: 'مرحلة الإقصاء',
         isReady: hasKnockoutStage,
         detail: hasKnockoutStage
             ? knockoutBracket.value?.championParticipantId == null
-                ? 'تم إنشاء شجرة الإقصاء.'
-                : 'تم تحديد بطل الإقصاء.'
+                  ? 'تم إنشاء شجرة الإقصاء.'
+                  : 'تم تحديد بطل الإقصاء.'
             : canStartKnockoutAction
-                ? 'جاهزة للبدء الآن.'
-                : currentTournament.format == TournamentFormat.groupsOnly
-                    ? 'غير مطلوبة في هذا النوع من البطولات.'
-                    : 'تنتظر اكتمال المؤهلين ونتائج المراحل السابقة.',
+            ? 'جاهزة للبدء الآن.'
+            : currentTournament.format == TournamentFormat.groupsOnly
+            ? 'غير مطلوبة في هذا النوع من البطولات.'
+            : 'تنتظر اكتمال المؤهلين ونتائج المراحل السابقة.',
       ),
     ];
   }
@@ -435,6 +501,18 @@ class TournamentOperationsController extends GetxController {
     }
 
     final actions = <TournamentOpsPendingAction>[];
+    final urgentFixture = urgentOperationalFixture;
+    if (urgentFixture != null) {
+      actions.add(
+        TournamentOpsPendingAction(
+          title: urgentFixture.status == MatchStatus.live
+              ? 'سجّل نتيجة المباراة الجارية'
+              : 'راجع النتيجة المعلقة',
+          detail:
+              '${fixtureTeamLabel(urgentFixture, isHome: true)} ضد ${fixtureTeamLabel(urgentFixture, isHome: false)} تحتاج إجراءك الآن.',
+        ),
+      );
+    }
     if (currentTournament.participantListFinalizedAt == null) {
       actions.add(
         TournamentOpsPendingAction(
@@ -457,9 +535,7 @@ class TournamentOperationsController extends GetxController {
       actions.add(
         TournamentOpsPendingAction(
           title: 'نشر المباريات',
-          detail: draftFixturesCount == 0
-              ? 'كل المباريات الحالية منشورة.'
-              : 'يوجد $draftFixturesCount مباراة مسودة تنتظر النشر.',
+          detail: 'يوجد $draftFixturesCount مباراة مسودة تنتظر النشر.',
         ),
       );
     }
@@ -492,10 +568,7 @@ class TournamentOperationsController extends GetxController {
     return _groupNameById[groupId] ?? groupId;
   }
 
-  String participantLabelFor(
-    String? participantId, {
-    String fallback = 'TBD',
-  }) {
+  String participantLabelFor(String? participantId, {String fallback = 'TBD'}) {
     if (participantId == null || participantId.isEmpty) {
       return fallback;
     }
@@ -540,8 +613,9 @@ class TournamentOperationsController extends GetxController {
       final groupStageId = currentTournament.currentGroupStageId;
       final bracketId = currentTournament.currentKnockoutBracketId;
 
-      final participantsFuture =
-          _participantService.getTournamentParticipants(id);
+      final participantsFuture = _participantService.getTournamentParticipants(
+        id,
+      );
       final groupsFuture = groupStageId != null && groupStageId.isNotEmpty
           ? _groupRepository.getTournamentGroups(id, groupStageId: groupStageId)
           : Future.value(const <TournamentGroup>[]);
@@ -581,7 +655,12 @@ class TournamentOperationsController extends GetxController {
         knockoutBracket.value = null;
         knockoutTies.clear();
       }
-    } catch (error) {
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'TournamentOperationsController.refreshAll',
+        error,
+        stackTrace,
+      );
       _clearDerivedState();
       errorMessage.value = _normalizeError(error);
     } finally {
@@ -604,8 +683,7 @@ class TournamentOperationsController extends GetxController {
       return false;
     }
     final currentTournament = tournament.value;
-    if (currentTournament == null ||
-        currentTournament.organizerId != actorId) {
+    if (currentTournament == null || currentTournament.organizerId != actorId) {
       errorMessage.value = accessDeniedMessage;
       _showSnackbar('غير مسموح', errorMessage.value);
       return false;
@@ -672,8 +750,8 @@ class TournamentOperationsController extends GetxController {
     if (id == null || id.isEmpty) {
       return;
     }
-    final participantsResult =
-        await _participantService.getTournamentParticipants(id);
+    final participantsResult = await _participantService
+        .getTournamentParticipants(id);
     _applyParticipants(participantsResult);
     if (refreshTournament) {
       await _refreshTournamentOnly();
@@ -701,9 +779,7 @@ class TournamentOperationsController extends GetxController {
     _upsertParticipants(<TournamentParticipant>[participant]);
   }
 
-  void _upsertParticipants(
-    List<TournamentParticipant> updatedParticipants,
-  ) {
+  void _upsertParticipants(List<TournamentParticipant> updatedParticipants) {
     final nextParticipants = participants.toList(growable: true);
     for (final participant in updatedParticipants) {
       final index = nextParticipants.indexWhere(
@@ -752,13 +828,9 @@ class TournamentOperationsController extends GetxController {
     fixtures.assignAll(nextFixtures);
   }
 
-  void _replaceGroupStageFixtures(
-    List<Match> nextGroupStageFixtures,
-  ) {
+  void _replaceGroupStageFixtures(List<Match> nextGroupStageFixtures) {
     final preservedFixtures = fixtures
-        .where(
-          (fixture) => fixture.stageType != TournamentStageType.groupStage,
-        )
+        .where((fixture) => fixture.stageType != TournamentStageType.groupStage)
         .toList(growable: true);
     preservedFixtures.addAll(nextGroupStageFixtures);
     _sortFixtures(preservedFixtures);
@@ -778,14 +850,12 @@ class TournamentOperationsController extends GetxController {
     required List<TournamentGroup> groupsResult,
   }) {
     final participantById = {
-      for (final participant in participantsResult)
-        participant.id: participant,
+      for (final participant in participantsResult) participant.id: participant,
     };
     final groupNameById = {
       for (final group in groupsResult) group.id: group.name,
     };
-    final participantsByGroupId =
-        <String, List<TournamentParticipant>>{};
+    final participantsByGroupId = <String, List<TournamentParticipant>>{};
     for (final group in groupsResult) {
       participantsByGroupId[group.id] = group.participantIds
           .map((participantId) => participantById[participantId])

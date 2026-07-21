@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../../app/routes/app_routes.dart';
 import '../../../core/enums/claim_merge_conflict_type.dart';
+import '../../../core/navigation/pending_deep_link_service.dart';
 import '../../../core/services/guest_claim_service.dart';
 import '../controllers/guest_team_claim_controller.dart';
 import '_claim_ui_shared.dart';
@@ -39,9 +40,11 @@ class GuestTeamClaimScreen extends GetView<GuestTeamClaimController> {
 
           final claimResult = controller.claimResult.value;
           final selectedTeamId = controller.selectedTeamId.value;
-          final canCompletePendingApproval = controller.canCompletePendingApproval;
+          final canCompletePendingApproval =
+              controller.canCompletePendingApproval;
           final pendingRequestedTeam = controller.pendingRequestedTeam.value;
-          final hasTerminalResult = claimResult != null &&
+          final hasTerminalResult =
+              claimResult != null &&
               (claimResult.outcome == GuestTeamClaimOutcome.claimed ||
                   claimResult.outcome == GuestTeamClaimOutcome.alreadyClaimed);
 
@@ -120,7 +123,7 @@ class GuestTeamClaimScreen extends GetView<GuestTeamClaimController> {
                   ),
                 ] else if (!controller.isAuthenticated) ...[
                   FilledButton(
-                    onPressed: () => Get.toNamed(AppRoutes.login),
+                    onPressed: _storePendingRouteAndOpenLogin,
                     child: const Text('تسجيل الدخول'),
                   ),
                 ] else if (canCompletePendingApproval) ...[
@@ -175,8 +178,8 @@ class GuestTeamClaimScreen extends GetView<GuestTeamClaimController> {
                       controller.isSubmitting.value
                           ? 'جارٍ معالجة الطلب...'
                           : controller.requiresApprovalHint
-                              ? 'إرسال طلب الاستلام'
-                              : 'استلام الفريق',
+                          ? 'إرسال طلب الاستلام'
+                          : 'استلام الفريق',
                     ),
                   ),
                 ],
@@ -191,6 +194,24 @@ class GuestTeamClaimScreen extends GetView<GuestTeamClaimController> {
         }),
       ),
     );
+  }
+
+  void _storePendingRouteAndOpenLogin() {
+    final id = controller.guestTeamId;
+    if (id != null && id.isNotEmpty) {
+      final query = Map<String, String?>.from(Get.parameters)
+        ..remove('guestTeamId');
+      _pendingDeepLinkService().store(
+        AppRoutes.guestTeamClaimById(id, queryParameters: query),
+      );
+    }
+    Get.toNamed(AppRoutes.login);
+  }
+
+  PendingDeepLinkService _pendingDeepLinkService() {
+    return Get.isRegistered<PendingDeepLinkService>()
+        ? Get.find<PendingDeepLinkService>()
+        : Get.put(PendingDeepLinkService(), permanent: true);
   }
 
   String _resultTitle(GuestTeamClaimResult result) {
@@ -215,7 +236,8 @@ class GuestTeamClaimScreen extends GetView<GuestTeamClaimController> {
       case GuestTeamClaimOutcome.approvalRequired:
         return 'تم حفظ طلب الـ claim. سيحتاج الرابط الآن إلى موافقة منشئ الفريق الضيف لإكمال الربط.';
       case GuestTeamClaimOutcome.conflict:
-        return result.conflict?.message ?? 'حدث تعارض غير متوقع أثناء الاستلام.';
+        return result.conflict?.message ??
+            'حدث تعارض غير متوقع أثناء الاستلام.';
     }
   }
 

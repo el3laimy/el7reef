@@ -4,7 +4,6 @@ import '../../core/constants/firebase_paths.dart';
 import '../../core/enums/claim_code_status.dart';
 import '../../core/enums/claim_merge_conflict_type.dart';
 import '../../core/enums/claim_target_type.dart';
-import '../../core/enums/guest_claim_status.dart';
 import '../../data/models/claim_code_model.dart';
 import '../../data/models/guest_player_model.dart';
 import '../../data/models/guest_team_model.dart';
@@ -18,13 +17,11 @@ import '../../domain/entities/player.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/entities/team_membership.dart';
 import 'analytics_service.dart';
+import 'guest_claim_completion_reporter.dart';
+import 'guest_claim_policy.dart';
 import 'team_roster_policy.dart';
 
-enum GuestPlayerClaimOutcome {
-  claimed,
-  alreadyClaimed,
-  conflict,
-}
+enum GuestPlayerClaimOutcome { claimed, alreadyClaimed, conflict }
 
 class GuestPlayerClaimResult {
   final GuestPlayerClaimOutcome outcome;
@@ -88,15 +85,17 @@ class GuestTeamClaimResult {
 class GuestClaimService {
   final FirebaseFirestore _firestore;
   final TeamRosterPolicy _teamRosterPolicy;
-  final AnalyticsService _analyticsService;
+  final GuestClaimCompletionReporter _completionReporter;
 
   GuestClaimService({
     FirebaseFirestore? firestore,
     TeamRosterPolicy? teamRosterPolicy,
     AnalyticsService? analyticsService,
-  })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _teamRosterPolicy = teamRosterPolicy ?? const TeamRosterPolicy(),
-        _analyticsService = analyticsService ?? AnalyticsService();
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _teamRosterPolicy = teamRosterPolicy ?? const TeamRosterPolicy(),
+       _completionReporter = GuestClaimCompletionReporter(
+         analyticsService ?? AnalyticsService(),
+       );
 
   CollectionReference<Map<String, dynamic>> get _claimCodesRef =>
       _firestore.collection(FirebasePaths.claimCodes);
@@ -131,15 +130,16 @@ class GuestClaimService {
       throw Exception('رابط الاستلام المطلوب غير موجود.');
     }
 
-    final initialClaim =
-        ClaimCodeModel.fromJson(initialClaimSnapshot.data()!, initialClaimSnapshot.id)
-            .toEntity();
-    if (initialClaim.targetType != ClaimTargetType.guestPlayer) {
-      throw Exception('رابط الاستلام هذا لا يخص لاعبًا ضيفًا.');
-    }
+    final initialClaim = ClaimCodeModel.fromJson(
+      initialClaimSnapshot.data()!,
+      initialClaimSnapshot.id,
+    ).toEntity();
+    GuestClaimTokenPolicy.assertTargetType(
+      initialClaim,
+      ClaimTargetType.guestPlayer,
+    );
 
-    if (initialClaim.status == ClaimCodeStatus.active &&
-        initialClaim.isExpiredAt(effectiveNow)) {
+    if (GuestClaimTokenPolicy.shouldMarkExpired(initialClaim, effectiveNow)) {
       await claimRef.update({
         'status': ClaimCodeStatus.expired.name,
         'updatedAt': effectiveNow.millisecondsSinceEpoch,
@@ -148,8 +148,11 @@ class GuestClaimService {
     }
 
     final guestPlayerId = initialClaim.targetId;
-    final initialGuestPlayerSnapshot = await _guestPlayersRef.doc(guestPlayerId).get();
-    if (!initialGuestPlayerSnapshot.exists || initialGuestPlayerSnapshot.data() == null) {
+    final initialGuestPlayerSnapshot = await _guestPlayersRef
+        .doc(guestPlayerId)
+        .get();
+    if (!initialGuestPlayerSnapshot.exists ||
+        initialGuestPlayerSnapshot.data() == null) {
       throw Exception('اللاعب الضيف المطلوب غير موجود.');
     }
     final initialGuestPlayer = GuestPlayerModel.fromJson(
@@ -193,23 +196,28 @@ class GuestClaimService {
     final guestMembershipSnapshot = await _membershipsRef
         .where('guestPlayerId', isEqualTo: guestPlayerId)
         .get();
-    final playerMembershipSnapshot =
-        await _membershipsRef.where('playerId', isEqualTo: playerId).get();
+    final playerMembershipSnapshot = await _membershipsRef
+        .where('playerId', isEqualTo: playerId)
+        .get();
 
-    return _firestore.runTransaction((transaction) async {
+    final result = await _firestore.runTransaction((transaction) async {
       final claimSnapshot = await transaction.get(claimRef);
       if (!claimSnapshot.exists || claimSnapshot.data() == null) {
         throw Exception('رابط الاستلام المطلوب غير موجود.');
       }
-      final currentClaim =
-          ClaimCodeModel.fromJson(claimSnapshot.data()!, claimSnapshot.id).toEntity();
-      if (currentClaim.targetType != ClaimTargetType.guestPlayer) {
-        throw Exception('رابط الاستلام هذا لا يخص لاعبًا ضيفًا.');
-      }
-      if (currentClaim.status == ClaimCodeStatus.active &&
-          currentClaim.isExpiredAt(effectiveNow)) {
-        throw Exception('انتهت صلاحية رابط الاستلام.');
-      }
+      final currentClaim = ClaimCodeModel.fromJson(
+        claimSnapshot.data()!,
+        claimSnapshot.id,
+      ).toEntity();
+      GuestClaimTokenPolicy.assertTargetType(
+        currentClaim,
+        ClaimTargetType.guestPlayer,
+      );
+      GuestClaimTokenPolicy.assertNotExpired(
+        currentClaim,
+        effectiveNow,
+        targetType: ClaimTargetType.guestPlayer,
+      );
 
       final guestPlayerRef = _guestPlayersRef.doc(guestPlayerId);
       final guestPlayerSnapshot = await transaction.get(guestPlayerRef);
@@ -281,9 +289,10 @@ class GuestClaimService {
         );
       }
 
-      if (currentClaim.status != ClaimCodeStatus.active) {
-        throw Exception('رابط الاستلام هذا غير صالح الآن.');
-      }
+      GuestClaimTokenPolicy.assertUsableStatus(
+        currentClaim,
+        targetType: ClaimTargetType.guestPlayer,
+      );
 
       if (currentClaim.claimedByPlayerId != null &&
           currentClaim.claimedByPlayerId != playerId) {
@@ -309,7 +318,9 @@ class GuestClaimService {
           snapshot.data()!,
           snapshot.id,
         ).toEntity();
-        playerMembershipsByTeam.putIfAbsent(membership.teamId, () => []).add(membership);
+        playerMembershipsByTeam
+            .putIfAbsent(membership.teamId, () => [])
+            .add(membership);
       }
 
       final relinkedMembershipIds = <String>[];
@@ -330,7 +341,10 @@ class GuestClaimService {
         ).toEntity();
         if (membership.guestPlayerId == guestPlayerId) {
           guestMemberships.add(
-            _ClaimMembershipRef(reference: doc.reference, membership: membership),
+            _ClaimMembershipRef(
+              reference: doc.reference,
+              membership: membership,
+            ),
           );
         }
       }
@@ -356,7 +370,8 @@ class GuestClaimService {
         final membership = resolvedMembership.membership;
 
         final conflictingMemberships =
-            playerMembershipsByTeam[membership.teamId] ?? const <TeamMembership>[];
+            playerMembershipsByTeam[membership.teamId] ??
+            const <TeamMembership>[];
         final activeConflict = conflictingMemberships.where(
           (entry) =>
               entry.id != membership.id &&
@@ -431,25 +446,28 @@ class GuestClaimService {
         final updatedPlayerIds = List<String>.from(team.playerIds);
         if (!updatedPlayerIds.contains(playerId)) {
           updatedPlayerIds.add(playerId);
-          transaction.update(
-            _teamsRef.doc(team.id),
-            {'playerIds': updatedPlayerIds},
-          );
+          transaction.update(_teamsRef.doc(team.id), {
+            'playerIds': updatedPlayerIds,
+          });
           loadedTeams[team.id] = team.copyWith(playerIds: updatedPlayerIds);
           syncedLegacyTeamIds.add(team.id);
         }
       }
 
-      final updatedPlayer = player.copyWith(
-        teamIds: linkedTeamIds.toList(growable: false),
-        lastActiveAt: effectiveNow,
+      final updatedPlayer = GuestClaimMergePolicy.mergePlayerIdentity(
+        player: player,
+        linkedTeamIds: linkedTeamIds,
+        now: effectiveNow,
       );
-      transaction.update(playerRef, PlayerModel.fromEntity(updatedPlayer).toJson());
+      transaction.update(
+        playerRef,
+        PlayerModel.fromEntity(updatedPlayer).toJson(),
+      );
 
-      final updatedGuestPlayer = guestPlayer.copyWith(
-        claimStatus: GuestClaimStatus.claimed,
-        linkedPlayerId: playerId,
-        updatedAt: effectiveNow,
+      final updatedGuestPlayer = GuestClaimMergePolicy.linkGuestPlayer(
+        guestPlayer: guestPlayer,
+        playerId: playerId,
+        now: effectiveNow,
       );
       transaction.update(
         guestPlayerRef,
@@ -462,12 +480,9 @@ class GuestClaimService {
         claimedAt: effectiveNow,
         updatedAt: effectiveNow,
       );
-      transaction.update(claimRef, ClaimCodeModel.fromEntity(updatedClaim).toJson());
-
-      _analyticsService.trackClaimCompletion(
-        type: 'guest_player',
-        targetId: guestPlayer.id,
-        actorId: effectiveActorId,
+      transaction.update(
+        claimRef,
+        ClaimCodeModel.fromEntity(updatedClaim).toJson(),
       );
 
       return GuestPlayerClaimResult(
@@ -480,6 +495,13 @@ class GuestClaimService {
         syncedLegacyTeamIds: syncedLegacyTeamIds.toList(growable: false),
       );
     });
+    if (result.outcome == GuestPlayerClaimOutcome.claimed) {
+      _completionReporter.playerClaimed(
+        guestPlayerId: result.guestPlayerId,
+        actorId: effectiveActorId,
+      );
+    }
+    return result;
   }
 
   Future<GuestTeamClaimResult> claimGuestTeam({
@@ -496,15 +518,16 @@ class GuestClaimService {
       throw Exception('رابط استلام الفريق المطلوب غير موجود.');
     }
 
-    final initialClaim =
-        ClaimCodeModel.fromJson(initialClaimSnapshot.data()!, initialClaimSnapshot.id)
-            .toEntity();
-    if (initialClaim.targetType != ClaimTargetType.guestTeam) {
-      throw Exception('رابط الاستلام هذا لا يخص فريقًا ضيفًا.');
-    }
+    final initialClaim = ClaimCodeModel.fromJson(
+      initialClaimSnapshot.data()!,
+      initialClaimSnapshot.id,
+    ).toEntity();
+    GuestClaimTokenPolicy.assertTargetType(
+      initialClaim,
+      ClaimTargetType.guestTeam,
+    );
 
-    if (initialClaim.status == ClaimCodeStatus.active &&
-        initialClaim.isExpiredAt(effectiveNow)) {
+    if (GuestClaimTokenPolicy.shouldMarkExpired(initialClaim, effectiveNow)) {
       await claimRef.update({
         'status': ClaimCodeStatus.expired.name,
         'updatedAt': effectiveNow.millisecondsSinceEpoch,
@@ -513,8 +536,11 @@ class GuestClaimService {
     }
 
     final guestTeamId = initialClaim.targetId;
-    final initialGuestTeamSnapshot = await _guestTeamsRef.doc(guestTeamId).get();
-    if (!initialGuestTeamSnapshot.exists || initialGuestTeamSnapshot.data() == null) {
+    final initialGuestTeamSnapshot = await _guestTeamsRef
+        .doc(guestTeamId)
+        .get();
+    if (!initialGuestTeamSnapshot.exists ||
+        initialGuestTeamSnapshot.data() == null) {
       throw Exception('الفريق الضيف المطلوب غير موجود.');
     }
     final initialGuestTeam = GuestTeamModel.fromJson(
@@ -559,24 +585,29 @@ class GuestClaimService {
       );
     }
 
-    return _firestore.runTransaction((transaction) async {
+    final result = await _firestore.runTransaction((transaction) async {
       final claimSnapshot = await transaction.get(claimRef);
       if (!claimSnapshot.exists || claimSnapshot.data() == null) {
         throw Exception('رابط استلام الفريق المطلوب غير موجود.');
       }
-      final currentClaim =
-          ClaimCodeModel.fromJson(claimSnapshot.data()!, claimSnapshot.id).toEntity();
-      if (currentClaim.targetType != ClaimTargetType.guestTeam) {
-        throw Exception('رابط الاستلام هذا لا يخص فريقًا ضيفًا.');
-      }
-      if (currentClaim.status == ClaimCodeStatus.active &&
-          currentClaim.isExpiredAt(effectiveNow)) {
-        throw Exception('انتهت صلاحية رابط استلام الفريق.');
-      }
-      if (currentClaim.status != ClaimCodeStatus.active &&
-          currentClaim.status != ClaimCodeStatus.claimed) {
-        throw Exception('رابط الاستلام هذا غير صالح الآن.');
-      }
+      final currentClaim = ClaimCodeModel.fromJson(
+        claimSnapshot.data()!,
+        claimSnapshot.id,
+      ).toEntity();
+      GuestClaimTokenPolicy.assertTargetType(
+        currentClaim,
+        ClaimTargetType.guestTeam,
+      );
+      GuestClaimTokenPolicy.assertNotExpired(
+        currentClaim,
+        effectiveNow,
+        targetType: ClaimTargetType.guestTeam,
+      );
+      GuestClaimTokenPolicy.assertUsableStatus(
+        currentClaim,
+        targetType: ClaimTargetType.guestTeam,
+        allowClaimed: true,
+      );
 
       final guestTeamRef = _guestTeamsRef.doc(guestTeamId);
       final guestTeamSnapshot = await transaction.get(guestTeamRef);
@@ -611,7 +642,7 @@ class GuestClaimService {
           claimCode: currentClaim.code,
           guestTeamId: guestTeam.id,
           teamId: teamId,
-          mergedTournamentIds: _mergeUniqueStrings(
+          mergedTournamentIds: GuestClaimMergePolicy.mergeUniqueStrings(
             team.tournamentIds,
             guestTeam.tournamentIds,
           ),
@@ -666,7 +697,7 @@ class GuestClaimService {
         );
       }
 
-      final mergedTournamentIds = _mergeUniqueStrings(
+      final mergedTournamentIds = GuestClaimMergePolicy.mergeUniqueStrings(
         team.tournamentIds,
         guestTeam.tournamentIds,
       );
@@ -674,17 +705,19 @@ class GuestClaimService {
       if (currentClaim.requiresApproval) {
         if (actorIsGuestCreator && !actorOwnsTeam) {
           if (currentClaim.teamId == null || currentClaim.teamId!.isEmpty) {
-            throw Exception('لا يوجد طلب claim معلق لهذا الفريق حتى تتم الموافقة عليه.');
+            throw Exception(
+              'لا يوجد طلب claim معلق لهذا الفريق حتى تتم الموافقة عليه.',
+            );
           }
           if (currentClaim.claimedByPlayerId == null ||
               currentClaim.claimedByPlayerId!.isEmpty) {
             throw Exception('بيانات طلب claim المعلق غير مكتملة.');
           }
 
-          final updatedGuestTeam = guestTeam.copyWith(
-            claimStatus: GuestClaimStatus.claimed,
-            linkedTeamId: teamId,
-            updatedAt: effectiveNow,
+          final updatedGuestTeam = GuestClaimMergePolicy.linkGuestTeam(
+            guestTeam: guestTeam,
+            teamId: teamId,
+            now: effectiveNow,
           );
           transaction.update(
             guestTeamRef,
@@ -699,12 +732,6 @@ class GuestClaimService {
           transaction.update(
             claimRef,
             ClaimCodeModel.fromEntity(updatedClaim).toJson(),
-          );
-
-          _analyticsService.trackClaimCompletion(
-            type: 'guest_team',
-            targetId: updatedGuestTeam.id,
-            actorId: actorId,
           );
 
           return GuestTeamClaimResult(
@@ -721,15 +748,18 @@ class GuestClaimService {
           throw Exception('هذا الرابط يحتاج إلى موافقة المنظم قبل ربط الفريق.');
         }
 
-        if (!_sameStringSet(team.tournamentIds, mergedTournamentIds)) {
+        if (!GuestClaimMergePolicy.hasSameStrings(
+          team.tournamentIds,
+          mergedTournamentIds,
+        )) {
           transaction.update(teamRef, {'tournamentIds': mergedTournamentIds});
         }
 
         if (actorIsGuestCreator) {
-          final updatedGuestTeam = guestTeam.copyWith(
-            claimStatus: GuestClaimStatus.claimed,
-            linkedTeamId: teamId,
-            updatedAt: effectiveNow,
+          final updatedGuestTeam = GuestClaimMergePolicy.linkGuestTeam(
+            guestTeam: guestTeam,
+            teamId: teamId,
+            now: effectiveNow,
           );
           transaction.update(
             guestTeamRef,
@@ -746,12 +776,6 @@ class GuestClaimService {
           transaction.update(
             claimRef,
             ClaimCodeModel.fromEntity(updatedClaim).toJson(),
-          );
-
-          _analyticsService.trackClaimCompletion(
-            type: 'guest_team',
-            targetId: updatedGuestTeam.id,
-            actorId: actorId,
           );
 
           return GuestTeamClaimResult(
@@ -830,14 +854,17 @@ class GuestClaimService {
         );
       }
 
-      if (!_sameStringSet(team.tournamentIds, mergedTournamentIds)) {
+      if (!GuestClaimMergePolicy.hasSameStrings(
+        team.tournamentIds,
+        mergedTournamentIds,
+      )) {
         transaction.update(teamRef, {'tournamentIds': mergedTournamentIds});
       }
 
-      final updatedGuestTeam = guestTeam.copyWith(
-        claimStatus: GuestClaimStatus.claimed,
-        linkedTeamId: teamId,
-        updatedAt: effectiveNow,
+      final updatedGuestTeam = GuestClaimMergePolicy.linkGuestTeam(
+        guestTeam: guestTeam,
+        teamId: teamId,
+        now: effectiveNow,
       );
       transaction.update(
         guestTeamRef,
@@ -865,6 +892,13 @@ class GuestClaimService {
         requestedByPlayerId: actorId,
       );
     });
+    if (result.outcome == GuestTeamClaimOutcome.claimed) {
+      _completionReporter.teamClaimed(
+        guestTeamId: result.guestTeamId,
+        actorId: actorId,
+      );
+    }
+    return result;
   }
 
   Future<void> _assertClaimAuthorization({
@@ -887,7 +921,10 @@ class GuestClaimService {
     if (!teamSnapshot.exists || teamSnapshot.data() == null) {
       throw Exception('لا تملك صلاحية إتمام claim لهذا اللاعب.');
     }
-    final team = TeamModel.fromJson(teamSnapshot.data()!, teamSnapshot.id).toEntity();
+    final team = TeamModel.fromJson(
+      teamSnapshot.data()!,
+      teamSnapshot.id,
+    ).toEntity();
     if (_teamRosterPolicy.canManageRoster(
       team: team,
       actorId: effectiveActorId,
@@ -924,20 +961,6 @@ class GuestClaimService {
       linked.add(guestPlayer.teamId!);
     }
     return linked.toList(growable: false);
-  }
-
-  List<String> _mergeUniqueStrings(
-    List<String> existing,
-    List<String> incoming,
-  ) {
-    return {...existing, ...incoming}.toList(growable: false);
-  }
-
-  bool _sameStringSet(List<String> left, List<String> right) {
-    if (left.length != right.length) {
-      return false;
-    }
-    return left.toSet().containsAll(right);
   }
 
   GuestPlayerClaimResult _guestPlayerConflictResult({
@@ -1031,7 +1054,10 @@ class GuestClaimService {
       return null;
     }
 
-    final snapshot = await _playersRef.where('phone', isEqualTo: phone).limit(3).get();
+    final snapshot = await _playersRef
+        .where('phone', isEqualTo: phone)
+        .limit(3)
+        .get();
     for (final doc in snapshot.docs) {
       if (doc.id == excludedPlayerId) {
         continue;
@@ -1070,8 +1096,10 @@ class GuestClaimService {
       return null;
     }
 
-    final snapshot =
-        await _teamsRef.where('nameLower', isEqualTo: normalizedName).limit(3).get();
+    final snapshot = await _teamsRef
+        .where('nameLower', isEqualTo: normalizedName)
+        .limit(3)
+        .get();
     for (final doc in snapshot.docs) {
       if (doc.id == excludedTeamId) {
         continue;

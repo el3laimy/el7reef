@@ -20,10 +20,12 @@ import '../../domain/repositories/guest_team_repository.dart';
 import '../../domain/repositories/team_repository.dart';
 import '../../domain/repositories/tournament_repository.dart';
 import 'analytics_service.dart';
+import 'guest_player_claim_link_issuer.dart';
 import 'team_roster_policy.dart';
 import 'tournament_permission_service.dart';
+import '../navigation/app_link_route_parser.dart';
 
-class ShareLinkService {
+class ShareLinkService implements GuestPlayerClaimLinkIssuer {
   final ClaimCodeRepository _claimCodeRepository;
   final GuestPlayerRepository _guestPlayerRepository;
   final GuestTeamRepository _guestTeamRepository;
@@ -35,7 +37,7 @@ class ShareLinkService {
   final Uuid _uuid;
 
   static const String appScheme = 'el7reef';
-  static const String webHost = 'el7reef.app';
+  static const String webHost = AppLinkRouteParser.pilotWebHost;
 
   ShareLinkService({
     ClaimCodeRepository? claimCodeRepository,
@@ -73,6 +75,9 @@ class ShareLinkService {
     );
     if (guestPlayer == null) {
       throw Exception('اللاعب الضيف المطلوب غير موجود.');
+    }
+    if (guestPlayer.isClaimed) {
+      throw Exception('تم استلام هذا اللاعب بالفعل ولا يمكن إصدار رابط جديد.');
     }
     await _assertCanManageGuestPlayer(guestPlayer, actorId);
 
@@ -114,6 +119,22 @@ class ShareLinkService {
     );
 
     return link;
+  }
+
+  @override
+  Future<Uri> createGuestPlayerClaimUrl({
+    required String guestPlayerId,
+    required String actorId,
+    Duration ttl = const Duration(days: 7),
+    bool requiresApproval = false,
+  }) async {
+    final link = await createGuestPlayerClaimLink(
+      guestPlayerId: guestPlayerId,
+      actorId: actorId,
+      ttl: ttl,
+      requiresApproval: requiresApproval,
+    );
+    return link.webUri;
   }
 
   Future<GeneratedShareLink> createGuestTeamClaimLink({
@@ -219,7 +240,7 @@ class ShareLinkService {
     required String label,
     required String subjectName,
   }) {
-    final payload = claimCode.toPayload(subjectName: subjectName);
+    final payload = claimCode.toPayload();
     final routeHost = claimCode.targetType == ClaimTargetType.teamInvite
         ? 'invite'
         : 'claim';

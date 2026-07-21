@@ -1,0 +1,58 @@
+{
+  "validParticipants": [
+    {
+      "kind": "player",
+      "id": "player-1",
+      "displayName": "Registered Player",
+      "linkedPlayerId": null,
+      "identityKey": "player:player-1"
+    },
+    {
+      "kind": "guestPlayer",
+      "id": "guest-1",
+      "displayName": "Guest Player",
+      "linkedPlayerId": "player-9",
+      "identityKey": "guestPlayer:guest-1"
+    },
+    {
+      "kind": "matchSidePlayer",
+      "id": "side-player-1",
+      "displayName": "Temporary Player",
+      "linkedPlayerId": null,
+      "identityKey": "matchSidePlayer:side-player-1"
+    }
+  ],
+  "invalidParticipants": [
+    {
+      "label": "unknown kind",
+      "actor": {
+        "kind": "unknown",
+        "id": "player-1",
+        "displayName": "Unknown"
+      }
+    },
+    {
+      "label": "missing kind",
+      "actor": {
+        "id": "player-1",
+        "displayName": "Missing Kind"
+      }
+    },
+    {
+      "label": "empty id",
+      "actor": {
+        "kind": "guestPlayer",
+        "id": " ",
+        "displayName": "Guest"
+      }
+    },
+    {
+      "label": "empty display name",
+      "actor": {
+        "kind": "matchSidePlayer",
+        "id": "side-1",
+        "displayName": " "
+      }
+    }
+  ]
+}

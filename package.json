@@ -1,5 +1,16 @@
 {
   "scripts": {
+    "check:architecture": "node tool/architecture_guard.js",
+    "check:indexes": "node tool/firestore_index_guard.js",
+    "check:format:changed": "node tool/check_changed_dart_format.js",
+    "check:hotspots": "node tool/hotspot_report.js --check",
+    "report:hotspots": "node tool/hotspot_report.js",
+    "rollback:firestore-rules": "node tool/firestore_ruleset_rollback.js",
+    "test:functions": "mocha \"test/functions/**/*.test.js\" --timeout 20000",
+    "test:functions:emulator": "env FIREBASE_CLI_DISABLE_UPDATE_CHECK=true npx firebase-tools --config firebase.json --project demo-el7reef emulators:exec --only functions,firestore,auth,storage \"node functions/scripts/emulator_smoke.js\"",
+    "test:pride-sting": "node --test test/tool/pride_sting_generator_test.js",
+    "test:world-cup-data": "node --test test/tool/world_cup_2026_squads_test.js",
+    "test:world-cup-import:emulator": "env FIREBASE_CLI_DISABLE_UPDATE_CHECK=true npx firebase-tools --config firebase.rules.test.json --project el7reef-app emulators:exec --only firestore,auth \"npm --prefix functions run seed:world-cup-organizer-auth -- el7reef-app && npm --prefix functions run import:world-cup-2026 -- --organizer-id organizer-1 --project el7reef-app --apply && npm --prefix functions run import:world-cup-2026 -- --organizer-id organizer-1 --project el7reef-app --apply && npm --prefix functions run verify:world-cup-2026 -- organizer-1 el7reef-app\"",
     "test:rules": "mocha \"test/rules/**/*.test.js\" --timeout 20000",
     "test:rules:emulator": "env FIREBASE_CLI_DISABLE_UPDATE_CHECK=true npx firebase-tools --config firebase.rules.test.json emulators:exec --only firestore \"npm run test:rules\""
   },

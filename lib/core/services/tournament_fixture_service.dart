@@ -7,6 +7,7 @@ import '../../data/models/group_standing_snapshot_model.dart';
 import '../../data/models/match_check_in_model.dart';
 import '../../data/models/match_lineup_snapshot_model.dart';
 import '../../data/models/match_model.dart';
+import '../../data/models/team_model.dart';
 import '../../data/models/tournament_group_model.dart';
 import '../../data/models/tournament_model.dart';
 import '../../data/models/tournament_participant_model.dart';
@@ -54,6 +55,12 @@ class TournamentFixtureService {
       _firestore.collection(FirebasePaths.matchCheckIns);
   CollectionReference<Map<String, dynamic>> get _snapshotsRef =>
       _firestore.collection(FirebasePaths.matchLineupSnapshots);
+  CollectionReference<Map<String, dynamic>> get _teamsRef =>
+      _firestore.collection(FirebasePaths.teams);
+  CollectionReference<Map<String, dynamic>> get _guestPlayersRef =>
+      _firestore.collection(FirebasePaths.guestPlayers);
+  CollectionReference<Map<String, dynamic>> get _membershipsRef =>
+      _firestore.collection(FirebasePaths.teamMemberships);
 
   Future<Match> scheduleFixture({
     required String matchId,
@@ -68,7 +75,7 @@ class TournamentFixtureService {
       throw Exception('لا يمكن جدولة مباراة ليست جزءًا من بطولة.');
     }
     if (match.isOfficialTournamentResult) {
-      throw Exception('لا يمكن جدولة fixture بعد اعتماد نتيجتها.');
+      throw Exception('لا يمكن جدولة مباراة بعد اعتماد نتيجتها.');
     }
 
     final tournament = await _loadTournament(tournamentId);
@@ -129,7 +136,7 @@ class TournamentFixtureService {
       throw Exception('لا يمكن بدء المباراة بحالتها الحالية.');
     }
     if (match.fixtureStatus != FixtureStatus.published) {
-      throw Exception('يجب نشر fixture قبل بدء المباراة.');
+      throw Exception('يجب نشر المباراة المجدولة قبل بدء المباراة.');
     }
 
     final homeSide = await _loadStartSide(
@@ -250,7 +257,7 @@ class TournamentFixtureService {
     if (fixtures.any(
       (fixture) => fixture.fixtureStatus == FixtureStatus.published,
     )) {
-      throw Exception('لا يمكن إعادة توليد المجموعات بعد نشر fixtures.');
+      throw Exception('لا يمكن إعادة توليد المجموعات بعد نشر المباريات.');
     }
 
     if (fixtures.any(
@@ -278,7 +285,7 @@ class TournamentFixtureService {
   Future<Match> _loadMatch(String matchId) async {
     final snapshot = await _matchesRef.doc(matchId).get();
     if (!snapshot.exists || snapshot.data() == null) {
-      throw Exception('تعذر العثور على fixture المطلوبة.');
+      throw Exception('تعذر العثور على المباراة المجدولة المطلوبة.');
     }
     return MatchModel.fromJson(snapshot.data()!, snapshot.id).toEntity();
   }
@@ -312,7 +319,7 @@ class TournamentFixtureService {
     required String sideLabel,
   }) async {
     if (participantId == null || participantId.isEmpty) {
-      throw Exception('تعذر تحديد $sideLabel داخل هذه الـ fixture.');
+      throw Exception('تعذر تحديد $sideLabel داخل هذه المباراة.');
     }
     final participant = await _loadParticipant(participantId);
     final displayLabel = participant.displayName;
@@ -326,7 +333,7 @@ class TournamentFixtureService {
             guestTeamId: sourceEntityId,
           );
     if (checkIn == null || !checkIn.isCheckedIn) {
-      throw Exception('يجب تنفيذ check-in لـ $displayLabel قبل بدء المباراة.');
+      throw Exception('يجب تسجيل حضور $displayLabel قبل بدء المباراة.');
     }
 
     final snapshot =
@@ -336,24 +343,92 @@ class TournamentFixtureService {
             matchId: match.id,
             guestTeamId: sourceEntityId,
           );
-    if (snapshot == null) {
-      throw Exception('يجب قفل التشكيل لـ $displayLabel قبل بدء المباراة.');
-    }
-
-    final projectedRegisteredPlayerIds = _projectRegisteredPlayerIds(snapshot);
-    if (participant.sourceType ==
-            TournamentParticipantSourceType.registeredTeam &&
-        projectedRegisteredPlayerIds.isEmpty) {
+    final roster = snapshot == null
+        ? await _loadFallbackRoster(participant)
+        : _rosterFromSnapshot(snapshot);
+    if (!roster.hasPlayers) {
       throw Exception(
-        'تعذر تكوين roster فعلية لـ $displayLabel من التشكيل المقفول.',
+        'أضف لاعبًا واحدًا على الأقل إلى قائمة $displayLabel قبل بدء المباراة.',
       );
     }
 
     return _FixtureStartSide(
-      participant: participant,
-      checkIn: checkIn,
-      snapshot: snapshot,
-      projectedRegisteredPlayerIds: projectedRegisteredPlayerIds,
+      projectedRegisteredPlayerIds: roster.registeredPlayerIds,
+    );
+  }
+
+  Future<_StartRoster> _loadFallbackRoster(
+    TournamentParticipant participant,
+  ) async {
+    final sourceEntityId = participant.sourceEntityId;
+    if (participant.sourceType == TournamentParticipantSourceType.guestTeam) {
+      final guestPlayers = await _guestPlayersRef
+          .where('guestTeamId', isEqualTo: sourceEntityId)
+          .get();
+      return _StartRoster(
+        participantCount: guestPlayers.docs.where(_isActiveGuestPlayer).length,
+      );
+    }
+
+    final teamSnapshot = await _teamsRef.doc(sourceEntityId).get();
+    final team = teamSnapshot.exists && teamSnapshot.data() != null
+        ? TeamModel.fromJson(teamSnapshot.data()!, teamSnapshot.id).toEntity()
+        : null;
+    final registeredPlayerIds = <String>{...?team?.playerIds};
+    final memberships = await _membershipsRef
+        .where('teamId', isEqualTo: sourceEntityId)
+        .get();
+    final membershipGuestIds = <String>{};
+    for (final membership in memberships.docs) {
+      final playerId = (membership.data()['playerId'] as String?)?.trim();
+      final guestPlayerId = (membership.data()['guestPlayerId'] as String?)
+          ?.trim();
+      if (playerId != null && playerId.isNotEmpty) {
+        registeredPlayerIds.add(playerId);
+      }
+      if (guestPlayerId != null && guestPlayerId.isNotEmpty) {
+        membershipGuestIds.add(guestPlayerId);
+      }
+    }
+    final directGuestPlayers = await _guestPlayersRef
+        .where('teamId', isEqualTo: sourceEntityId)
+        .get();
+    final activeDirectGuestIds = directGuestPlayers.docs
+        .where(_isActiveGuestPlayer)
+        .map((doc) => doc.id)
+        .toSet();
+
+    return _StartRoster(
+      registeredPlayerIds: registeredPlayerIds.toList(growable: false),
+      participantCount:
+          registeredPlayerIds.length +
+          {...membershipGuestIds, ...activeDirectGuestIds}.length,
+    );
+  }
+
+  bool _isActiveGuestPlayer(
+    QueryDocumentSnapshot<Map<String, dynamic>> snapshot,
+  ) => snapshot.data()['claimStatus'] != 'archived';
+
+  _StartRoster _rosterFromSnapshot(MatchLineupSnapshot snapshot) {
+    final entries = [...snapshot.starters, ...snapshot.bench];
+    final registeredPlayerIds = _projectRegisteredPlayerIds(snapshot);
+    final participantKeys = <String>{};
+    for (final entry in entries) {
+      final playerId = entry.playerId?.trim();
+      final guestPlayerId = entry.guestPlayerId?.trim();
+      final matchSidePlayerId = entry.matchSidePlayerId?.trim();
+      if (playerId != null && playerId.isNotEmpty) {
+        participantKeys.add('player:$playerId');
+      } else if (guestPlayerId != null && guestPlayerId.isNotEmpty) {
+        participantKeys.add('guest:$guestPlayerId');
+      } else if (matchSidePlayerId != null && matchSidePlayerId.isNotEmpty) {
+        participantKeys.add('side:$matchSidePlayerId');
+      }
+    }
+    return _StartRoster(
+      registeredPlayerIds: registeredPlayerIds,
+      participantCount: participantKeys.length,
     );
   }
 
@@ -503,15 +578,19 @@ class TournamentFixtureService {
 }
 
 class _FixtureStartSide {
-  final TournamentParticipant participant;
-  final MatchCheckIn checkIn;
-  final MatchLineupSnapshot snapshot;
   final List<String> projectedRegisteredPlayerIds;
 
-  const _FixtureStartSide({
-    required this.participant,
-    required this.checkIn,
-    required this.snapshot,
-    required this.projectedRegisteredPlayerIds,
+  const _FixtureStartSide({required this.projectedRegisteredPlayerIds});
+}
+
+class _StartRoster {
+  final List<String> registeredPlayerIds;
+  final int participantCount;
+
+  const _StartRoster({
+    this.registeredPlayerIds = const <String>[],
+    required this.participantCount,
   });
+
+  bool get hasPlayers => participantCount > 0;
 }

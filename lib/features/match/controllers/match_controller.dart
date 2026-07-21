@@ -69,6 +69,8 @@ class MatchController extends GetxController {
       <String, MatchTemporaryParticipantCounts>{}.obs;
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
+  final RxString liveMatchesErrorMessage = ''.obs;
+  final RxString myMatchesErrorMessage = ''.obs;
   Worker? _authWorker;
 
   @override
@@ -91,18 +93,23 @@ class MatchController extends GetxController {
     temporaryParticipantCountsByMatch.clear();
     isLoading.value = false;
     errorMessage.value = '';
+    liveMatchesErrorMessage.value = '';
+    myMatchesErrorMessage.value = '';
   }
 
   /// تحميل المباريات المتاحة
   Future<void> loadLiveMatches() async {
     try {
       isLoading.value = true;
+      errorMessage.value = '';
+      liveMatchesErrorMessage.value = '';
       final matches = await _matchRepo.getLiveMatches();
       liveMatches.value = matches;
       await _loadTemporaryParticipantCounts(matches);
     } catch (e) {
       AppLogger.error('MatchController.loadLiveMatches', e);
       errorMessage.value = 'فشل تحميل المباريات';
+      liveMatchesErrorMessage.value = 'فشل تحميل المباريات الجارية';
     } finally {
       isLoading.value = false;
     }
@@ -113,11 +120,13 @@ class MatchController extends GetxController {
     final uid = _authService.currentUserId;
     if (uid == null) return;
     try {
+      myMatchesErrorMessage.value = '';
       final matches = await _matchRepo.getPlayerMatches(uid);
       myMatches.value = matches;
       await _loadTemporaryParticipantCounts(matches);
     } catch (e) {
       AppLogger.error('MatchController.loadMyMatches', e);
+      myMatchesErrorMessage.value = 'فشل تحميل آخر مبارياتك';
     }
   }
 

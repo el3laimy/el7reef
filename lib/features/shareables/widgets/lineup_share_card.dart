@@ -4,12 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../core/lineup/pitch_layout.dart';
 import '../models/lineup_share_data.dart';
+import '../models/pride_card_format.dart';
+import 'pride_card_shell.dart';
+import 'pride_card_text_scale.dart';
 
 // ── Design tokens ──
-const _gold = Color(0xFFD4A843);
-const _goldLight = Color(0xFFE8C96A);
-const _goldDark = Color(0xFF8B6914);
+const _gold = AppColors.primary;
+const _goldLight = AppColors.primaryLight;
 const _cardBg = Color(0xFF0A0E0A);
 const _cardBgRaised = Color(0xFF141A14);
 const _pitchGreen = Color(0xFF1B5E20);
@@ -17,56 +20,55 @@ const _pitchGreenLight = Color(0xFF2E7D32);
 const _pitchLine = Color(0x60FFFFFF);
 
 class LineupShareCard extends StatelessWidget {
-  static const double exportLogicalWidth = 432;
-  static const double exportLogicalHeight = 648; // 2:3 ratio
-
   final LineupShareData data;
   final bool exportMode;
+  final PrideCardFormat format;
 
   const LineupShareCard({
     super.key,
     required this.data,
     this.exportMode = false,
+    this.format = PrideCardFormat.feed4x5,
   });
 
   @override
   Widget build(BuildContext context) {
-    final content = Directionality(
-      textDirection: TextDirection.rtl,
-      child: Container(
-        width: exportMode ? exportLogicalWidth : null,
-        height: exportMode ? exportLogicalHeight : null,
-        decoration: BoxDecoration(
-          color: _cardBg,
-          borderRadius: BorderRadius.circular(exportMode ? 16 : 22),
-          border: Border.all(color: _gold.withValues(alpha: 0.25)),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          children: [
-            Positioned.fill(child: CustomPaint(painter: _CardBgPainter())),
-            Column(
-              children: [
-                _HeaderSection(data: data, exportMode: exportMode),
-                Expanded(
-                  child: _PitchSection(
-                    players: data.pitchPlayers,
-                    accentColor: data.accentColor,
-                    exportMode: exportMode,
-                  ),
+    final dense = PrideCardTextScale.usesDenseLayout(context);
+    final content = Container(
+      decoration: BoxDecoration(
+        color: _cardBg,
+        borderRadius: BorderRadius.circular(exportMode ? 16 : 22),
+        border: Border.all(color: _gold.withValues(alpha: 0.25)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Positioned.fill(child: CustomPaint(painter: _CardBgPainter())),
+          Column(
+            children: [
+              _HeaderSection(data: data, exportMode: exportMode, dense: dense),
+              Expanded(
+                child: _PitchSection(
+                  players: data.pitchPlayers,
+                  teamSize: data.teamSize,
+                  accentColor: data.accentColor,
+                  exportMode: exportMode,
+                  dense: dense,
                 ),
-                _FooterSection(data: data, exportMode: exportMode),
-              ],
-            ),
-          ],
-        ),
+              ),
+              _FooterSection(data: data, exportMode: exportMode, dense: dense),
+            ],
+          ),
+        ],
       ),
     );
-
-    if (exportMode) {
-      return Material(color: Colors.transparent, child: content);
-    }
-    return AspectRatio(aspectRatio: 2 / 3, child: content);
+    return PrideCardShell(
+      exportMode: exportMode,
+      format: format,
+      semanticsLabel: 'بطاقة تشكيلة ${data.teamName}',
+      payload: data.sharePayload,
+      child: content,
+    );
   }
 }
 
@@ -77,13 +79,20 @@ class LineupShareCard extends StatelessWidget {
 class _HeaderSection extends StatelessWidget {
   final LineupShareData data;
   final bool exportMode;
+  final bool dense;
 
-  const _HeaderSection({required this.data, required this.exportMode});
+  const _HeaderSection({
+    required this.data,
+    required this.exportMode,
+    required this.dense,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      padding: dense
+          ? const EdgeInsets.fromLTRB(8, 6, 8, 4)
+          : const EdgeInsets.fromLTRB(16, 14, 16, 10),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
@@ -100,42 +109,47 @@ class _HeaderSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Team branding (right side in RTL)
-          _TeamBranding(data: data, exportMode: exportMode),
-          const SizedBox(width: 12),
+          _TeamBranding(data: data, exportMode: exportMode, dense: dense),
+          SizedBox(width: dense ? 6 : 12),
           // Title + formation
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Text(
-                  'التشكيلة الرسمية',
+                  data.statusLabel ?? 'التشكيلة الرسمية',
                   style: TextStyle(
                     color: _gold,
-                    fontSize: exportMode ? 20 : 22,
+                    fontSize: dense ? 11 : (exportMode ? 20 : 22),
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 1,
                     height: 1.1,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
+                SizedBox(height: dense ? 1 : 2),
                 Text(
-                  'الخطة التكتيكية',
+                  data.matchLabel ?? data.lineupTypeLabel,
                   style: TextStyle(
                     color: _goldLight.withValues(alpha: 0.6),
-                    fontSize: exportMode ? 11 : 12,
+                    fontSize: dense ? 7 : (exportMode ? 12 : 13),
                     fontWeight: FontWeight.w700,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: dense ? 2 : 6),
                 Text(
                   data.formationLabel ?? data.formationCode,
                   style: TextStyle(
                     color: AppColors.textPrimary,
-                    fontSize: exportMode ? 32 : 36,
+                    fontSize: dense ? 16 : (exportMode ? 28 : 32),
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
+                    letterSpacing: dense ? 1 : 2,
                     height: 1.0,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -149,30 +163,22 @@ class _HeaderSection extends StatelessWidget {
 class _TeamBranding extends StatelessWidget {
   final LineupShareData data;
   final bool exportMode;
+  final bool dense;
 
-  const _TeamBranding({required this.data, required this.exportMode});
+  const _TeamBranding({
+    required this.data,
+    required this.exportMode,
+    required this.dense,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final logoSize = exportMode ? 48.0 : 54.0;
+    final logoSize = dense ? 34.0 : (exportMode ? 48.0 : 54.0);
     final url = data.logoUrl?.trim();
     final hasLogo = url != null && url.isNotEmpty;
 
     return Column(
       children: [
-        // Stars
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(
-            3,
-            (_) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 1),
-              child: Icon(Icons.star, color: _gold, size: exportMode ? 10 : 12),
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        // Logo / avatar
         Container(
           width: logoSize,
           height: logoSize,
@@ -196,26 +202,32 @@ class _TeamBranding extends StatelessWidget {
                   placeholder: (context, url) => _LogoFallback(
                     initials: data.initials,
                     exportMode: exportMode,
+                    dense: dense,
                   ),
                   errorWidget: (context, url, error) => _LogoFallback(
                     initials: data.initials,
                     exportMode: exportMode,
+                    dense: dense,
                   ),
                 )
-              : _LogoFallback(initials: data.initials, exportMode: exportMode),
+              : _LogoFallback(
+                  initials: data.initials,
+                  exportMode: exportMode,
+                  dense: dense,
+                ),
         ),
-        const SizedBox(height: 4),
+        SizedBox(height: dense ? 2 : 4),
         // Team name
         SizedBox(
           width: logoSize + 10,
           child: Text(
             data.teamName,
             textAlign: TextAlign.center,
-            maxLines: 2,
+            maxLines: dense ? 1 : 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: AppColors.textPrimary,
-              fontSize: exportMode ? 10 : 11,
+              fontSize: dense ? 6.5 : (exportMode ? 10 : 11),
               fontWeight: FontWeight.w900,
               height: 1.2,
             ),
@@ -229,8 +241,13 @@ class _TeamBranding extends StatelessWidget {
 class _LogoFallback extends StatelessWidget {
   final String initials;
   final bool exportMode;
+  final bool dense;
 
-  const _LogoFallback({required this.initials, required this.exportMode});
+  const _LogoFallback({
+    required this.initials,
+    required this.exportMode,
+    required this.dense,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -239,7 +256,7 @@ class _LogoFallback extends StatelessWidget {
         initials,
         style: TextStyle(
           color: AppColors.textPrimary,
-          fontSize: exportMode ? 16 : 18,
+          fontSize: dense ? 9 : (exportMode ? 16 : 18),
           fontWeight: FontWeight.w900,
         ),
       ),
@@ -253,13 +270,17 @@ class _LogoFallback extends StatelessWidget {
 
 class _PitchSection extends StatelessWidget {
   final List<LineupSharePlayerData> players;
+  final int teamSize;
   final Color accentColor;
   final bool exportMode;
+  final bool dense;
 
   const _PitchSection({
     required this.players,
+    required this.teamSize,
     required this.accentColor,
     required this.exportMode,
+    required this.dense,
   });
 
   @override
@@ -285,21 +306,70 @@ class _PitchSection extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final nodeW = (constraints.maxWidth / 4.5).clamp(70.0, 90.0);
-            final nodeH = exportMode ? 90.0 : 95.0;
+            final playersPerLine = teamSize >= 10
+                ? 5
+                : teamSize >= 7
+                ? 3
+                : 2;
+            final nodeW = (constraints.maxWidth / (playersPerLine + 0.6)).clamp(
+              dense ? 48.0 : 52.0,
+              dense ? 70.0 : 82.0,
+            );
+            final desiredNodeH = teamSize >= 10
+                ? (dense ? 46.0 : 50.0)
+                : (dense ? 66.0 : (exportMode ? 90.0 : 95.0));
+            final verticalPositions = _verticalPositions(players);
+            final lineCount = math.max(1, verticalPositions.length);
+            final heightAllowedByLines =
+                (constraints.maxHeight - ((lineCount - 1) * 3)) / lineCount;
+            final minimumReadableHeight = teamSize >= 10
+                ? 44.0
+                : dense
+                ? 48.0
+                : 54.0;
+            final nodeH = math.min(
+              desiredNodeH,
+              math.max(minimumReadableHeight, heightAllowedByLines),
+            );
+            final expandVertically = teamSize >= 10 && lineCount > 1;
+            final minimumY = verticalPositions.isEmpty
+                ? 0.0
+                : verticalPositions.first;
+            final maximumY = verticalPositions.isEmpty
+                ? 100.0
+                : verticalPositions.last;
             return Stack(
               children: [
                 Positioned.fill(child: CustomPaint(painter: _PitchPainter())),
                 for (final player in players)
                   Positioned(
-                    left: _pos(player.slotX, constraints.maxWidth, nodeW),
-                    top: _pos(player.slotY, constraints.maxHeight, nodeH),
+                    left: PitchLayout.positionedCoordinate(
+                      percentage: player.slotX,
+                      totalExtent: constraints.maxWidth,
+                      childExtent: nodeW,
+                    ),
+                    top: expandVertically
+                        ? _expandedVerticalCoordinate(
+                            percentage: player.slotY,
+                            minimumPercentage: minimumY,
+                            maximumPercentage: maximumY,
+                            totalExtent: constraints.maxHeight,
+                            childExtent: nodeH,
+                          )
+                        : PitchLayout.positionedCoordinate(
+                            percentage: player.slotY,
+                            totalExtent: constraints.maxHeight,
+                            childExtent: nodeH,
+                          ),
                     child: _PlayerNode(
+                      key: ValueKey('lineup-share-player-${player.id}'),
                       player: player,
                       width: nodeW,
                       height: nodeH,
                       accentColor: accentColor,
                       exportMode: exportMode,
+                      dense: dense,
+                      denseSquad: teamSize >= 10,
                     ),
                   ),
               ],
@@ -310,9 +380,39 @@ class _PitchSection extends StatelessWidget {
     );
   }
 
-  double _pos(double pct, double total, double extent) {
-    final raw = (pct.clamp(0, 100) / 100) * total - (extent / 2);
-    return raw.clamp(2, total - extent - 2).toDouble();
+  List<double> _verticalPositions(List<LineupSharePlayerData> players) {
+    final positions =
+        players
+            .map((player) => player.slotY.clamp(0, 100).toDouble())
+            .toSet()
+            .toList(growable: false)
+          ..sort();
+    return positions;
+  }
+
+  double _expandedVerticalCoordinate({
+    required double percentage,
+    required double minimumPercentage,
+    required double maximumPercentage,
+    required double totalExtent,
+    required double childExtent,
+  }) {
+    const edgeInset = 2.0;
+    final percentageRange = maximumPercentage - minimumPercentage;
+    if (percentageRange <= 0) {
+      return PitchLayout.positionedCoordinate(
+        percentage: percentage,
+        totalExtent: totalExtent,
+        childExtent: childExtent,
+      );
+    }
+    final usableExtent = math.max(
+      0.0,
+      totalExtent - childExtent - (edgeInset * 2),
+    );
+    final normalized = ((percentage - minimumPercentage) / percentageRange)
+        .clamp(0, 1);
+    return edgeInset + (normalized * usableExtent);
   }
 }
 
@@ -322,18 +422,27 @@ class _PlayerNode extends StatelessWidget {
   final double height;
   final Color accentColor;
   final bool exportMode;
+  final bool dense;
+  final bool denseSquad;
 
   const _PlayerNode({
+    super.key,
     required this.player,
     required this.width,
     required this.height,
     required this.accentColor,
     required this.exportMode,
+    required this.dense,
+    required this.denseSquad,
   });
 
   @override
   Widget build(BuildContext context) {
-    final jerseyH = exportMode ? 40.0 : 44.0;
+    final jerseyH = denseSquad
+        ? (dense ? 26.0 : 30.0)
+        : dense
+        ? 30.0
+        : (exportMode ? 40.0 : 44.0);
 
     return SizedBox(
       width: width,
@@ -351,47 +460,37 @@ class _PlayerNode extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Short name on back
-                    if (player.shortName != null)
-                      Text(
-                        player.shortName!,
-                        maxLines: 1,
-                        overflow: TextOverflow.clip,
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: exportMode ? 5.5 : 6,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.3,
-                          height: 1.0,
-                        ),
-                      ),
-                    // Shirt number
                     Text(
                       player.shirtNumber != null
                           ? '${player.shirtNumber}'
                           : player.initials,
                       style: TextStyle(
                         color: AppColors.textPrimary,
-                        fontSize: exportMode ? 14 : 15,
+                        fontSize: denseSquad
+                            ? (dense ? 6 : 9)
+                            : dense
+                            ? 7.5
+                            : (exportMode ? 14 : 15),
                         fontWeight: FontWeight.w900,
                         height: 1.0,
                       ),
+                      maxLines: 1,
                     ),
                   ],
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 3),
+          SizedBox(height: denseSquad ? 1 : (dense ? 1 : 3)),
           // Gold name card
           Container(
             width: width,
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+            padding: EdgeInsets.symmetric(
+              horizontal: denseSquad ? 2 : (dense ? 2 : 4),
+              vertical: denseSquad ? 1 : (dense ? 1 : 3),
+            ),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [_goldDark, _gold, _goldLight, _gold, _goldDark],
-                stops: [0, 0.2, 0.5, 0.8, 1],
-              ),
+              color: AppColors.textPrimaryTinted,
               borderRadius: BorderRadius.circular(4),
               boxShadow: [
                 BoxShadow(
@@ -411,23 +510,15 @@ class _PlayerNode extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: _cardBg,
-                    fontSize: exportMode ? 8 : 8.5,
+                    fontSize: denseSquad
+                        ? (dense ? 6 : 8.5)
+                        : dense
+                        ? 6.5
+                        : (exportMode ? 10.5 : 11),
                     fontWeight: FontWeight.w900,
                     height: 1.1,
                   ),
                 ),
-                if (player.positionLabel != null)
-                  Text(
-                    player.positionLabel!,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    style: TextStyle(
-                      color: _cardBg.withValues(alpha: 0.7),
-                      fontSize: exportMode ? 6.5 : 7,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                    ),
-                  ),
               ],
             ),
           ),
@@ -438,19 +529,28 @@ class _PlayerNode extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════
-// Footer: Tactical notes + Motivational quote
+// Footer: verified match context + bench
 // ═══════════════════════════════════════════
 
 class _FooterSection extends StatelessWidget {
   final LineupShareData data;
   final bool exportMode;
+  final bool dense;
 
-  const _FooterSection({required this.data, required this.exportMode});
+  const _FooterSection({
+    required this.data,
+    required this.exportMode,
+    required this.dense,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final visibleBench = data.benchPlayers.take(5).toList(growable: false);
+    final hiddenBenchCount = data.benchPlayers.length - visibleBench.length;
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+      padding: dense
+          ? const EdgeInsets.fromLTRB(8, 4, 8, 5)
+          : const EdgeInsets.fromLTRB(14, 8, 14, 10),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
@@ -463,113 +563,143 @@ class _FooterSection extends StatelessWidget {
         ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (visibleBench.isNotEmpty) ...[
+            Text(
+              'البدلاء',
+              style: TextStyle(
+                color: AppColors.textSecondaryTinted,
+                fontSize: dense ? 7 : (exportMode ? 10 : 11),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            SizedBox(height: dense ? 2 : 4),
+            Wrap(
+              spacing: dense ? 3 : 5,
+              runSpacing: dense ? 2 : 4,
+              children: [
+                for (final player in visibleBench)
+                  _BenchChip(
+                    player: player,
+                    exportMode: exportMode,
+                    dense: dense,
+                  ),
+                if (hiddenBenchCount > 0)
+                  _BenchMoreChip(
+                    count: hiddenBenchCount,
+                    exportMode: exportMode,
+                    dense: dense,
+                  ),
+              ],
+            ),
+            SizedBox(height: dense ? 3 : 6),
+          ],
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Tactical notes (right in RTL)
-              if (data.tacticalNotes.isNotEmpty)
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 14,
-                            height: 14,
-                            decoration: BoxDecoration(
-                              color: _gold.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                            child: const Icon(
-                              Icons.sticky_note_2_outlined,
-                              size: 10,
-                              color: _gold,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'ملاحظات تكتيكية',
-                            style: TextStyle(
-                              color: _gold,
-                              fontSize: exportMode ? 9 : 10,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      ...data.tacticalNotes
-                          .take(5)
-                          .map(
-                            (note) => Padding(
-                              padding: const EdgeInsets.only(bottom: 1),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 4),
-                                    child: Icon(
-                                      Icons.star,
-                                      size: 6,
-                                      color: _gold.withValues(alpha: 0.7),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Flexible(
-                                    child: Text(
-                                      note,
-                                      style: TextStyle(
-                                        color: AppColors.textPrimary.withValues(
-                                          alpha: 0.8,
-                                        ),
-                                        fontSize: exportMode ? 8 : 8.5,
-                                        fontWeight: FontWeight.w600,
-                                        height: 1.4,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                    ],
+              Expanded(
+                child: Text(
+                  data.teamLabel ?? data.lineupTypeLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.textSecondaryTinted,
+                    fontSize: dense ? 6.5 : (exportMode ? 10 : 11),
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              // Motivational quote (left in RTL)
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      data.motivationalQuote,
-                      textAlign: TextAlign.end,
-                      style: TextStyle(
-                        color: _goldLight,
-                        fontSize: exportMode ? 14 : 16,
-                        fontWeight: FontWeight.w900,
-                        height: 1.3,
-                      ),
+              ),
+              if (data.updatedLabel != null) ...[
+                SizedBox(width: dense ? 4 : 8),
+                Flexible(
+                  child: Text(
+                    'حُفظت ${data.updatedLabel}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.textSecondaryTinted,
+                      fontSize: dense ? 6.5 : (exportMode ? 10 : 11),
+                      fontWeight: FontWeight.w700,
                     ),
-                  ],
+                  ),
                 ),
+              ],
+              SizedBox(width: dense ? 4 : 8),
+              Text(
+                'EL7REEF',
+                style: TextStyle(
+                  color: _gold,
+                  fontSize: dense ? 6.5 : (exportMode ? 11 : 12),
+                  fontWeight: FontWeight.w900,
+                ),
+                maxLines: 1,
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          // App branding
-          Text(
-            'EL7REEF  •  الحريف',
-            style: TextStyle(
-              color: _gold.withValues(alpha: 0.5),
-              fontSize: exportMode ? 8 : 9,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1,
-            ),
-          ),
         ],
+      ),
+    );
+  }
+}
+
+class _BenchChip extends StatelessWidget {
+  final LineupShareBenchPlayerData player;
+  final bool exportMode;
+  final bool dense;
+
+  const _BenchChip({
+    required this.player,
+    required this.exportMode,
+    required this.dense,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final number = player.shirtNumber == null ? '' : '#${player.shirtNumber} ';
+    return Container(
+      constraints: BoxConstraints(maxWidth: dense ? 92 : 112),
+      padding: EdgeInsets.symmetric(
+        horizontal: dense ? 4 : 7,
+        vertical: dense ? 2 : 3,
+      ),
+      decoration: BoxDecoration(
+        color: _cardBgRaised,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.surfaceBorder),
+      ),
+      child: Text(
+        '$number${player.displayName}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: AppColors.textPrimaryTinted,
+          fontSize: dense ? 6.5 : (exportMode ? 10 : 11),
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _BenchMoreChip extends StatelessWidget {
+  final int count;
+  final bool exportMode;
+  final bool dense;
+
+  const _BenchMoreChip({
+    required this.count,
+    required this.exportMode,
+    required this.dense,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      '+$count',
+      style: TextStyle(
+        color: _gold,
+        fontSize: dense ? 6.5 : (exportMode ? 10 : 11),
+        fontWeight: FontWeight.w900,
       ),
     );
   }

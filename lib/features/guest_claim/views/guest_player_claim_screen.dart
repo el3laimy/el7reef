@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 
 import '../../../app/routes/app_routes.dart';
 import '../../../core/enums/claim_merge_conflict_type.dart';
+import '../../../core/enums/guest_claim_status.dart';
+import '../../../core/navigation/pending_deep_link_service.dart';
 import '../../../core/services/guest_claim_service.dart';
 import '../controllers/guest_player_claim_controller.dart';
 import '_claim_ui_shared.dart';
@@ -46,12 +48,13 @@ class GuestPlayerClaimScreen extends GetView<GuestPlayerClaimController> {
               children: [
                 ClaimInfoCard(
                   title: guestPlayer.displayName,
-                  subtitle: controller.linkedTeam.value?.name ?? 'لا يوجد فريق مرتبط',
+                  subtitle:
+                      controller.linkedTeam.value?.name ?? 'لا يوجد فريق مرتبط',
                   icon: Icons.person_pin_circle_outlined,
                   rows: [
                     ClaimInfoRow(
                       label: 'الحالة',
-                      value: guestPlayer.claimStatus.name,
+                      value: _claimStatusLabel(guestPlayer.claimStatus),
                     ),
                     if (guestPlayer.preferredPosition != null &&
                         guestPlayer.preferredPosition!.isNotEmpty)
@@ -98,8 +101,14 @@ class GuestPlayerClaimScreen extends GetView<GuestPlayerClaimController> {
                 const SizedBox(height: 24),
                 if (!controller.isAuthenticated) ...[
                   FilledButton(
-                    onPressed: () => Get.toNamed(AppRoutes.login),
+                    onPressed: _storePendingRouteAndOpenLogin,
                     child: const Text('تسجيل الدخول'),
+                  ),
+                ] else if (controller.hasSuccessfulClaim) ...[
+                  FilledButton.icon(
+                    onPressed: _openClaimedProfile,
+                    icon: const Icon(Icons.person_rounded),
+                    label: const Text('افتح بروفايلك'),
                   ),
                 ] else ...[
                   FilledButton(
@@ -126,6 +135,41 @@ class GuestPlayerClaimScreen extends GetView<GuestPlayerClaimController> {
     );
   }
 
+  void _storePendingRouteAndOpenLogin() {
+    final id = controller.guestPlayerId;
+    if (id != null && id.isNotEmpty) {
+      final query = Map<String, String?>.from(Get.parameters)
+        ..remove('guestPlayerId');
+      _pendingDeepLinkService().store(
+        AppRoutes.guestPlayerClaimById(id, queryParameters: query),
+      );
+    }
+    Get.toNamed(AppRoutes.login);
+  }
+
+  PendingDeepLinkService _pendingDeepLinkService() {
+    return Get.isRegistered<PendingDeepLinkService>()
+        ? Get.find<PendingDeepLinkService>()
+        : Get.put(PendingDeepLinkService(), permanent: true);
+  }
+
+  void _openClaimedProfile() {
+    final playerId = controller.claimedPlayerId;
+    if (playerId == null || playerId.isEmpty) return;
+    Get.offNamed(
+      AppRoutes.playerProfileByKindAndId(kind: 'player', id: playerId),
+    );
+  }
+
+  String _claimStatusLabel(GuestClaimStatus status) {
+    return switch (status) {
+      GuestClaimStatus.guest => 'ضيف',
+      GuestClaimStatus.invited => 'بانتظار الاستلام',
+      GuestClaimStatus.claimed => 'تم الاستلام',
+      GuestClaimStatus.archived => 'مؤرشف',
+    };
+  }
+
   String _resultTitle(GuestPlayerClaimResult result) {
     switch (result.outcome) {
       case GuestPlayerClaimOutcome.claimed:
@@ -144,7 +188,8 @@ class GuestPlayerClaimScreen extends GetView<GuestPlayerClaimController> {
       case GuestPlayerClaimOutcome.alreadyClaimed:
         return 'لا حاجة لتكرار العملية. هذا المكان تم ربطه بحسابك بالفعل.';
       case GuestPlayerClaimOutcome.conflict:
-        return result.conflict?.message ?? 'حدث تعارض غير متوقع أثناء الاستلام.';
+        return result.conflict?.message ??
+            'حدث تعارض غير متوقع أثناء الاستلام.';
     }
   }
 
@@ -156,8 +201,7 @@ class GuestPlayerClaimScreen extends GetView<GuestPlayerClaimController> {
       case GuestPlayerClaimOutcome.conflict:
         return switch (result.conflict?.type) {
           ClaimMergeConflictType.duplicatePhone ||
-          ClaimMergeConflictType.duplicateName =>
-            Colors.orange,
+          ClaimMergeConflictType.duplicateName => Colors.orange,
           _ => Colors.redAccent,
         };
     }

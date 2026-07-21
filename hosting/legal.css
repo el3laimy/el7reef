@@ -1,0 +1,117 @@
+:root {
+  color-scheme: dark;
+  font-family: "Cairo", "Noto Sans Arabic", system-ui, sans-serif;
+  background: #07130f;
+  color: #f4fff9;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at top right, rgba(48, 196, 120, 0.2), transparent 34rem),
+    linear-gradient(180deg, #0b1e17, #06100c);
+  min-height: 100vh;
+}
+
+main {
+  width: min(760px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 48px 0 72px;
+}
+
+.eyebrow {
+  color: #74e2a6;
+  font-weight: 800;
+  margin: 0 0 8px;
+}
+
+h1 {
+  font-size: clamp(2rem, 7vw, 3.25rem);
+  line-height: 1.2;
+  margin: 0 0 16px;
+}
+
+h2 {
+  color: #caffdf;
+  font-size: 1.15rem;
+  margin: 0 0 8px;
+}
+
+p,
+li {
+  color: #c9d8d0;
+  line-height: 1.85;
+}
+
+.lead {
+  font-size: 1.08rem;
+  margin-bottom: 28px;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(148, 255, 196, 0.18);
+  border-radius: 20px;
+  margin: 12px 0;
+  padding: 20px;
+}
+
+.action {
+  align-items: center;
+  background: #40d884;
+  border-radius: 14px;
+  color: #042012;
+  display: inline-flex;
+  font-weight: 900;
+  justify-content: center;
+  min-height: 52px;
+  padding: 12px 22px;
+  text-decoration: none;
+}
+
+.action:focus-visible,
+a:focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: 4px;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.links a:not(.action) {
+  color: #8fe8b7;
+  min-height: 48px;
+  padding: 12px 4px;
+}
+
+.note {
+  color: #91a69b;
+  font-size: 0.9rem;
+}
+
+ul {
+  padding-inline-start: 22px;
+}
+
+@media (max-width: 480px) {
+  main {
+    padding-top: 28px;
+  }
+
+  .card {
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  .action {
+    width: 100%;
+  }
+}

@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/lineup/lineup_types.dart';
-import 'lineup_player_display.dart';
+import 'squad_player_card.dart';
 
 class BenchBar extends StatelessWidget {
   final List<LineupPlayer> players;
   final ValueChanged<LineupPlayer>? onPlayerTap;
   final VoidCallback? onAddGuest;
   final ValueChanged<LineupPlayer>? onPlayerDroppedOnBench;
+  final VoidCallback? onSelectedPlayerMoveToBench;
+  final VoidCallback? onSelectedBenchSwapRequest;
+  final String? selectedPlayerKey;
   final String title;
   final bool compact;
   final bool draggable;
@@ -22,6 +24,9 @@ class BenchBar extends StatelessWidget {
     this.onPlayerTap,
     this.onAddGuest,
     this.onPlayerDroppedOnBench,
+    this.onSelectedPlayerMoveToBench,
+    this.onSelectedBenchSwapRequest,
+    this.selectedPlayerKey,
     this.title = 'البدلاء',
     this.compact = false,
     this.draggable = false,
@@ -32,16 +37,32 @@ class BenchBar extends StatelessWidget {
     final textScale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
     final benchListHeight = _benchListHeight(textScale);
     final cardWidth = _benchCardWidth(textScale);
+    final hasTapBenchTarget = onSelectedPlayerMoveToBench != null;
+    final hasSelectedBenchSwapTarget =
+        onSelectedBenchSwapRequest != null &&
+        selectedPlayerKey != null &&
+        players.any((player) => player.key == selectedPlayerKey);
     Widget content = Container(
       padding: const EdgeInsets.all(AppDimensions.md),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: hasTapBenchTarget || hasSelectedBenchSwapTarget
+            ? AppColors.warning.withValues(alpha: 0.08)
+            : AppColors.surface,
         borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-        border: Border.all(color: AppColors.surfaceBorder),
+        border: Border.all(
+          color: hasTapBenchTarget || hasSelectedBenchSwapTarget
+              ? AppColors.warning.withValues(alpha: 0.72)
+              : AppColors.surfaceBorder,
+          width: hasTapBenchTarget || hasSelectedBenchSwapTarget ? 1.7 : 1.0,
+        ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.backgroundDeep.withValues(alpha: 0.28),
-            blurRadius: 16,
+            color: hasTapBenchTarget || hasSelectedBenchSwapTarget
+                ? AppColors.warning.withValues(alpha: 0.16)
+                : AppColors.backgroundDeep.withValues(alpha: 0.28),
+            blurRadius: hasTapBenchTarget || hasSelectedBenchSwapTarget
+                ? 20
+                : 16,
             offset: const Offset(0, 8),
           ),
         ],
@@ -80,6 +101,50 @@ class BenchBar extends StatelessWidget {
                 ),
             ],
           ),
+          if (hasTapBenchTarget) ...[
+            const SizedBox(height: AppDimensions.sm),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                key: const ValueKey('bench-move-selected-target'),
+                onPressed: onSelectedPlayerMoveToBench,
+                icon: const Icon(Icons.event_seat_rounded, size: 18),
+                label: const Text('انقل المختار للبدلاء'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.warning,
+                  side: BorderSide(
+                    color: AppColors.warning.withValues(alpha: 0.75),
+                  ),
+                  textStyle: AppTextStyles.labelLarge,
+                  minimumSize: const Size.fromHeight(44),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          if (hasSelectedBenchSwapTarget) ...[
+            const SizedBox(height: AppDimensions.sm),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                key: const ValueKey('bench-swap-selected-target'),
+                onPressed: onSelectedBenchSwapRequest,
+                icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                label: const Text('بدّل المختار مع أساسي'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.textOnPrimary,
+                  textStyle: AppTextStyles.labelLarge,
+                  minimumSize: const Size.fromHeight(44),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+                  ),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: AppDimensions.sm),
           if (players.isEmpty)
             Container(
@@ -91,7 +156,9 @@ class BenchBar extends StatelessWidget {
                 border: Border.all(color: AppColors.surfaceBorder),
               ),
               child: Text(
-                'لا يوجد بدلاء حالياً',
+                draggable
+                    ? 'لا يوجد بدلاء حاليًا. انقل لاعبًا من الملعب إلى هنا.'
+                    : 'لا يوجد بدلاء حاليًا',
                 style: AppTextStyles.bodySmall,
                 textAlign: TextAlign.center,
               ),
@@ -108,13 +175,16 @@ class BenchBar extends StatelessWidget {
                   Widget card = _BenchDockCard(
                     player: player,
                     compact: compact,
+                    isSelected: player.key == selectedPlayerKey,
                     onTap: onPlayerTap == null
                         ? null
                         : () => onPlayerTap!(player),
                   );
                   if (draggable) {
-                    card = Draggable<LineupPlayer>(
-                      data: player,
+                    card = Draggable<LineupDragPayload>(
+                      data: LineupDragPayload(player: player),
+                      dragAnchorStrategy: pointerDragAnchorStrategy,
+                      maxSimultaneousDrags: 1,
                       feedback: Material(
                         color: Colors.transparent,
                         child: SizedBox(
@@ -137,21 +207,58 @@ class BenchBar extends StatelessWidget {
 
     if (onPlayerDroppedOnBench != null) {
       final targetChild = content;
-      content = DragTarget<LineupPlayer>(
+      content = DragTarget<LineupDragPayload>(
+        onWillAcceptWithDetails: (details) => !details.data.fromBench,
         onAcceptWithDetails: (details) {
-          onPlayerDroppedOnBench!(details.data);
+          onPlayerDroppedOnBench!(details.data.player);
         },
         builder: (context, candidateData, rejectedData) {
-          if (candidateData.isNotEmpty) {
-            return Container(
+          final hasCandidate = candidateData.any(
+            (candidate) => candidate != null,
+          );
+          if (hasCandidate) {
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              curve: Curves.easeOutCubic,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+                color: AppColors.warning.withValues(alpha: 0.08),
                 border: Border.all(
-                  color: AppColors.warning.withValues(alpha: 0.6),
+                  color: AppColors.warning.withValues(alpha: 0.8),
                   width: 2,
                 ),
               ),
-              child: targetChild,
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.topCenter,
+                children: [
+                  targetChild,
+                  Positioned(
+                    top: -10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.backgroundDeep,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: AppColors.warning),
+                      ),
+                      child: const Text(
+                        'انقل للبدلاء',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          color: AppColors.warning,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             );
           }
           return targetChild;
@@ -176,160 +283,60 @@ class BenchBar extends StatelessWidget {
 class _BenchDockCard extends StatelessWidget {
   final LineupPlayer player;
   final bool compact;
+  final bool isSelected;
   final VoidCallback? onTap;
 
   const _BenchDockCard({
     required this.player,
     required this.compact,
+    required this.isSelected,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final roleColor = (player.isGuest || player.isTemporary)
-        ? AppColors.warning
-        : lineupPlayerRoleColor(player);
+    final role = SlotRole.values.firstWhere(
+      (candidate) => candidate.matchesPosition(player.preferredPosition),
+      orElse: () => SlotRole.mid,
+    );
     return InkWell(
+      key: ValueKey('bench-player-${player.key}'),
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final availableHeight = constraints.maxHeight.isFinite
-              ? constraints.maxHeight
-              : compact
-              ? 80.0
-              : 95.0;
-          final cardWidth = constraints.maxWidth.isFinite
-              ? constraints.maxWidth
-              : compact
-              ? 82.0
-              : 96.0;
-          final padding = (availableHeight * 0.08).clamp(5.0, 8.0);
-          final avatarSize = (availableHeight * (compact ? 0.38 : 0.4)).clamp(
-            compact ? 28.0 : 34.0,
-            compact ? 36.0 : 42.0,
-          );
-          final nameFontSize = (availableHeight * 0.13).clamp(
-            compact ? 9.0 : 10.0,
-            compact ? 11.0 : 12.0,
-          );
-          final metaFontSize = (availableHeight * 0.1).clamp(7.5, 9.5);
-
-          return Container(
-            width: cardWidth,
-            padding: EdgeInsets.all(padding),
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-              border: Border.all(color: roleColor.withValues(alpha: 0.5)),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Stack(
-              children: [
-                // Role color strip at top
-                PositionedDirectional(
-                  top: 0,
-                  start: 0,
-                  end: 0,
-                  child: Container(height: 3, color: roleColor),
-                ),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.max,
-                  children: [
-                    // Avatar
-                    Container(
-                      width: avatarSize,
-                      height: avatarSize,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: roleColor.withValues(alpha: 0.16),
-                        border: Border.all(color: roleColor),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: (player.photoUrl ?? '').isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: player.photoUrl!,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) =>
-                                  _BenchInitial(player: player),
-                              errorWidget: (context, url, error) =>
-                                  _BenchInitial(player: player),
-                            )
-                          : _BenchInitial(player: player),
-                    ),
-                    SizedBox(height: (availableHeight * 0.05).clamp(3.0, 5.0)),
-                    // Name
-                    Flexible(
-                      child: Text(
-                        lineupDisplayName(player),
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: nameFontSize,
-                          height: 1.05,
-                          letterSpacing: 0,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    // Meta / position
-                    Flexible(
-                      child: Text(
-                        player.isTemporary
-                            ? 'مؤقت'
-                            : player.isGuest
-                            ? 'ضيف'
-                            : (player.preferredPosition ?? 'لاعب'),
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: roleColor,
-                          fontSize: metaFontSize,
-                          height: 1.05,
-                          letterSpacing: 0,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _BenchInitial extends StatelessWidget {
-  final LineupPlayer player;
-
-  const _BenchInitial({required this.player});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Padding(
-          padding: const EdgeInsets.all(4),
-          child: Text(
-            lineupInitialsForPlayer(player),
-            style: AppTextStyles.titleMedium.copyWith(
-              color: (player.isGuest || player.isTemporary)
-                  ? AppColors.warning
-                  : AppColors.primaryLight,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.clip,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          SquadPlayerCard(
+            player: player,
+            role: role,
+            size: compact
+                ? SquadPlayerCardSize.compact
+                : SquadPlayerCardSize.bench,
+            isSelected: isSelected,
           ),
-        ),
+          if (isSelected)
+            PositionedDirectional(
+              top: -6,
+              end: -4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  'مختار',
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.textOnPrimary,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

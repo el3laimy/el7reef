@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:el7reef/core/widgets/el7reef_glass_surface.dart';
 import 'package:el7reef/core/services/tournament_top_scorers_resolver.dart';
 import 'package:el7reef/domain/entities/participant_ref.dart';
 import 'package:el7reef/features/shareables/controllers/top_scorers_share_controller.dart';
@@ -25,9 +26,10 @@ void main() {
       ];
 
       final data = const TopScorersShareController().build(
+        tournamentId: 'tournament-1',
         tournamentName: 'Street Cup',
         scorers: scorers,
-      );
+      )!;
 
       expect(data.title, 'هدافو البطولة');
       expect(data.tournamentName, 'Street Cup');
@@ -58,8 +60,9 @@ void main() {
       expect(twoGoals.goalLabel, '2 أهداف');
     });
 
-    test('uses fallback names for empty tournament and scorer names', () {
+    test('rejects cards whose tournament or scorer names are missing', () {
       final data = const TopScorersShareController().build(
+        tournamentId: 'tournament-1',
         tournamentName: '   ',
         scorers: const [
           TournamentTopScorerEntry(
@@ -73,8 +76,35 @@ void main() {
         ],
       );
 
-      expect(data.tournamentName, 'بطولة الحريف');
-      expect(data.scorers.single.displayName, 'لاعب');
+      expect(data, isNull);
+    });
+
+    test('omits nameless scorer rows instead of inventing player labels', () {
+      final data = const TopScorersShareController().build(
+        tournamentId: 'tournament-1',
+        tournamentName: 'Street Cup',
+        scorers: const [
+          TournamentTopScorerEntry(
+            actor: ParticipantRef(
+              kind: ParticipantRefKind.player,
+              id: 'missing-name',
+              displayName: '   ',
+            ),
+            goals: 2,
+          ),
+          TournamentTopScorerEntry(
+            actor: ParticipantRef(
+              kind: ParticipantRefKind.guestPlayer,
+              id: 'guest-1',
+              displayName: 'هداف ضيف',
+            ),
+            goals: 1,
+          ),
+        ],
+      )!;
+
+      expect(data.scorers, hasLength(1));
+      expect(data.scorers.single.displayName, 'هداف ضيف');
     });
   });
 
@@ -116,5 +146,37 @@ void main() {
     expect(find.text('3 أهداف'), findsOneWidget);
     expect(find.text('ضيف'), findsOneWidget);
     expect(find.text('الحريف'), findsOneWidget);
+    expect(find.byType(El7reefGlassSurface), findsOneWidget);
+  });
+
+  testWidgets('export mode keeps the top scorers image deterministic', (
+    tester,
+  ) async {
+    const data = TopScorersShareData(
+      title: 'هدافو البطولة',
+      tournamentName: 'Street Cup',
+      scorers: [
+        TopScorersShareEntryData(
+          rank: 1,
+          displayName: 'Ali',
+          goals: 2,
+          isGuest: false,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: TopScorersShareCard(data: data, exportMode: true),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Ali'), findsOneWidget);
+    expect(find.byType(El7reefGlassSurface), findsNothing);
+    expect(find.byType(BackdropFilter), findsNothing);
   });
 }

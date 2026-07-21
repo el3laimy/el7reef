@@ -2,16 +2,21 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:el7reef/app/routes/app_routes.dart';
 import 'package:el7reef/core/enums/guest_claim_status.dart';
+import 'package:el7reef/core/enums/match_status.dart';
 import 'package:el7reef/core/enums/player_trust_level.dart';
 import 'package:el7reef/core/enums/user_role.dart';
+import 'package:el7reef/core/services/feature_flag_service.dart';
 import 'package:el7reef/core/services/match_event_service.dart';
 import 'package:el7reef/data/repositories/guest_player_repository_impl.dart';
 import 'package:el7reef/data/repositories/match_event_repository_impl.dart';
+import 'package:el7reef/data/repositories/match_repository_impl.dart';
 import 'package:el7reef/data/repositories/player_repository_impl.dart';
 import 'package:el7reef/domain/entities/guest_player.dart';
+import 'package:el7reef/domain/entities/match.dart';
 import 'package:el7reef/domain/entities/match_event.dart';
 import 'package:el7reef/domain/entities/participant_ref.dart';
 import 'package:el7reef/domain/entities/player.dart';
@@ -52,6 +57,87 @@ void main() {
       expect(profile.totalGoals, 2);
       expect(profile.totalMvps, 1);
     });
+
+    test(
+      'keeps guest goals and MVPs after the player claims the profile',
+      () async {
+        final fixture = _ResolverFixture();
+        await fixture.playerRepository.createPlayer(_player(id: 'player-1'));
+        await fixture.guestPlayerRepository.createGuestPlayer(
+          _guestPlayer(
+            id: 'guest-before-claim',
+            displayName: 'Guest Ali',
+            linkedPlayerId: 'player-1',
+          ),
+        );
+        await fixture.seedEvent(
+          id: 'registered-goal',
+          eventType: MatchEventType.goal,
+          actor: _actor(ParticipantRefKind.player, 'player-1', 'Ali'),
+        );
+        await fixture.seedEvent(
+          id: 'guest-goal-before-claim',
+          eventType: MatchEventType.goal,
+          actor: _actor(
+            ParticipantRefKind.guestPlayer,
+            'guest-before-claim',
+            'Guest Ali',
+          ),
+        );
+        await fixture.seedEvent(
+          id: 'guest-mvp-before-claim',
+          eventType: MatchEventType.mvp,
+          actor: _actor(
+            ParticipantRefKind.guestPlayer,
+            'guest-before-claim',
+            'Guest Ali',
+          ),
+        );
+
+        final profile = await fixture.resolver.resolve(
+          kind: 'player',
+          id: 'player-1',
+        );
+
+        expect(profile, isNotNull);
+        expect(profile!.displayName, 'Registered Ali');
+        expect(profile.totalGoals, 2);
+        expect(profile.totalMvps, 1);
+      },
+    );
+
+    test(
+      'does not query private guest links for another player profile',
+      () async {
+        final fixture = _ResolverFixture(currentUserId: 'viewer-2');
+        await fixture.playerRepository.createPlayer(_player(id: 'player-1'));
+        await fixture.guestPlayerRepository.createGuestPlayer(
+          _guestPlayer(
+            id: 'guest-private-link',
+            displayName: 'Guest Ali',
+            linkedPlayerId: 'player-1',
+          ),
+        );
+        await fixture.seedEvent(
+          id: 'guest-private-goal',
+          eventType: MatchEventType.goal,
+          actor: _actor(
+            ParticipantRefKind.guestPlayer,
+            'guest-private-link',
+            'Guest Ali',
+          ),
+        );
+
+        final profile = await fixture.resolver.resolve(
+          kind: 'player',
+          id: 'player-1',
+        );
+
+        expect(profile, isNotNull);
+        expect(profile!.totalGoals, 0);
+        expect(profile.totalMvps, 0);
+      },
+    );
 
     test('aggregates goals and MVPs for guest player', () async {
       final fixture = _ResolverFixture();
@@ -105,6 +191,30 @@ void main() {
       expect(profile, isNotNull);
       expect(profile!.totalGoals, 1);
       expect(profile.totalMvps, 0);
+    });
+
+    test('ignores active events until their match result is settled', () async {
+      final fixture = _ResolverFixture();
+      await fixture.playerRepository.createPlayer(_player(id: 'player-1'));
+      await fixture.seedEvent(
+        id: 'settled-goal',
+        eventType: MatchEventType.goal,
+        actor: _actor(ParticipantRefKind.player, 'player-1', 'Ali'),
+      );
+      await fixture.seedEvent(
+        id: 'pending-goal',
+        eventType: MatchEventType.goal,
+        actor: _actor(ParticipantRefKind.player, 'player-1', 'Ali'),
+        matchStatus: MatchStatus.pendingReview,
+      );
+
+      final profile = await fixture.resolver.resolve(
+        kind: 'player',
+        id: 'player-1',
+      );
+
+      expect(profile, isNotNull);
+      expect(profile!.totalGoals, 1);
     });
 
     test('invalid kind or id returns safe null state', () async {
@@ -200,6 +310,81 @@ void main() {
     expect(find.text('2'), findsOneWidget);
     expect(find.textContaining('ده أنت؟ اطلب رابط الدعوة'), findsOneWidget);
     expect(find.text('استلم البروفايل'), findsNothing);
+  });
+
+  testWidgets('earned milestone CTA opens the picker then the share composer', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    await _pumpProfileRoute(
+      tester,
+      const PublicPlayerProfileData(
+        kind: ParticipantRefKind.player,
+        id: 'player-1',
+        displayName: 'هداف الحارة',
+        totalGoals: 5,
+        totalMvps: 3,
+      ),
+      routeKind: 'player',
+      routeId: 'player-1',
+      catalogV2Enabled: true,
+    );
+
+    expect(find.text('إنجاز يستحق يتشاف'), findsOneWidget);
+    expect(find.text('شارك إنجازك'), findsOneWidget);
+
+    await tester.tap(find.text('شارك إنجازك'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('اختار الإنجاز'), findsOneWidget);
+    expect(find.text('5 هدف'), findsOneWidget);
+    expect(find.text('3 مرات MVP'), findsOneWidget);
+
+    await tester.tap(find.text('5 هدف'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('جهّز لحظة الفخر'), findsOneWidget);
+  });
+
+  testWidgets('verified milestone CTA stays hidden below every threshold', (
+    tester,
+  ) async {
+    await _pumpProfileRoute(
+      tester,
+      const PublicPlayerProfileData(
+        kind: ParticipantRefKind.player,
+        id: 'player-2',
+        displayName: 'لاعب صاعد',
+        totalGoals: 4,
+        totalMvps: 2,
+      ),
+      routeKind: 'player',
+      routeId: 'player-2',
+      catalogV2Enabled: true,
+    );
+
+    expect(find.text('إنجاز يستحق يتشاف'), findsNothing);
+    expect(find.text('شارك إنجازك'), findsNothing);
+  });
+
+  testWidgets('earned milestone CTA stays hidden while catalog V2 is off', (
+    tester,
+  ) async {
+    await _pumpProfileRoute(
+      tester,
+      const PublicPlayerProfileData(
+        kind: ParticipantRefKind.player,
+        id: 'player-3',
+        displayName: 'هداف مؤكد',
+        totalGoals: 20,
+        totalMvps: 10,
+      ),
+      routeKind: 'player',
+      routeId: 'player-3',
+    );
+
+    expect(find.text('إنجاز يستحق يتشاف'), findsNothing);
+    expect(find.text('شارك إنجازك'), findsNothing);
   });
 
   testWidgets('guest profile with valid matching token shows claim CTA', (
@@ -405,6 +590,7 @@ Future<void> _pumpProfileRoute(
   String routeId = 'guest-1',
   Map<String, String?> queryParameters = const {},
   bool includeClaimRoute = false,
+  bool catalogV2Enabled = false,
 }) async {
   Get.testMode = true;
   Get.reset();
@@ -422,6 +608,13 @@ Future<void> _pumpProfileRoute(
           name: AppRoutes.playerProfile,
           page: () => const PublicPlayerProfileScreen(),
           binding: BindingsBuilder(() {
+            Get.put(
+              FeatureFlagService(
+                overrides: {
+                  FeatureFlagKey.prideShareCatalogV2Enabled: catalogV2Enabled,
+                },
+              ),
+            );
             Get.put(
               PublicPlayerProfileController(
                 kind: Get.parameters['kind'] ?? routeKind,
@@ -484,8 +677,10 @@ String _withQuery(String path, Map<String, String?> queryParameters) {
 }
 
 class _ResolverFixture {
-  _ResolverFixture() : firestore = FakeFirebaseFirestore() {
+  _ResolverFixture({this.currentUserId = 'player-1'})
+    : firestore = FakeFirebaseFirestore() {
     matchEventRepository = MatchEventRepositoryImpl(firestore: firestore);
+    matchRepository = MatchRepositoryImpl(firestore: firestore);
     playerRepository = PlayerRepositoryImpl(firestore: firestore);
     guestPlayerRepository = GuestPlayerRepositoryImpl(firestore: firestore);
     resolver = PublicPlayerProfileResolver(
@@ -495,11 +690,15 @@ class _ResolverFixture {
         repository: matchEventRepository,
         firestore: firestore,
       ),
+      matchRepository: matchRepository,
+      currentUserId: () => currentUserId,
     );
   }
 
+  final String currentUserId;
   final FakeFirebaseFirestore firestore;
   late final MatchEventRepositoryImpl matchEventRepository;
+  late final MatchRepositoryImpl matchRepository;
   late final PlayerRepositoryImpl playerRepository;
   late final GuestPlayerRepositoryImpl guestPlayerRepository;
   late final PublicPlayerProfileResolver resolver;
@@ -509,11 +708,24 @@ class _ResolverFixture {
     required MatchEventType eventType,
     required ParticipantRef actor,
     MatchEventStatus status = MatchEventStatus.active,
-  }) {
-    return matchEventRepository.createEvent(
+    MatchStatus matchStatus = MatchStatus.settled,
+  }) async {
+    final matchId = 'match-$id';
+    await matchRepository.createMatch(
+      Match(
+        id: matchId,
+        organizerId: 'organizer-1',
+        status: matchStatus,
+        scoreTeamA: 1,
+        scoreTeamB: 0,
+        tournamentId: 'tournament-1',
+        createdAt: DateTime.utc(2026, 7, 14),
+      ),
+    );
+    await matchEventRepository.createEvent(
       MatchEvent(
         id: id,
-        matchId: 'match-$id',
+        matchId: matchId,
         tournamentId: 'tournament-1',
         eventType: eventType,
         sideKey: 'A',
@@ -541,6 +753,9 @@ class _FakeResolver extends PublicPlayerProfileResolver {
           repository: MatchEventRepositoryImpl(
             firestore: FakeFirebaseFirestore(),
           ),
+          firestore: FakeFirebaseFirestore(),
+        ),
+        matchRepository: MatchRepositoryImpl(
           firestore: FakeFirebaseFirestore(),
         ),
       );
@@ -579,7 +794,11 @@ Player _player({required String id}) {
   );
 }
 
-GuestPlayer _guestPlayer({required String id, required String displayName}) {
+GuestPlayer _guestPlayer({
+  required String id,
+  required String displayName,
+  String? linkedPlayerId,
+}) {
   return GuestPlayer(
     id: id,
     displayName: displayName,
@@ -587,6 +806,9 @@ GuestPlayer _guestPlayer({required String id, required String displayName}) {
     createdBy: 'organizer-1',
     createdAt: DateTime(2026),
     updatedAt: DateTime(2026),
-    claimStatus: GuestClaimStatus.guest,
+    claimStatus: linkedPlayerId == null
+        ? GuestClaimStatus.guest
+        : GuestClaimStatus.claimed,
+    linkedPlayerId: linkedPlayerId,
   );
 }

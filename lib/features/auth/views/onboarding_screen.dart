@@ -1,200 +1,219 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
+
 import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/navigation/pending_deep_link_service.dart';
+import '../../../core/widgets/el7reef_brand_mark.dart';
 import '../../../core/widgets/el7reef_button.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 
-/// شاشة الترحيب — 3 slides تعريفية
-class OnboardingScreen extends StatefulWidget {
+/// بداية سريعة تركز على نية المستخدم، لا شرح طويل.
+class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({super.key});
-
-  @override
-  State<OnboardingScreen> createState() => _OnboardingScreenState();
-}
-
-class _OnboardingScreenState extends State<OnboardingScreen> {
-  final PageController _pageController = PageController();
-  int _currentPage = 0;
-
-  final _pages = const [
-    _OnboardingPage(
-      icon: '⚽',
-      title: 'ملعبك، قواعدك',
-      description: 'سجّل مبارياتك في الشارع وتابع أداءك الحقيقي مع كل لمسة كورة.',
-      gradient: AppColors.primaryGradient,
-    ),
-    _OnboardingPage(
-      icon: '📊',
-      title: 'تقييم عادل',
-      description: 'خوارزمية ذكية تحسب مستواك بناءً على أدائك الفعلي وقوة خصومك.',
-      gradient: LinearGradient(
-        colors: [AppColors.primary, AppColors.primaryLight],
-      ),
-    ),
-    _OnboardingPage(
-      icon: '🏆',
-      title: 'دورات وإنجازات',
-      description: 'شارك في دورات محلية، اجمع بادجات، وأثبت إنك الحريف الحقيقي.',
-      gradient: AppColors.goldGradient,
-    ),
-  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppColors.backgroundGradient,
-        ),
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
         child: SafeArea(
-          child: Column(
-            children: [
-              // زر تخطي
-              Align(
-                alignment: Alignment.topLeft,
-                child: TextButton(
-                  onPressed: () => Get.offAllNamed(AppRoutes.login),
-                  child: Text('تخطي', style: AppTextStyles.labelLarge.copyWith(color: AppColors.textMuted)),
-                ),
-              ).animate().fadeIn(delay: 500.ms),
-
-              // الصفحات
-              Expanded(
-                child: PageView.builder(
-                  controller: _pageController,
-                  itemCount: _pages.length,
-                  onPageChanged: (index) => setState(() => _currentPage = index),
-                  itemBuilder: (context, index) => _buildPage(_pages[index]),
-                ),
-              ),
-
-              // مؤشرات الصفحات
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: AppDimensions.lg),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    _pages.length,
-                    (index) => AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      width: _currentPage == index ? 28 : 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(4),
-                        color: _currentPage == index
-                            ? AppColors.primary
-                            : AppColors.surfaceBorder,
+          child: LayoutBuilder(
+            builder: (context, _) {
+              return CustomScrollView(
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.all(AppDimensions.pagePadding),
+                    sliver: SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: TextButton.icon(
+                              onPressed: () => Get.offAllNamed(AppRoutes.login),
+                              icon: const Icon(Icons.login_rounded, size: 18),
+                              label: const Text('تسجيل الدخول'),
+                            ),
+                          ),
+                          const Spacer(),
+                          El7reefGlassSurface(
+                                variant: El7reefGlassVariant.raised,
+                                padding: const EdgeInsets.all(AppDimensions.xl),
+                                radius: AppDimensions.radiusXl,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    const Align(
+                                      alignment:
+                                          AlignmentDirectional.centerStart,
+                                      child: El7reefBrandMark(size: 92),
+                                    ),
+                                    const SizedBox(height: AppDimensions.lg),
+                                    Text(
+                                      'اختار بدايتك في الحريف',
+                                      style: AppTextStyles.displaySmall,
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: AppDimensions.sm),
+                                    Text(
+                                      'الدورة، الفريق، النتيجة، وكارت الفخر يبدأوا من خطوة واحدة.',
+                                      style: AppTextStyles.bodyMedium.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: AppDimensions.xl),
+                                    _IntentAction(
+                                      icon: Icons.emoji_events_rounded,
+                                      title: 'أنظم بطولة',
+                                      subtitle:
+                                          'ابدأ دورة شعبية وسجل الفرق والنتائج.',
+                                      onTap: () => _openAfterLogin(
+                                        AppRoutes.createTournament,
+                                      ),
+                                    ),
+                                    _IntentAction(
+                                      icon: Icons.groups_2_rounded,
+                                      title: 'أنا كابتن فريق',
+                                      subtitle:
+                                          'كوّن فريقك وجهّز اللاعيبة للبطولات.',
+                                      onTap: () =>
+                                          _openAfterLogin(AppRoutes.createTeam),
+                                    ),
+                                    _IntentAction(
+                                      icon: Icons.sports_soccer_rounded,
+                                      title: 'أنا لاعب',
+                                      subtitle:
+                                          'استكشف البطولات وخلّي لعبك متوثق.',
+                                      onTap: () => _openAfterLogin(
+                                        AppRoutes.tournamentExplore,
+                                      ),
+                                    ),
+                                    _IntentAction(
+                                      icon: Icons.qr_code_scanner_rounded,
+                                      title: 'معايا رابط أو QR',
+                                      subtitle:
+                                          'افتح دعوة، استلام لاعب، أو تسجيل بطولة.',
+                                      onTap: () =>
+                                          Get.toNamed(AppRoutes.qrScanner),
+                                    ),
+                                    const SizedBox(height: AppDimensions.lg),
+                                    El7reefButton(
+                                      text: 'المتابعة بحساب Google',
+                                      icon: Icons.login_rounded,
+                                      onPressed: () =>
+                                          Get.offAllNamed(AppRoutes.login),
+                                    ),
+                                  ],
+                                ),
+                              )
+                              .animate()
+                              .fadeIn(duration: 220.ms)
+                              .slideY(
+                                begin: 0.04,
+                                duration: 220.ms,
+                                curve: Curves.easeOutCubic,
+                              ),
+                          const Spacer(),
+                        ],
                       ),
                     ),
                   ),
-                ),
-              ),
-
-              // أزرار
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppDimensions.pagePadding,
-                  0,
-                  AppDimensions.pagePadding,
-                  AppDimensions.xl,
-                ),
-                child: _currentPage == _pages.length - 1
-                    ? El7reefButton(
-                        text: 'ابدأ الآن',
-                        icon: Icons.arrow_forward_rounded,
-                        onPressed: () => Get.offAllNamed(AppRoutes.login),
-                      )
-                    : El7reefButton(
-                        text: 'التالي',
-                        onPressed: () => _pageController.nextPage(
-                          duration: const Duration(milliseconds: 400),
-                          curve: Curves.easeInOut,
-                        ),
-                      ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
         ),
       ),
     );
   }
 
-  Widget _buildPage(_OnboardingPage page) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // أيقونة مع glow
-          Container(
-            width: 140,
-            height: 140,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: page.gradient,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.3),
-                  blurRadius: 40,
-                  spreadRadius: 5,
-                ),
-              ],
-            ),
-            child: Center(
-              child: Text(page.icon, style: const TextStyle(fontSize: 64)),
-            ),
-          )
-              .animate()
-              .scale(begin: const Offset(0.5, 0.5), duration: 600.ms, curve: Curves.elasticOut)
-              .fadeIn(duration: 400.ms),
-
-          const SizedBox(height: AppDimensions.xl),
-
-          Text(
-            page.title,
-            style: AppTextStyles.displaySmall,
-            textAlign: TextAlign.center,
-          )
-              .animate()
-              .fadeIn(delay: 200.ms, duration: 500.ms)
-              .slideY(begin: 0.2, duration: 500.ms),
-
-          const SizedBox(height: AppDimensions.md),
-
-          Text(
-            page.description,
-            style: AppTextStyles.bodyLarge.copyWith(color: AppColors.textSecondary),
-            textAlign: TextAlign.center,
-          )
-              .animate()
-              .fadeIn(delay: 400.ms, duration: 500.ms)
-              .slideY(begin: 0.2, duration: 500.ms),
-        ],
-      ),
-    );
+  static void _openAfterLogin(String route) {
+    _pendingDeepLinkService().store(route);
+    Get.offAllNamed(AppRoutes.login);
   }
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
+  static PendingDeepLinkService _pendingDeepLinkService() {
+    return Get.isRegistered<PendingDeepLinkService>()
+        ? Get.find<PendingDeepLinkService>()
+        : Get.put(PendingDeepLinkService(), permanent: true);
   }
 }
 
-class _OnboardingPage {
-  final String icon;
+class _IntentAction extends StatelessWidget {
+  final IconData icon;
   final String title;
-  final String description;
-  final LinearGradient gradient;
+  final String subtitle;
+  final VoidCallback onTap;
 
-  const _OnboardingPage({
+  const _IntentAction({
     required this.icon,
     required this.title,
-    required this.description,
-    required this.gradient,
+    required this.subtitle,
+    required this.onTap,
   });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppDimensions.sm),
+      child: Material(
+        color: AppColors.surface.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+          child: Padding(
+            padding: const EdgeInsets.all(AppDimensions.md),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.24),
+                    ),
+                  ),
+                  child: Icon(icon, color: AppColors.primary, size: 22),
+                ),
+                const SizedBox(width: AppDimensions.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: AppTextStyles.titleMedium),
+                      const SizedBox(height: AppDimensions.xs),
+                      Text(
+                        subtitle,
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppDimensions.sm),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: AppColors.textMuted,
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

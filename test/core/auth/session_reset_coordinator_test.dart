@@ -76,7 +76,10 @@ void main() {
         matchRepository: matchRepository,
         sidePlayerRepository: sidePlayerRepository,
         cancellationService: MatchCancellationService(firestore: firestore),
-        settlementService: MatchSettlementService(firestore: firestore),
+        settlementService: MatchSettlementService(
+          firestore: firestore,
+          allowLocalFallback: true,
+        ),
         matchStartService: MatchStartService(
           matchRepo: matchRepository,
           snapshotRepo: MatchLineupSnapshotRepositoryImpl(firestore: firestore),
@@ -89,6 +92,8 @@ void main() {
       controller.temporaryParticipantCountsByMatch['match-a'] =
           const MatchTemporaryParticipantCounts(teamA: 1, teamB: 2);
       controller.errorMessage.value = 'old error';
+      controller.liveMatchesErrorMessage.value = 'old live error';
+      controller.myMatchesErrorMessage.value = 'old my error';
       controller.isLoading.value = true;
 
       controller.resetSessionState();
@@ -97,6 +102,8 @@ void main() {
       expect(controller.currentMatch.value, isNull);
       expect(controller.temporaryParticipantCountsByMatch, isEmpty);
       expect(controller.errorMessage.value, isEmpty);
+      expect(controller.liveMatchesErrorMessage.value, isEmpty);
+      expect(controller.myMatchesErrorMessage.value, isEmpty);
       expect(controller.isLoading.value, isFalse);
       controller.onClose();
     },
@@ -178,6 +185,61 @@ void main() {
         controller.followedOnlyTournaments.map((tournament) => tournament.id),
         ['followed-only-cup'],
       );
+      controller.onClose();
+    },
+  );
+
+  test(
+    'TournamentController keeps my tournaments when followed tournaments fail',
+    () async {
+      authService.setCurrentPlayer(_player('account-a'));
+      final tournamentRepository = _FailingFollowedTournamentRepository(
+        db: firestore,
+      );
+      final teamRepository = TeamRepositoryImpl(firestore: firestore);
+      final controller = TournamentController(
+        authService: authService,
+        tournamentRepository: tournamentRepository,
+        teamRepository: teamRepository,
+      );
+      final organized = _tournament(
+        'organized-cup',
+      ).copyWith(createdAt: DateTime(2026, 5, 9));
+      final participating = _tournament('participating-cup').copyWith(
+        organizerId: 'organizer-b',
+        registeredTeamIds: ['team-a'],
+        createdAt: DateTime(2026, 5, 8),
+      );
+
+      await tournamentRepository.createTournament(organized);
+      await tournamentRepository.createTournament(participating);
+      await teamRepository.createTeam(
+        _team('team-a').copyWith(playerIds: ['account-a']),
+      );
+
+      await controller.loadMyTournaments();
+
+      expect(controller.myTournamentsErrorMessage.value, isEmpty);
+      expect(
+        controller.followedTournamentsErrorMessage.value,
+        'تعذر تحميل البطولات التي تتابعها حالياً.',
+      );
+      expect(controller.followedTournaments, isEmpty);
+      expect(
+        controller.myOrganizedTournaments.map((tournament) => tournament.id),
+        ['organized-cup'],
+      );
+      expect(
+        controller.myParticipatingTournaments.map(
+          (tournament) => tournament.id,
+        ),
+        ['participating-cup'],
+      );
+      expect(controller.myTournaments.map((tournament) => tournament.id), [
+        'organized-cup',
+        'participating-cup',
+      ]);
+      expect(controller.isLoadingMyTournaments.value, isFalse);
       controller.onClose();
     },
   );
@@ -327,7 +389,7 @@ void main() {
       authService.setCurrentPlayer(_player('account-b'));
       await Future<void>.delayed(Duration.zero);
 
-      expect(controller.loadCalls, 2);
+      expect(controller.loadCalls, 1);
       expect(controller.loadedForUserIds.last, 'account-b');
       controller.onClose();
     },
@@ -372,9 +434,15 @@ class _ReloadTrackingTournamentController extends TournamentController {
 
 class _FakeAuthService extends GetxService implements AuthService {
   final Rx<Player?> _currentPlayer = Rx<Player?>(null);
+  final Rx<AuthProfileStatus> _profileStatus =
+      AuthProfileStatus.unauthenticated.obs;
+  final RxString _profileErrorMessage = ''.obs;
 
   void setCurrentPlayer(Player? player) {
     _currentPlayer.value = player;
+    _profileStatus.value = player == null
+        ? AuthProfileStatus.unauthenticated
+        : AuthProfileStatus.ready;
   }
 
   @override
@@ -390,6 +458,12 @@ class _FakeAuthService extends GetxService implements AuthService {
   RxBool get isLoading => false.obs;
 
   @override
+  Rx<AuthProfileStatus> get profileStatus => _profileStatus;
+
+  @override
+  RxString get profileErrorMessage => _profileErrorMessage;
+
+  @override
   Future<AuthService> init() async => this;
 
   @override
@@ -399,14 +473,28 @@ class _FakeAuthService extends GetxService implements AuthService {
   Future<Player?> signInWithGoogle() async => _currentPlayer.value;
 
   @override
+  Future<void> reauthenticateWithGoogle() async {}
+
+  @override
   Future<void> signOut() async {
     _currentPlayer.value = null;
+    _profileStatus.value = AuthProfileStatus.unauthenticated;
   }
 }
 
 class _UnusedChallengeRepository implements ChallengeRepository {
   @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FailingFollowedTournamentRepository extends TournamentRepositoryImpl {
+  _FailingFollowedTournamentRepository({required FakeFirebaseFirestore db})
+    : super(db: db);
+
+  @override
+  Future<List<Tournament>> getFollowedTournaments(String userId) {
+    throw StateError('followed tournaments unavailable');
+  }
 }
 
 Player _player(String id) {

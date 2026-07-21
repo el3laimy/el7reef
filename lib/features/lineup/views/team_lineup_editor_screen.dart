@@ -8,16 +8,20 @@ import '../../../core/lineup/lineup_types.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../shareables/controllers/lineup_share_controller.dart';
 import '../../shareables/models/lineup_share_data.dart';
+import '../../shareables/models/pride_card_format.dart';
 import '../../shareables/services/share_card_capture_service.dart';
 import '../../shareables/widgets/lineup_share_card.dart';
+import '../../shareables/widgets/pride_card_format_picker.dart';
 import '../controllers/team_lineup_editor_controller.dart';
+import '../utils/lineup_haptics.dart';
 import '../widgets/bench_bar.dart';
 import '../widgets/formation_control_bar.dart';
 import '../widgets/lineup_bottom_action_bar.dart';
-import '../widgets/lineup_player_display.dart';
 import '../widgets/lineup_save_success_share_sheet.dart';
+import '../widgets/lineup_status_panel.dart';
 import '../widgets/player_picker_sheet.dart';
 import '../widgets/professional_pitch_card.dart';
+import '../widgets/starter_swap_sheet.dart';
 
 class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
   const TeamLineupEditorScreen({super.key});
@@ -82,35 +86,75 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
                       onReset: controller.resetLayout,
                     ),
                   const SizedBox(height: AppDimensions.md),
+                  LineupStatusPanel(
+                    formationCode: controller.formationCode.value,
+                    filledSlots: controller.slots
+                        .where((slot) => !slot.isEmpty)
+                        .length,
+                    totalSlots: controller.slots.isEmpty
+                        ? controller.playerCount.value
+                        : controller.slots.length,
+                    benchCount: controller.benchPlayers.length,
+                    isDirty: controller.isLineupDirty.value,
+                    canManageLineup: controller.canEdit,
+                    selectedPlayerName: controller.selectedLineupPlayerName,
+                    editableHint:
+                        'اضغط لاعب من الملعب أو البدلاء، ثم اضغط خانة للنقل أو التبديل.',
+                    readonlyHint: 'عرض تشكيلة الفريق الرسمية.',
+                    onSave: () => _handleSaveLineup(context),
+                  ),
+                  const SizedBox(height: AppDimensions.md),
                   ProfessionalPitchCard(
                     slots: controller.slots,
                     playersByKey: controller.playersByKey,
                     formationCode: controller.formationCode.value,
                     playerCount: controller.playerCount.value,
                     teamName: controller.teamName,
+                    selectedPlayerKey: controller.selectedLineupPlayerKey,
                     editorMode: controller.canEdit,
                     onEmptySlotTap: (slot) => _showPlayerPicker(context, slot),
                     onPlayerTap: (slot, player) =>
-                        _showPlayerActions(context, player),
+                        _handlePitchPlayerTap(slot, player),
                     onPlayerLongPress: (slot, player) =>
                         _showPlayerActions(context, player),
                     onPlayerDrop: controller.canEdit
-                        ? (slot, player) =>
-                              controller.dropPlayerOnSlot(player, slot)
+                        ? (slot, payload) {
+                            controller.dropPlayerOnSlot(payload, slot);
+                            LineupHaptics.commit();
+                          }
                         : null,
                   ),
                   const SizedBox(height: AppDimensions.md),
                   BenchBar(
                     players: controller.benchPlayers,
                     draggable: controller.canEdit,
+                    selectedPlayerKey: controller.selectedLineupPlayerKey,
                     onPlayerTap: controller.canEdit
-                        ? (player) => _assignBenchPlayer(context, player)
+                        ? (player) {
+                            controller.selectLineupPlayer(player);
+                            LineupHaptics.select();
+                          }
                         : null,
                     onAddGuest: controller.canEdit
                         ? () => _showGuestDialog(context)
                         : null,
                     onPlayerDroppedOnBench: controller.canEdit
-                        ? (player) => controller.movePlayerToBench(player)
+                        ? (player) {
+                            controller.movePlayerToBench(player);
+                            LineupHaptics.move();
+                          }
+                        : null,
+                    onSelectedPlayerMoveToBench:
+                        controller.canEdit &&
+                            controller.selectedLineupPlayerCanMoveToBench
+                        ? () {
+                            if (controller.moveSelectedLineupPlayerToBench()) {
+                              LineupHaptics.move();
+                            }
+                          }
+                        : null,
+                    onSelectedBenchSwapRequest: controller.canEdit
+                        ? () => _showStarterSwapSheet(context)
                         : null,
                   ),
                   const SizedBox(height: AppDimensions.md),
@@ -135,6 +179,10 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
 
   void _showPlayerPicker(BuildContext context, FormationSlot slot) {
     if (!controller.canEdit) return;
+    if (controller.moveSelectedLineupPlayerToSlot(slot)) {
+      LineupHaptics.commit();
+      return;
+    }
     Get.bottomSheet(
       PlayerPickerSheet(
         title: 'اختيار لاعب ${slot.role.arabicLabel}',
@@ -149,53 +197,32 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
     );
   }
 
-  void _assignBenchPlayer(BuildContext context, LineupPlayer player) {
-    final emptySlots = controller.slots.where((slot) => slot.isEmpty).toList();
-    if (emptySlots.length == 1) {
-      controller.assignPlayerToSlot(player, emptySlots.first);
-      return;
-    }
+  void _showStarterSwapSheet(BuildContext context) {
+    if (!controller.canEdit) return;
     Get.bottomSheet(
-      SafeArea(
-        child: Container(
-          padding: const EdgeInsets.all(AppDimensions.lg),
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'اختر مركز ${lineupDisplayName(player)}',
-                style: AppTextStyles.headlineSmall,
-              ),
-              const SizedBox(height: AppDimensions.md),
-              ...controller.slots.map(
-                (slot) => ListTile(
-                  onTap: () {
-                    controller.assignPlayerToSlot(player, slot);
-                    Get.back();
-                  },
-                  leading: Icon(
-                    slot.isEmpty
-                        ? Icons.add_circle_outline_rounded
-                        : Icons.swap_horiz_rounded,
-                    color: AppColors.primaryLight,
-                  ),
-                  title: Text('${slot.role.arabicLabel} • ${slot.id}'),
-                  subtitle: Text(
-                    slot.isEmpty ? 'خانة فارغة' : 'استبدال اللاعب الحالي',
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+      StarterSwapSheet(
+        title: 'بدّل مع لاعب أساسي',
+        slots: controller.slots,
+        playersByKey: controller.playersByKey,
+        onSlotSelected: (slot) {
+          if (controller.moveSelectedLineupPlayerToSlot(slot)) {
+            LineupHaptics.commit();
+            Get.back();
+          }
+        },
       ),
       isScrollControlled: true,
     );
+  }
+
+  void _handlePitchPlayerTap(FormationSlot slot, LineupPlayer player) {
+    if (!controller.canEdit) return;
+    if (controller.moveSelectedLineupPlayerToSlot(slot)) {
+      LineupHaptics.commit();
+      return;
+    }
+    controller.selectLineupPlayer(player, sourceSlotId: slot.id);
+    LineupHaptics.select();
   }
 
   void _showPlayerActions(BuildContext context, LineupPlayer player) {
@@ -216,6 +243,7 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
                 title: const Text('نقل إلى البدلاء'),
                 onTap: () {
                   controller.movePlayerToBench(player);
+                  LineupHaptics.move();
                   Get.back();
                 },
               ),
@@ -270,12 +298,15 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
       accentColor: AppColors.primary,
     );
 
-    await _captureAndShareLineup(context, shareData);
+    final format = await showPrideCardFormatPicker(context);
+    if (format == null || !context.mounted) return;
+    await _captureAndShareLineup(context, shareData, format);
   }
 
   Future<void> _captureAndShareLineup(
     BuildContext context,
     LineupShareData shareData,
+    PrideCardFormat format,
   ) async {
     final overlay = Overlay.of(context);
     final entry = OverlayEntry(
@@ -287,7 +318,11 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
             opacity: 0.01,
             child: RepaintBoundary(
               key: _lineupShareBoundaryKey,
-              child: LineupShareCard(data: shareData, exportMode: true),
+              child: LineupShareCard(
+                data: shareData,
+                exportMode: true,
+                format: format,
+              ),
             ),
           ),
         ),
@@ -304,6 +339,7 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
         boundaryKey: _lineupShareBoundaryKey,
         fileName: 'el7reef_lineup_${shareData.matchId}_${shareData.ownerId}',
         text: 'تشكيلة ${shareData.teamName} على الحريف',
+        payload: shareData.sharePayload,
         pixelRatio: matchResultShareExportPixelRatio,
       );
     } catch (error) {
@@ -320,7 +356,10 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
     final url = shareData.logoUrl?.trim();
     if (url == null || url.isEmpty) return;
     try {
-      await precacheImage(NetworkImage(url), context);
+      await precacheImage(
+        NetworkImage(url),
+        context,
+      ).timeout(sharePreparationTimeout);
     } catch (error) {
       AppLogger.warning('TeamLineupEditorScreen._precacheLineupLogo', error);
       // Initials fallback remains available if the logo cannot be loaded.

@@ -326,7 +326,46 @@ void main() {
       },
     );
 
-    test('startMatch is blocked until both sides are ready', () async {
+    test(
+      'startMatch succeeds without lineups when both rosters have players',
+      () async {
+        await lifecycleService.startGroupStage(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 15)),
+        );
+        final publishedFixtures = await lifecycleService.publishFixtures(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 16)),
+        );
+        final fixture = publishedFixtures.first;
+        await _seedSingleRegisteredCheckIn(
+          firestore: firestore,
+          matchId: fixture.id,
+          teamId: fixture.teamAId!,
+          now: now.add(const Duration(minutes: 17)),
+        );
+        await _seedSingleRegisteredCheckIn(
+          firestore: firestore,
+          matchId: fixture.id,
+          teamId: fixture.teamBId!,
+          now: now.add(const Duration(minutes: 17)),
+        );
+
+        final started = await fixtureService.startMatch(
+          matchId: fixture.id,
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 18)),
+        );
+
+        expect(started.status, MatchStatus.live);
+        expect(started.teamAPlayerIds, isNotEmpty);
+        expect(started.teamBPlayerIds, isNotEmpty);
+      },
+    );
+
+    test('startMatch is blocked until both sides check in', () async {
       await lifecycleService.startGroupStage(
         tournamentId: 'tournament-1',
         actorId: 'organizer-1',
@@ -352,15 +391,56 @@ void main() {
           actorId: 'organizer-1',
           now: now.add(const Duration(minutes: 18)),
         ),
-        throwsA(
-          predicate(
-            (error) =>
-                error.toString().contains('check-in') ||
-                error.toString().contains('التشكيل'),
-          ),
-        ),
+        throwsA(predicate((error) => error.toString().contains('تسجيل حضور'))),
       );
     });
+
+    test(
+      'startMatch fails with actionable Arabic message for empty roster',
+      () async {
+        await lifecycleService.startGroupStage(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 15)),
+        );
+        final publishedFixtures = await lifecycleService.publishFixtures(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 16)),
+        );
+        final fixture = publishedFixtures.first;
+        await firestore
+            .collection(FirebasePaths.teams)
+            .doc(fixture.teamAId)
+            .update({'playerIds': <String>[]});
+        await _seedSingleRegisteredCheckIn(
+          firestore: firestore,
+          matchId: fixture.id,
+          teamId: fixture.teamAId!,
+          now: now.add(const Duration(minutes: 17)),
+        );
+        await _seedSingleRegisteredCheckIn(
+          firestore: firestore,
+          matchId: fixture.id,
+          teamId: fixture.teamBId!,
+          now: now.add(const Duration(minutes: 17)),
+        );
+
+        expect(
+          () => fixtureService.startMatch(
+            matchId: fixture.id,
+            actorId: 'organizer-1',
+            now: now.add(const Duration(minutes: 18)),
+          ),
+          throwsA(
+            predicate(
+              (error) =>
+                  error.toString().contains('أضف لاعبًا واحدًا على الأقل'),
+            ),
+          ),
+        );
+      },
+    );
 
     test('non-organizer cannot start a published fixture', () async {
       await lifecycleService.startGroupStage(

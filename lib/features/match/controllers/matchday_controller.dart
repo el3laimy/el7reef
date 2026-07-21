@@ -5,6 +5,7 @@ import '../../../core/auth/auth_session.dart';
 import '../../../core/enums/match_attendance_status.dart';
 import '../../../core/enums/match_status.dart';
 import '../../../core/enums/team_membership_status.dart';
+import '../../../core/enums/tournament_ops_enums.dart';
 import '../../../core/enums/tournament_registration_status.dart';
 import '../../../core/services/matchday_service.dart';
 import '../../../app/routes/app_routes.dart';
@@ -20,9 +21,11 @@ import '../../../data/repositories/player_repository_impl.dart';
 import '../../../data/repositories/team_membership_repository_impl.dart';
 import '../../../data/repositories/team_repository_impl.dart';
 import '../../../data/repositories/tournament_assistant_permission_repository_impl.dart';
+import '../../../data/repositories/tournament_participant_repository_impl.dart';
 import '../../../data/repositories/tournament_registration_repository_impl.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
 import '../../../domain/entities/guest_player.dart';
+import '../../../domain/entities/guest_team.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/entities/match_attendance.dart';
 import '../../../domain/entities/match_check_in.dart';
@@ -34,6 +37,7 @@ import '../../../domain/entities/team.dart';
 import '../../../domain/entities/team_membership.dart';
 import '../../../domain/entities/tournament.dart';
 import '../../../domain/entities/tournament_assistant_permission.dart';
+import '../../../domain/entities/tournament_participant.dart';
 import '../models/friendly_match_side_view.dart';
 
 part 'matchday_side_discovery.dart';
@@ -127,6 +131,7 @@ class MatchdayController extends GetxController {
   final MatchdayService _matchdayService;
   final MatchRepositoryImpl _matchRepository;
   final TournamentRepositoryImpl _tournamentRepository;
+  final TournamentParticipantRepositoryImpl _participantRepository;
   final TournamentRegistrationRepositoryImpl _registrationRepository;
   final TeamRepositoryImpl _teamRepository;
   final GuestTeamRepositoryImpl _guestTeamRepository;
@@ -146,6 +151,7 @@ class MatchdayController extends GetxController {
     required MatchdayService matchdayService,
     required MatchRepositoryImpl matchRepository,
     required TournamentRepositoryImpl tournamentRepository,
+    required TournamentParticipantRepositoryImpl participantRepository,
     required TournamentRegistrationRepositoryImpl registrationRepository,
     required TeamRepositoryImpl teamRepository,
     required GuestTeamRepositoryImpl guestTeamRepository,
@@ -162,6 +168,7 @@ class MatchdayController extends GetxController {
        _matchdayService = matchdayService,
        _matchRepository = matchRepository,
        _tournamentRepository = tournamentRepository,
+       _participantRepository = participantRepository,
        _registrationRepository = registrationRepository,
        _teamRepository = teamRepository,
        _guestTeamRepository = guestTeamRepository,
@@ -240,6 +247,14 @@ class MatchdayController extends GetxController {
       tournament.value?.teamSize.value ?? match.value?.teamSize;
   bool get isLineupLocked => activeSnapshot.value != null;
   bool get isMatchLive => match.value?.status == MatchStatus.live;
+  bool get canStartTournamentMatch {
+    final currentMatch = match.value;
+    return tournament.value != null &&
+        currentMatch?.status == MatchStatus.open &&
+        activeCheckIn.value?.isCheckedIn == true &&
+        canUnlockLineupPermission.value;
+  }
+
   bool get canSubmitScore {
     final currentMatch = match.value;
     if (currentMatch == null) return false;
@@ -400,11 +415,47 @@ class MatchdayController extends GetxController {
     await _loadSelectedSideState();
   }
 
+  Future<void> startTournamentMatch() async {
+    final actorId = currentUserId;
+    if (actorId == null || actorId.isEmpty) {
+      _showSnack('غير مسموح', 'يجب تسجيل الدخول أولاً.');
+      return;
+    }
+    if (!canStartTournamentMatch) {
+      _showSnack('المباراة غير جاهزة', 'راجع حضور الفريقين قبل بدء المباراة.');
+      return;
+    }
+
+    try {
+      isSubmitting.value = true;
+      match.value = await _matchdayService.startTournamentMatch(
+        matchId: matchId,
+        actorId: actorId,
+      );
+      _showSnack(
+        'بدأت المباراة',
+        'يمكنك تسجيل الأهداف والـMVP عند نهاية اللعب.',
+      );
+    } catch (error) {
+      _showErrorSnack(error);
+    } finally {
+      isSubmitting.value = false;
+    }
+  }
+
   void setAttendanceStatus(String selectionId, MatchAttendanceStatus status) {
     attendanceDrafts[selectionId] = status;
     if (!_isEligibleForLineup(selectionId)) {
       lineupDrafts.remove(selectionId);
     }
+  }
+
+  Future<void> submitAllPresentCheckIn() async {
+    attendanceDrafts.assignAll({
+      for (final participant in participants)
+        participant.selectionId: MatchAttendanceStatus.present,
+    });
+    await submitCheckIn();
   }
 
   void setLineupSlot(String selectionId, MatchdayLineupSlot? slot) {

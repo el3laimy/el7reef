@@ -17,7 +17,10 @@ extension TeamRosterOps on TeamRosterController {
         teamId: targetTeamId,
         actorId: actorId,
         name: name,
-        formationLabel: formationLabel,
+        formationLabel: formationLabel?.trim().isNotEmpty == true
+            ? formationLabel
+            : visualFormationCode.value,
+        entries: buildVisualFormationEntries(),
       );
       clearTemplateForm();
       await loadTeamRoster();
@@ -48,8 +51,11 @@ extension TeamRosterOps on TeamRosterController {
         teamId: targetTeamId,
         actorId: actorId,
         label: label,
-        formationLabel: formationLabel,
+        formationLabel: formationLabel?.trim().isNotEmpty == true
+            ? formationLabel
+            : visualFormationCode.value,
         sourceTemplateId: sourceTemplateId,
+        entries: buildVisualFormationEntries(),
       );
       clearSnapshotForm();
       await loadTeamRoster();
@@ -222,6 +228,13 @@ extension TeamRosterOps on TeamRosterController {
       if (updates.isNotEmpty) {
         await Future.wait(updates);
       }
+
+      await _teamFormationService.saveCurrentLineupState(
+        teamId: targetTeamId,
+        actorId: actorId,
+        formationLabel: visualFormationCode.value,
+        entries: buildVisualFormationEntries(),
+      );
 
       isLineupDirty.value = false;
       await loadTeamRoster();

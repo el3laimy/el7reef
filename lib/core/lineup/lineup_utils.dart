@@ -149,6 +149,43 @@ class LineupUtils {
         .toList(growable: false);
   }
 
+  static List<FormationSlot> movePlayerToSlot({
+    required List<FormationSlot> slots,
+    required LineupDragPayload payload,
+    required String targetSlotId,
+  }) {
+    final currentSlots = slots.toList(growable: false);
+    final targetIndex = currentSlots.indexWhere(
+      (slot) => slot.id == targetSlotId,
+    );
+    if (targetIndex == -1) return currentSlots;
+
+    final sourceIndex = _sourceSlotIndexForPayload(currentSlots, payload);
+    if (sourceIndex == targetIndex) return currentSlots;
+
+    final updatedSlots = currentSlots.toList(growable: true);
+    final oldTargetSlot = updatedSlots[targetIndex];
+
+    if (sourceIndex == -1) {
+      updatedSlots[targetIndex] = oldTargetSlot.assignPlayer(payload.player);
+      return _withoutDuplicateOccupants(updatedSlots, payload.player.key);
+    }
+
+    final oldSourceSlot = updatedSlots[sourceIndex];
+    if (oldTargetSlot.isEmpty) {
+      updatedSlots[sourceIndex] = oldSourceSlot.clearPlayer();
+      updatedSlots[targetIndex] = oldTargetSlot.assignPlayer(payload.player);
+      return updatedSlots;
+    }
+
+    updatedSlots[targetIndex] = oldTargetSlot.assignPlayer(payload.player);
+    updatedSlots[sourceIndex] = _copyOccupant(
+      target: oldSourceSlot,
+      source: oldTargetSlot,
+    );
+    return updatedSlots;
+  }
+
   static List<FormationSlot> removePlayerFromSlots({
     required List<FormationSlot> slots,
     required LineupPlayer player,
@@ -167,6 +204,47 @@ class LineupUtils {
       SlotRole.mid => 2,
       SlotRole.att => 3,
     };
+  }
+
+  static int _sourceSlotIndexForPayload(
+    List<FormationSlot> slots,
+    LineupDragPayload payload,
+  ) {
+    final sourceSlotId = payload.sourceSlotId;
+    if (sourceSlotId != null) {
+      final sourceIndex = slots.indexWhere((slot) => slot.id == sourceSlotId);
+      if (sourceIndex != -1) return sourceIndex;
+    }
+    return slots.indexWhere((slot) => slot.occupantKey == payload.player.key);
+  }
+
+  static FormationSlot _copyOccupant({
+    required FormationSlot target,
+    required FormationSlot source,
+  }) {
+    return target.copyWith(
+      playerId: source.playerId,
+      guestPlayerId: source.guestPlayerId,
+      matchSidePlayerId: source.matchSidePlayerId,
+      isCaptain: source.isCaptain,
+    );
+  }
+
+  static List<FormationSlot> _withoutDuplicateOccupants(
+    List<FormationSlot> slots,
+    String protectedKey,
+  ) {
+    var protectedSeen = false;
+    return slots
+        .map((slot) {
+          if (slot.occupantKey != protectedKey) return slot;
+          if (!protectedSeen) {
+            protectedSeen = true;
+            return slot;
+          }
+          return slot.clearPlayer();
+        })
+        .toList(growable: false);
   }
 
   static int? _bestTargetSlotIndex({

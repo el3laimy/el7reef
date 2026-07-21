@@ -1,0 +1,5 @@
+{
+  "score": 5,
+  "summary": "The linked guest-history read path is ownership-scoped to request.auth.uid, supports only an equality-filtered owner query, and does not trust a client-writable linkage: linkedPlayerId must be empty on client create, remains immutable during manager updates, and can change only through the existing same-batch claim proof. Focused direct-read, query, broad-list, create-bypass, and update-bypass emulator cases pass.",
+  "findings": []
+}

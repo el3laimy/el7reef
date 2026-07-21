@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:el7reef/data/models/match_event_model.dart';
@@ -34,7 +35,8 @@ void main() {
       expect(json['sideKey'], 'A');
       expect(json['actor']['kind'], 'matchSidePlayer');
       expect(json['minute'], 12);
-      expect(json['createdAt'], createdAt.millisecondsSinceEpoch);
+      expect(json['createdAt'], isA<Timestamp>());
+      expect((json['createdAt'] as Timestamp).toDate(), createdAt);
       expect(json['status'], 'active');
 
       expect(parsed.id, event.id);
@@ -64,6 +66,34 @@ void main() {
       expect(parsed.status, MatchEventStatus.voided);
       expect(parsed.sideKey, 'B');
       expect(parsed.minute, isNull);
+    });
+
+    test('reads legacy milliseconds and new Firestore timestamps', () {
+      final createdAt = DateTime(2026, 5, 3, 18, 15);
+      Map<String, dynamic> json(Object storedDate) => {
+        'matchId': 'match-1',
+        'eventType': 'goal',
+        'sideKey': 'A',
+        'actor': {
+          'kind': 'guestPlayer',
+          'id': 'guest-1',
+          'displayName': 'Guest',
+        },
+        'createdBy': 'organizer-1',
+        'createdAt': storedDate,
+      };
+
+      final legacy = MatchEventModel.fromJson(
+        json(createdAt.millisecondsSinceEpoch),
+        'legacy',
+      ).toEntity();
+      final current = MatchEventModel.fromJson(
+        json(Timestamp.fromDate(createdAt)),
+        'current',
+      ).toEntity();
+
+      expect(legacy.createdAt, createdAt);
+      expect(current.createdAt, createdAt);
     });
   });
 }

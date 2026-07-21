@@ -1,4 +1,5 @@
 const fs = require('fs');
+const assert = require('assert');
 
 const {
   assertFails,
@@ -17,6 +18,7 @@ const {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
 } = require('firebase/firestore');
 
 const projectId = 'demo-no-project';
@@ -42,6 +44,48 @@ function tournamentData(overrides = {}) {
   };
 }
 
+function quickCreateTournamentData(overrides = {}) {
+  return {
+    organizerId: 'organizer-1',
+    name: 'Codex QA Cup',
+    description: null,
+    location: null,
+    format: 'groupsThenKnockout',
+    teamSize: 5,
+    maxTeams: 8,
+    visibility: 'public',
+    discoverable: true,
+    isFeatured: false,
+    featuredPriority: 1000,
+    participantViewerIds: [],
+    prizePool: null,
+    prizeDescription: null,
+    status: 'registration',
+    registeredTeamIds: [],
+    assistants: [],
+    isFantasyEnabled: false,
+    registrationDeadline: null,
+    startDate: null,
+    endDate: null,
+    participantListFinalizedAt: null,
+    activeParticipantCount: null,
+    currentGroupStageId: null,
+    currentKnockoutBracketId: null,
+    winnerParticipantId: null,
+    needsManualOpsMigration: false,
+    groupStandingsConfig: {
+      tiebreakerOrder: [
+        'points',
+        'goalDifference',
+        'goalsFor',
+        'randomDraw',
+      ],
+    },
+    createdAt: now,
+    ...overrides,
+  };
+}
+
 function matchData(overrides = {}) {
   return {
     organizerId: 'organizer-1',
@@ -53,6 +97,9 @@ function matchData(overrides = {}) {
     teamBId: 'team-2',
     scoreTeamA: null,
     scoreTeamB: null,
+    penaltyScoreTeamA: null,
+    penaltyScoreTeamB: null,
+    knockoutDecision: null,
     roundIndex: 0,
     order: 0,
     scheduledAt: now + 86400000,
@@ -174,6 +221,8 @@ function knockoutBracketData(overrides = {}) {
     tournamentId: 'tournament-1',
     format: 'singleElimination',
     qualifierParticipantIds: ['participant-1', 'participant-2'],
+    seedingMethod: 'ranked',
+    byeParticipantIds: [],
     championParticipantId: null,
     createdAt: now,
     updatedAt: now,
@@ -192,6 +241,7 @@ function knockoutTieData(overrides = {}) {
     winnerParticipantId: null,
     matchId: 'match-1',
     nextTieId: null,
+    resolutionType: 'pending',
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -302,7 +352,7 @@ const operationCollectionSpecs = [
     collectionName: 'knockoutBrackets',
     docId: 'bracket-1',
     data: knockoutBracketData,
-    safeUpdate: {championParticipantId: 'participant-1', updatedAt: now + 1},
+    safeUpdate: {updatedAt: now + 1},
     immutableUpdate: {tournamentId: 'tournament-2', updatedAt: now + 1},
     otherOwnerData: () => knockoutBracketData({tournamentId: 'tournament-2'}),
     deleteAllowed: false,
@@ -311,7 +361,7 @@ const operationCollectionSpecs = [
     collectionName: 'knockoutTies',
     docId: 'tie-1',
     data: knockoutTieData,
-    safeUpdate: {winnerParticipantId: 'participant-1', updatedAt: now + 1},
+    safeUpdate: {updatedAt: now + 1},
     immutableUpdate: {bracketId: 'bracket-2', updatedAt: now + 1},
     otherOwnerData: () => knockoutTieData({tournamentId: 'tournament-2'}),
     deleteAllowed: false,
@@ -360,15 +410,139 @@ describe('tournament permission Firestore rules', () => {
   });
 
   describe('tournament ownership', () => {
-    it('allows organizer to create a tournament with own organizerId', async () => {
+    it('denies an orphan tournament without its organizer membership', async () => {
       const db = authedDb('organizer-1');
 
-      await assertSucceeds(
+      await assertFails(
         setDoc(doc(db, 'tournaments', 'tournament-1'), tournamentData()),
       );
     });
 
+    it('allows the 2026-07-17 app batch to create tournament and organizer membership', async () => {
+      const db = authedDb('organizer-1');
+      const tournamentId = 'batch-created';
+      const batch = writeBatch(db);
+      batch.set(
+        doc(db, 'tournaments', tournamentId),
+        quickCreateTournamentData(),
+      );
+      batch.set(
+        doc(db, 'tournamentMemberships', `organizer-1_${tournamentId}`),
+        {
+          tournamentId,
+          userId: 'organizer-1',
+          role: 'organizer',
+          createdAt: now,
+        },
+      );
+
+      await assertSucceeds(batch.commit());
+
+      const membershipSnapshot = await assertSucceeds(
+        getDocs(
+          query(
+            collection(db, 'tournamentMemberships'),
+            where('userId', '==', 'organizer-1'),
+            where('role', '==', 'organizer'),
+          ),
+        ),
+      );
+      assert.deepStrictEqual(
+        membershipSnapshot.docs.map((snapshot) => snapshot.id),
+        ['organizer-1_batch-created'],
+      );
+      const tournamentSnapshot = await assertSucceeds(
+        getDoc(doc(db, 'tournaments', tournamentId)),
+      );
+      assert.strictEqual(tournamentSnapshot.data().format, 'groupsThenKnockout');
+    });
+
+    it('denies an organizer self-promoting a new tournament as featured', async () => {
+      const db = authedDb('organizer-1');
+      const tournamentId = 'forged-featured-cup';
+      const batch = writeBatch(db);
+      batch.set(
+        doc(db, 'tournaments', tournamentId),
+        quickCreateTournamentData({isFeatured: true, featuredPriority: 0}),
+      );
+      batch.set(
+        doc(db, 'tournamentMemberships', `organizer-1_${tournamentId}`),
+        {
+          tournamentId,
+          userId: 'organizer-1',
+          role: 'organizer',
+          createdAt: now,
+        },
+      );
+
+      await assertFails(batch.commit());
+    });
+
+    it('denies an organizer changing administrative featured metadata', async () => {
+      await seed(
+        'tournaments/tournament-1',
+        quickCreateTournamentData({isFeatured: true, featuredPriority: 0}),
+      );
+      const db = authedDb('organizer-1');
+
+      await assertFails(
+        updateDoc(doc(db, 'tournaments', 'tournament-1'), {
+          featuredPriority: 10,
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(db, 'tournaments', 'tournament-1'), {
+          isFeatured: false,
+        }),
+      );
+      await assertSucceeds(
+        updateDoc(doc(db, 'tournaments', 'tournament-1'), {
+          name: 'Featured Cup Updated Safely',
+        }),
+      );
+    });
+
+    it('denies self-assigned organizer membership for another organizer tournament', async () => {
+      await seed(
+        'tournaments/other-cup',
+        quickCreateTournamentData({organizerId: 'organizer-2'}),
+      );
+      const db = authedDb('organizer-1');
+
+      await assertFails(
+        setDoc(
+          doc(db, 'tournamentMemberships', 'organizer-1_other-cup'),
+          {
+            tournamentId: 'other-cup',
+            userId: 'organizer-1',
+            role: 'organizer',
+            createdAt: now,
+          },
+        ),
+      );
+    });
+
+    it('rejects a mismatched organizer membership id', async () => {
+      await seed('tournaments/atomic-cup', quickCreateTournamentData());
+      const db = authedDb('organizer-1');
+
+      await assertFails(
+        setDoc(doc(db, 'tournamentMemberships', 'wrong-membership-id'), {
+          tournamentId: 'atomic-cup',
+          userId: 'organizer-1',
+          role: 'organizer',
+          createdAt: now,
+        }),
+      );
+    });
+
     it('denies authenticated user creating a tournament for another organizerId', async () => {
+      await seed('tournamentMemberships/account-b_forged-tournament', {
+        tournamentId: 'forged-tournament',
+        userId: 'account-b',
+        role: 'organizer',
+        createdAt: now,
+      });
       const db = authedDb('account-b');
 
       await assertFails(
@@ -438,6 +612,71 @@ describe('tournament permission Firestore rules', () => {
       const db = authedDb('organizer-1');
 
       await assertSucceeds(getDoc(doc(db, 'tournaments/tournament-1')));
+    });
+
+    it('allows organizer to list own tournament memberships', async () => {
+      await seed(
+        'tournaments/own-private',
+        tournamentData({
+          organizerId: 'organizer-1',
+          visibility: 'private',
+          discoverable: false,
+        }),
+      );
+      await seed(
+        'tournaments/other-private',
+        tournamentData({
+          organizerId: 'organizer-2',
+          visibility: 'private',
+          discoverable: false,
+        }),
+      );
+      await seed('tournamentMemberships/organizer-1_own-private', {
+        tournamentId: 'own-private',
+        userId: 'organizer-1',
+        role: 'organizer',
+        createdAt: now,
+      });
+      await seed('tournamentMemberships/organizer-2_other-private', {
+        tournamentId: 'other-private',
+        userId: 'organizer-2',
+        role: 'organizer',
+        createdAt: now,
+      });
+      const db = authedDb('organizer-1');
+
+      await assertFails(
+        getDocs(
+          query(
+            collection(db, 'tournaments'),
+            where('organizerId', '==', 'organizer-1'),
+          ),
+        ),
+      );
+
+      const ownSnapshot = await assertSucceeds(
+        getDocs(
+          query(
+            collection(db, 'tournamentMemberships'),
+            where('userId', '==', 'organizer-1'),
+            where('role', '==', 'organizer'),
+          ),
+        ),
+      );
+      assert.deepStrictEqual(
+        ownSnapshot.docs.map((docSnapshot) => docSnapshot.id),
+        ['organizer-1_own-private'],
+      );
+
+      await assertFails(
+        getDocs(
+          query(
+            collection(db, 'tournamentMemberships'),
+            where('userId', '==', 'organizer-2'),
+            where('role', '==', 'organizer'),
+          ),
+        ),
+      );
     });
 
     it('allows active assistants to read private tournament details', async () => {
@@ -518,6 +757,74 @@ describe('tournament permission Firestore rules', () => {
           query(
             collection(db, 'tournaments'),
             where('visibility', '==', 'private'),
+          ),
+        ),
+      );
+    });
+
+    it('allows signed-in featured discovery and denies the same query when signed out', async () => {
+      await seed(
+        'tournaments/world-cup',
+        quickCreateTournamentData({
+          organizerId: 'el7reef-official',
+          name: 'كأس العالم 2026',
+          status: 'completed',
+          isFeatured: true,
+          featuredPriority: 0,
+        }),
+      );
+      const featuredQuery = (db) =>
+        query(
+          collection(db, 'tournaments'),
+          where('visibility', '==', 'public'),
+          where('discoverable', '==', true),
+          where('isFeatured', '==', true),
+        );
+
+      await assertSucceeds(getDocs(featuredQuery(authedDb('viewer-1'))));
+      await assertFails(
+        getDocs(featuredQuery(testEnv.unauthenticatedContext().firestore())),
+      );
+    });
+
+    it('allows signed-in public World Cup roster reads and denies signed-out reads', async () => {
+      await seed('guestTeams/world-cup-team-1', {
+        name: 'World Cup Team',
+        creatorId: 'el7reef-official',
+        tournamentIds: ['world-cup-2026-simulation'],
+      });
+      await seed('publicTournamentRosterEntries/world-cup-player-1', {
+        tournamentId: 'world-cup-2026-simulation',
+        guestTeamId: 'world-cup-team-1',
+        playerId: 'player-1',
+        displayName: 'Player One',
+        normalizedName: 'player one',
+        jerseyNumber: 1,
+        preferredPosition: 'GK',
+        createdBy: 'el7reef-official',
+        createdAt: now,
+        updatedAt: now,
+        claimStatus: 'guest',
+      });
+      const rosterQuery = (db) =>
+        query(
+          collection(db, 'publicTournamentRosterEntries'),
+          where('tournamentId', '==', 'world-cup-2026-simulation'),
+          where('guestTeamId', '==', 'world-cup-team-1'),
+        );
+
+      await assertSucceeds(getDocs(rosterQuery(authedDb('viewer-1'))));
+      await assertSucceeds(
+        getDoc(doc(authedDb('viewer-1'), 'guestTeams/world-cup-team-1')),
+      );
+      await assertFails(
+        getDocs(rosterQuery(testEnv.unauthenticatedContext().firestore())),
+      );
+      await assertFails(
+        getDoc(
+          doc(
+            testEnv.unauthenticatedContext().firestore(),
+            'guestTeams/world-cup-team-1',
           ),
         ),
       );
@@ -657,6 +964,21 @@ describe('tournament permission Firestore rules', () => {
       );
     });
 
+    it('denies organizer direct score submission after backend hardening', async () => {
+      await seed('matches/match-1', matchData({status: 'live'}));
+      const db = authedDb('organizer-1');
+
+      await assertFails(
+        updateDoc(doc(db, 'matches', 'match-1'), {
+          scoreTeamA: 2,
+          scoreTeamB: 1,
+          status: 'completed',
+          completedAt: now + 1,
+          isAnomaly: false,
+        }),
+      );
+    });
+
     it('denies non-organizer updating another organizer match', async () => {
       await seed('matches/match-1', matchData());
       const db = authedDb('account-b');
@@ -674,6 +996,275 @@ describe('tournament permission Firestore rules', () => {
       const db = authedDb('organizer-1');
 
       await assertFails(deleteDoc(doc(db, 'matches', 'match-1')));
+    });
+
+    it('denies organizer direct player stats writes after backend hardening', async () => {
+      await seed('matches/match-1', matchData({status: 'completed'}));
+      const db = authedDb('organizer-1');
+
+      await assertFails(
+        setDoc(doc(db, 'matches/match-1/player_stats/player-1'), {
+          playerId: 'player-1',
+          goals: 2,
+          assists: 0,
+          mvp: false,
+          updatedAt: now + 1,
+        }),
+      );
+    });
+
+    it('denies organizer direct fan voting session writes after backend hardening', async () => {
+      await seedTournamentFixture();
+      const db = authedDb('organizer-1');
+
+      await assertFails(
+        setDoc(doc(db, 'fanVotingSessions', 'match-1'), {
+          matchId: 'match-1',
+          tournamentId: 'tournament-1',
+          status: 'open',
+          createdAt: now + 1,
+          updatedAt: now + 1,
+        }),
+      );
+    });
+  });
+
+  describe('knockout result write boundary', () => {
+    it('allows fixture creation only with unset backend-owned knockout fields', async () => {
+      const db = authedDb('organizer-1');
+
+      await assertSucceeds(
+        setDoc(
+          doc(db, 'matches', 'safe-knockout-match'),
+          matchData({
+            stageType: 'knockoutStage',
+            penaltyScoreTeamA: null,
+            penaltyScoreTeamB: null,
+            knockoutDecision: null,
+          }),
+        ),
+      );
+      await assertFails(
+        setDoc(
+          doc(db, 'matches', 'forged-knockout-match'),
+          matchData({
+            stageType: 'knockoutStage',
+            penaltyScoreTeamA: 5,
+            penaltyScoreTeamB: 4,
+            knockoutDecision: 'teamA',
+          }),
+        ),
+      );
+    });
+
+    it('denies organizer direct penalty and decision updates', async () => {
+      await seed(
+        'matches/match-1',
+        matchData({stageType: 'knockoutStage', status: 'live'}),
+      );
+      const db = authedDb('organizer-1');
+
+      await assertFails(
+        updateDoc(doc(db, 'matches', 'match-1'), {
+          penaltyScoreTeamA: 5,
+          penaltyScoreTeamB: 4,
+          knockoutDecision: 'teamA',
+        }),
+      );
+    });
+
+    it('denies invalid penalty types and ranges at the client boundary', async () => {
+      await seed(
+        'matches/match-1',
+        matchData({stageType: 'knockoutStage', status: 'live'}),
+      );
+      const db = authedDb('organizer-1');
+
+      for (const forgedUpdate of [
+        {penaltyScoreTeamA: -1},
+        {penaltyScoreTeamA: 100},
+        {penaltyScoreTeamA: '5'},
+        {penaltyScoreTeamA: 4, penaltyScoreTeamB: 4},
+        {knockoutDecision: 'draw'},
+      ]) {
+        await assertFails(
+          updateDoc(doc(db, 'matches', 'match-1'), forgedUpdate),
+        );
+      }
+    });
+
+    it('preserves backend-owned knockout values during a safe organizer update', async () => {
+      await seed(
+        'matches/match-1',
+        matchData({
+          stageType: 'knockoutStage',
+          status: 'completed',
+          scoreTeamA: 2,
+          scoreTeamB: 2,
+          penaltyScoreTeamA: 5,
+          penaltyScoreTeamB: 4,
+          knockoutDecision: 'teamA',
+        }),
+      );
+      const db = authedDb('organizer-1');
+
+      await assertSucceeds(
+        updateDoc(doc(db, 'matches', 'match-1'), {
+          venueId: 'pitch-2',
+          updatedAt: now + 1,
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(db, 'matches', 'match-1'), {
+          penaltyScoreTeamA: null,
+          penaltyScoreTeamB: null,
+          knockoutDecision: null,
+        }),
+      );
+    });
+  });
+
+  describe('knockout bracket security', () => {
+    beforeEach(async () => {
+      await seedTournamentFixture();
+    });
+
+    it('allows a validated persisted draw with BYE participants', async () => {
+      const db = authedDb('organizer-1');
+
+      await assertSucceeds(
+        setDoc(
+          doc(db, 'knockoutBrackets', 'bracket-draw'),
+          knockoutBracketData({
+            qualifierParticipantIds: [
+              'participant-1',
+              'participant-2',
+              'participant-3',
+            ],
+            seedingMethod: 'draw',
+            byeParticipantIds: ['participant-1'],
+          }),
+        ),
+      );
+    });
+
+    it('denies invalid seeding, BYE, type, size, and extra-field payloads', async () => {
+      const db = authedDb('organizer-1');
+      const invalidPayloads = [
+        knockoutBracketData({seedingMethod: 'clientChosenWinner'}),
+        knockoutBracketData({byeParticipantIds: ['participant-3']}),
+        knockoutBracketData({
+          byeParticipantIds: ['participant-1', 'participant-1'],
+        }),
+        knockoutBracketData({qualifierParticipantIds: ['participant-1', 2]}),
+        knockoutBracketData({
+          qualifierParticipantIds: Array.from(
+            {length: 17},
+            (_, index) => `participant-${index + 1}`,
+          ),
+        }),
+        knockoutBracketData({championParticipantId: 'participant-1'}),
+        knockoutBracketData({extraData: 'schema-pollution'}),
+      ];
+
+      for (const [index, payload] of invalidPayloads.entries()) {
+        await assertFails(
+          setDoc(
+            doc(db, 'knockoutBrackets', `invalid-bracket-${index}`),
+            payload,
+          ),
+        );
+      }
+    });
+
+    it('denies client mutation of seed order, BYEs, champion, and extra fields', async () => {
+      await seed('knockoutBrackets/bracket-1', knockoutBracketData());
+      const db = authedDb('organizer-1');
+
+      for (const forgedUpdate of [
+        {seedingMethod: 'draw', updatedAt: now + 1},
+        {byeParticipantIds: ['participant-1'], updatedAt: now + 1},
+        {championParticipantId: 'participant-1', updatedAt: now + 1},
+        {extraData: 'schema-pollution', updatedAt: now + 1},
+      ]) {
+        await assertFails(
+          updateDoc(doc(db, 'knockoutBrackets', 'bracket-1'), forgedUpdate),
+        );
+      }
+    });
+  });
+
+  describe('knockout tie security', () => {
+    beforeEach(async () => {
+      await seedTournamentFixture();
+    });
+
+    it('allows only a structurally valid first-round BYE', async () => {
+      const db = authedDb('organizer-1');
+
+      await assertSucceeds(
+        setDoc(
+          doc(db, 'knockoutTies', 'tie-bye'),
+          knockoutTieData({
+            participantBId: null,
+            winnerParticipantId: 'participant-1',
+            matchId: null,
+            resolutionType: 'bye',
+          }),
+        ),
+      );
+    });
+
+    it('denies forged resolution states, invalid ranges, and extra fields', async () => {
+      const db = authedDb('organizer-1');
+      const invalidPayloads = [
+        knockoutTieData({resolutionType: 'penalties'}),
+        knockoutTieData({resolutionType: 'regularTime'}),
+        knockoutTieData({resolutionType: 'walkover'}),
+        knockoutTieData({winnerParticipantId: 'participant-1'}),
+        knockoutTieData({
+          participantBId: null,
+          winnerParticipantId: 'participant-2',
+          matchId: null,
+          resolutionType: 'bye',
+        }),
+        knockoutTieData({roundIndex: -1}),
+        knockoutTieData({slotNumber: '0'}),
+        knockoutTieData({extraData: 'schema-pollution'}),
+      ];
+
+      for (const [index, payload] of invalidPayloads.entries()) {
+        await assertFails(
+          setDoc(
+            doc(db, 'knockoutTies', `invalid-tie-${index}`),
+            payload,
+          ),
+        );
+      }
+    });
+
+    it('denies organizer result transitions and winner propagation bypass', async () => {
+      await seed('knockoutTies/tie-1', knockoutTieData());
+      const db = authedDb('organizer-1');
+
+      for (const forgedUpdate of [
+        {
+          resolutionType: 'penalties',
+          winnerParticipantId: 'participant-1',
+          updatedAt: now + 1,
+        },
+        {
+          resolutionType: 'regularTime',
+          winnerParticipantId: 'participant-2',
+          updatedAt: now + 1,
+        },
+        {participantAId: 'participant-3', updatedAt: now + 1},
+        {extraData: 'schema-pollution', updatedAt: now + 1},
+      ]) {
+        await assertFails(
+          updateDoc(doc(db, 'knockoutTies', 'tie-1'), forgedUpdate),
+        );
+      }
     });
   });
 
@@ -788,20 +1379,28 @@ describe('tournament permission Firestore rules', () => {
   });
 
   describe('matchEvents', () => {
-    it('allows organizer to create a valid goal event fixture', async () => {
+    it('allows authenticated users to read backend-created match events', async () => {
+      await seedTournamentFixture();
+      await seed('matchEvents/goal-1', matchEventData());
+      const db = authedDb('account-b');
+
+      await assertSucceeds(getDoc(doc(db, 'matchEvents', 'goal-1')));
+    });
+
+    it('denies organizer direct goal event writes after backend hardening', async () => {
       await seedTournamentFixture();
       const db = authedDb('organizer-1');
 
-      await assertSucceeds(
+      await assertFails(
         setDoc(doc(db, 'matchEvents', 'goal-1'), matchEventData()),
       );
     });
 
-    it('allows organizer to create a valid MVP event fixture', async () => {
+    it('denies organizer direct MVP event writes after backend hardening', async () => {
       await seedTournamentFixture();
       const db = authedDb('organizer-1');
 
-      await assertSucceeds(
+      await assertFails(
         setDoc(
           doc(db, 'matchEvents', 'mvp-1'),
           matchEventData({

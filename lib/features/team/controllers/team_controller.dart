@@ -49,6 +49,7 @@ class TeamController extends GetxController {
     if (userId == null) return;
     try {
       isLoading.value = true;
+      errorMessage.value = '';
       myTeams.value = await _teamRepo.getPlayerTeams(userId);
     } catch (e) {
       errorMessage.value = 'فشل تحميل الفرق';

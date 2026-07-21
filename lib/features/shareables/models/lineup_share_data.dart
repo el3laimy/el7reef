@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/lineup/lineup_types.dart';
+import '../../../domain/entities/share_payload.dart';
 
 enum LineupShareOwnerType { officialTeam, temporarySide, guestTeam }
 
@@ -75,11 +76,12 @@ class LineupShareData {
   final String? statusLabel;
   final String? updatedLabel;
 
-  /// Auto-generated tactical notes for the card footer.
+  /// Deprecated compatibility field. Never populate it from inferred tactics.
   final List<String> tacticalNotes;
 
-  /// Motivational quote displayed on the card.
+  /// Optional editorial copy. It must not imply measured tactical analysis.
   final String motivationalQuote;
+  final SharePayload? sharePayload;
 
   const LineupShareData({
     required this.matchId,
@@ -101,6 +103,7 @@ class LineupShareData {
     this.statusLabel,
     this.updatedLabel,
     this.tacticalNotes = const [],
-    this.motivationalQuote = 'روح واحدة.. هدف واحد',
+    this.motivationalQuote = 'العب. اتوثق. اتفاخر.',
+    this.sharePayload,
   });
 }

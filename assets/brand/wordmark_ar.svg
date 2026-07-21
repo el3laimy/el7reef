@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 160" role="img" aria-labelledby="title desc">
+  <title id="title">الحريف</title>
+  <desc id="desc">الشعار الكتابي العربي الأساسي للحريف</desc>
+  <text
+    x="500"
+    y="108"
+    fill="#F4F7EE"
+    direction="rtl"
+    unicode-bidi="bidi-override"
+    text-anchor="start"
+    font-family="Cairo, Noto Sans Arabic, sans-serif"
+    font-size="104"
+    font-weight="800">الحريف</text>
+  <path fill="#7ED957" d="M80 132h380l-14 12H66l14-12Z"/>
+</svg>

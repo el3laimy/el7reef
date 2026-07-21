@@ -264,6 +264,454 @@ void main() {
     expect(find.text('قبل المباراة'), findsOneWidget);
   });
 
+  testWidgets('manager save lineup preserves visual slot assignments', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        authSession: authSession,
+        teamRepository: teamRepository,
+        teamRosterService: teamRosterService,
+        teamFormationService: teamFormationService,
+        playerRepository: playerRepository,
+        guestPlayerRepository: guestPlayerRepository,
+        shareLinkService: shareLinkService,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final controller = Get.find<TeamRosterController>();
+    final player = controller.visualBench.firstWhere(
+      (candidate) => candidate.name == 'Mahmoud Ali',
+    );
+    final targetSlot = controller.visualSlots.first;
+
+    controller.assignPlayerToVisualSlot(player, targetSlot);
+    await controller.saveVisualLineup();
+    await tester.pumpAndSettle();
+
+    final state = await teamFormationService.getCurrentLineupState('team-1');
+    final savedGuestEntry = state!.entries.firstWhere(
+      (entry) => entry.guestPlayerId == 'guest-1',
+    );
+    final restoredSlot = controller.visualSlots.firstWhere(
+      (slot) => slot.id == targetSlot.id,
+    );
+
+    expect(savedGuestEntry.slotId, targetSlot.id);
+    expect(restoredSlot.occupantKey, player.key);
+    expect(controller.isLineupDirty.value, isFalse);
+    Get.closeAllSnackbars();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('manager changes lineup size to 11 and saves it visibly', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        authSession: authSession,
+        teamRepository: teamRepository,
+        teamRosterService: teamRosterService,
+        teamFormationService: teamFormationService,
+        playerRepository: playerRepository,
+        guestPlayerRepository: guestPlayerRepository,
+        shareLinkService: shareLinkService,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('خطة الفريق'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('اضغط لاعبًا ثم اختر خانة للنقل أو التبديل.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('squad-player-count-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byWidgetPredicate(
+        (widget) => widget is PopupMenuItem<int> && widget.value == 11,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final controller = Get.find<TeamRosterController>();
+
+    expect(controller.visualPlayerCount.value, 11);
+    expect(controller.visualFormationCode.value, '4-2-3-1');
+    expect(controller.visualSlots, hasLength(11));
+    expect(find.text('تعديلات غير محفوظة'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'حفظ'), findsOneWidget);
+    expect(find.byKey(const ValueKey('squad-tactics-save')), findsOneWidget);
+    expect(find.text('11v11'), findsOneWidget);
+
+    final screenWidth = tester.view.physicalSize.width;
+    final saveRect = tester.getRect(
+      find.byKey(const ValueKey('squad-tactics-save')),
+    );
+    expect(saveRect.left, greaterThanOrEqualTo(0));
+    expect(saveRect.right, lessThanOrEqualTo(screenWidth));
+
+    await tester.tap(find.byKey(const ValueKey('squad-tactics-save')));
+    await tester.pumpAndSettle();
+
+    final state = await teamFormationService.getCurrentLineupState('team-1');
+    expect(state?.formationLabel, '4-2-3-1');
+    expect(controller.visualPlayerCount.value, 11);
+    expect(controller.isLineupDirty.value, isFalse);
+    expect(find.byKey(const ValueKey('squad-tactics-saved')), findsOneWidget);
+    Get.closeAllSnackbars();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('resizing 7 to 5 to 11 never loses active roster players', (
+    WidgetTester tester,
+  ) async {
+    final now = DateTime(2026, 7, 13, 17);
+    for (var index = 2; index <= 7; index += 1) {
+      final guestId = 'resize-guest-$index';
+      await guestPlayerRepository.createGuestPlayer(
+        GuestPlayer(
+          id: guestId,
+          displayName: 'Resize Guest $index',
+          normalizedName: 'resize guest $index',
+          teamId: 'team-1',
+          createdBy: 'owner-1',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      await teamRosterService.addGuestPlayer(
+        teamId: 'team-1',
+        actorId: 'owner-1',
+        guestPlayerId: guestId,
+      );
+    }
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        authSession: authSession,
+        teamRepository: teamRepository,
+        teamRosterService: teamRosterService,
+        teamFormationService: teamFormationService,
+        playerRepository: playerRepository,
+        guestPlayerRepository: guestPlayerRepository,
+        shareLinkService: shareLinkService,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final controller = Get.find<TeamRosterController>();
+    final activePlayerKeys = controller.allVisualPlayers
+        .map((player) => player.key)
+        .toSet();
+    expect(activePlayerKeys, hasLength(8));
+
+    final initialPlayers = controller.allVisualPlayers.take(7).toList();
+    for (var index = 0; index < initialPlayers.length; index += 1) {
+      controller.assignPlayerToVisualSlot(
+        initialPlayers[index],
+        controller.visualSlots[index],
+      );
+    }
+    expect(controller.visualSlots.where((slot) => !slot.isEmpty), hasLength(7));
+    expect(controller.visualBench, hasLength(1));
+
+    controller.changeVisualPlayerCount(5);
+    expect(controller.visualSlots.where((slot) => !slot.isEmpty), hasLength(5));
+    expect(controller.visualBench, hasLength(3));
+    expect(_visibleVisualPlayerKeys(controller), activePlayerKeys);
+
+    await controller.saveVisualLineup();
+    await tester.pumpAndSettle();
+    expect(controller.visualPlayerCount.value, 5);
+    expect(controller.visualBench, hasLength(3));
+    expect(_visibleVisualPlayerKeys(controller), activePlayerKeys);
+    Get.closeAllSnackbars();
+    await tester.pumpAndSettle();
+
+    controller.changeVisualPlayerCount(11);
+    expect(controller.visualSlots.where((slot) => !slot.isEmpty), hasLength(8));
+    expect(controller.visualBench, isEmpty);
+    expect(_visibleVisualPlayerKeys(controller), activePlayerKeys);
+
+    await controller.saveVisualLineup();
+    await tester.pumpAndSettle();
+    expect(controller.visualPlayerCount.value, 11);
+    expect(controller.visualSlots.where((slot) => !slot.isEmpty), hasLength(8));
+    expect(_visibleVisualPlayerKeys(controller), activePlayerKeys);
+    Get.closeAllSnackbars();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('formation tab places a tapped bench player on first pitch tap', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        authSession: authSession,
+        teamRepository: teamRepository,
+        teamRosterService: teamRosterService,
+        teamFormationService: teamFormationService,
+        playerRepository: playerRepository,
+        guestPlayerRepository: guestPlayerRepository,
+        shareLinkService: shareLinkService,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('خطة الفريق'));
+    await tester.pumpAndSettle();
+
+    final controller = Get.find<TeamRosterController>();
+    final guest = controller.allVisualPlayers.firstWhere(
+      (candidate) => candidate.name == 'Mahmoud Ali',
+    );
+    final targetSlot = controller.visualSlots.first;
+    final benchPlayerFinder = find.byKey(ValueKey('bench-player-${guest.key}'));
+    final targetSlotFinder = find.byKey(
+      ValueKey('lineup-slot-${targetSlot.id}'),
+    );
+    final formationScrollable = find
+        .descendant(
+          of: find.byKey(const ValueKey('team-roster-formation-list-view')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+
+    await tester.scrollUntilVisible(
+      benchPlayerFinder,
+      500,
+      scrollable: formationScrollable,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(benchPlayerFinder);
+    await tester.pumpAndSettle();
+
+    expect(find.text('مختار'), findsOneWidget);
+    expect(controller.selectedVisualPlayerName, 'Mahmoud Ali');
+
+    await tester.scrollUntilVisible(
+      find.text('مختار: Mahmoud Ali'),
+      -500,
+      scrollable: formationScrollable,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('مختار: Mahmoud Ali'), findsOneWidget);
+    expect(find.text('اختر خانة للنقل أو التبديل'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      targetSlotFinder,
+      -500,
+      scrollable: formationScrollable,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(targetSlotFinder);
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.visualSlots.any((slot) => slot.occupantKey == guest.key),
+      isTrue,
+    );
+    expect(controller.selectedVisualPlayerKey, isNull);
+    expect(find.text('مختار'), findsNothing);
+    expect(find.text('مختار: Mahmoud Ali'), findsNothing);
+  });
+
+  testWidgets('lineup tap-select mode swaps occupied slots without dragging', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        authSession: authSession,
+        teamRepository: teamRepository,
+        teamRosterService: teamRosterService,
+        teamFormationService: teamFormationService,
+        playerRepository: playerRepository,
+        guestPlayerRepository: guestPlayerRepository,
+        shareLinkService: shareLinkService,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final controller = Get.find<TeamRosterController>();
+    final registered = controller.visualBench.firstWhere(
+      (candidate) => candidate.name == 'Ahmed Salem',
+    );
+    final guest = controller.visualBench.firstWhere(
+      (candidate) => candidate.name == 'Mahmoud Ali',
+    );
+    final firstSlot = controller.visualSlots[0];
+    final secondSlot = controller.visualSlots[1];
+
+    controller.assignPlayerToVisualSlot(registered, firstSlot);
+    controller.assignPlayerToVisualSlot(guest, secondSlot);
+    controller.selectVisualPlayer(registered, sourceSlotId: firstSlot.id);
+
+    final moved = controller.moveSelectedVisualPlayerToSlot(secondSlot);
+
+    expect(moved, isTrue);
+    expect(
+      controller.visualSlots
+          .firstWhere((slot) => slot.id == secondSlot.id)
+          .occupantKey,
+      registered.key,
+    );
+    expect(
+      controller.visualSlots
+          .firstWhere((slot) => slot.id == firstSlot.id)
+          .occupantKey,
+      guest.key,
+    );
+    expect(controller.selectedVisualPlayerKey, isNull);
+    expect(controller.isLineupDirty.value, isTrue);
+  });
+
+  testWidgets('lineup bench action removes starter and returns him to bench', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        authSession: authSession,
+        teamRepository: teamRepository,
+        teamRosterService: teamRosterService,
+        teamFormationService: teamFormationService,
+        playerRepository: playerRepository,
+        guestPlayerRepository: guestPlayerRepository,
+        shareLinkService: shareLinkService,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final controller = Get.find<TeamRosterController>();
+    final player = controller.visualBench.firstWhere(
+      (candidate) => candidate.name == 'Ahmed Salem',
+    );
+    final targetSlot = controller.visualSlots.first;
+
+    controller.assignPlayerToVisualSlot(player, targetSlot);
+    expect(
+      controller.visualSlots
+          .firstWhere((slot) => slot.id == targetSlot.id)
+          .occupantKey,
+      player.key,
+    );
+    expect(
+      controller.visualBench.map((candidate) => candidate.key),
+      isNot(contains(player.key)),
+    );
+
+    controller.movePlayerToVisualBench(player);
+
+    expect(
+      controller.visualSlots
+          .firstWhere((slot) => slot.id == targetSlot.id)
+          .occupantKey,
+      isNull,
+    );
+    expect(
+      controller.visualBench.map((candidate) => candidate.key),
+      contains(player.key),
+    );
+    expect(controller.selectedVisualPlayerKey, isNull);
+    expect(controller.isLineupDirty.value, isTrue);
+  });
+
+  testWidgets('lineup tap-select mode moves pitch player to bench target', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        authSession: authSession,
+        teamRepository: teamRepository,
+        teamRosterService: teamRosterService,
+        teamFormationService: teamFormationService,
+        playerRepository: playerRepository,
+        guestPlayerRepository: guestPlayerRepository,
+        shareLinkService: shareLinkService,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final controller = Get.find<TeamRosterController>();
+    final player = controller.visualBench.firstWhere(
+      (candidate) => candidate.name == 'Ahmed Salem',
+    );
+    final targetSlot = controller.visualSlots.first;
+
+    controller.assignPlayerToVisualSlot(player, targetSlot);
+    controller.selectVisualPlayer(player, sourceSlotId: targetSlot.id);
+
+    expect(controller.selectedVisualPlayerCanMoveToBench, isTrue);
+
+    final moved = controller.moveSelectedVisualPlayerToBench();
+
+    expect(moved, isTrue);
+    expect(
+      controller.visualSlots
+          .firstWhere((slot) => slot.id == targetSlot.id)
+          .occupantKey,
+      isNull,
+    );
+    expect(
+      controller.visualBench.map((candidate) => candidate.key),
+      contains(player.key),
+    );
+    expect(controller.selectedVisualPlayerKey, isNull);
+    expect(controller.isLineupDirty.value, isTrue);
+  });
+
+  testWidgets('lineup tap-select mode replaces starter with bench player', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        authSession: authSession,
+        teamRepository: teamRepository,
+        teamRosterService: teamRosterService,
+        teamFormationService: teamFormationService,
+        playerRepository: playerRepository,
+        guestPlayerRepository: guestPlayerRepository,
+        shareLinkService: shareLinkService,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final controller = Get.find<TeamRosterController>();
+    final starter = controller.visualBench.firstWhere(
+      (candidate) => candidate.name == 'Ahmed Salem',
+    );
+    final benchPlayer = controller.visualBench.firstWhere(
+      (candidate) => candidate.name == 'Mahmoud Ali',
+    );
+    final targetSlot = controller.visualSlots.first;
+
+    controller.assignPlayerToVisualSlot(starter, targetSlot);
+    controller.selectVisualPlayer(benchPlayer);
+
+    expect(controller.selectedVisualPlayerKey, benchPlayer.key);
+
+    final moved = controller.moveSelectedVisualPlayerToSlot(targetSlot);
+
+    expect(moved, isTrue);
+    expect(
+      controller.visualSlots
+          .firstWhere((slot) => slot.id == targetSlot.id)
+          .occupantKey,
+      benchPlayer.key,
+    );
+    expect(
+      controller.visualBench.map((player) => player.key),
+      contains(starter.key),
+    );
+    expect(controller.selectedVisualPlayerKey, isNull);
+    expect(controller.isLineupDirty.value, isTrue);
+  });
+
   testWidgets('manager can share a guest player claim link', (
     WidgetTester tester,
   ) async {
@@ -456,6 +904,15 @@ void main() {
     Get.closeAllSnackbars();
     await tester.pumpAndSettle();
   });
+}
+
+Set<String> _visibleVisualPlayerKeys(TeamRosterController controller) {
+  return {
+    ...controller.visualSlots
+        .map((slot) => slot.occupantKey)
+        .whereType<String>(),
+    ...controller.visualBench.map((player) => player.key),
+  };
 }
 
 class _FakeAuthSession implements AuthSession {

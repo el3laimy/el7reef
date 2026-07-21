@@ -7,6 +7,8 @@ import 'package:el7reef/core/services/match_event_service.dart';
 import 'package:el7reef/core/services/tournament_top_scorers_resolver.dart';
 import 'package:el7reef/data/repositories/match_repository_impl.dart';
 import 'package:el7reef/data/repositories/match_event_repository_impl.dart';
+import 'package:el7reef/data/repositories/guest_player_repository_impl.dart';
+import 'package:el7reef/domain/entities/guest_player.dart';
 import 'package:el7reef/domain/entities/participant_ref.dart';
 import 'package:el7reef/features/shareables/controllers/top_scorers_share_controller.dart';
 
@@ -15,6 +17,7 @@ void main() {
     late FakeFirebaseFirestore firestore;
     late MatchEventService matchEventService;
     late TournamentTopScorersResolver resolver;
+    late GuestPlayerRepositoryImpl guestPlayerRepository;
     late DateTime now;
 
     const registeredActor = ParticipantRef(
@@ -25,6 +28,11 @@ void main() {
     const guestActor = ParticipantRef(
       kind: ParticipantRefKind.guestPlayer,
       id: 'guest-1',
+      displayName: 'Bassem',
+    );
+    const claimedGuestActor = ParticipantRef(
+      kind: ParticipantRefKind.guestPlayer,
+      id: 'guest-claimed-1',
       displayName: 'Bassem',
       linkedPlayerId: 'claimed-player-1',
     );
@@ -40,9 +48,11 @@ void main() {
         repository: MatchEventRepositoryImpl(firestore: firestore),
         firestore: firestore,
       );
+      guestPlayerRepository = GuestPlayerRepositoryImpl(firestore: firestore);
       resolver = TournamentTopScorersResolver(
         matchEventService: matchEventService,
         matchRepository: MatchRepositoryImpl(db: firestore),
+        guestPlayerRepository: guestPlayerRepository,
       );
       now = DateTime(2026, 5, 4, 20);
     });
@@ -52,6 +62,23 @@ void main() {
       expect(await resolver.getTopScorers('tournament-1', limit: 0), isEmpty);
       expect(await resolver.getTopScorers('tournament-1', limit: -1), isEmpty);
     });
+
+    test(
+      'reports official results when scorer details were not recorded',
+      () async {
+        await _seedMatch(
+          firestore,
+          matchId: 'imported-result-1',
+          tournamentId: 'tournament-1',
+        );
+
+        final snapshot = await resolver.getTopScorersSnapshot('tournament-1');
+
+        expect(snapshot.scorers, isEmpty);
+        expect(snapshot.officialMatchCount, 1);
+        expect(snapshot.hasOfficialResultsWithoutScorerDetails, isTrue);
+      },
+    );
 
     test('aggregates multiple goals for the same registered player', () async {
       await _recordGoals(
@@ -74,13 +101,13 @@ void main() {
     });
 
     test(
-      'aggregates guest player goals and preserves linkedPlayerId',
+      'uses the linked registered identity for a claimed guest scorer',
       () async {
         await _recordGoals(
           firestore: firestore,
           service: matchEventService,
           tournamentId: 'tournament-1',
-          actor: guestActor,
+          actor: claimedGuestActor,
           count: 2,
           now: now,
         );
@@ -88,13 +115,60 @@ void main() {
         final scorers = await resolver.getTopScorers('tournament-1');
 
         expect(scorers, hasLength(1));
-        expect(scorers.single.actor.kind, ParticipantRefKind.guestPlayer);
-        expect(scorers.single.actor.id, 'guest-1');
+        expect(scorers.single.actor.kind, ParticipantRefKind.player);
+        expect(scorers.single.actor.id, 'claimed-player-1');
         expect(scorers.single.actor.displayName, 'Bassem');
-        expect(scorers.single.actor.linkedPlayerId, 'claimed-player-1');
+        expect(scorers.single.actor.linkedPlayerId, isNull);
         expect(scorers.single.goals, 2);
       },
     );
+
+    test('merges historical guest and registered goals after claim', () async {
+      const historicalGuest = ParticipantRef(
+        kind: ParticipantRefKind.guestPlayer,
+        id: 'guest-historical',
+        displayName: 'Historical Guest',
+      );
+      const linkedPlayer = ParticipantRef(
+        kind: ParticipantRefKind.player,
+        id: 'player-linked',
+        displayName: 'Registered Name',
+      );
+      await guestPlayerRepository.createGuestPlayer(
+        GuestPlayer(
+          id: historicalGuest.id,
+          displayName: historicalGuest.displayName,
+          normalizedName: 'historical guest',
+          createdBy: 'organizer-1',
+          linkedPlayerId: linkedPlayer.id,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      await _recordGoals(
+        firestore: firestore,
+        service: matchEventService,
+        tournamentId: 'tournament-claim',
+        actor: historicalGuest,
+        count: 2,
+        now: now,
+      );
+      await _recordGoals(
+        firestore: firestore,
+        service: matchEventService,
+        tournamentId: 'tournament-claim',
+        actor: linkedPlayer,
+        count: 1,
+        now: now.add(const Duration(minutes: 1)),
+      );
+
+      final scorers = await resolver.getTopScorers('tournament-claim');
+
+      expect(scorers, hasLength(1));
+      expect(scorers.single.actor.kind, ParticipantRefKind.player);
+      expect(scorers.single.actor.id, 'player-linked');
+      expect(scorers.single.goals, 3);
+    });
 
     test(
       'excludes registered goals from unapproved submitted matches',
@@ -397,9 +471,10 @@ void main() {
 
         final scorers = await resolver.getTopScorers('tournament-1');
         final data = const TopScorersShareController().build(
+          tournamentId: 'tournament-1',
           tournamentName: 'Official Cup',
           scorers: scorers,
-        );
+        )!;
 
         expect(data.scorers, hasLength(1));
         expect(data.scorers.single.displayName, 'Ali');

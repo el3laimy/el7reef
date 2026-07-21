@@ -57,13 +57,183 @@ service cloud.firestore {
         data.visibility == 'public';
     }
 
+    function validOptionalTournamentString(value, maxLength) {
+      return value == null ||
+        (value is string && value.size() <= maxLength);
+    }
+
+    function validOptionalTournamentInt(value, minValue, maxValue) {
+      return value == null ||
+        (value is int && value >= minValue && value <= maxValue);
+    }
+
+    function validTournamentDocument(data) {
+      return data.keys().hasOnly([
+          'organizerId',
+          'name',
+          'description',
+          'location',
+          'format',
+          'teamSize',
+          'maxTeams',
+          'visibility',
+          'discoverable',
+          'isFeatured',
+          'featuredPriority',
+          'participantViewerIds',
+          'prizePool',
+          'prizeDescription',
+          'status',
+          'registeredTeamIds',
+          'registeredTeamCount',
+          'guestTeamCount',
+          'approvedParticipantCount',
+          'assistants',
+          'groupRoundIds',
+          'knockoutRoundIds',
+          'isFantasyEnabled',
+          'registrationDeadline',
+          'startDate',
+          'endDate',
+          'participantListFinalizedAt',
+          'activeParticipantCount',
+          'currentGroupStageId',
+          'currentKnockoutBracketId',
+          'winnerParticipantId',
+          'needsManualOpsMigration',
+          'groupAdvancementConfig',
+          'groupStandingsConfig',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasAll([
+          'organizerId',
+          'name',
+          'format',
+          'teamSize',
+          'maxTeams',
+          'status',
+          'createdAt'
+        ]) &&
+        data.organizerId is string &&
+        data.organizerId.size() > 0 &&
+        data.organizerId.size() <= 128 &&
+        data.name is string &&
+        data.name.size() > 0 &&
+        data.name.size() <= 120 &&
+        validOptionalTournamentString(data.get('description', null), 600) &&
+        validOptionalTournamentString(data.get('location', null), 160) &&
+        data.format in [
+          'groups',
+          'knockout',
+          'groupsOnly',
+          'knockoutOnly',
+          'groupsThenKnockout'
+        ] &&
+        data.teamSize is int &&
+        data.teamSize >= 5 &&
+        data.teamSize <= 11 &&
+        data.maxTeams is int &&
+        data.maxTeams >= 2 &&
+        data.maxTeams <= 128 &&
+        data.get('visibility', 'public') in ['public', 'private', 'inviteOnly'] &&
+        data.get('discoverable', true) is bool &&
+        data.get('isFeatured', false) is bool &&
+        data.get('featuredPriority', 1000) is int &&
+        data.get('featuredPriority', 1000) >= 0 &&
+        data.get('featuredPriority', 1000) <= 1000 &&
+        data.get('participantViewerIds', []) is list &&
+        data.get('participantViewerIds', []).size() <= 200 &&
+        validOptionalTournamentInt(data.get('prizePool', null), 0, 1000000000) &&
+        validOptionalTournamentString(data.get('prizeDescription', null), 300) &&
+        data.status in [
+          'upcoming',
+          'registration',
+          'groupStage',
+          'transferWindow',
+          'knockoutStage',
+          'active',
+          'completed',
+          'cancelled'
+        ] &&
+        data.get('registeredTeamIds', []) is list &&
+        data.get('registeredTeamIds', []).size() <= 128 &&
+        validOptionalTournamentInt(data.get('registeredTeamCount', null), 0, 128) &&
+        validOptionalTournamentInt(data.get('guestTeamCount', null), 0, 128) &&
+        validOptionalTournamentInt(data.get('approvedParticipantCount', null), 0, 128) &&
+        data.get('assistants', []) is list &&
+        data.get('assistants', []).size() <= 20 &&
+        data.get('groupRoundIds', []) is list &&
+        data.get('groupRoundIds', []).size() <= 128 &&
+        data.get('knockoutRoundIds', []) is list &&
+        data.get('knockoutRoundIds', []).size() <= 128 &&
+        data.get('isFantasyEnabled', false) is bool &&
+        validOptionalTournamentInt(data.get('registrationDeadline', null), 0, 4102444800000) &&
+        validOptionalTournamentInt(data.get('startDate', null), 0, 4102444800000) &&
+        validOptionalTournamentInt(data.get('endDate', null), 0, 4102444800000) &&
+        validOptionalTournamentInt(data.get('participantListFinalizedAt', null), 0, 4102444800000) &&
+        validOptionalTournamentInt(data.get('activeParticipantCount', null), 0, 128) &&
+        validOptionalTournamentString(data.get('currentGroupStageId', null), 160) &&
+        validOptionalTournamentString(data.get('currentKnockoutBracketId', null), 160) &&
+        validOptionalTournamentString(data.get('winnerParticipantId', null), 160) &&
+        data.get('needsManualOpsMigration', false) is bool &&
+        (
+          !data.keys().hasAny(['groupAdvancementConfig']) ||
+          (
+            data.groupAdvancementConfig is map &&
+            data.groupAdvancementConfig.keys().hasOnly([
+              'groupCount',
+              'automaticQualifiersPerGroup',
+              'bestRankedAdditionalQualifiers'
+            ]) &&
+            validOptionalTournamentInt(
+              data.groupAdvancementConfig.get('groupCount', null),
+              1,
+              32
+            ) &&
+            data.groupAdvancementConfig.automaticQualifiersPerGroup is int &&
+            data.groupAdvancementConfig.automaticQualifiersPerGroup >= 1 &&
+            data.groupAdvancementConfig.automaticQualifiersPerGroup <= 16 &&
+            data.groupAdvancementConfig.bestRankedAdditionalQualifiers is int &&
+            data.groupAdvancementConfig.bestRankedAdditionalQualifiers >= 0 &&
+            data.groupAdvancementConfig.bestRankedAdditionalQualifiers <= 64
+          )
+        ) &&
+        (
+          !data.keys().hasAny(['groupStandingsConfig']) ||
+          (
+            data.groupStandingsConfig is map &&
+            data.groupStandingsConfig.keys().hasOnly(['tiebreakerOrder']) &&
+            data.groupStandingsConfig.tiebreakerOrder is list &&
+            data.groupStandingsConfig.tiebreakerOrder.size() >= 1 &&
+            data.groupStandingsConfig.tiebreakerOrder.size() <= 4
+          )
+        ) &&
+        data.createdAt is int &&
+        data.createdAt >= 0 &&
+        data.createdAt <= 4102444800000 &&
+        validOptionalTournamentInt(data.get('updatedAt', null), 0, 4102444800000);
+    }
+
+    function createsUnfeaturedTournament(data) {
+      return data.get('isFeatured', false) == false &&
+        data.get('featuredPriority', 1000) == 1000;
+    }
+
+    function preservesTournamentAuthorityAndPromotion() {
+      return request.resource.data.organizerId == resource.data.organizerId &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.get('isFeatured', false) ==
+          resource.data.get('isFeatured', false) &&
+        request.resource.data.get('featuredPriority', 1000) ==
+          resource.data.get('featuredPriority', 1000);
+    }
+
     function canListTournament(data) {
       return isAuthenticated() &&
-        isPublicTournament(data) &&
-        (
-          !data.keys().hasAny(['discoverable']) ||
-          data.discoverable == true
-        );
+        data.keys().hasAll(['visibility', 'discoverable']) &&
+        data.visibility == 'public' &&
+        data.discoverable == true;
     }
 
     function ownsTeamById(teamId) {
@@ -109,9 +279,16 @@ service cloud.firestore {
       );
     }
 
+    function isLinkedGuestPlayer(data) {
+      return isAuthenticated() &&
+        data.linkedPlayerId is string &&
+        data.linkedPlayerId == request.auth.uid;
+    }
+
     function canCreateGuestPlayer(data) {
       return isAuthenticated() &&
         data.createdBy == request.auth.uid &&
+        data.get('linkedPlayerId', null) == null &&
         (
           (data.teamId is string && canManageTeamById(data.teamId)) ||
           (data.guestTeamId is string && ownsGuestTeamById(data.guestTeamId)) ||
@@ -166,6 +343,10 @@ service cloud.firestore {
       return isAuthenticated() &&
         (
           (data.creatorId is string && data.creatorId == request.auth.uid) ||
+          (
+            data.tournamentIds is list &&
+            'world-cup-2026-simulation' in data.tournamentIds
+          ) ||
           canReadGuestTeamByTournamentIds(data.tournamentIds) ||
           canManageGuestRosterByTournamentIds(data.tournamentIds)
         );
@@ -737,126 +918,275 @@ service cloud.firestore {
           .data.ownerPlayerId == request.auth.uid;
     }
 
-    function hasValidMatchEventActor(data) {
-      return data.actor is map &&
-        data.actor.keys().hasOnly([
-          'kind',
-          'id',
-          'displayName',
-          'linkedPlayerId'
-        ]) &&
-        data.actor.kind in ['player', 'guestPlayer', 'matchSidePlayer'] &&
-        data.actor.id is string &&
-        data.actor.id.size() > 0 &&
-        data.actor.displayName is string &&
-        data.actor.displayName.size() > 0 &&
-        (
-          !data.actor.keys().hasAny(['linkedPlayerId']) ||
-          data.actor.linkedPlayerId == null ||
-          data.actor.linkedPlayerId is string
-        );
-    }
-
-    function hasValidMatchEventOptionalFields(data) {
-      return (
-          !data.keys().hasAny(['tournamentId']) ||
-          data.tournamentId == null ||
-          data.tournamentId is string
-        ) &&
-        (
-          !data.keys().hasAny(['minute']) ||
-          data.minute == null ||
-          data.minute is int
-        );
-    }
-
-    function canCreateMatchEvent(data) {
-      return isAuthenticated() &&
-        data.keys().hasOnly([
-          'matchId',
-          'tournamentId',
-          'eventType',
-          'sideKey',
-          'actor',
-          'minute',
-          'createdBy',
-          'createdAt',
-          'status'
-        ]) &&
-        data.createdBy == request.auth.uid &&
-        data.matchId is string &&
-        data.eventType in ['goal', 'mvp'] &&
-        data.sideKey in ['A', 'B'] &&
-        data.createdAt is int &&
-        data.status == 'active' &&
-        hasValidMatchEventActor(data) &&
-        hasValidMatchEventOptionalFields(data) &&
-        canCreateMatchEventForMatch(data);
-    }
-
-    function canCreateMatchEventForMatch(data) {
-      return data.matchId is string &&
-        exists(/databases/$(database)/documents/matches/$(data.matchId)) &&
-        (
-          canOrganizerCreateMatchEventForMatch(data) ||
-          canAssistantCreateMatchEventForMatch(data)
-        );
-    }
-
-    function canOrganizerCreateMatchEventForMatch(data) {
-      return get(/databases/$(database)/documents/matches/$(data.matchId))
-          .data.organizerId == request.auth.uid &&
-        matchEventTournamentMatchesMatch(data);
-    }
-
-    function canAssistantCreateMatchEventForMatch(data) {
-      return get(/databases/$(database)/documents/matches/$(data.matchId))
-          .data.tournamentId is string &&
-        data.tournamentId is string &&
-        data.tournamentId ==
-          get(/databases/$(database)/documents/matches/$(data.matchId))
-            .data.tournamentId &&
-        hasActiveTournamentAssistantPermission(
-          get(/databases/$(database)/documents/matches/$(data.matchId))
-            .data.tournamentId,
-          'canRecordGoalsAndMvp'
-        );
-    }
-
-    function matchEventTournamentMatchesMatch(data) {
-      return (
-          get(/databases/$(database)/documents/matches/$(data.matchId))
-            .data.tournamentId is string &&
-          data.tournamentId is string &&
-          data.tournamentId ==
-            get(/databases/$(database)/documents/matches/$(data.matchId))
-              .data.tournamentId
-        ) ||
-        (
-          !(get(/databases/$(database)/documents/matches/$(data.matchId))
-            .data.tournamentId is string) &&
-          (
-            !data.keys().hasAny(['tournamentId']) ||
-            data.tournamentId == null
-          )
-        );
-    }
-
-    function canVoidMatchEvent() {
-      return isAuthenticated() &&
-        resource.data.createdBy == request.auth.uid &&
-        resource.data.status == 'active' &&
-        request.resource.data.status == 'voided' &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status']);
-    }
-
     function nullableString(data, key) {
       return data.get(key, null) == null || data.get(key, null) is string;
     }
 
     function nullableInt(data, key) {
       return data.get(key, null) == null || data.get(key, null) is int;
+    }
+
+    function isBoundedDocumentId(value) {
+      return value is string && value.size() > 0 && value.size() <= 128;
+    }
+
+    // Firestore Rules cannot iterate over lists, so inspect every supported
+    // knockout slot explicitly. Larger brackets must be persisted through a
+    // trusted backend operation instead of weakening client-side validation.
+    function isBoundedDocumentIdList(value, minSize, maxSize) {
+      return value is list &&
+        value.size() >= minSize &&
+        value.size() <= maxSize &&
+        (value.size() <= 0 || isBoundedDocumentId(value[0])) &&
+        (value.size() <= 1 || isBoundedDocumentId(value[1])) &&
+        (value.size() <= 2 || isBoundedDocumentId(value[2])) &&
+        (value.size() <= 3 || isBoundedDocumentId(value[3])) &&
+        (value.size() <= 4 || isBoundedDocumentId(value[4])) &&
+        (value.size() <= 5 || isBoundedDocumentId(value[5])) &&
+        (value.size() <= 6 || isBoundedDocumentId(value[6])) &&
+        (value.size() <= 7 || isBoundedDocumentId(value[7])) &&
+        (value.size() <= 8 || isBoundedDocumentId(value[8])) &&
+        (value.size() <= 9 || isBoundedDocumentId(value[9])) &&
+        (value.size() <= 10 || isBoundedDocumentId(value[10])) &&
+        (value.size() <= 11 || isBoundedDocumentId(value[11])) &&
+        (value.size() <= 12 || isBoundedDocumentId(value[12])) &&
+        (value.size() <= 13 || isBoundedDocumentId(value[13])) &&
+        (value.size() <= 14 || isBoundedDocumentId(value[14])) &&
+        (value.size() <= 15 || isBoundedDocumentId(value[15]));
+    }
+
+    function isAllowedAnalyticsCardType(value) {
+      return value in [
+        'matchResult',
+        'mvp',
+        'topScorers',
+        'lineup',
+        'champion',
+        'player',
+        'team',
+        'tournamentInvite',
+        'upcomingFixture',
+        'goalScorer',
+        'qualification',
+        'groupStandings',
+        'knockoutBracket',
+        'playerMilestone'
+      ];
+    }
+
+    function isAllowedAnalyticsEntityType(value) {
+      return value in [
+        'match',
+        'player',
+        'guestPlayer',
+        'team',
+        'tournament',
+        'lineup'
+      ];
+    }
+
+    function isValidAnalyticsCampaignSource(value) {
+      return value is string &&
+        value.size() > 0 &&
+        value.size() <= 64 &&
+        value.matches('^[a-z0-9][a-z0-9_-]{0,63}$');
+    }
+
+    function isValidPrideAnalyticsParameters(parameters) {
+      return parameters is map &&
+        parameters.keys().hasAll([
+          'cardType',
+          'entityType',
+          'entityId',
+          'campaignSource',
+          'schemaVersion'
+        ]) &&
+        parameters.keys().hasOnly([
+          'cardType',
+          'entityType',
+          'entityId',
+          'tournamentId',
+          'matchId',
+          'campaignSource',
+          'schemaVersion'
+        ]) &&
+        isAllowedAnalyticsCardType(parameters.cardType) &&
+        isAllowedAnalyticsEntityType(parameters.entityType) &&
+        isBoundedDocumentId(parameters.entityId) &&
+        (
+          !parameters.keys().hasAny(['tournamentId']) ||
+          isBoundedDocumentId(parameters.tournamentId)
+        ) &&
+        (
+          !parameters.keys().hasAny(['matchId']) ||
+          isBoundedDocumentId(parameters.matchId)
+        ) &&
+        isValidAnalyticsCampaignSource(parameters.campaignSource) &&
+        parameters.schemaVersion is int &&
+        parameters.schemaVersion == 1;
+    }
+
+    function isValidPrideAnalyticsEvent(data) {
+      return data.keys().hasOnly(['eventName', 'parameters', 'createdAt']) &&
+        data.eventName in [
+          'pride_card_viewed',
+          'share_started',
+          'share_sheet_returned',
+          'share_link_opened',
+          'claim_started_from_card',
+          'claim_completed_from_card'
+        ] &&
+        isValidPrideAnalyticsParameters(data.parameters);
+    }
+
+    function isValidPrideExportParameters(parameters) {
+      return parameters is map &&
+        parameters.keys().hasAll([
+          'cardType',
+          'format',
+          'mediaType',
+          'exportDurationMs',
+          'fallbackUsed'
+        ]) &&
+        parameters.keys().hasOnly([
+          'cardType',
+          'format',
+          'mediaType',
+          'exportDurationMs',
+          'fallbackUsed',
+          'failureCode'
+        ]) &&
+        isAllowedAnalyticsCardType(parameters.cardType) &&
+        parameters.format in [
+          'square1x1',
+          'feed4x5',
+          'story9x16',
+          'landscape16x9'
+        ] &&
+        parameters.mediaType in ['image', 'video'] &&
+        parameters.exportDurationMs is int &&
+        parameters.exportDurationMs >= 0 &&
+        parameters.exportDurationMs <= 600000 &&
+        parameters.fallbackUsed is bool &&
+        (
+          !parameters.keys().hasAny(['failureCode']) ||
+          (
+            parameters.failureCode is string &&
+            parameters.failureCode.size() > 0 &&
+            parameters.failureCode.size() <= 64 &&
+            parameters.failureCode.matches('^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$')
+          )
+        );
+    }
+
+    function isValidPrideExportAnalyticsEvent(data) {
+      return data.keys().hasOnly(['eventName', 'parameters', 'createdAt']) &&
+        data.eventName == 'pride_export_finished' &&
+        isValidPrideExportParameters(data.parameters);
+    }
+
+    function isAllowedLegacyAnalyticsType(eventName, type) {
+      return (
+          eventName == 'invite_sent' &&
+          type in ['guest_player', 'guest_team', 'team_invite']
+        ) ||
+        (
+          eventName == 'claim_open' &&
+          type in ['guestPlayer', 'guestTeam', 'teamInvite', 'team_invite']
+        ) ||
+        (
+          eventName == 'claim_completion' &&
+          type in ['guest_player', 'guest_team']
+        ) ||
+        (
+          eventName == 'join_completion' &&
+          type == 'team_invite'
+        );
+    }
+
+    function isValidLegacyAnalyticsParameters(data) {
+      let requiresActor = data.eventName in [
+        'invite_sent',
+        'claim_completion',
+        'join_completion'
+      ];
+      return data.parameters is map &&
+        data.parameters.keys().hasAll(['type', 'targetId']) &&
+        data.parameters.keys().hasOnly(
+          requiresActor
+            ? ['type', 'targetId', 'actorId']
+            : ['type', 'targetId']
+        ) &&
+        isAllowedLegacyAnalyticsType(
+          data.eventName,
+          data.parameters.type
+        ) &&
+        isBoundedDocumentId(data.parameters.targetId) &&
+        (
+          !requiresActor ||
+          (
+            data.parameters.keys().hasAll(['actorId']) &&
+            data.parameters.actorId == request.auth.uid &&
+            isBoundedDocumentId(data.parameters.actorId)
+          )
+        );
+    }
+
+    function isValidLegacyAnalyticsEvent(data) {
+      let requiresActor = data.eventName in [
+        'invite_sent',
+        'claim_completion',
+        'join_completion'
+      ];
+      return data.eventName in [
+          'invite_sent',
+          'claim_open',
+          'claim_completion',
+          'join_completion'
+        ] &&
+        data.keys().hasOnly(
+          requiresActor
+            ? ['eventName', 'actorId', 'parameters', 'createdAt']
+            : ['eventName', 'parameters', 'createdAt']
+        ) &&
+        (
+          !requiresActor ||
+          (
+            data.keys().hasAll(['actorId']) &&
+            data.actorId == request.auth.uid &&
+            isBoundedDocumentId(data.actorId)
+          )
+        ) &&
+        isValidLegacyAnalyticsParameters(data);
+    }
+
+    function isValidAnalyticsEvent(data) {
+      return isAuthenticated() &&
+        data.keys().hasAll(['eventName', 'parameters', 'createdAt']) &&
+        data.eventName is string &&
+        data.createdAt is int &&
+        data.createdAt >= 0 &&
+        data.createdAt <= request.time.toMillis() + 300000 &&
+        (
+          isValidLegacyAnalyticsEvent(data) ||
+          isValidPrideAnalyticsEvent(data) ||
+          isValidPrideExportAnalyticsEvent(data)
+        );
+    }
+
+    function clientMatchDecisionFieldsAreUnset(data) {
+      return data.get('penaltyScoreTeamA', null) == null &&
+        data.get('penaltyScoreTeamB', null) == null &&
+        data.get('knockoutDecision', null) == null;
+    }
+
+    function clientMatchDecisionFieldsAreUnchanged() {
+      return request.resource.data.get('penaltyScoreTeamA', null) ==
+          resource.data.get('penaltyScoreTeamA', null) &&
+        request.resource.data.get('penaltyScoreTeamB', null) ==
+          resource.data.get('penaltyScoreTeamB', null) &&
+        request.resource.data.get('knockoutDecision', null) ==
+          resource.data.get('knockoutDecision', null);
     }
 
     function isAllowedAssistantPermissionName(permissionName) {
@@ -901,40 +1231,6 @@ service cloud.firestore {
         );
     }
 
-    function isAssistantScoreSubmissionUpdate(matchId) {
-      return hasActiveAssistantPermissionForMatch(matchId, 'canSubmitScore') &&
-        hasActiveAssistantPermissionForMatch(matchId, 'canRecordGoalsAndMvp') &&
-        resource.data.status == 'live' &&
-        resource.data.isFrozen != true &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly([
-            'scoreTeamA',
-            'scoreTeamB',
-            'mvpPlayerId',
-            'prideEventsPending',
-            'completedAt',
-            'isAnomaly',
-            'status'
-          ]) &&
-        request.resource.data.status in ['completed', 'pendingReview'] &&
-        request.resource.data.scoreTeamA is int &&
-        request.resource.data.scoreTeamB is int &&
-        nullableString(request.resource.data, 'mvpPlayerId') &&
-        request.resource.data.prideEventsPending == true &&
-        request.resource.data.isAnomaly is bool &&
-        request.resource.data.completedAt is int;
-    }
-
-    function isAssistantPrideEventsPendingClear(matchId) {
-      return hasActiveAssistantPermissionForMatch(matchId, 'canRecordGoalsAndMvp') &&
-        resource.data.status in ['completed', 'pendingReview'] &&
-        resource.data.isFrozen != true &&
-        resource.data.prideEventsPending == true &&
-        request.resource.data.prideEventsPending == false &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['prideEventsPending']);
-    }
-
     function isAssistantLineupSnapshotIdUpdate(matchId) {
       return hasActiveAssistantPermissionForMatch(matchId, 'canStartMatch') &&
         resource.data.status in ['open', 'full'] &&
@@ -950,19 +1246,33 @@ service cloud.firestore {
         request.resource.data.get('matchSideLineupSnapshotIds', {}) is map;
     }
 
-    function isAssistantScoreApprovalUpdate(matchId) {
-      return hasActiveAssistantPermissionForMatch(matchId, 'canApproveScore') &&
-        resource.data.status in ['completed', 'pendingReview'] &&
-        resource.data.isFrozen != true &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly([
-            'status',
+    function isOrganizerSafeMatchUpdate() {
+      return isMatchOrganizer() &&
+        clientMatchDecisionFieldsAreUnchanged() &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny([
+            'scoreTeamA',
+            'scoreTeamB',
+            'penaltyScoreTeamA',
+            'penaltyScoreTeamB',
+            'knockoutDecision',
+            'mvpPlayerId',
+            'prideEventsPending',
+            'completedAt',
             'isAnomaly',
             'ratingsAppliedAt'
           ]) &&
-        request.resource.data.status == 'settled' &&
-        request.resource.data.isAnomaly == false &&
-        request.resource.data.ratingsAppliedAt is int;
+        (
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['status']) ||
+          request.resource.data.status in [
+            'open',
+            'full',
+            'live',
+            'cancelled',
+            'frozen'
+          ]
+        );
     }
 
     function canReadAuditEvent(data) {
@@ -1184,6 +1494,40 @@ service cloud.firestore {
         data.createdAt is int;
     }
 
+    function validOrganizerTournamentMembership(data, membershipId) {
+      return data.keys().hasOnly([
+          'tournamentId',
+          'userId',
+          'role',
+          'createdAt'
+        ]) &&
+        data.keys().hasAll([
+          'tournamentId',
+          'userId',
+          'role',
+          'createdAt'
+        ]) &&
+        isBoundedDocumentId(data.tournamentId) &&
+        data.userId == request.auth.uid &&
+        data.role == 'organizer' &&
+        data.createdAt is int &&
+        data.createdAt > 0 &&
+        membershipId == request.auth.uid + '_' + data.tournamentId &&
+        getAfter(
+          /databases/$(database)/documents/tournaments/$(data.tournamentId)
+        ).data.organizerId == request.auth.uid;
+    }
+
+    function hasMatchingOrganizerMembershipAfter(tournamentId) {
+      let membershipId = request.auth.uid + '_' + tournamentId;
+      let membership = getAfter(
+          /databases/$(database)/documents/tournamentMemberships/$(membershipId)
+        ).data;
+      return membership.tournamentId == tournamentId &&
+        membership.userId == request.auth.uid &&
+        membership.role == 'organizer';
+    }
+
     function canReadOwnFollowerDocument(followerUserId) {
       return isOwner(followerUserId) &&
         resource.data.userId is string &&
@@ -1211,35 +1555,6 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/matches/$(matchId)) &&
         get(/databases/$(database)/documents/matches/$(matchId))
           .data.organizerId == request.auth.uid;
-    }
-
-    function canSubmitAndRecordForMatch(matchId) {
-      return isMatchOrganizerById(matchId) ||
-        (
-          hasActiveAssistantPermissionForMatch(matchId, 'canSubmitScore') &&
-          hasActiveAssistantPermissionForMatch(matchId, 'canRecordGoalsAndMvp')
-        );
-    }
-
-    function isValidPendingPridePayload(data, matchId) {
-      return data.keys().hasOnly([
-          'version',
-          'matchId',
-          'scoreTeamA',
-          'scoreTeamB',
-          'goals',
-          'mvp',
-          'createdBy',
-          'createdAt'
-        ]) &&
-        data.version is int &&
-        data.matchId == matchId &&
-        data.scoreTeamA is int &&
-        data.scoreTeamB is int &&
-        data.goals is list &&
-        (data.mvp == null || data.mvp is map) &&
-        data.createdBy == request.auth.uid &&
-        data.createdAt is int;
     }
 
     function isOptionalString(value) {
@@ -1442,6 +1757,7 @@ service cloud.firestore {
 
     function canCreateMatch(data, matchId) {
       return isAuthenticated() &&
+        clientMatchDecisionFieldsAreUnset(data) &&
         (
           data.organizerId == request.auth.uid ||
           canCreateAcceptedChallengeMatch(data, matchId)
@@ -1663,16 +1979,87 @@ service cloud.firestore {
           'tournamentId',
           'format',
           'qualifierParticipantIds',
+          'seedingMethod',
+          'byeParticipantIds',
           'championParticipantId',
           'createdAt',
           'updatedAt'
         ]) &&
-        data.tournamentId is string &&
+        data.keys().hasAll([
+          'tournamentId',
+          'format',
+          'qualifierParticipantIds',
+          'seedingMethod',
+          'byeParticipantIds',
+          'championParticipantId',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isBoundedDocumentId(data.tournamentId) &&
         data.format == 'singleElimination' &&
-        data.qualifierParticipantIds is list &&
-        nullableString(data, 'championParticipantId') &&
-        data.createdAt is int &&
-        data.updatedAt is int;
+        isBoundedDocumentIdList(data.qualifierParticipantIds, 2, 16) &&
+        data.qualifierParticipantIds.toSet().size() ==
+          data.qualifierParticipantIds.size() &&
+        data.seedingMethod in ['ranked', 'draw', 'groupCrossPairing'] &&
+        isBoundedDocumentIdList(data.byeParticipantIds, 0, 15) &&
+        data.byeParticipantIds.toSet().size() ==
+          data.byeParticipantIds.size() &&
+        data.byeParticipantIds.toSet()
+          .difference(data.qualifierParticipantIds.toSet()).size() == 0 &&
+        (
+          data.championParticipantId == null ||
+          (
+            isBoundedDocumentId(data.championParticipantId) &&
+            data.championParticipantId in data.qualifierParticipantIds
+          )
+        ) &&
+        data.createdAt is int && data.createdAt >= 0 &&
+        data.updatedAt is int && data.updatedAt >= data.createdAt;
+    }
+
+    function validKnockoutBracketCreate(data) {
+      return validKnockoutBracket(data) &&
+        data.championParticipantId == null;
+    }
+
+    function validKnockoutBracketClientUpdate() {
+      // The participant lists were deeply validated on create and are
+      // immutable here. Re-validating them on every update can exceed the
+      // Firestore Rules expression budget, so validate the only mutable field
+      // and lock the complete persisted structure instead.
+      return request.resource.data.keys().hasOnly([
+          'tournamentId',
+          'format',
+          'qualifierParticipantIds',
+          'seedingMethod',
+          'byeParticipantIds',
+          'championParticipantId',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'tournamentId',
+          'format',
+          'qualifierParticipantIds',
+          'seedingMethod',
+          'byeParticipantIds',
+          'championParticipantId',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        tournamentOperationRefsUnchanged() &&
+        request.resource.data.format == resource.data.format &&
+        request.resource.data.qualifierParticipantIds ==
+          resource.data.qualifierParticipantIds &&
+        request.resource.data.seedingMethod == resource.data.seedingMethod &&
+        request.resource.data.byeParticipantIds ==
+          resource.data.byeParticipantIds &&
+        request.resource.data.championParticipantId ==
+          resource.data.championParticipantId &&
+        request.resource.data.updatedAt is int &&
+        request.resource.data.updatedAt >= resource.data.updatedAt &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['updatedAt']);
     }
 
     function validKnockoutTie(data) {
@@ -1686,20 +2073,101 @@ service cloud.firestore {
           'winnerParticipantId',
           'matchId',
           'nextTieId',
+          'resolutionType',
           'createdAt',
           'updatedAt'
         ]) &&
-        data.tournamentId is string &&
-        data.bracketId is string &&
+        data.keys().hasAll([
+          'tournamentId',
+          'bracketId',
+          'roundIndex',
+          'slotNumber',
+          'participantAId',
+          'participantBId',
+          'winnerParticipantId',
+          'matchId',
+          'nextTieId',
+          'resolutionType',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isBoundedDocumentId(data.tournamentId) &&
+        isBoundedDocumentId(data.bracketId) &&
         data.roundIndex is int &&
+        data.roundIndex >= 0 && data.roundIndex <= 15 &&
         data.slotNumber is int &&
-        nullableString(data, 'participantAId') &&
-        nullableString(data, 'participantBId') &&
-        nullableString(data, 'winnerParticipantId') &&
-        nullableString(data, 'matchId') &&
-        nullableString(data, 'nextTieId') &&
-        data.createdAt is int &&
-        data.updatedAt is int;
+        data.slotNumber >= 0 && data.slotNumber <= 32767 &&
+        (
+          data.participantAId == null ||
+          isBoundedDocumentId(data.participantAId)
+        ) &&
+        (
+          data.participantBId == null ||
+          isBoundedDocumentId(data.participantBId)
+        ) &&
+        (
+          data.winnerParticipantId == null ||
+          isBoundedDocumentId(data.winnerParticipantId)
+        ) &&
+        (data.matchId == null || isBoundedDocumentId(data.matchId)) &&
+        (data.nextTieId == null || isBoundedDocumentId(data.nextTieId)) &&
+        data.resolutionType in [
+          'pending',
+          'regularTime',
+          'penalties',
+          'bye'
+        ] &&
+        data.createdAt is int && data.createdAt >= 0 &&
+        data.updatedAt is int && data.updatedAt >= data.createdAt &&
+        validKnockoutTieResolutionState(data);
+    }
+
+    function validKnockoutTieResolutionState(data) {
+      return (
+          data.resolutionType == 'pending' &&
+          data.winnerParticipantId == null &&
+          isBoundedDocumentId(data.matchId)
+        ) ||
+        (
+          data.resolutionType == 'bye' &&
+          data.roundIndex == 0 &&
+          data.matchId == null &&
+          (
+            (
+              isBoundedDocumentId(data.participantAId) &&
+              data.participantBId == null &&
+              data.winnerParticipantId == data.participantAId
+            ) ||
+            (
+              data.participantAId == null &&
+              isBoundedDocumentId(data.participantBId) &&
+              data.winnerParticipantId == data.participantBId
+            )
+          )
+        ) ||
+        (
+          data.resolutionType in ['regularTime', 'penalties'] &&
+          isBoundedDocumentId(data.participantAId) &&
+          isBoundedDocumentId(data.participantBId) &&
+          isBoundedDocumentId(data.matchId) &&
+          data.winnerParticipantId in [
+            data.participantAId,
+            data.participantBId
+          ]
+        );
+    }
+
+    function validKnockoutTieCreate(data) {
+      return validKnockoutTie(data) &&
+        data.resolutionType in ['pending', 'bye'];
+    }
+
+    function validKnockoutTieClientUpdate() {
+      return validKnockoutTie(request.resource.data) &&
+        tieRefsUnchanged() &&
+        request.resource.data.updatedAt >= resource.data.updatedAt &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['updatedAt']);
     }
 
     function tieRefsUnchanged() {
@@ -1788,11 +2256,14 @@ service cloud.firestore {
     }
 
     match /guestPlayers/{guestPlayerId} {
-      allow read: if canManageGuestPlayer(resource.data);
+      allow read: if canManageGuestPlayer(resource.data) ||
+        isLinkedGuestPlayer(resource.data);
       allow create: if canCreateGuestPlayer(request.resource.data);
       allow update: if (
         canManageGuestPlayer(resource.data) &&
-        request.resource.data.createdBy == resource.data.createdBy
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.get('linkedPlayerId', null) ==
+          resource.data.get('linkedPlayerId', null)
       ) || canSelfClaimGuestPlayer(guestPlayerId);
       allow delete: if false;
     }
@@ -1851,34 +2322,25 @@ service cloud.firestore {
     match /matches/{matchId} {
       allow read: if isAuthenticated();
       allow create: if canCreateMatch(request.resource.data, matchId);
-      allow update: if isMatchOrganizer() ||
-        isAssistantLineupSnapshotIdUpdate(matchId) ||
-        isAssistantScoreApprovalUpdate(matchId) ||
-        isAssistantScoreSubmissionUpdate(matchId) ||
-        isAssistantPrideEventsPendingClear(matchId);
+      allow update: if isOrganizerSafeMatchUpdate() ||
+        isAssistantLineupSnapshotIdUpdate(matchId);
       allow delete: if false;
 
       match /player_stats/{playerId} {
         allow read: if isAuthenticated();
-        allow create, update: if isMatchOrganizerById(matchId) ||
-          hasActiveAssistantPermissionForMatch(matchId, 'canSubmitScore');
+        allow create, update: if false;
         allow delete: if false;
       }
 
       match /pendingPrideEvents/{payloadId} {
         allow read: if isAuthenticated();
-        allow create, update: if payloadId == 'current' &&
-          canSubmitAndRecordForMatch(matchId) &&
-          isValidPendingPridePayload(request.resource.data, matchId);
-        allow delete: if payloadId == 'current' &&
-          canSubmitAndRecordForMatch(matchId);
+        allow create, update, delete: if false;
       }
     }
 
     match /matchEvents/{eventId} {
       allow read: if isAuthenticated();
-      allow create: if canCreateMatchEvent(request.resource.data);
-      allow update: if canVoidMatchEvent();
+      allow create, update: if false;
       allow delete: if false;
     }
 
@@ -1935,8 +2397,13 @@ service cloud.firestore {
         );
       allow list: if canListTournament(resource.data);
       allow create: if isAuthenticated() &&
-        request.resource.data.organizerId == request.auth.uid;
-      allow update: if isTournamentOrganizer();
+        request.resource.data.organizerId == request.auth.uid &&
+        validTournamentDocument(request.resource.data) &&
+        createsUnfeaturedTournament(request.resource.data) &&
+        hasMatchingOrganizerMembershipAfter(tournamentId);
+      allow update: if isTournamentOrganizer() &&
+        validTournamentDocument(request.resource.data) &&
+        preservesTournamentAuthorityAndPromotion();
       allow delete: if false;
 
       match /assistants/{assistantUserId} {
@@ -1982,6 +2449,17 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /tournamentMemberships/{membershipId} {
+      allow read: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() &&
+        validOrganizerTournamentMembership(
+          request.resource.data,
+          membershipId
+        );
+      allow update, delete: if false;
+    }
+
     match /tournamentParticipants/{participantId} {
       allow read: if isAuthenticated();
       allow create: if ownsTournamentOperation(request.resource.data) &&
@@ -1991,6 +2469,11 @@ service cloud.firestore {
         participantSourceRefsUnchanged() &&
         validTournamentParticipant(request.resource.data);
       allow delete: if ownsExistingTournamentOperation();
+    }
+
+    match /publicTournamentRosterEntries/{entryId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if false;
     }
 
     match /tournamentGroups/{groupId} {
@@ -2016,20 +2499,18 @@ service cloud.firestore {
     match /knockoutBrackets/{bracketId} {
       allow read: if isAuthenticated();
       allow create: if ownsTournamentOperation(request.resource.data) &&
-        validKnockoutBracket(request.resource.data);
+        validKnockoutBracketCreate(request.resource.data);
       allow update: if ownsExistingTournamentOperation() &&
-        tournamentOperationRefsUnchanged() &&
-        validKnockoutBracket(request.resource.data);
+        validKnockoutBracketClientUpdate();
       allow delete: if false;
     }
 
     match /knockoutTies/{tieId} {
       allow read: if isAuthenticated();
       allow create: if ownsTournamentOperation(request.resource.data) &&
-        validKnockoutTie(request.resource.data);
+        validKnockoutTieCreate(request.resource.data);
       allow update: if ownsExistingTournamentOperation() &&
-        tieRefsUnchanged() &&
-        validKnockoutTie(request.resource.data);
+        validKnockoutTieClientUpdate();
       allow delete: if false;
     }
 
@@ -2117,9 +2598,7 @@ service cloud.firestore {
 
     match /fanVotingSessions/{sessionId} {
       allow read: if isAuthenticated();
-      allow create, update: if isMatchOrganizerById(sessionId) ||
-        hasActiveAssistantPermissionForMatch(sessionId, 'canSubmitScore') ||
-        hasActiveAssistantPermissionForMatch(sessionId, 'canApproveScore');
+      allow create, update: if false;
       allow delete: if false;
     }
 
@@ -2178,27 +2657,7 @@ service cloud.firestore {
 
     match /analyticsEvents/{eventId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() &&
-        request.resource.data.keys().hasOnly([
-          'eventName',
-          'actorId',
-          'parameters',
-          'createdAt'
-        ]) &&
-        request.resource.data.eventName is string &&
-        request.resource.data.createdAt is int &&
-        (
-          !request.resource.data.keys().hasAny(['parameters']) ||
-          request.resource.data.parameters is map
-        ) &&
-        (
-          !request.resource.data.keys().hasAny(['actorId']) ||
-          (
-            request.resource.data.actorId is string &&
-            isAuthenticated() &&
-            request.resource.data.actorId == request.auth.uid
-          )
-        );
+      allow create: if isValidAnalyticsEvent(request.resource.data);
       allow update, delete: if false;
     }
 

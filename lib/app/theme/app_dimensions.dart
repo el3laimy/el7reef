@@ -45,6 +45,7 @@ abstract class AppDimensions {
   static const double buttonHeightSm = 36.0;
   static const double buttonHeightMd = 48.0;
   static const double buttonHeightLg = 56.0;
+  static const double minTouchTarget = 48.0;
 
   // ── Card ──
   static const double cardElevation = 0.0;
@@ -53,9 +54,15 @@ abstract class AppDimensions {
   // ── Bottom Nav ──
   static const double bottomNavHeight = 72.0;
 
+  // ── Functional glass ──
+  static const double functionalGlassBlur = 14.0;
+
   // ── Animation Durations (ms) ──
-  static const int animFast = 200; // UX Rule
-  static const int animNormal = 350;
-  static const int animSlow = 600;
-  static const int animVerySlow = 1000;
+  static const int animFast = 150;
+  static const int animNormal = 220;
+  static const int animSlow = 250;
+  static const int animCelebration = 650;
+
+  /// باقٍ للتوافق مع المؤثرات القديمة، ولا يستخدم لحركة تشغيلية متكررة.
+  static const int animVerySlow = animCelebration;
 }

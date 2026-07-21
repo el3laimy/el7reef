@@ -4,26 +4,40 @@ import 'package:get/get.dart';
 import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../controllers/matchday_controller.dart';
 import 'matchday_lineup_participant_tile.dart';
 import 'matchday_snapshot_readonly_view.dart';
 
-class MatchdayLineupSection extends StatelessWidget {
+class MatchdayLineupSection extends StatefulWidget {
   final MatchdayController controller;
 
   const MatchdayLineupSection({super.key, required this.controller});
 
   @override
+  State<MatchdayLineupSection> createState() => _MatchdayLineupSectionState();
+}
+
+class _MatchdayLineupSectionState extends State<MatchdayLineupSection> {
+  bool _showPlayerSelection = false;
+  String? _sideKey;
+
+  @override
   Widget build(BuildContext context) {
+    final controller = widget.controller;
+    final currentSideKey = controller.selectedSideKey.value;
+    if (_sideKey != currentSideKey) {
+      _sideKey = currentSideKey;
+      _showPlayerSelection = false;
+    }
     final snapshot = controller.activeSnapshot.value;
     final startersCount = controller.lineupDrafts.values
         .where((value) => value == MatchdayLineupSlot.starter.name)
         .length;
 
-    return GlassmorphicContainer(
+    return El7reefGlassSurface(
+      variant: El7reefGlassVariant.base,
       padding: const EdgeInsets.all(AppDimensions.md),
-      borderRadius: AppDimensions.radiusLg,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -67,18 +81,44 @@ class MatchdayLineupSection extends StatelessWidget {
               ),
               const SizedBox(height: AppDimensions.md),
             ],
-            ...controller.participants.map(
-              (participant) => MatchdayLineupParticipantTile(
-                controller: controller,
-                participant: participant,
-                enabled: controller.canEditPreKickoff && !controller.isSubmitting.value,
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                key: const ValueKey('matchday-lineup-details-toggle'),
+                onPressed: () => setState(
+                  () => _showPlayerSelection = !_showPlayerSelection,
+                ),
+                icon: Icon(
+                  _showPlayerSelection
+                      ? Icons.expand_less_rounded
+                      : Icons.groups_rounded,
+                ),
+                label: Text(
+                  _showPlayerSelection
+                      ? 'إخفاء اختيار اللاعبين'
+                      : 'تعديل الأساسيين والبدلاء',
+                ),
               ),
             ),
+            if (_showPlayerSelection) ...[
+              const SizedBox(height: AppDimensions.md),
+              ...controller.participants.map(
+                (participant) => MatchdayLineupParticipantTile(
+                  controller: controller,
+                  participant: participant,
+                  enabled:
+                      controller.canEditPreKickoff &&
+                      !controller.isSubmitting.value,
+                ),
+              ),
+            ],
             const SizedBox(height: AppDimensions.md),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: controller.canEditPreKickoff && !controller.isSubmitting.value
+                onPressed:
+                    controller.canEditPreKickoff &&
+                        !controller.isSubmitting.value
                     ? controller.lockLineup
                     : null,
                 icon: const Icon(Icons.lock_outline),

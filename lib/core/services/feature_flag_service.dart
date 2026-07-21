@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:get/get.dart';
 
@@ -18,7 +20,13 @@ enum FeatureFlagKey {
     'hybrid_tournament_registration_enabled',
     true,
   ),
-  matchdayUiEnabled('matchday_ui_enabled', true);
+  matchdayUiEnabled('matchday_ui_enabled', true),
+  prideGrowthLinksEnabled('pride_growth_links_enabled', false),
+  postMatchPrideHubEnabled('post_match_pride_hub_enabled', false),
+  functionalGlassEnabled('functional_glass_enabled', false),
+  prideShareCatalogV2Enabled('pride_share_catalog_v2_enabled', false),
+  prideVideoExportEnabled('pride_video_export_enabled', false),
+  reduceGlassBlurEnabled('reduce_glass_blur_enabled', false);
 
   final String remoteKey;
   final bool defaultValue;
@@ -55,7 +63,8 @@ class FeatureFlagService extends GetxService {
           minimumFetchInterval: const Duration(hours: 1),
         ),
       );
-      await remoteConfig.fetchAndActivate();
+      await remoteConfig.activate();
+      unawaited(_fetchForNextStartup(remoteConfig));
     } catch (error, stackTrace) {
       AppLogger.warning(
         'FeatureFlagService.init',
@@ -64,6 +73,22 @@ class FeatureFlagService extends GetxService {
       AppLogger.error('FeatureFlagService.init', error, stackTrace);
     }
     return this;
+  }
+
+  Future<void> _fetchForNextStartup(FirebaseRemoteConfig remoteConfig) async {
+    try {
+      await remoteConfig.fetch();
+    } catch (error, stackTrace) {
+      AppLogger.warning(
+        'FeatureFlagService.fetchForNextStartup',
+        'Remote Config refresh deferred; active cached values remain in use.',
+      );
+      AppLogger.error(
+        'FeatureFlagService.fetchForNextStartup',
+        error,
+        stackTrace,
+      );
+    }
   }
 
   bool isEnabled(FeatureFlagKey key) {

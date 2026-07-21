@@ -3,25 +3,16 @@
     "platforms": {
       "android": {
         "default": {
-          "projectId": "el7reef-app-2026",
-          "appId": "1:807857485912:android:a0d2caccaebd4ea2d8f22d",
+          "projectId": "el7reef-app",
+          "appId": "1:876861689777:android:0d2a83f5ba8026f0c7f790",
           "fileOutput": "android/app/google-services.json"
-        }
-      },
-      "ios": {
-        "default": {
-          "projectId": "el7reef-app-2026",
-          "appId": "1:807857485912:ios:4068f942ababc771d8f22d",
-          "uploadDebugSymbols": false,
-          "fileOutput": "ios/Runner/GoogleService-Info.plist"
         }
       },
       "dart": {
         "lib/firebase_options.dart": {
-          "projectId": "el7reef-app-2026",
+          "projectId": "el7reef-app",
           "configurations": {
-            "android": "1:807857485912:android:a0d2caccaebd4ea2d8f22d",
-            "ios": "1:807857485912:ios:4068f942ababc771d8f22d"
+            "android": "1:876861689777:android:0d2a83f5ba8026f0c7f790"
           }
         }
       }
@@ -32,6 +23,57 @@
     "location": "nam5",
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
+  },
+  "functions": {
+    "source": "functions"
+  },
+  "hosting": {
+    "public": "hosting",
+    "ignore": [
+      "firebase.json",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "no-referrer"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "/privacy",
+        "destination": "/privacy.html"
+      },
+      {
+        "source": "/delete-account",
+        "destination": "/delete-account.html"
+      },
+      {
+        "source": "/community-guidelines",
+        "destination": "/community-guidelines.html"
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "El7reef",
+        "supportEmail": "jitly9@gmail.com"
+      }
+    }
   },
   "remoteconfig": {
     "template": "remote_config.json"

@@ -1,440 +1,421 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart' as intl;
 
 import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_dimensions.dart';
+import '../../../app/theme/app_text_styles.dart';
+import '../../../core/constants/feature_flags.dart';
 import '../../../core/enums/match_status.dart';
 import '../../../core/enums/tournament_ops_enums.dart';
 import '../../../domain/entities/match.dart';
-import '../../../domain/entities/knockout_tie.dart';
+import '../../../domain/entities/tournament_participant.dart';
+import '../../shareables/models/tournament_stage_share_data.dart';
+import '../../shareables/services/pride_share_payload_builder.dart';
+import '../../shareables/services/share_card_capture_service.dart';
+import '../../shareables/widgets/pride_card_format_picker.dart';
+import '../../shareables/widgets/tournament_stage_share_card.dart';
 import '../controllers/tournament_operations_controller.dart';
+import '../widgets/knockout_bracket_view.dart';
+import '../widgets/tournament_stage_components.dart';
 
 class TournamentBracketScreen extends GetView<TournamentOperationsController> {
   const TournamentBracketScreen({super.key});
 
+  static const _captureService = ShareCardCaptureService();
+  static const _payloadBuilder = PrideSharePayloadBuilder();
+
   @override
   Widget build(BuildContext context) {
-    return _ScaffoldListScreen(
-      title: 'Bracket',
+    return TournamentStageScaffold(
+      title: 'الأدوار الإقصائية',
+      onRefresh: controller.refreshAll,
       child: Obx(() {
         final bracket = controller.knockoutBracket.value;
-        if (bracket == null) {
-          return const _StateMessage(
-            title: 'لا يوجد bracket بعد',
-            message: 'ابدأ الإقصاء بعد اكتمال المؤهلين.',
+        final hasData = bracket != null;
+        if (controller.isLoading.value && !hasData) {
+          return const TournamentStageSkeleton(rows: 5);
+        }
+        if (controller.errorMessage.value.isNotEmpty && !hasData) {
+          return TournamentStageStateView(
+            title: 'تعذر تحميل الشجرة',
+            message: controller.errorMessage.value,
+            icon: Icons.cloud_off_rounded,
+            color: AppColors.error,
+            actionLabel: 'إعادة المحاولة',
+            actionIcon: Icons.refresh_rounded,
+            onAction: controller.refreshAll,
           );
         }
-        final tiesByRound = <int, List<KnockoutTie>>{};
-        final visibleKnockoutFixtures = controller.canManageTournament
+        if (bracket == null) {
+          return _EmptyBracketState(controller: controller);
+        }
+
+        final visibleFixtures = controller.canManageTournament
             ? controller.knockoutFixtures.toList(growable: false)
             : controller.knockoutFixtures
-                .where((fixture) => fixture.fixtureStatus != FixtureStatus.draft)
-                .toList(growable: false);
-        final matchById = {
-          for (final fixture in visibleKnockoutFixtures)
-            fixture.id: fixture,
+                  .where(
+                    (fixture) => fixture.fixtureStatus != FixtureStatus.draft,
+                  )
+                  .toList(growable: false);
+        final matchesById = <String, Match>{
+          for (final fixture in visibleFixtures) fixture.id: fixture,
         };
-        for (final tie in controller.knockoutTies) {
-          tiesByRound
-              .putIfAbsent(tie.roundIndex, () => <KnockoutTie>[])
-              .add(tie);
-        }
-        final sortedRounds = tiesByRound.keys.toList(growable: true)..sort();
-        final finalRoundIndex = sortedRounds.isEmpty ? 0 : sortedRounds.last;
-        final finalTie = tiesByRound[finalRoundIndex]?.firstOrNull;
+        final participantsById = <String, TournamentParticipant>{
+          for (final participant in controller.participants)
+            participant.id: participant,
+        };
+        final tiesByRound = groupKnockoutTiesByRound(
+          controller.knockoutTies.toList(growable: false),
+        );
+        final roundCount = tiesByRound.length;
 
-        return ListView(
+        String participantLabel(String? participantId) {
+          if (participantId == null || participantId.isEmpty) {
+            return 'لم يتحدد';
+          }
+          return participantsById[participantId]?.displayName ?? 'فريق متأهل';
+        }
+
+        return Column(
           children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            if (controller.errorMessage.value.isNotEmpty) ...[
+              TournamentStageDataNotice.cachedError(
+                onRetry: controller.refreshAll,
+              ),
+              const SizedBox(height: AppDimensions.md),
+            ] else if (controller.isLoading.value) ...[
+              const TournamentStageDataNotice.refreshing(),
+              const SizedBox(height: AppDimensions.md),
+            ],
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: controller.refreshAll,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   children: [
-                    Text(
-                      'ملخص الإقصاء',
-                      style: Theme.of(context).textTheme.titleMedium,
+                    _BracketScreenSummaryBar(
+                      teamCount: bracket.qualifierParticipantIds.length,
+                      roundCount: roundCount,
+                      byeCount: bracket.byeParticipantIds.length,
+                      championLabel: bracket.championParticipantId == null
+                          ? null
+                          : participantLabel(bracket.championParticipantId),
+                      onShare: FeatureFlags.prideShareCatalogV2Enabled
+                          ? () => _shareBracket(
+                              context,
+                              matchesById: matchesById,
+                              participantsById: participantsById,
+                            )
+                          : null,
                     ),
-                    const SizedBox(height: 8),
-                    Text('Format: Single Elimination'),
-                    Text(
-                      'Qualifiers: ${bracket.qualifierParticipantIds.length}',
-                    ),
-                    Text(
-                      bracket.championParticipantId == null
-                          ? 'البطل لم يتحدد بعد'
-                          : 'البطل: ${controller.participantLabelFor(bracket.championParticipantId)}',
-                    ),
+                    const SizedBox(height: AppDimensions.md),
+                    if (controller.knockoutTies.isEmpty)
+                      TournamentStageStateView(
+                        title: 'جارٍ تجهيز المواجهات',
+                        message: controller.canManageTournament
+                            ? 'حدث البيانات، أو راجع لوحة التشغيل إذا لم تظهر المواجهات.'
+                            : 'ستظهر المواجهات هنا فور نشرها من المنظم.',
+                        icon: Icons.account_tree_rounded,
+                        actionLabel: controller.canManageTournament
+                            ? 'تحديث الآن'
+                            : null,
+                        actionIcon: Icons.refresh_rounded,
+                        onAction: controller.canManageTournament
+                            ? controller.refreshAll
+                            : null,
+                      )
+                    else
+                      KnockoutBracketView(
+                        ties: controller.knockoutTies.toList(growable: false),
+                        matchesById: matchesById,
+                        participantLabel: participantLabel,
+                        hideUnpublishedParticipants:
+                            !controller.canManageTournament,
+                        onOpenMatch: (match) =>
+                            Get.toNamed(AppRoutes.matchDetailsById(match.id)),
+                        canReviewMatch: controller.canManageTournament
+                            ? _canOpenScoreFlow
+                            : null,
+                        onReviewMatch: controller.canManageTournament
+                            ? (match) => Get.toNamed(
+                                AppRoutes.scoreApprovalForMatch(match.id),
+                              )
+                            : null,
+                      ),
+                    const SizedBox(height: AppDimensions.xl),
                   ],
                 ),
               ),
-            ),
-            if (finalTie != null) ...[
-              const SizedBox(height: 12),
-              _KnockoutFinalSummaryCard(
-                tie: finalTie,
-                match: finalTie.matchId == null
-                    ? null
-                    : matchById[finalTie.matchId!],
-                controller: controller,
-              ),
-            ],
-            const SizedBox(height: 12),
-            ...sortedRounds.expand(
-              (roundIndex) => <Widget>[
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    _knockoutRoundLabel(
-                      roundIndex,
-                      maxRoundIndex: finalRoundIndex,
-                    ),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                ...tiesByRound[roundIndex]!.map(
-                  (tie) => _KnockoutTieCard(
-                    tie: tie,
-                    match: tie.matchId == null ? null : matchById[tie.matchId!],
-                    controller: controller,
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
             ),
           ],
         );
       }),
     );
   }
-}
 
-class _KnockoutFinalSummaryCard extends StatelessWidget {
-  final KnockoutTie tie;
-  final Match? match;
-  final TournamentOperationsController controller;
+  Future<void> _shareBracket(
+    BuildContext context, {
+    required Map<String, Match> matchesById,
+    required Map<String, TournamentParticipant> participantsById,
+  }) async {
+    final tournament = controller.tournament.value;
+    final bracket = controller.knockoutBracket.value;
+    final ties = controller.knockoutTies.toList(growable: false)
+      ..sort((left, right) {
+        final roundCompare = right.roundIndex.compareTo(left.roundIndex);
+        return roundCompare != 0
+            ? roundCompare
+            : left.slotNumber.compareTo(right.slotNumber);
+      });
+    if (tournament == null || bracket == null || ties.isEmpty) {
+      Get.snackbar('تعذر المشاركة', 'لا توجد شجرة مؤكدة لمشاركتها الآن.');
+      return;
+    }
+    final format = await showPrideCardFormatPicker(context);
+    if (format == null || !context.mounted) return;
+    final maxRoundIndex = ties
+        .map((tie) => tie.roundIndex)
+        .reduce((left, right) => left > right ? left : right);
 
-  const _KnockoutFinalSummaryCard({
-    required this.tie,
-    required this.match,
-    required this.controller,
-  });
+    String participantName(String? participantId) {
+      if (participantId == null || participantId.isEmpty) {
+        return 'بانتظار المتأهل';
+      }
+      return participantsById[participantId]?.displayName ?? 'فريق متأهل';
+    }
 
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: AppColors.surface,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'ملخص النهائي',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '${controller.participantLabelFor(tie.participantAId)} vs ${controller.participantLabelFor(tie.participantBId)}',
-            ),
-            const SizedBox(height: 4),
-            Text(
-              tie.winnerParticipantId == null
-                  ? 'لم يُحسم النهائي بعد.'
-                  : 'الفائز الحالي: ${controller.participantLabelFor(tie.winnerParticipantId)}',
-            ),
-            if (match != null) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _MetricChip(label: 'Score', value: _matchScoreLabel(match)),
-                  _MetricChip(
-                    label: 'Status',
-                    value: _matchStatusLabel(match!.status),
-                  ),
-                  _MetricChip(
-                    label: 'Schedule',
-                    value: _formatDateTime(match!.scheduledAt),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () =>
-                        Get.toNamed(AppRoutes.matchDetailsById(match!.id)),
-                    icon: const Icon(Icons.sports_soccer),
-                    label: Text(
-                      controller.canManageTournament
-                          ? 'إدارة المباراة'
-                          : 'عرض المباراة',
-                    ),
-                  ),
-                  if (controller.canManageTournament)
-                    OutlinedButton.icon(
-                      onPressed: _scoreActionForMatch(controller, match!),
-                      icon: Icon(_scoreActionIcon(match!)),
-                      label: Text(_scoreActionLabel(match!)),
-                    ),
-                ],
-              ),
-            ],
-          ],
-        ),
+    final rows = ties
+        .map((tie) {
+          final match = tie.matchId == null ? null : matchesById[tie.matchId];
+          final hidden =
+              !controller.canManageTournament &&
+              tie.matchId != null &&
+              match == null;
+          final isBye = tie.resolutionType == KnockoutTieResolution.bye;
+          final firstName = hidden
+              ? 'مواجهة لم تُنشر'
+              : participantName(tie.participantAId);
+          final secondName = hidden
+              ? null
+              : tie.participantBId == null || tie.participantBId!.isEmpty
+              ? null
+              : participantName(tie.participantBId);
+          final title = isBye
+              ? '${participantName(tie.winnerParticipantId ?? tie.participantAId ?? tie.participantBId)} · تأهل مباشر'
+              : secondName == null
+              ? firstName
+              : '$firstName × $secondName';
+          final regulationScore = match?.scoreTeamA == null
+              ? null
+              : '${match!.scoreTeamA}-${match.scoreTeamB}';
+          final penaltyScore = match?.penaltyScoreTeamA == null
+              ? null
+              : '${match!.penaltyScoreTeamA}-${match.penaltyScoreTeamB}';
+          final trailing = penaltyScore == null
+              ? regulationScore
+              : regulationScore == null
+              ? penaltyScore
+              : '$regulationScore ($penaltyScore)';
+          final isFinalWinner =
+              tie.roundIndex == maxRoundIndex &&
+              tie.winnerParticipantId != null;
+          final roundLabel = knockoutRoundLabel(
+            tie.roundIndex,
+            maxRoundIndex: maxRoundIndex,
+          );
+          final shareTitle = isFinalWinner
+              ? '${participantName(tie.winnerParticipantId)} · البطل'
+              : title;
+          return TournamentStageShareRowData(
+            leading: '${tie.slotNumber + 1}',
+            title: shareTitle,
+            subtitle: isFinalWinner ? '$roundLabel · $title' : roundLabel,
+            trailing: trailing,
+            emphasized: tie.winnerParticipantId != null,
+            earned: isFinalWinner,
+          );
+        })
+        .toList(growable: false);
+    final payload = _payloadBuilder.knockoutBracket(
+      tournamentId: tournament.id,
+    );
+    final data = TournamentStageShareData(
+      kind: TournamentStagePrideKind.knockoutBracket,
+      tournamentName: tournament.name,
+      title: 'طريق النهائي',
+      statusLabel: bracket.championParticipantId == null
+          ? 'الإقصائيات جارية'
+          : 'البطل اتحدد',
+      rows: rows,
+      sharePayload: payload,
+    );
+    await _captureService.captureAndShareWidget(
+      context: context,
+      widget: TournamentStageShareCard(
+        data: data,
+        exportMode: true,
+        format: format,
+        includeGrowthLink: FeatureFlags.prideGrowthLinksEnabled,
       ),
+      fileName: 'el7reef_bracket_${bracket.id}',
+      text: 'طريق النهائي في ${tournament.name}',
+      payload: payload,
     );
   }
 }
 
-class _KnockoutTieCard extends StatelessWidget {
-  final KnockoutTie tie;
-  final Match? match;
-  final TournamentOperationsController controller;
+class _BracketScreenSummaryBar extends StatelessWidget {
+  final int teamCount;
+  final int roundCount;
+  final int byeCount;
+  final String? championLabel;
+  final VoidCallback? onShare;
 
-  const _KnockoutTieCard({
-    required this.tie,
-    required this.match,
-    required this.controller,
+  const _BracketScreenSummaryBar({
+    required this.teamCount,
+    required this.roundCount,
+    required this.byeCount,
+    required this.championLabel,
+    required this.onShare,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    final hasChampion = championLabel?.isNotEmpty ?? false;
+    final color = hasChampion ? AppColors.secondary : AppColors.primary;
+    final details = <String>[
+      '$teamCount فريق',
+      '$roundCount أدوار',
+      if (byeCount > 0) '$byeCount تأهل مباشر',
+    ].join('  •  ');
+
+    return Container(
+      key: const ValueKey('bracket-screen-summary-bar'),
+      width: double.infinity,
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        AppDimensions.md,
+        AppDimensions.sm,
+        AppDimensions.sm,
+        AppDimensions.sm,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+        border: Border.all(
+          color: hasChampion
+              ? AppColors.secondary.withValues(alpha: 0.42)
+              : AppColors.surfaceBorder,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+            ),
+            child: Icon(
+              hasChampion
+                  ? Icons.emoji_events_rounded
+                  : Icons.account_tree_rounded,
+              color: color,
+            ),
+          ),
+          const SizedBox(width: AppDimensions.sm),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${controller.participantLabelFor(tie.participantAId)} vs ${controller.participantLabelFor(tie.participantBId)}',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Slot ${tie.slotNumber + 1}${tie.nextTieId == null ? '' : ' • الفائز يتقدم للمرحلة التالية'}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
+                Text(
+                  hasChampion ? 'البطل: $championLabel' : 'المسار الرسمي',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.titleMedium.copyWith(
+                    color: hasChampion
+                        ? AppColors.secondary
+                        : AppColors.textPrimaryTinted,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: tie.winnerParticipantId == null
-                        ? AppColors.surface
-                        : AppColors.success.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    tie.winnerParticipantId == null ? 'قيد الانتظار' : 'تم التحديد',
-                    style: Theme.of(context).textTheme.labelMedium,
+                Text(
+                  details,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondaryTinted,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _MetricChip(label: 'Ready', value: tie.isReady ? 'Yes' : 'No'),
-                if (match != null)
-                  _MetricChip(label: 'Score', value: _matchScoreLabel(match)),
-                if (match != null)
-                  _MetricChip(
-                    label: 'Status',
-                    value: _matchStatusLabel(match!.status),
-                  ),
-                if (match != null)
-                  _MetricChip(
-                    label: 'Schedule',
-                    value: _formatDateTime(match!.scheduledAt),
-                  ),
-              ],
-            ),
-            if (tie.winnerParticipantId != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                'الفائز: ${controller.participantLabelFor(tie.winnerParticipantId)}',
-                style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          if (onShare != null) ...[
+            const SizedBox(width: AppDimensions.xs),
+            TextButton.icon(
+              key: const ValueKey('share-knockout-road'),
+              onPressed: onShare,
+              icon: const Icon(Icons.ios_share_rounded, size: 20),
+              label: const Text('شارك'),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, AppDimensions.minTouchTarget),
+                foregroundColor: AppColors.primary,
               ),
-            ],
-            if (match != null) ...[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () =>
-                        Get.toNamed(AppRoutes.matchDetailsById(match!.id)),
-                    icon: const Icon(Icons.sports_soccer),
-                    label: Text(
-                      controller.canManageTournament
-                          ? 'إدارة المباراة'
-                          : 'عرض المباراة',
-                    ),
-                  ),
-                  if (controller.canManageTournament)
-                    OutlinedButton.icon(
-                      onPressed: _scoreActionForMatch(controller, match!),
-                      icon: Icon(_scoreActionIcon(match!)),
-                      label: Text(_scoreActionLabel(match!)),
-                    ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ScaffoldListScreen extends StatelessWidget {
-  final String title;
-  final Widget child;
-
-  const _ScaffoldListScreen({
-    required this.title,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: SafeArea(
-        child: Padding(padding: const EdgeInsets.all(16), child: child),
-      ),
-    );
-  }
-}
-
-class _StateMessage extends StatelessWidget {
-  final String title;
-  final String message;
-
-  const _StateMessage({required this.title, required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
             ),
           ],
-        ),
+        ],
       ),
     );
   }
 }
 
-class _MetricChip extends StatelessWidget {
-  final String label;
-  final String value;
+class _EmptyBracketState extends StatelessWidget {
+  final TournamentOperationsController controller;
 
-  const _MetricChip({required this.label, required this.value});
+  const _EmptyBracketState({required this.controller});
 
   @override
   Widget build(BuildContext context) {
-    return Chip(
-      label: Text('$label: $value'),
-      visualDensity: VisualDensity.compact,
+    final canManage = controller.canManageTournament;
+    final canStart = controller.canStartKnockoutAction;
+    return TournamentStageStateView(
+      title: 'الإقصائيات لم تبدأ بعد',
+      message: canManage
+          ? canStart
+                ? 'المتأهلون جاهزون. أنشئ الشجرة لبدء طريق النهائي.'
+                : 'أكمل واعتمد نتائج المجموعات أولًا، ثم ابدأ الإقصائيات.'
+          : 'ستظهر شجرة الإقصائيات هنا بعد اكتمال التأهل ونشر المواجهات.',
+      icon: Icons.account_tree_rounded,
+      actionLabel: !canManage
+          ? null
+          : canStart
+          ? 'أنشئ شجرة الإقصائيات'
+          : 'افتح لوحة التشغيل',
+      actionIcon: canStart
+          ? Icons.account_tree_rounded
+          : Icons.dashboard_customize_rounded,
+      onAction: !canManage
+          ? null
+          : canStart
+          ? controller.startKnockout
+          : () {
+              final tournamentId = controller.tournamentId;
+              if (tournamentId != null && tournamentId.isNotEmpty) {
+                Get.offNamed(
+                  AppRoutes.organizerDashboardForTournament(tournamentId),
+                );
+              }
+            },
+      actionLoading: controller.isActing.value,
     );
   }
 }
 
-VoidCallback? _scoreActionForMatch(
-  TournamentOperationsController controller,
-  Match match,
-) {
-  if (controller.isActing.value) {
-    return null;
-  }
-  return switch (match.status) {
-    MatchStatus.live => () => Get.toNamed(
-      AppRoutes.scoreApprovalForMatch(match.id),
-    ),
-    MatchStatus.completed ||
-    MatchStatus.pendingReview => () => controller.approveFixtureScore(match.id),
-    MatchStatus.settled => null,
-    _ => null,
-  };
-}
-
-String _scoreActionLabel(Match match) => switch (match.status) {
-  MatchStatus.live => 'Submit Score',
-  MatchStatus.completed => 'Approve Score',
-  MatchStatus.pendingReview => 'Review & Approve',
-  MatchStatus.settled => 'Approved',
-  _ => 'Score Review',
+bool _canOpenScoreFlow(Match match) => switch (match.status) {
+  MatchStatus.live ||
+  MatchStatus.completed ||
+  MatchStatus.pendingReview => true,
+  _ => false,
 };
-
-IconData _scoreActionIcon(Match match) => switch (match.status) {
-  MatchStatus.live => Icons.edit_note,
-  MatchStatus.completed || MatchStatus.pendingReview => Icons.verified_outlined,
-  MatchStatus.settled => Icons.check_circle_outline,
-  _ => Icons.rule_folder_outlined,
-};
-
-String _knockoutRoundLabel(int roundIndex, {required int maxRoundIndex}) {
-  final distanceFromFinal = maxRoundIndex - roundIndex;
-  return switch (distanceFromFinal) {
-    0 => 'النهائي',
-    1 => 'نصف النهائي',
-    2 => 'ربع النهائي',
-    _ => 'Round ${roundIndex + 1}',
-  };
-}
-
-String _matchStatusLabel(MatchStatus status) => switch (status) {
-  MatchStatus.open => 'Open',
-  MatchStatus.full => 'Full',
-  MatchStatus.live => 'Live',
-  MatchStatus.pendingReview => 'Pending Review',
-  MatchStatus.completed => 'Completed',
-  MatchStatus.settled => 'Settled',
-  MatchStatus.ratingWindow => 'Rating Window',
-  MatchStatus.frozen => 'Frozen',
-  MatchStatus.cancelled => 'Cancelled',
-};
-
-String _formatDateTime(DateTime? value) {
-  if (value == null) {
-    return 'غير محدد';
-  }
-  return intl.DateFormat('yyyy/MM/dd – HH:mm').format(value);
-}
-
-String _matchScoreLabel(Match? match) {
-  if (match == null || match.scoreTeamA == null || match.scoreTeamB == null) {
-    return '-';
-  }
-  return '${match.scoreTeamA} - ${match.scoreTeamB}';
-}

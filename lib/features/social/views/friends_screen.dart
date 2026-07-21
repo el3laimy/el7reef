@@ -6,7 +6,7 @@ import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../core/widgets/rank_tier_badge.dart';
 import '../../../domain/entities/player.dart';
 import '../controllers/friend_controller.dart';
@@ -145,17 +145,19 @@ class FriendsScreen extends GetView<FriendController> {
 
   Widget _buildFriendCard(Player? player, {required bool isRequest}) {
     if (player == null) {
-      return GlassmorphicContainer(
+      return El7reefGlassSurface(
+        variant: El7reefGlassVariant.base,
         margin: const EdgeInsets.only(bottom: AppDimensions.md),
         padding: const EdgeInsets.all(AppDimensions.md),
         child: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    return GlassmorphicContainer(
+    return El7reefGlassSurface(
+      variant: El7reefGlassVariant.base,
       margin: const EdgeInsets.only(bottom: AppDimensions.md),
       padding: const EdgeInsets.all(AppDimensions.md),
-      borderRadius: AppDimensions.radiusLg,
+      radius: AppDimensions.radiusLg,
       child: Row(
         children: [
           // Avatar

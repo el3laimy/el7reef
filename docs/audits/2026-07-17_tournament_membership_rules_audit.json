@@ -1,0 +1,5 @@
+{
+  "score": 5,
+  "summary": "Tournament creation and organizer membership are bound bidirectionally inside one atomic batch: a tournament create requires the canonical organizer membership through getAfter(), and membership creation requires the same organizer-owned tournament, exact uid_tournamentId document ID, strict fields, bounded IDs, and immutable records. The real quick-create payload, owner query, orphan tournament, cross-owner forgery, mismatched ID, and unauthorized read cases pass in the Firestore emulator as part of 189 passing rules tests.",
+  "findings": []
+}

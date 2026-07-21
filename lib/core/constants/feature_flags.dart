@@ -26,6 +26,18 @@ abstract class FeatureFlags {
   static bool get hybridTournamentRegistrationEnabled =>
       _read(FeatureFlagKey.hybridTournamentRegistrationEnabled);
   static bool get matchdayUiEnabled => _read(FeatureFlagKey.matchdayUiEnabled);
+  static bool get prideGrowthLinksEnabled =>
+      _read(FeatureFlagKey.prideGrowthLinksEnabled);
+  static bool get postMatchPrideHubEnabled =>
+      _read(FeatureFlagKey.postMatchPrideHubEnabled);
+  static bool get functionalGlassEnabled =>
+      _read(FeatureFlagKey.functionalGlassEnabled);
+  static bool get prideShareCatalogV2Enabled =>
+      _read(FeatureFlagKey.prideShareCatalogV2Enabled);
+  static bool get prideVideoExportEnabled =>
+      _read(FeatureFlagKey.prideVideoExportEnabled);
+  static bool get reduceGlassBlurEnabled =>
+      _read(FeatureFlagKey.reduceGlassBlurEnabled);
 
   static bool _read(FeatureFlagKey key) {
     if (Get.isRegistered<FeatureFlagService>()) {

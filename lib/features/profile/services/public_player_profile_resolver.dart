@@ -1,23 +1,33 @@
 import '../../../core/services/match_event_service.dart';
 import '../../../data/repositories/guest_player_repository_impl.dart';
+import '../../../data/repositories/match_repository_impl.dart';
 import '../../../data/repositories/player_repository_impl.dart';
+import '../../../domain/entities/guest_player.dart';
+import '../../../domain/entities/match.dart';
 import '../../../domain/entities/match_event.dart';
 import '../../../domain/entities/participant_ref.dart';
+import '../../../domain/repositories/match_repository.dart';
 import '../models/public_player_profile_data.dart';
 
 class PublicPlayerProfileResolver {
   final PlayerRepositoryImpl _playerRepository;
   final GuestPlayerRepositoryImpl _guestPlayerRepository;
   final MatchEventService _matchEventService;
+  final MatchRepository _matchRepository;
+  final String? Function() _currentUserId;
 
   PublicPlayerProfileResolver({
     PlayerRepositoryImpl? playerRepository,
     GuestPlayerRepositoryImpl? guestPlayerRepository,
     MatchEventService? matchEventService,
+    MatchRepository? matchRepository,
+    String? Function()? currentUserId,
   }) : _playerRepository = playerRepository ?? PlayerRepositoryImpl(),
        _guestPlayerRepository =
            guestPlayerRepository ?? GuestPlayerRepositoryImpl(),
-       _matchEventService = matchEventService ?? MatchEventService();
+       _matchEventService = matchEventService ?? MatchEventService(),
+       _matchRepository = matchRepository ?? MatchRepositoryImpl(),
+       _currentUserId = currentUserId ?? (() => null);
 
   Future<PublicPlayerProfileData?> resolve({
     required String kind,
@@ -27,10 +37,13 @@ class PublicPlayerProfileResolver {
     final actorId = id.trim();
     if (actorKind == null || actorId.isEmpty) return null;
 
-    final events = await _matchEventService.getEventsForActor(
-      actorKind: actorKind,
-      actorId: actorId,
-    );
+    final actorEvents = actorKind == ParticipantRefKind.player
+        ? await _eventsForRegisteredPlayer(actorId)
+        : await _matchEventService.getEventsForActor(
+            actorKind: actorKind,
+            actorId: actorId,
+          );
+    final events = await _officialEvents(actorEvents);
 
     return switch (actorKind) {
       ParticipantRefKind.player => _resolvePlayer(actorId, events),
@@ -50,6 +63,9 @@ class PublicPlayerProfileResolver {
       kind: ParticipantRefKind.player,
       id: playerId,
       displayName: _displayName(player?.name, events, fallback: 'لاعب'),
+      photoUrl:
+          _normalizeOptional(player?.photoThumbUrl) ??
+          _normalizeOptional(player?.photoUrl),
       totalGoals: _countGoals(events),
       totalMvps: _countMvps(events),
     );
@@ -99,6 +115,44 @@ class PublicPlayerProfileResolver {
 
   int _countMvps(List<MatchEvent> events) =>
       events.where((event) => event.isActive && event.isMvp).length;
+
+  Future<List<MatchEvent>> _eventsForRegisteredPlayer(String playerId) async {
+    final isOwnProfile = _normalizeOptional(_currentUserId()) == playerId;
+    final linkedGuests = isOwnProfile
+        ? await _guestPlayerRepository.getGuestPlayersLinkedToPlayer(playerId)
+        : const <GuestPlayer>[];
+    final eventGroups = await Future.wait(<Future<List<MatchEvent>>>[
+      _matchEventService.getEventsForActor(
+        actorKind: ParticipantRefKind.player,
+        actorId: playerId,
+      ),
+      for (final guest in linkedGuests)
+        _matchEventService.getEventsForActor(
+          actorKind: ParticipantRefKind.guestPlayer,
+          actorId: guest.id,
+        ),
+    ]);
+    final eventsById = <String, MatchEvent>{};
+    for (final events in eventGroups) {
+      for (final event in events) {
+        eventsById[event.id] = event;
+      }
+    }
+    return eventsById.values.toList(growable: false);
+  }
+
+  Future<List<MatchEvent>> _officialEvents(List<MatchEvent> events) async {
+    if (events.isEmpty) return const <MatchEvent>[];
+    final matchIds = events.map((event) => event.matchId).toSet();
+    final matches = await Future.wait(matchIds.map(_matchRepository.getMatch));
+    final officialMatchIds = <String>{
+      for (final Match? match in matches)
+        if (match != null && match.isOfficialTournamentResult) match.id,
+    };
+    return events
+        .where((event) => officialMatchIds.contains(event.matchId))
+        .toList(growable: false);
+  }
 
   String _displayName(
     String? sourceName,

@@ -1,0 +1,13 @@
+{
+  "lib/features/tournament/views/tournament_detail_screen.dart": 1374,
+  "lib/features/tournament/views/tournament_operations_dashboard_screen.dart": 1281,
+  "lib/features/tournament/views/tournament_list_screen.dart": 1174,
+  "lib/core/services/guest_claim_service.dart": 1121,
+  "lib/features/match/views/score_submit_screen.dart": 1047,
+  "lib/core/services/matchday_lineup.dart": 1039,
+  "lib/features/lineup/widgets/professional_pitch_card.dart": 983,
+  "lib/features/team/controllers/team_roster_controller.dart": 955,
+  "lib/features/tournament/controllers/tournament_operations_controller.dart": 904,
+  "lib/features/shareables/widgets/lineup_share_card.dart": 867,
+  "lib/core/services/match_settlement_service.dart": 865
+}

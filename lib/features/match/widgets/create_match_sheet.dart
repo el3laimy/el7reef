@@ -7,6 +7,7 @@ import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/lineup/formation_library.dart';
 import '../../../core/widgets/el7reef_button.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../team/controllers/team_controller.dart';
 import '../controllers/match_controller.dart';
 
@@ -43,7 +44,11 @@ class _CreateMatchSheetState extends State<CreateMatchSheet> {
     final hasTeamController = Get.isRegistered<TeamController>();
     final teamCtrl = hasTeamController ? Get.find<TeamController>() : null;
 
-    return Container(
+    return El7reefGlassSurface(
+      variant: El7reefGlassVariant.sheet,
+      borderRadius: const BorderRadius.vertical(
+        top: Radius.circular(AppDimensions.radiusXl),
+      ),
       padding:
           EdgeInsets.symmetric(
             horizontal: AppDimensions.lg,
@@ -51,12 +56,6 @@ class _CreateMatchSheetState extends State<CreateMatchSheet> {
           ).copyWith(
             bottom: MediaQuery.of(context).viewInsets.bottom + AppDimensions.lg,
           ),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppDimensions.radiusXl),
-        ),
-      ),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,

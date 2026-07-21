@@ -58,6 +58,26 @@ class GuestPlayerRepositoryImpl implements GuestPlayerRepository {
   }
 
   @override
+  Future<List<GuestPlayer>> getGuestPlayersLinkedToPlayer(
+    String playerId,
+  ) async {
+    return FirebaseErrorHandler.guard(() async {
+      final normalizedPlayerId = playerId.trim();
+      if (normalizedPlayerId.isEmpty) {
+        return const <GuestPlayer>[];
+      }
+      final snapshot = await _guestPlayersRef
+          .where('linkedPlayerId', isEqualTo: normalizedPlayerId)
+          .get();
+      return snapshot.docs
+          .map(
+            (doc) => GuestPlayerModel.fromJson(doc.data(), doc.id).toEntity(),
+          )
+          .toList(growable: false);
+    });
+  }
+
+  @override
   Future<void> createGuestPlayer(GuestPlayer guestPlayer) async {
     return FirebaseErrorHandler.guard(() async {
       final model = GuestPlayerModel.fromEntity(guestPlayer);
@@ -82,7 +102,9 @@ class GuestPlayerRepositoryImpl implements GuestPlayerRepository {
           .get();
 
       return snapshot.docs
-          .map((doc) => GuestPlayerModel.fromJson(doc.data(), doc.id).toEntity())
+          .map(
+            (doc) => GuestPlayerModel.fromJson(doc.data(), doc.id).toEntity(),
+          )
           .toList(growable: false);
     });
   }
@@ -96,7 +118,29 @@ class GuestPlayerRepositoryImpl implements GuestPlayerRepository {
           .get();
 
       return snapshot.docs
-          .map((doc) => GuestPlayerModel.fromJson(doc.data(), doc.id).toEntity())
+          .map(
+            (doc) => GuestPlayerModel.fromJson(doc.data(), doc.id).toEntity(),
+          )
+          .toList(growable: false);
+    });
+  }
+
+  @override
+  Future<List<GuestPlayer>> getPublicTournamentGuestTeamPlayers({
+    required String tournamentId,
+    required String guestTeamId,
+  }) async {
+    return FirebaseErrorHandler.guard(() async {
+      final snapshot = await _firestore
+          .collection(FirebasePaths.publicTournamentRosterEntries)
+          .where('tournamentId', isEqualTo: tournamentId)
+          .where('guestTeamId', isEqualTo: guestTeamId)
+          .orderBy('jerseyNumber')
+          .get();
+      return snapshot.docs
+          .map(
+            (doc) => GuestPlayerModel.fromJson(doc.data(), doc.id).toEntity(),
+          )
           .toList(growable: false);
     });
   }
@@ -112,7 +156,9 @@ class GuestPlayerRepositoryImpl implements GuestPlayerRepository {
           .get();
 
       return snapshot.docs
-          .map((doc) => GuestPlayerModel.fromJson(doc.data(), doc.id).toEntity())
+          .map(
+            (doc) => GuestPlayerModel.fromJson(doc.data(), doc.id).toEntity(),
+          )
           .toList(growable: false);
     });
   }

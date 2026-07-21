@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/enums/audit_action.dart';
+import '../../core/enums/tournament_ops_enums.dart';
 import '../../data/repositories/audit_repository_impl.dart';
 import '../../domain/entities/guest_player.dart';
 import '../../domain/entities/guest_team.dart';
@@ -214,12 +215,21 @@ class TournamentAuditEmitter {
     required String actorId,
     required String bracketId,
     required int tiesCount,
+    required KnockoutSeedingMethod seedingMethod,
+    required List<String> qualifierParticipantIds,
+    required List<String> byeParticipantIds,
   }) {
     return _auditService.recordTournamentEvent(
       tournamentId: tournament.id,
       action: AuditAction.knockoutGenerated,
       actorId: actorId,
-      metadata: {'bracketId': bracketId, 'tiesCount': tiesCount},
+      metadata: {
+        'bracketId': bracketId,
+        'tiesCount': tiesCount,
+        'seedingMethod': seedingMethod.name,
+        'qualifierParticipantIds': qualifierParticipantIds,
+        'byeParticipantIds': byeParticipantIds,
+      },
     );
   }
 

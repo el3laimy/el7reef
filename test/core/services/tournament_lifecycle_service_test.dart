@@ -215,6 +215,81 @@ void main() {
     );
 
     test(
+      'startKnockout rejects provisional group results until every fixture is approved',
+      () async {
+        await lifecycleService.finalizeParticipants(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 10)),
+        );
+        final groupStage = await lifecycleService.startGroupStage(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 15)),
+        );
+
+        for (final fixture in groupStage.fixtures) {
+          final score = _groupScoreFor(fixture.teamAId!, fixture.teamBId!);
+          await matchRepository.updateMatch(
+            fixture.copyWith(
+              scoreTeamA: score.$1,
+              scoreTeamB: score.$2,
+              status: fixture.id == groupStage.fixtures.last.id
+                  ? MatchStatus.completed
+                  : MatchStatus.settled,
+            ),
+          );
+        }
+
+        await lifecycleService.refreshGroupStandings(
+          tournamentId: 'tournament-1',
+          now: now.add(const Duration(minutes: 20)),
+        );
+
+        await expectLater(
+          lifecycleService.startKnockout(
+            tournamentId: 'tournament-1',
+            actorId: 'organizer-1',
+            now: now.add(const Duration(minutes: 25)),
+          ),
+          throwsA(
+            predicate(
+              (error) => error.toString().contains(
+                'قبل اعتماد كل مباريات دور المجموعات',
+              ),
+            ),
+          ),
+        );
+        final bracketsAfterRejectedStart = await firestore
+            .collection(FirebasePaths.knockoutBrackets)
+            .get();
+        expect(bracketsAfterRejectedStart.docs, isEmpty);
+
+        final pendingFixture = groupStage.fixtures.last;
+        final pendingScore = _groupScoreFor(
+          pendingFixture.teamAId!,
+          pendingFixture.teamBId!,
+        );
+        await matchRepository.updateMatch(
+          pendingFixture.copyWith(
+            scoreTeamA: pendingScore.$1,
+            scoreTeamB: pendingScore.$2,
+            status: MatchStatus.settled,
+          ),
+        );
+
+        final knockout = await lifecycleService.startKnockout(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 30)),
+        );
+
+        expect(knockout.ties, isNotEmpty);
+        expect(knockout.matches, isNotEmpty);
+      },
+    );
+
+    test(
       'startGroupStage is idempotent and does not duplicate fixtures',
       () async {
         await lifecycleService.finalizeParticipants(
@@ -643,6 +718,62 @@ void main() {
           ),
           isTrue,
         );
+      },
+    );
+
+    test(
+      'knockout-only lifecycle persists a three-team bracket with a bye',
+      () async {
+        await tournamentRepository.createTournament(
+          Tournament(
+            id: 'knockout-3',
+            organizerId: 'organizer-1',
+            name: 'Three Team Cup',
+            format: TournamentFormat.knockoutOnly,
+            teamSize: TournamentTeamSize.fiveVsFive,
+            maxTeams: 3,
+            status: TournamentStatus.registration,
+            createdAt: now,
+          ),
+        );
+        for (int index = 1; index <= 3; index++) {
+          await registrationService.registerTeam(
+            tournamentId: 'knockout-3',
+            teamId: 'team-$index',
+            actorId: 'organizer-1',
+            now: now.add(Duration(minutes: index)),
+          );
+        }
+        await lifecycleService.finalizeParticipants(
+          tournamentId: 'knockout-3',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 10)),
+        );
+
+        final knockout = await lifecycleService.startKnockout(
+          tournamentId: 'knockout-3',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 15)),
+        );
+
+        expect(knockout.bracket.seedingMethod, KnockoutSeedingMethod.draw);
+        expect(knockout.bracket.qualifierParticipantIds, hasLength(3));
+        expect(knockout.bracket.byeParticipantIds, hasLength(1));
+        expect(knockout.ties, hasLength(3));
+        expect(knockout.matches, hasLength(2));
+        final bracketDoc = await firestore
+            .collection(FirebasePaths.knockoutBrackets)
+            .doc(knockout.bracket.id)
+            .get();
+        expect(bracketDoc.data()?['seedingMethod'], 'draw');
+        expect(bracketDoc.data()?['byeParticipantIds'], hasLength(1));
+        final audit = await firestore
+            .collection(FirebasePaths.auditEvents)
+            .where('entityId', isEqualTo: 'knockout-3')
+            .where('action', isEqualTo: 'knockoutGenerated')
+            .get();
+        expect(audit.docs, hasLength(1));
+        expect(audit.docs.single.data()['metadata']['seedingMethod'], 'draw');
       },
     );
   });

@@ -15,6 +15,7 @@ class MatchLineupEntryModel {
   final MatchAttendanceStatus attendanceStatus;
   final String displayName;
   final String? position;
+  final int? shirtNumber;
   final bool ratingEligible;
 
   // ── Slot assignment (nullable for backward compatibility) ──
@@ -37,6 +38,7 @@ class MatchLineupEntryModel {
     required this.attendanceStatus,
     required this.displayName,
     this.position,
+    this.shirtNumber,
     this.ratingEligible = true,
     this.slotId,
     this.slotRole,
@@ -76,6 +78,7 @@ class MatchLineupEntryModel {
       ),
       displayName: json['displayName'] as String? ?? '',
       position: json['position'] as String?,
+      shirtNumber: (json['shirtNumber'] as num?)?.toInt(),
       ratingEligible: json['ratingEligible'] as bool? ?? true,
       slotId: json['slotId'] as String?,
       slotRole: json['slotRole'] as String?,
@@ -99,6 +102,7 @@ class MatchLineupEntryModel {
       'attendanceStatus': attendanceStatus.name,
       'displayName': displayName,
       'position': position,
+      'shirtNumber': shirtNumber,
       'ratingEligible': ratingEligible,
       'slotId': slotId,
       'slotRole': slotRole,
@@ -122,6 +126,7 @@ class MatchLineupEntryModel {
       attendanceStatus: attendanceStatus,
       displayName: displayName,
       position: position,
+      shirtNumber: shirtNumber,
       ratingEligible: ratingEligible,
       slotId: slotId,
       slotRole: slotRole,
@@ -145,6 +150,7 @@ class MatchLineupEntryModel {
       attendanceStatus: entry.attendanceStatus,
       displayName: entry.displayName,
       position: entry.position,
+      shirtNumber: entry.shirtNumber,
       ratingEligible: entry.ratingEligible,
       slotId: entry.slotId,
       slotRole: entry.slotRole,

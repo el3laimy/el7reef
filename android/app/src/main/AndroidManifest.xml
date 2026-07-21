@@ -1,8 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
-        android:label="el7reef"
+        android:label="الحريف"
         android:name="${applicationName}"
-        android:icon="@mipmap/launcher_icon">
+        android:icon="@mipmap/launcher_icon"
+        android:roundIcon="@mipmap/launcher_icon">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -20,6 +23,73 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <meta-data
+              android:name="flutter_deeplinking_enabled"
+              android:value="false" />
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="el7reef-app.web.app"
+                    android:pathPrefix="/claim" />
+                <data
+                    android:scheme="https"
+                    android:host="el7reef-app.web.app"
+                    android:pathPrefix="/invite" />
+                <data
+                    android:scheme="https"
+                    android:host="el7reef-app.web.app"
+                    android:pathPrefix="/match" />
+                <data
+                    android:scheme="https"
+                    android:host="el7reef-app.web.app"
+                    android:pathPrefix="/tournament" />
+                <data
+                    android:scheme="https"
+                    android:host="el7reef-app.web.app"
+                    android:pathPrefix="/player" />
+                <data
+                    android:scheme="https"
+                    android:host="el7reef-app.web.app"
+                    android:pathPrefix="/team" />
+                <data
+                    android:scheme="https"
+                    android:host="el7reef.app"
+                    android:pathPrefix="/claim" />
+                <data
+                    android:scheme="https"
+                    android:host="el7reef.app"
+                    android:pathPrefix="/invite" />
+                <data
+                    android:scheme="https"
+                    android:host="el7reef.app"
+                    android:pathPrefix="/match" />
+                <data
+                    android:scheme="https"
+                    android:host="el7reef.app"
+                    android:pathPrefix="/tournament" />
+                <data
+                    android:scheme="https"
+                    android:host="el7reef.app"
+                    android:pathPrefix="/player" />
+                <data
+                    android:scheme="https"
+                    android:host="el7reef.app"
+                    android:pathPrefix="/team" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="el7reef" android:host="claim" />
+                <data android:scheme="el7reef" android:host="invite" />
+                <data android:scheme="el7reef" android:host="match" />
+                <data android:scheme="el7reef" android:host="tournament" />
+                <data android:scheme="el7reef" android:host="player" />
+                <data android:scheme="el7reef" android:host="team" />
+            </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>

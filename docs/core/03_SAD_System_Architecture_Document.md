@@ -29,12 +29,12 @@
 
 ### 2.1 حجم الكود المراجع
 
-- `lib`: 367 ملف Dart، حوالي 65k سطر.
-- `test`: 52 ملف، حوالي 13k سطر.
-- `firestore.rules`: 667 سطر.
-- docs/md داخل المستودع: 27 ملف تقريبًا.
+- <bdi dir="ltr">lib</bdi>: عدد 535 ملف Dart، حوالي 89k سطر في لقطة 2026-07-13.
+- <bdi dir="ltr">test</bdi>: عدد 126 ملف Dart، حوالي 27k سطر في اللقطة نفسها.
+- <bdi dir="ltr">firestore.rules</bdi>: عدد 2064 سطرًا.
+- <bdi dir="ltr">docs/**/*.md</bdi>: عدد 108 ملفات في اللقطة نفسها.
 
-> لم يتم تشغيل Flutter/Dart داخل هذه البيئة لأن أدوات flutter/dart غير متاحة هنا. يوجد داخل المستودع `analysis_report.txt` يذكر أن تحليلًا سابقًا خرج بـ “No issues found”. يجب إعادة تشغيل الأوامر محليًا قبل أي release.
+> تتغير الأرقام مع التطوير؛ المرجع القابل للتكرار لأكبر الملفات هو <bdi dir="ltr">npm run report:hotspots</bdi>. شُغلت اختبارات وتحليلات مركزة أثناء إصلاح 2026-07-13، وتظل بوابة CI الكاملة مطلوبة قبل أي release.
 
 ---
 
@@ -359,14 +359,14 @@ Shared claim link
 
 ### 10.1 الحالة الحالية
 
-Firestore rules موجودة وتغطي معظم المجموعات. يوجد تحقق من owner/organizer/team manager/claim codes. لكن أي collections جديدة مثل `matchEvents` ستحتاج rules واضحة.
+Firestore rules تغطي مجموعات V1 الحساسة، ومنها <bdi dir="ltr">matchEvents</bdi> وplayer stats وaudit events. نتيجة المباراة وإحصائياتها النهائية مملوكة للخادم؛ أما إنشاء المباراة وتشغيل matchday فمسموحان للمنظم أو المساعد ضمن حقول محددة.
 
-### 10.2 قواعد matchEvents المقترحة
+### 10.2 قواعد matchEvents المنفذة
 
 - read: authenticated users على الأقل في V1.
-- create/update: match organizer أو tournament organizer/assistant أو captain مصرح له حسب المرحلة.
+- create/update/delete: ممنوعة على عميل Flutter؛ تتم عبر callable التسوية فقط.
 - delete: لا حذف فعلي؛ استخدم status = voided.
-- كل update يجب أن يحافظ على matchId/createdBy/createdAt.
+- retry من controller يعيد payload إلى service والخادم ولا يكتب الحدث مباشرة.
 
 ### 10.3 قواعد shareCardEvents
 
@@ -444,3 +444,14 @@ Firestore rules موجودة وتغطي معظم المجموعات. يوجد ت
 ## 15. الخلاصة
 
 المعمارية الحالية جيدة كبداية، لكنها لا تكفي للرؤية النفسية الجديدة دون `MatchEvent` وPlayerIdentityRef وتوسيع shareables. القرار التقني الأهم قبل V1 هو تحويل المباراة من “score فقط” إلى “event-producing engine” يدعم الضيوف والمسجلين، لأن هذا هو مصدر الفخر والانتشار.
+
+---
+
+## 16. خط الأساس المنفذ في 2026-07-13
+
+- <bdi dir="ltr">ParticipantRef</bdi> هو العقد الحالي للأنواع <bdi dir="ltr">player | guestPlayer | matchSidePlayer</bdi>، والـparser يرفض النوع المفقود أو المجهول.
+- <bdi dir="ltr">MatchEvent</bdi> هو مصدر الأهداف وMVP، وكتابة التسوية خادمية وذرية وحتمية.
+- roster precedence وsettlement idempotency وpost-claim identity موثقة في ADR-003 إلى ADR-005.
+- timestamps الجديدة لـMatchEvent تُكتب كـFirestore Timestamp مع قراءة milliseconds القديمة عبر adapter مركزي.
+- <bdi dir="ltr">tool/architecture_guard.js</bdi> يمنع Firestore المباشر في controllers واستيراد data implementations من views.
+- <bdi dir="ltr">.github/workflows/quality.yml</bdi> يشغل format/analyze/tests/architecture/hotspot وEmulators.

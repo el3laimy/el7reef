@@ -3,7 +3,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/enums/challenge_status.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../domain/entities/challenge.dart';
 
 class ChallengeCard extends StatelessWidget {
@@ -26,9 +26,10 @@ class ChallengeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassmorphicContainer(
+    return El7reefGlassSurface(
+      variant: El7reefGlassVariant.base,
       padding: const EdgeInsets.all(AppDimensions.md),
-      borderRadius: AppDimensions.radiusMd,
+      radius: AppDimensions.radiusMd,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -49,23 +50,34 @@ class ChallengeCard extends StatelessWidget {
               _ChallengeStatusBadge(status: challenge.status),
             ],
           ),
-          
+
           if (challenge.message != null && challenge.message!.isNotEmpty) ...[
             const SizedBox(height: AppDimensions.sm),
             Text(
               '"${challenge.message}"',
-              style: AppTextStyles.bodyMedium.copyWith(fontStyle: FontStyle.italic, color: AppColors.textMuted),
+              style: AppTextStyles.bodyMedium.copyWith(
+                fontStyle: FontStyle.italic,
+                color: AppColors.textMuted,
+              ),
             ),
           ],
-          
+
           const SizedBox(height: AppDimensions.md),
           Row(
             children: [
-              if (challenge.location != null && challenge.location!.isNotEmpty) ...[
-                const Icon(Icons.location_on_outlined, size: 14, color: AppColors.textMuted),
+              if (challenge.location != null &&
+                  challenge.location!.isNotEmpty) ...[
+                const Icon(
+                  Icons.location_on_outlined,
+                  size: 14,
+                  color: AppColors.textMuted,
+                ),
                 const SizedBox(width: 4),
                 Expanded(
-                  child: Text(challenge.location!, style: AppTextStyles.labelSmall),
+                  child: Text(
+                    challenge.location!,
+                    style: AppTextStyles.labelSmall,
+                  ),
                 ),
               ],
               Container(
@@ -74,11 +86,14 @@ class ChallengeCard extends StatelessWidget {
                   color: AppColors.surfaceBorder,
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: Text('${challenge.teamSize}v${challenge.teamSize}', style: AppTextStyles.labelSmall),
+                child: Text(
+                  '${challenge.teamSize}v${challenge.teamSize}',
+                  style: AppTextStyles.labelSmall,
+                ),
               ),
             ],
           ),
-          
+
           if (challenge.status == ChallengeStatus.pending) ...[
             const SizedBox(height: AppDimensions.md),
             Row(
@@ -87,12 +102,18 @@ class ChallengeCard extends StatelessWidget {
                 if (isSentByMe)
                   TextButton(
                     onPressed: onCancel,
-                    child: const Text('إلغاء', style: TextStyle(color: AppColors.error)),
+                    child: const Text(
+                      'إلغاء',
+                      style: TextStyle(color: AppColors.error),
+                    ),
                   )
                 else ...[
                   TextButton(
                     onPressed: onDecline,
-                    child: const Text('رفض', style: TextStyle(color: AppColors.error)),
+                    child: const Text(
+                      'رفض',
+                      style: TextStyle(color: AppColors.error),
+                    ),
                   ),
                   const SizedBox(width: AppDimensions.sm),
                   ElevatedButton(
@@ -131,7 +152,10 @@ class _ChallengeStatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
-      child: Text(label, style: AppTextStyles.labelSmall.copyWith(color: color)),
+      child: Text(
+        label,
+        style: AppTextStyles.labelSmall.copyWith(color: color),
+      ),
     );
   }
 }

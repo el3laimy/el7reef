@@ -2,8 +2,10 @@ import 'package:get/get.dart';
 
 import '../../../core/auth/auth_service_session.dart';
 import '../../../core/auth/auth_session.dart';
+import '../../../core/services/claimed_participant_identity_resolver.dart';
 import '../../../core/services/match_event_service.dart';
 import '../../../core/services/matchday_service.dart';
+import '../../../core/services/share_link_service.dart';
 import '../../../core/services/team_roster_service.dart';
 import '../../../data/repositories/guest_player_repository_impl.dart';
 import '../../../data/repositories/match_attendance_repository_impl.dart';
@@ -18,6 +20,8 @@ import '../../../data/repositories/team_repository_impl.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../shareables/controllers/lineup_share_controller.dart';
+import '../../shareables/services/guest_mvp_claim_link_service.dart';
+import '../../shareables/services/pride_identity_image_resolver.dart';
 import '../controllers/match_result_lineup_controller.dart';
 import '../controllers/match_side_lineup_editor_controller.dart';
 import '../controllers/team_lineup_editor_controller.dart';
@@ -73,6 +77,8 @@ class MatchResultLineupBinding extends Bindings {
         matchSidePlayerRepository: Get.find<MatchSidePlayerRepositoryImpl>(),
         matchEventService: Get.find<MatchEventService>(),
         tournamentRepository: Get.find<TournamentRepositoryImpl>(),
+        identityImageResolver: Get.find<PrideIdentityImageResolver>(),
+        claimedIdentityResolver: Get.find<ClaimedParticipantIdentityResolver>(),
       ),
     );
   }
@@ -98,6 +104,13 @@ void _putSharedLineupDependencies() {
   }
   if (!Get.isRegistered<GuestPlayerRepositoryImpl>()) {
     Get.lazyPut<GuestPlayerRepositoryImpl>(() => GuestPlayerRepositoryImpl());
+  }
+  if (!Get.isRegistered<ClaimedParticipantIdentityResolver>()) {
+    Get.lazyPut<ClaimedParticipantIdentityResolver>(
+      () => ClaimedParticipantIdentityResolver(
+        guestPlayerRepository: Get.find<GuestPlayerRepositoryImpl>(),
+      ),
+    );
   }
   if (!Get.isRegistered<MatchLineupSnapshotRepositoryImpl>()) {
     Get.lazyPut<MatchLineupSnapshotRepositoryImpl>(
@@ -141,6 +154,23 @@ void _putSharedLineupDependencies() {
         snapshotRepository: Get.find<MatchLineupSnapshotRepositoryImpl>(),
         teamRepository: Get.find<TeamRepositoryImpl>(),
         matchSideRepository: Get.find<MatchSideRepositoryImpl>(),
+      ),
+    );
+  }
+  if (!Get.isRegistered<ShareLinkService>()) {
+    Get.lazyPut<ShareLinkService>(() => ShareLinkService());
+  }
+  if (!Get.isRegistered<GuestMvpClaimLinkService>()) {
+    Get.lazyPut<GuestMvpClaimLinkService>(
+      () => GuestMvpClaimLinkService(
+        claimLinkIssuer: Get.find<ShareLinkService>(),
+      ),
+    );
+  }
+  if (!Get.isRegistered<PrideIdentityImageResolver>()) {
+    Get.lazyPut<PrideIdentityImageResolver>(
+      () => PrideIdentityImageResolver(
+        playerRepository: Get.find<PlayerRepositoryImpl>(),
       ),
     );
   }

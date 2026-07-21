@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 
 import 'package:el7reef/app/routes/app_routes.dart';
+import 'package:el7reef/app/theme/app_theme.dart';
 import 'package:el7reef/core/constants/firebase_paths.dart';
 import 'package:el7reef/core/enums/match_attendance_status.dart';
 import 'package:el7reef/core/enums/match_check_in_status.dart';
@@ -22,9 +23,11 @@ import 'package:el7reef/core/services/tournament_lifecycle_service.dart';
 import 'package:el7reef/core/services/tournament_ops_migration_service.dart';
 import 'package:el7reef/core/services/tournament_participant_service.dart';
 import 'package:el7reef/core/services/tournament_registration_service.dart';
+import 'package:el7reef/core/widgets/section_state_card.dart';
 import 'package:el7reef/data/repositories/match_event_repository_impl.dart';
 import 'package:el7reef/data/models/match_check_in_model.dart';
 import 'package:el7reef/data/models/match_lineup_snapshot_model.dart';
+import 'package:el7reef/data/models/tournament_participant_model.dart';
 import 'package:el7reef/data/repositories/guest_team_repository_impl.dart';
 import 'package:el7reef/data/repositories/guest_player_repository_impl.dart';
 import 'package:el7reef/data/repositories/group_standing_snapshot_repository_impl.dart';
@@ -103,6 +106,7 @@ void main() {
           firestore: firestore,
         ),
         matchRepository: MatchRepositoryImpl(db: firestore),
+        guestPlayerRepository: guestPlayerRepository,
       ),
       permanent: true,
     );
@@ -134,6 +138,7 @@ void main() {
       MatchSettlementService(
         firestore: firestore,
         tournamentLifecycleService: Get.find<TournamentLifecycleService>(),
+        allowLocalFallback: true,
       ),
       permanent: true,
     );
@@ -254,6 +259,73 @@ void main() {
     expect(find.text('Red Wolves'), findsOneWidget);
   });
 
+  testWidgets('new tournament dashboard has no horizontal overflow at 360dp', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final now = DateTime(2026, 7, 17);
+    await tournamentRepository.createTournament(
+      Tournament(
+        id: 'empty-tournament',
+        organizerId: 'organizer-1',
+        name: 'CodexFixedE2ECup20260717',
+        format: TournamentFormat.groupsThenKnockout,
+        teamSize: TournamentTeamSize.fiveVsFive,
+        maxTeams: 8,
+        visibility: TournamentVisibility.public,
+        discoverable: true,
+        status: TournamentStatus.registration,
+        createdAt: now,
+      ),
+    );
+
+    await tester.pumpWidget(
+      _buildOpsApp(
+        AppRoutes.organizerDashboardForTournament('empty-tournament'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('أضف أول فريق'), findsWidgets);
+    expect(
+      find.text('يمكن إضافة اللاعبين مباشرة بعد إنشاء الفريق.'),
+      findsOneWidget,
+    );
+    expect(find.text('0 فريق نشط جاهز'), findsOneWidget);
+    expect(find.text('مفتوحة للتعديل'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('operations dashboard keeps section error scoped to dashboard', (
+    tester,
+  ) async {
+    const errorMessage = 'تعذر تحديث بيانات التشغيل الآن.';
+
+    await tester.pumpWidget(
+      _buildOpsApp(AppRoutes.organizerDashboardForTournament('tournament-1')),
+    );
+    await tester.pumpAndSettle();
+
+    Get.find<TournamentOperationsController>().errorMessage.value =
+        errorMessage;
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byType(SectionStateCard),
+        matching: find.text(errorMessage),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('قفل قائمة الفرق'), findsWidgets);
+    expect(find.text('حاول تاني'), findsNothing);
+  });
+
   testWidgets('direct operations route is blocked for non-organizer', (
     tester,
   ) async {
@@ -319,10 +391,79 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('مباريات البطولة'), findsOneWidget);
+    expect(find.text('فلاتر متقدمة'), findsOneWidget);
+    expect(find.text('اختر يومًا'), findsNothing);
+    expect(find.text('كل المجموعات'), findsNothing);
+
+    await tester.tap(
+      find.byKey(const ValueKey('advanced-fixtures-filter-toggle')),
+    );
+    await tester.pumpAndSettle();
+
     expect(find.text('اختر يومًا'), findsOneWidget);
     expect(find.text('كل المجموعات'), findsOneWidget);
-    expect(find.text('إدارة المباراة'), findsOneWidget);
-    expect(find.text('راجع واعتمد'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.byKey(ValueKey('fixture-manage-${groupStage.fixtures.single.id}')),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(
+      find.byKey(ValueKey('fixture-manage-${groupStage.fixtures.single.id}')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(ValueKey('fixture-primary-${groupStage.fixtures.single.id}')),
+      findsOneWidget,
+    );
+
+    final reviewButton = find.byKey(
+      ValueKey('fixture-primary-${groupStage.fixtures.single.id}'),
+    );
+    await tester.ensureVisible(reviewButton);
+    await tester.pumpAndSettle();
+    await tester.tap(reviewButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('score:${groupStage.fixtures.single.id}'), findsOneWidget);
+  });
+
+  testWidgets('live fixture becomes the organizer do-now action', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final lifecycleService = TournamentLifecycleService(firestore: firestore);
+    await lifecycleService.finalizeParticipants(
+      tournamentId: 'tournament-1',
+      actorId: 'organizer-1',
+    );
+    final groupStage = await lifecycleService.startGroupStage(
+      tournamentId: 'tournament-1',
+      actorId: 'organizer-1',
+    );
+    final liveFixture = groupStage.fixtures.single.copyWith(
+      status: MatchStatus.live,
+    );
+    await Get.find<MatchRepositoryImpl>().updateMatch(liveFixture);
+
+    await tester.pumpWidget(
+      _buildOpsApp(AppRoutes.organizerDashboardForTournament('tournament-1')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('سجّل النتيجة الآن'), findsWidgets);
+    final doNowButton = find.widgetWithText(FilledButton, 'سجّل النتيجة الآن');
+    await tester.scrollUntilVisible(
+      doNowButton,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(doNowButton);
+    await tester.pumpAndSettle();
+    expect(find.text('score:${liveFixture.id}'), findsOneWidget);
   });
 
   testWidgets('standings screen renders table columns and qualifier state', (
@@ -342,7 +483,7 @@ void main() {
     expect(find.text('Blue Sharks'), findsOneWidget);
   });
 
-  testWidgets('bracket screen shows final summary and tie actions', (
+  testWidgets('bracket screen shows the knockout journey and tie actions', (
     tester,
   ) async {
     final lifecycleService = await _seedOfficialGroupStandings(firestore);
@@ -356,9 +497,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('ملخص الإقصاء'), findsOneWidget);
-    expect(find.text('ملخص النهائي'), findsOneWidget);
-    expect(find.text('النهائي'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('bracket-screen-summary-bar')),
+      findsOneWidget,
+    );
+    expect(find.text('الطريق إلى الكأس'), findsOneWidget);
+    expect(find.text('النهائي'), findsWidgets);
+    await tester.tap(find.text('الجولات'));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView).first, const Offset(0, -520));
+    await tester.pumpAndSettle();
     expect(find.text('إدارة المباراة'), findsWidgets);
   });
 
@@ -386,13 +534,18 @@ void main() {
     expect(find.text('حالة التشغيل'), findsNothing);
     expect(find.text('لوحة تشغيل البطولة'), findsNothing);
     expect(find.text('هدافو البطولة'), findsOneWidget);
-    expect(find.text('لم يتم تسجيل هدافين بعد'), findsOneWidget);
+    expect(
+      find.text('النتائج محفوظة، تفاصيل الهدافين غير مسجلة'),
+      findsOneWidget,
+    );
     expect(
       find.text(
-        'بعد أول نتيجة بأهداف، ستظهر منصة الهدافين هنا ويصبح كارت المشاركة جاهزًا.',
+        'تم اعتماد 1 مباراة، لكن النتائج المستوردة لا تتضمن أسماء مسجلي الأهداف؛ لذلك لن نعرض ترتيبًا أو كارت مشاركة غير مؤكد.',
       ),
       findsOneWidget,
     );
+    expect(find.text('تفاصيل الهدافين غير مسجلة'), findsOneWidget);
+    expect(find.text('لم يتم تسجيل هدافين بعد'), findsNothing);
     expect(find.text('شارك لوحة الهدافين'), findsNothing);
   });
 
@@ -417,6 +570,62 @@ void main() {
       expect(find.text('المجموعات'), findsOneWidget);
       expect(find.text('المباريات'), findsOneWidget);
       expect(find.text('الإقصائيات'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'tournament detail stays readable at 360dp and 200 percent text',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        _buildOpsApp(
+          AppRoutes.tournamentDetailById('tournament-1'),
+          textScale: 2,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Street Cup'), findsWidgets);
+      expect(find.text('حجم الفريق'), findsOneWidget);
+      expect(find.text('التسجيلات'), findsOneWidget);
+      expect(find.text('داخل البطولة'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    '2026-07-18 long tournament title stays readable while hero collapses',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      final tournament = await tournamentRepository.getTournament(
+        'tournament-1',
+      );
+      const longName = 'كأس العالم 2026، محاكاة المنظم للبطولة الكبرى';
+      await tournamentRepository.updateTournament(
+        tournament!.copyWith(name: longName),
+      );
+
+      await tester.pumpWidget(
+        _buildOpsApp(AppRoutes.tournamentDetailById('tournament-1')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -44));
+      await tester.pumpAndSettle();
+
+      expect(find.text(longName), findsWidgets);
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -501,6 +710,26 @@ void main() {
     expect(find.text('profile:guestPlayer:guest-scorer'), findsOneWidget);
   });
 
+  testWidgets('claimed guest scorer row opens the registered player profile', (
+    tester,
+  ) async {
+    await _seedTopScorerGoals(firestore, claimedGuest: true);
+
+    await tester.pumpWidget(
+      _buildOpsApp(AppRoutes.tournamentDetailById('tournament-1')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('ضيف'), findsNothing);
+    final claimedScorer = find.text('ضيف هداف');
+    await tester.ensureVisible(claimedScorer);
+    await tester.pumpAndSettle();
+    await tester.tap(claimedScorer);
+    await tester.pumpAndSettle();
+
+    expect(find.text('profile:player:claimed-player'), findsOneWidget);
+  });
+
   testWidgets('tournament detail shows safe top scorers error state', (
     tester,
   ) async {
@@ -534,47 +763,39 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(
-      find.text('المجموعات'),
-      220,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('المجموعات'));
-    await tester.pumpAndSettle();
+    Future<void> openDashboardDestination(String label) async {
+      final target = find.text(label);
+      await tester.scrollUntilVisible(
+        target,
+        320,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.ensureVisible(target);
+      await tester.pumpAndSettle();
+      await tester.tap(target);
+      await tester.pumpAndSettle();
+    }
+
+    await openDashboardDestination('المجموعات');
     expect(find.text('مباريات المجموعة'), findsOneWidget);
 
     Get.back();
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('المباريات'),
-      220,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('المباريات'));
-    await tester.pumpAndSettle();
+    await openDashboardDestination('المباريات');
     expect(find.text('مباريات البطولة'), findsOneWidget);
 
     Get.back();
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('الترتيب'),
-      220,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('الترتيب'));
-    await tester.pumpAndSettle();
+    await openDashboardDestination('الترتيب');
     expect(find.text('ترتيب المجموعات'), findsOneWidget);
 
     Get.back();
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('الإقصائيات'),
-      220,
-      scrollable: find.byType(Scrollable).first,
+    await openDashboardDestination('الإقصائيات');
+    expect(
+      find.byKey(const ValueKey('bracket-screen-summary-bar')),
+      findsOneWidget,
     );
-    await tester.tap(find.text('الإقصائيات'));
-    await tester.pumpAndSettle();
-    expect(find.text('ملخص الإقصاء'), findsOneWidget);
   });
 
   testWidgets('participants screen groups active and withdrawn participants', (
@@ -586,8 +807,10 @@ void main() {
     final participants = await participantService.getTournamentParticipants(
       'tournament-1',
     );
+    final withdrawnParticipant = participants.first;
+    final activeParticipant = participants.last;
     await participantService.withdrawParticipant(
-      participantId: participants.first.id,
+      participantId: withdrawnParticipant.id,
       actorId: 'organizer-1',
     );
 
@@ -596,10 +819,88 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('الفرق النشطة'), findsOneWidget);
-    expect(find.text('المنسحبون'), findsWidgets);
-    expect(find.text('Blue Sharks'), findsOneWidget);
+    expect(find.byKey(const ValueKey('participant-search-field')), findsOne);
+    expect(find.text(activeParticipant.displayName), findsOneWidget);
+
+    await tester.tap(find.text('المنسحبة 1'));
+    await tester.pumpAndSettle();
+
+    expect(find.text(withdrawnParticipant.displayName), findsOneWidget);
+    expect(find.text(activeParticipant.displayName), findsNothing);
   });
+
+  testWidgets(
+    '2026-07-18 large participant list searches and filters without card sprawl',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final participantService = Get.find<TournamentParticipantService>();
+      final now = DateTime(2026, 7, 18, 12);
+
+      for (var index = 0; index < 24; index++) {
+        final id = 'world-team-$index';
+        final name = index == 17
+            ? 'الأرجنتين (ARG)'
+            : 'منتخب ${(index + 1).toString().padLeft(2, '0')}';
+        await guestTeamRepository.createGuestTeam(
+          GuestTeam(
+            id: id,
+            name: name,
+            normalizedName: name.toLowerCase(),
+            creatorId: 'organizer-1',
+            tournamentIds: const ['tournament-1'],
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        final participant = await participantService.addManualParticipant(
+          tournamentId: 'tournament-1',
+          sourceType: TournamentParticipantSourceType.guestTeam,
+          sourceEntityId: id,
+          actorId: 'organizer-1',
+          now: now.add(Duration(minutes: index)),
+          refreshTournamentSummary: false,
+        );
+        final groupedParticipant = participant.copyWith(
+          groupId: index < 12 ? 'group-a' : 'group-b',
+        );
+        await firestore
+            .collection(FirebasePaths.tournamentParticipants)
+            .doc(groupedParticipant.id)
+            .set(
+              TournamentParticipantModel.fromEntity(
+                groupedParticipant,
+              ).toJson(),
+            );
+      }
+
+      await tester.pumpWidget(
+        _buildOpsApp(AppRoutes.tournamentParticipantsById('tournament-1')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('26 فريق ظاهر'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('participant-search-field')),
+        'الأرجنتين',
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('الأرجنتين (ARG)'), findsOneWidget);
+      expect(find.text('1 فريق ظاهر'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('مسح البحث'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('participant-group-group-a')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('12 فريق ظاهر'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('groups screen shows group fixture progress and qualifiers', (
     tester,
@@ -652,6 +953,7 @@ void main() {
         settlementService: MatchSettlementService(
           firestore: firestore,
           tournamentLifecycleService: lifecycleService,
+          allowLocalFallback: true,
         ),
       );
 
@@ -712,6 +1014,81 @@ void main() {
     },
   );
 
+  test(
+    'complete tournament immediately presents the champion celebration',
+    () async {
+      final lifecycleService = TournamentLifecycleService(firestore: firestore);
+      final matchRepository = MatchRepositoryImpl(db: firestore);
+      final controller = _CelebrationTrackingTournamentOperationsController(
+        fixedTournamentId: 'tournament-1',
+        tournamentRepository: tournamentRepository,
+        groupRepository: TournamentGroupRepositoryImpl(firestore: firestore),
+        matchRepository: matchRepository,
+        teamRepository: teamRepository,
+        guestTeamRepository: GuestTeamRepositoryImpl(firestore: firestore),
+        standingRepository: GroupStandingSnapshotRepositoryImpl(
+          firestore: firestore,
+        ),
+        bracketRepository: KnockoutBracketRepositoryImpl(firestore: firestore),
+        tieRepository: KnockoutTieRepositoryImpl(firestore: firestore),
+        participantService: TournamentParticipantService(firestore: firestore),
+        migrationService: TournamentOpsMigrationService(firestore: firestore),
+        lifecycleService: lifecycleService,
+        fixtureService: TournamentFixtureService(firestore: firestore),
+        authService: authService,
+        settlementService: MatchSettlementService(
+          firestore: firestore,
+          tournamentLifecycleService: lifecycleService,
+          allowLocalFallback: true,
+        ),
+      );
+
+      await lifecycleService.finalizeParticipants(
+        tournamentId: 'tournament-1',
+        actorId: 'organizer-1',
+      );
+      final groupStage = await lifecycleService.startGroupStage(
+        tournamentId: 'tournament-1',
+        actorId: 'organizer-1',
+      );
+      for (final fixture in groupStage.fixtures) {
+        await matchRepository.updateMatch(
+          fixture.copyWith(
+            scoreTeamA: 2,
+            scoreTeamB: 0,
+            status: MatchStatus.settled,
+          ),
+        );
+      }
+      await lifecycleService.refreshGroupStandings(
+        tournamentId: 'tournament-1',
+      );
+      final knockout = await lifecycleService.startKnockout(
+        tournamentId: 'tournament-1',
+        actorId: 'organizer-1',
+      );
+      for (final fixture in knockout.matches) {
+        await matchRepository.updateMatch(
+          fixture.copyWith(
+            scoreTeamA: 3,
+            scoreTeamB: 1,
+            status: MatchStatus.settled,
+          ),
+        );
+      }
+      await lifecycleService.refreshKnockoutProgress(
+        tournamentId: 'tournament-1',
+      );
+      await controller.refreshAll();
+
+      await controller.completeTournament();
+
+      expect(controller.tournament.value?.status, TournamentStatus.completed);
+      expect(controller.celebrationCount, 1);
+      expect(controller.celebratedTournament?.winnerParticipantId, isNotEmpty);
+    },
+  );
+
   test('operations controller fails closed for non-organizer', () async {
     final lifecycleService = TournamentLifecycleService(firestore: firestore);
     final controller = _TestTournamentOperationsController(
@@ -734,6 +1111,7 @@ void main() {
       settlementService: MatchSettlementService(
         firestore: firestore,
         tournamentLifecycleService: lifecycleService,
+        allowLocalFallback: true,
       ),
     );
 
@@ -934,14 +1312,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('ضيوف الحارة'), findsOneWidget);
-    final manageRosterButton = find.widgetWithText(
-      OutlinedButton,
-      'إدارة اللاعبين',
+    await tester.enterText(
+      find.byKey(const ValueKey('participant-search-field')),
+      'ضيوف الحارة',
     );
-    await tester.drag(find.byType(ListView).first, const Offset(0, -520));
     await tester.pumpAndSettle();
-    await tester.tap(manageRosterButton);
+    expect(find.text('ضيوف الحارة'), findsWidgets);
+    await tester.tap(
+      find.byKey(
+        const ValueKey(
+          'participant-roster-participant::tournament-1::guestTeam::guest-team-1',
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byType(TournamentGuestTeamRosterScreen), findsOneWidget);
@@ -965,8 +1348,20 @@ void main() {
   });
 }
 
-Widget _buildOpsApp(String initialRoute) {
+Widget _buildOpsApp(String initialRoute, {double textScale = 1}) {
   return GetMaterialApp(
+    locale: const Locale('ar', 'EG'),
+    fallbackLocale: const Locale('ar', 'EG'),
+    textDirection: TextDirection.rtl,
+    theme: AppTheme.darkTheme,
+    darkTheme: AppTheme.darkTheme,
+    themeMode: ThemeMode.dark,
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(
+        context,
+      ).copyWith(textScaler: TextScaler.linear(textScale)),
+      child: child!,
+    ),
     initialRoute: initialRoute,
     getPages: <GetPage>[
       GetPage(
@@ -981,6 +1376,10 @@ Widget _buildOpsApp(String initialRoute) {
             'profile:${Get.parameters['kind']}:${Get.parameters['id']}',
           ),
         ),
+      ),
+      GetPage(
+        name: AppRoutes.scoreApproval,
+        page: () => Scaffold(body: Text('score:${Get.parameters['matchId']}')),
       ),
       GetPage(
         name: AppRoutes.organizerDashboard,
@@ -1133,6 +1532,36 @@ class _TrackingTournamentOperationsController
   }
 }
 
+class _CelebrationTrackingTournamentOperationsController
+    extends _TestTournamentOperationsController {
+  int celebrationCount = 0;
+  Tournament? celebratedTournament;
+
+  _CelebrationTrackingTournamentOperationsController({
+    required super.fixedTournamentId,
+    required super.tournamentRepository,
+    required super.groupRepository,
+    required super.matchRepository,
+    required super.teamRepository,
+    required super.guestTeamRepository,
+    required super.standingRepository,
+    required super.bracketRepository,
+    required super.tieRepository,
+    required super.participantService,
+    required super.migrationService,
+    required super.lifecycleService,
+    required super.fixtureService,
+    super.authService,
+    super.settlementService,
+  });
+
+  @override
+  Future<void> showChampionCelebration(Tournament updatedTournament) async {
+    celebrationCount += 1;
+    celebratedTournament = updatedTournament;
+  }
+}
+
 _TrackingTournamentOperationsController _buildTrackingController() {
   return _TrackingTournamentOperationsController(
     fixedTournamentId: 'tournament-1',
@@ -1276,7 +1705,10 @@ Future<void> _seedRegisteredSnapshotForOps({
       .set(MatchLineupSnapshotModel.fromEntity(snapshot).toJson());
 }
 
-Future<void> _seedTopScorerGoals(FakeFirebaseFirestore firestore) async {
+Future<void> _seedTopScorerGoals(
+  FakeFirebaseFirestore firestore, {
+  bool claimedGuest = false,
+}) async {
   final service = MatchEventService(
     repository: MatchEventRepositoryImpl(firestore: firestore),
     firestore: firestore,
@@ -1287,11 +1719,11 @@ Future<void> _seedTopScorerGoals(FakeFirebaseFirestore firestore) async {
     id: 'player-scorer',
     displayName: 'Ali Scorer',
   );
-  const guestScorer = ParticipantRef(
+  final guestScorer = ParticipantRef(
     kind: ParticipantRefKind.guestPlayer,
     id: 'guest-scorer',
     displayName: 'ضيف هداف',
-    linkedPlayerId: 'claimed-player',
+    linkedPlayerId: claimedGuest ? 'claimed-player' : null,
   );
   const temporaryScorer = ParticipantRef(
     kind: ParticipantRefKind.matchSidePlayer,
@@ -1357,6 +1789,13 @@ class _FakeAuthService extends GetxService implements AuthService {
   @override
   final RxBool isLoading = false.obs;
 
+  @override
+  final Rx<AuthProfileStatus> profileStatus =
+      AuthProfileStatus.unauthenticated.obs;
+
+  @override
+  final RxString profileErrorMessage = ''.obs;
+
   String? _currentUserId;
 
   _FakeAuthService({required String? currentUserId}) {
@@ -1374,6 +1813,9 @@ class _FakeAuthService extends GetxService implements AuthService {
             createdAt: now,
             lastActiveAt: now,
           );
+    profileStatus.value = userId == null
+        ? AuthProfileStatus.unauthenticated
+        : AuthProfileStatus.ready;
   }
 
   @override
@@ -1392,7 +1834,12 @@ class _FakeAuthService extends GetxService implements AuthService {
   Future<Player?> signInWithGoogle() async => null;
 
   @override
-  Future<void> signOut() async {}
+  Future<void> reauthenticateWithGoogle() async {}
+
+  @override
+  Future<void> signOut() async {
+    setCurrentUserId(null);
+  }
 }
 
 class _ThrowingTopScorersResolver extends TournamentTopScorersResolver {

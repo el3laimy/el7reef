@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
+import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/widgets/el7reef_brand_mark.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../controllers/auth_controller.dart';
 
 /// شاشة تسجيل الدخول — Google Sign-In
@@ -19,121 +22,193 @@ class LoginScreen extends GetView<AuthController> {
         height: double.infinity,
         decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(AppDimensions.pagePadding),
-            child: Column(
-              children: [
-                const Spacer(flex: 2),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(AppDimensions.pagePadding),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight:
+                        constraints.maxHeight - (AppDimensions.pagePadding * 2),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      El7reefGlassSurface(
+                        variant: El7reefGlassVariant.raised,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppDimensions.lg,
+                          vertical: AppDimensions.xl,
+                        ),
+                        radius: AppDimensions.radiusXl,
+                        child: Column(
+                          children: [
+                            // ── الشعار ──
+                            Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(28),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.primary.withValues(
+                                          alpha: 0.28,
+                                        ),
+                                        blurRadius: 34,
+                                        spreadRadius: 3,
+                                      ),
+                                    ],
+                                  ),
+                                  child: const El7reefBrandMark(size: 124),
+                                )
+                                .animate()
+                                .scale(
+                                  begin: const Offset(0.92, 0.92),
+                                  end: const Offset(1.0, 1.0),
+                                  duration: 450.ms,
+                                  curve: Curves.easeOutCubic,
+                                )
+                                .fadeIn(duration: 260.ms),
 
-                // ── الشعار ──
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.3),
-                        blurRadius: 30,
-                        spreadRadius: 5,
+                            const SizedBox(height: AppDimensions.lg),
+
+                            Text(
+                                  AppConstants.appName,
+                                  style: AppTextStyles.displayLarge.copyWith(
+                                    foreground: Paint()
+                                      ..shader =
+                                          const LinearGradient(
+                                            colors: [
+                                              AppColors.primary,
+                                              AppColors.primaryLight,
+                                            ],
+                                          ).createShader(
+                                            const Rect.fromLTWH(0, 0, 200, 70),
+                                          ),
+                                  ),
+                                )
+                                .animate()
+                                .fadeIn(delay: 120.ms, duration: 300.ms)
+                                .slideY(
+                                  begin: 0.08,
+                                  duration: 300.ms,
+                                  curve: Curves.easeOut,
+                                ),
+
+                            const SizedBox(height: AppDimensions.sm),
+
+                            Text(
+                                  AppConstants.appTagline,
+                                  style: AppTextStyles.bodyLarge.copyWith(
+                                    color: AppColors.textSecondaryTinted,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                )
+                                .animate()
+                                .fadeIn(delay: 180.ms, duration: 300.ms)
+                                .slideY(begin: 0.06, duration: 300.ms),
+
+                            const SizedBox(height: AppDimensions.xl),
+
+                            // ── رسالة الخطأ ──
+                            Obx(
+                              () => controller.errorMessage.isNotEmpty
+                                  ? _AuthErrorBanner(
+                                      message: controller.errorMessage.value,
+                                    )
+                                  : const SizedBox.shrink(),
+                            ),
+
+                            Obx(
+                              () => Material(
+                                color: Colors.transparent,
+                                child: CheckboxListTile(
+                                  value: controller
+                                      .hasAcceptedCommunityPolicy
+                                      .value,
+                                  onChanged: (value) =>
+                                      controller.setCommunityPolicyAccepted(
+                                        value ?? false,
+                                      ),
+                                  controlAffinity:
+                                      ListTileControlAffinity.leading,
+                                  contentPadding: EdgeInsets.zero,
+                                  title: const Text(
+                                    'أوافق على قواعد المجتمع وسياسة الخصوصية',
+                                    textAlign: TextAlign.start,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            Wrap(
+                              alignment: WrapAlignment.center,
+                              children: [
+                                TextButton(
+                                  onPressed: () => Get.toNamed(
+                                    AppRoutes.communityGuidelines,
+                                  ),
+                                  child: const Text('قواعد المجتمع'),
+                                ),
+                                TextButton(
+                                  onPressed: () =>
+                                      Get.toNamed(AppRoutes.privacyPolicy),
+                                  child: const Text('سياسة الخصوصية'),
+                                ),
+                              ],
+                            ).animate().fadeIn(delay: 320.ms, duration: 260.ms),
+
+                            const SizedBox(height: AppDimensions.md),
+
+                            // يظل قابلاً للضغط كي يشرح شرط الموافقة بدلاً من
+                            // الظهور كزر معطّل بلا سبب.
+                            Obx(
+                              () => _GoogleSignInButton(
+                                isLoading: controller.isLoading.value,
+                                onPressed: controller.signInWithGoogle,
+                              ),
+                            ).animate().fadeIn(delay: 240.ms, duration: 300.ms),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(28),
-                    child: Image.asset(
-                      'assets/images/logo_icon.png',
-                      width: 130,
-                      height: 130,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                )
-                    .animate()
-                    .scale(
-                      begin: const Offset(0.0, 0.0),
-                      end: const Offset(1.0, 1.0),
-                      duration: 800.ms,
-                      curve: Curves.elasticOut,
-                    )
-                    .fadeIn(duration: 400.ms),
-
-                const SizedBox(height: AppDimensions.lg),
-
-                Text(
-                  AppConstants.appName,
-                  style: AppTextStyles.displayLarge.copyWith(
-                    foreground: Paint()
-                      ..shader = const LinearGradient(
-                        colors: [AppColors.primary, AppColors.primaryLight],
-                      ).createShader(const Rect.fromLTWH(0, 0, 200, 70)),
-                  ),
-                )
-                    .animate()
-                    .fadeIn(delay: 300.ms, duration: 600.ms)
-                    .slideY(begin: 0.3, duration: 600.ms, curve: Curves.easeOut),
-
-                Text(
-                  AppConstants.appTagline,
-                  style: AppTextStyles.bodyLarge.copyWith(color: AppColors.textSecondary),
-                  textAlign: TextAlign.center,
-                )
-                    .animate()
-                    .fadeIn(delay: 500.ms, duration: 600.ms)
-                    .slideY(begin: 0.2, duration: 600.ms),
-
-                const Spacer(flex: 2),
-
-                // ── رسالة الخطأ ──
-                Obx(() => controller.errorMessage.isNotEmpty
-                    ? Container(
-                        margin: const EdgeInsets.only(bottom: AppDimensions.md),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppDimensions.md,
-                          vertical: AppDimensions.sm,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.error.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-                          border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.error_outline, color: AppColors.error, size: 20),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                controller.errorMessage.value,
-                                style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ).animate().shake(duration: 400.ms)
-                    : const SizedBox.shrink()),
-
-                // ── زر Google Sign-In ──
-                Obx(() => _GoogleSignInButton(
-                      isLoading: controller.isLoading.value,
-                      onPressed: controller.signInWithGoogle,
-                    )).animate().fadeIn(delay: 700.ms, duration: 500.ms).slideY(begin: 0.2),
-
-                const SizedBox(height: AppDimensions.md),
-
-                // ── نص الموافقة ──
-                Text(
-                  'بتسجيل دخولك، أنت موافق على شروط الاستخدام وسياسة الخصوصية',
-                  style: AppTextStyles.labelSmall.copyWith(
-                    color: AppColors.textMuted.withValues(alpha: 0.6),
-                  ),
-                  textAlign: TextAlign.center,
-                ).animate().fadeIn(delay: 900.ms),
-
-                const Spacer(),
-              ],
-            ),
+                ),
+              );
+            },
           ),
         ),
       ),
     );
+  }
+}
+
+class _AuthErrorBanner extends StatelessWidget {
+  final String message;
+
+  const _AuthErrorBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return El7reefGlassSurface(
+      variant: El7reefGlassVariant.error,
+      margin: const EdgeInsets.only(bottom: AppDimensions.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimensions.md,
+        vertical: AppDimensions.sm,
+      ),
+      radius: AppDimensions.radiusMd,
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 180.ms).slideY(begin: 0.05, duration: 180.ms);
   }
 }
 
@@ -142,10 +217,7 @@ class _GoogleSignInButton extends StatelessWidget {
   final bool isLoading;
   final VoidCallback? onPressed;
 
-  const _GoogleSignInButton({
-    required this.isLoading,
-    this.onPressed,
-  });
+  const _GoogleSignInButton({required this.isLoading, this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -157,6 +229,7 @@ class _GoogleSignInButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: Colors.black87,
+          disabledBackgroundColor: Colors.white.withValues(alpha: 0.82),
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppDimensions.radiusMd),

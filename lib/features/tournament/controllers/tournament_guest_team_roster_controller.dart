@@ -2,26 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/auth/auth_session.dart';
+import '../../../core/constants/featured_tournaments.dart';
 import '../../../core/enums/guest_claim_status.dart';
+import '../../../core/enums/tournament_enums.dart';
 import '../../../core/services/guest_team_roster_service.dart';
 import '../../../domain/entities/guest_player.dart';
 import '../../../domain/entities/guest_team.dart';
 import '../../../domain/entities/tournament.dart';
 import '../../../domain/repositories/guest_team_repository.dart';
+import '../../../domain/repositories/guest_player_repository.dart';
 import '../../../domain/repositories/tournament_repository.dart';
 
 class TournamentGuestTeamRosterController extends GetxController {
   final AuthSession _authSession;
+  final GuestPlayerRepository _guestPlayerRepository;
   final GuestTeamRepository _guestTeamRepository;
   final TournamentRepository _tournamentRepository;
   final GuestTeamRosterService _rosterService;
 
   TournamentGuestTeamRosterController({
     required AuthSession authSession,
+    required GuestPlayerRepository guestPlayerRepository,
     required GuestTeamRepository guestTeamRepository,
     required TournamentRepository tournamentRepository,
     required GuestTeamRosterService rosterService,
   }) : _authSession = authSession,
+       _guestPlayerRepository = guestPlayerRepository,
        _guestTeamRepository = guestTeamRepository,
        _tournamentRepository = tournamentRepository,
        _rosterService = rosterService;
@@ -33,6 +39,7 @@ class TournamentGuestTeamRosterController extends GetxController {
 
   final isLoading = true.obs;
   final isSubmitting = false.obs;
+  final canManageRoster = false.obs;
   final errorMessage = ''.obs;
 
   final nameController = TextEditingController();
@@ -111,14 +118,25 @@ class TournamentGuestTeamRosterController extends GetxController {
       final loadedGuestTeam = await _guestTeamRepository.getGuestTeam(
         targetGuestTeamId,
       );
-      final loadedPlayers = await _rosterService.getGuestRoster(
-        tournamentId: targetTournamentId,
-        guestTeamId: targetGuestTeamId,
-        actorId: currentActorId,
-      );
+      final isPublicFeaturedRoster =
+          loadedTournament?.id == FeaturedTournaments.worldCup2026Id &&
+          loadedTournament?.isFeatured == true &&
+          loadedTournament?.visibility == TournamentVisibility.public &&
+          loadedTournament?.discoverable == true;
+      final loadedPlayers = isPublicFeaturedRoster
+          ? await _guestPlayerRepository.getPublicTournamentGuestTeamPlayers(
+              tournamentId: targetTournamentId,
+              guestTeamId: targetGuestTeamId,
+            )
+          : await _rosterService.getGuestRoster(
+              tournamentId: targetTournamentId,
+              guestTeamId: targetGuestTeamId,
+              actorId: currentActorId,
+            );
 
       tournament.value = loadedTournament;
       guestTeam.value = loadedGuestTeam;
+      canManageRoster.value = !isPublicFeaturedRoster;
       players.assignAll(_sortPlayers(loadedPlayers));
     } catch (error) {
       errorMessage.value = _readableError(error);

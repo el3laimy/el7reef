@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../controllers/matchday_controller.dart';
 import 'matchday_section_hint.dart';
 import 'matchday_substitution_dropdown.dart';
@@ -17,9 +17,9 @@ class MatchdaySubstitutionSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final snapshot = controller.activeSnapshot.value;
 
-    return GlassmorphicContainer(
+    return El7reefGlassSurface(
+      variant: El7reefGlassVariant.base,
       padding: const EdgeInsets.all(AppDimensions.md),
-      borderRadius: AppDimensions.radiusLg,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -56,7 +56,7 @@ class MatchdaySubstitutionSection extends StatelessWidget {
               onChanged: controller.isSubmitting.value
                   ? null
                   : (value) =>
-                      controller.selectedOutgoingAttendanceId.value = value,
+                        controller.selectedOutgoingAttendanceId.value = value,
             ),
             const SizedBox(height: AppDimensions.sm),
             MatchdaySubstitutionDropdown(
@@ -78,7 +78,7 @@ class MatchdaySubstitutionSection extends StatelessWidget {
               onChanged: controller.isSubmitting.value
                   ? null
                   : (value) =>
-                      controller.selectedIncomingAttendanceId.value = value,
+                        controller.selectedIncomingAttendanceId.value = value,
             ),
             const SizedBox(height: AppDimensions.sm),
             TextField(
@@ -106,7 +106,9 @@ class MatchdaySubstitutionSection extends StatelessWidget {
           Text('سجل التبديلات', style: AppTextStyles.titleMedium),
           const SizedBox(height: AppDimensions.sm),
           if (controller.sideSubstitutions.isEmpty)
-            const MatchdaySectionHint(message: 'لا توجد تبديلات مسجلة حتى الآن.')
+            const MatchdaySectionHint(
+              message: 'لا توجد تبديلات مسجلة حتى الآن.',
+            )
           else
             ...controller.sideSubstitutions.map(
               (substitution) => Container(

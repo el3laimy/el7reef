@@ -6,7 +6,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/enums/match_status.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../domain/entities/match.dart';
 import '../../../core/auth/auth_service.dart';
 
@@ -40,12 +40,13 @@ class HomeMyMatchCard extends StatelessWidget {
       }
     }
 
-    return GlassmorphicContainer(
+    return El7reefGlassSurface(
+          variant: El7reefGlassVariant.base,
           padding: const EdgeInsets.symmetric(
             horizontal: AppDimensions.md,
             vertical: AppDimensions.sm,
           ),
-          borderRadius: AppDimensions.radiusMd,
+          radius: AppDimensions.radiusMd,
           child: Row(
             children: [
               Container(

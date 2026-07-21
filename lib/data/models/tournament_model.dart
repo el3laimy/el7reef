@@ -1,5 +1,6 @@
 import '../../core/enums/tournament_enums.dart';
 import '../../domain/entities/tournament.dart';
+import '../../domain/entities/tournament_group_advancement_config.dart';
 import '../../domain/entities/tournament_group_standings_config.dart';
 import '../../domain/entities/tournament_assistant.dart';
 
@@ -15,6 +16,8 @@ class TournamentModel {
   final int maxTeams;
   final String visibility;
   final bool discoverable;
+  final bool isFeatured;
+  final int featuredPriority;
   final List<String> participantViewerIds;
   final int? prizePool;
   final String? prizeDescription;
@@ -33,6 +36,7 @@ class TournamentModel {
   final String? currentKnockoutBracketId;
   final String? winnerParticipantId;
   final bool needsManualOpsMigration;
+  final TournamentGroupAdvancementConfig groupAdvancementConfig;
   final TournamentGroupStandingsConfig groupStandingsConfig;
   final int createdAt;
 
@@ -47,6 +51,8 @@ class TournamentModel {
     required this.maxTeams,
     this.visibility = 'public',
     this.discoverable = true,
+    this.isFeatured = false,
+    this.featuredPriority = 1000,
     this.participantViewerIds = const [],
     this.prizePool,
     this.prizeDescription,
@@ -55,7 +61,7 @@ class TournamentModel {
     this.assistants = const [],
     this.groupRoundIds = const [],
     this.knockoutRoundIds = const [],
-    this.isFantasyEnabled = true,
+    this.isFantasyEnabled = false,
     this.registrationDeadline,
     this.startDate,
     this.endDate,
@@ -65,6 +71,7 @@ class TournamentModel {
     this.currentKnockoutBracketId,
     this.winnerParticipantId,
     this.needsManualOpsMigration = false,
+    this.groupAdvancementConfig = const TournamentGroupAdvancementConfig(),
     this.groupStandingsConfig = const TournamentGroupStandingsConfig(),
     required this.createdAt,
   });
@@ -82,6 +89,8 @@ class TournamentModel {
       maxTeams: (json['maxTeams'] as num?)?.toInt() ?? 8,
       visibility: visibility,
       discoverable: json['discoverable'] as bool? ?? visibility == 'public',
+      isFeatured: json['isFeatured'] as bool? ?? false,
+      featuredPriority: (json['featuredPriority'] as num?)?.toInt() ?? 1000,
       participantViewerIds:
           (json['participantViewerIds'] as List<dynamic>?)
               ?.map((e) => e as String)
@@ -112,7 +121,7 @@ class TournamentModel {
               ?.map((e) => e as String)
               .toList() ??
           [],
-      isFantasyEnabled: json['isFantasyEnabled'] as bool? ?? true,
+      isFantasyEnabled: json['isFantasyEnabled'] as bool? ?? false,
       registrationDeadline: (json['registrationDeadline'] as num?)?.toInt(),
       startDate: (json['startDate'] as num?)?.toInt(),
       endDate: (json['endDate'] as num?)?.toInt(),
@@ -124,6 +133,9 @@ class TournamentModel {
       winnerParticipantId: json['winnerParticipantId'] as String?,
       needsManualOpsMigration:
           json['needsManualOpsMigration'] as bool? ?? false,
+      groupAdvancementConfig: TournamentGroupAdvancementConfig.fromJson(
+        json['groupAdvancementConfig'] as Map<String, dynamic>?,
+      ),
       groupStandingsConfig: TournamentGroupStandingsConfig.fromJson(
         json['groupStandingsConfig'] as Map<String, dynamic>?,
       ),
@@ -144,6 +156,8 @@ class TournamentModel {
       'maxTeams': maxTeams,
       'visibility': visibility,
       'discoverable': discoverable,
+      'isFeatured': isFeatured,
+      'featuredPriority': featuredPriority,
       'participantViewerIds': participantViewerIds,
       'prizePool': prizePool,
       'prizeDescription': prizeDescription,
@@ -160,6 +174,7 @@ class TournamentModel {
       'currentKnockoutBracketId': currentKnockoutBracketId,
       'winnerParticipantId': winnerParticipantId,
       'needsManualOpsMigration': needsManualOpsMigration,
+      'groupAdvancementConfig': groupAdvancementConfig.toJson(),
       'groupStandingsConfig': groupStandingsConfig.toJson(),
       'createdAt': createdAt,
     };
@@ -185,6 +200,8 @@ class TournamentModel {
     maxTeams: maxTeams,
     visibility: _parseVisibility(visibility),
     discoverable: discoverable,
+    isFeatured: isFeatured,
+    featuredPriority: featuredPriority,
     participantViewerIds: participantViewerIds,
     prizePool: prizePool,
     prizeDescription: prizeDescription,
@@ -211,6 +228,7 @@ class TournamentModel {
     currentKnockoutBracketId: currentKnockoutBracketId,
     winnerParticipantId: winnerParticipantId,
     needsManualOpsMigration: needsManualOpsMigration,
+    groupAdvancementConfig: groupAdvancementConfig,
     groupStandingsConfig: groupStandingsConfig,
     createdAt: DateTime.fromMillisecondsSinceEpoch(createdAt),
   );
@@ -226,6 +244,8 @@ class TournamentModel {
     maxTeams: t.maxTeams,
     visibility: t.visibility.name,
     discoverable: t.discoverable,
+    isFeatured: t.isFeatured,
+    featuredPriority: t.featuredPriority,
     participantViewerIds: t.participantViewerIds,
     prizePool: t.prizePool,
     prizeDescription: t.prizeDescription,
@@ -245,6 +265,7 @@ class TournamentModel {
     currentKnockoutBracketId: t.currentKnockoutBracketId,
     winnerParticipantId: t.winnerParticipantId,
     needsManualOpsMigration: t.needsManualOpsMigration,
+    groupAdvancementConfig: t.groupAdvancementConfig,
     groupStandingsConfig: t.groupStandingsConfig,
     createdAt: t.createdAt.millisecondsSinceEpoch,
   );

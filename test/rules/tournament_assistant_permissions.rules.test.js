@@ -545,22 +545,22 @@ describe('tournament assistant permission Firestore rules', () => {
   });
 
   describe('assistant MatchEvent writes', () => {
-    it('allows assistant with canRecordGoalsAndMvp to create a goal event', async () => {
+    it('denies assistant direct goal event writes after backend hardening', async () => {
       await seedTournamentFixture();
       await seedAssistant();
       const db = authedDb('assistant-1');
 
-      await assertSucceeds(
+      await assertFails(
         setDoc(doc(db, 'matchEvents', 'assistant-goal-1'), matchEventData()),
       );
     });
 
-    it('allows assistant with canRecordGoalsAndMvp to create an MVP event', async () => {
+    it('denies assistant direct MVP event writes after backend hardening', async () => {
       await seedTournamentFixture();
       await seedAssistant();
       const db = authedDb('assistant-1');
 
-      await assertSucceeds(
+      await assertFails(
         setDoc(
           doc(db, 'matchEvents', 'assistant-mvp-1'),
           matchEventData({eventType: 'mvp', minute: null}),
@@ -678,17 +678,17 @@ describe('tournament assistant permission Firestore rules', () => {
       );
     });
 
-    it('preserves organizer goal and MVP event creation', async () => {
+    it('denies organizer direct goal and MVP event creation', async () => {
       await seedTournamentFixture();
       const db = authedDb('organizer-1');
 
-      await assertSucceeds(
+      await assertFails(
         setDoc(
           doc(db, 'matchEvents', 'organizer-goal-1'),
           matchEventData({createdBy: 'organizer-1'}),
         ),
       );
-      await assertSucceeds(
+      await assertFails(
         setDoc(
           doc(db, 'matchEvents', 'organizer-mvp-1'),
           matchEventData({
@@ -772,7 +772,7 @@ describe('tournament assistant permission Firestore rules', () => {
       );
     });
 
-    it('allows assistant with score and event permissions to submit live match score', async () => {
+    it('denies assistant direct live score submission after backend hardening', async () => {
       await seedTournament();
       await seed('matches/match-1', matchData({status: 'live'}));
       await seedAssistant({
@@ -780,7 +780,7 @@ describe('tournament assistant permission Firestore rules', () => {
       });
       const db = authedDb('assistant-1');
 
-      await assertSucceeds(
+      await assertFails(
         updateDoc(doc(db, 'matches', 'match-1'), {
           scoreTeamA: 2,
           scoreTeamB: 1,
@@ -793,7 +793,7 @@ describe('tournament assistant permission Firestore rules', () => {
       );
     });
 
-    it('allows assistant with event permission to clear pride retry state only', async () => {
+    it('denies assistant direct pride retry state updates after backend hardening', async () => {
       await seedTournament();
       await seed(
         'matches/match-1',
@@ -812,7 +812,7 @@ describe('tournament assistant permission Firestore rules', () => {
       });
       const db = authedDb('assistant-1');
 
-      await assertSucceeds(
+      await assertFails(
         updateDoc(doc(db, 'matches', 'match-1'), {
           prideEventsPending: false,
         }),
@@ -825,7 +825,7 @@ describe('tournament assistant permission Firestore rules', () => {
       );
     });
 
-    it('allows score assistant to persist pending pride payload', async () => {
+    it('denies score assistant direct pending pride payload writes', async () => {
       await seedTournament();
       await seed('matches/match-1', matchData({status: 'live'}));
       await seedAssistant({
@@ -833,7 +833,7 @@ describe('tournament assistant permission Firestore rules', () => {
       });
       const db = authedDb('assistant-1');
 
-      await assertSucceeds(
+      await assertFails(
         setDoc(
           doc(db, 'matches/match-1/pendingPrideEvents/current'),
           pendingPridePayloadData(),
@@ -911,7 +911,7 @@ describe('tournament assistant permission Firestore rules', () => {
       );
     });
 
-    it('allows canApproveScore assistant settlement update after score submission', async () => {
+    it('denies canApproveScore assistant direct settlement update', async () => {
       await seedTournament();
       await seed(
         'matches/match-1',
@@ -926,7 +926,7 @@ describe('tournament assistant permission Firestore rules', () => {
       await seedAssistant({permissions: {canApproveScore: true}});
       const db = authedDb('assistant-1');
 
-      await assertSucceeds(
+      await assertFails(
         updateDoc(doc(db, 'matches', 'match-1'), {
           status: 'settled',
           isAnomaly: false,

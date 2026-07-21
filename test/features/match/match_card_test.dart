@@ -71,7 +71,10 @@ MatchController _controllerFor({required String currentUserId}) {
     matchRepository: matchRepository,
     sidePlayerRepository: sidePlayerRepository,
     cancellationService: MatchCancellationService(firestore: firestore),
-    settlementService: MatchSettlementService(firestore: firestore),
+    settlementService: MatchSettlementService(
+      firestore: firestore,
+      allowLocalFallback: true,
+    ),
     matchStartService: MatchStartService(
       matchRepo: matchRepository,
       snapshotRepo: MatchLineupSnapshotRepositoryImpl(firestore: firestore),
@@ -124,6 +127,8 @@ Match _match({
 class _FakeAuthService extends GetxService implements AuthService {
   final Rx<Player?> _currentPlayer;
   final RxBool _isLoading = false.obs;
+  final Rx<AuthProfileStatus> _profileStatus = AuthProfileStatus.ready.obs;
+  final RxString _profileErrorMessage = ''.obs;
 
   _FakeAuthService(String currentUserId)
     : _currentPlayer = Rx<Player?>(
@@ -148,6 +153,12 @@ class _FakeAuthService extends GetxService implements AuthService {
   RxBool get isLoading => _isLoading;
 
   @override
+  Rx<AuthProfileStatus> get profileStatus => _profileStatus;
+
+  @override
+  RxString get profileErrorMessage => _profileErrorMessage;
+
+  @override
   Future<AuthService> init() async => this;
 
   @override
@@ -157,7 +168,11 @@ class _FakeAuthService extends GetxService implements AuthService {
   Future<Player?> signInWithGoogle() async => _currentPlayer.value;
 
   @override
+  Future<void> reauthenticateWithGoogle() async {}
+
+  @override
   Future<void> signOut() async {
     _currentPlayer.value = null;
+    _profileStatus.value = AuthProfileStatus.unauthenticated;
   }
 }

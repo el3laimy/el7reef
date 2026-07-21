@@ -7,7 +7,16 @@ const {
   initializeTestEnvironment,
 } = require('@firebase/rules-unit-testing');
 
-const {doc, getDoc, setDoc, updateDoc} = require('firebase/firestore');
+const {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+} = require('firebase/firestore');
 
 const projectId = 'demo-no-project';
 const now = 1770000000000;
@@ -129,6 +138,93 @@ describe('guest PII Firestore rules', () => {
 
     assert.strictEqual(snapshot.exists(), true);
     assert.strictEqual(snapshot.data().phoneNumber, '01000000000');
+  });
+
+  it('allows a linked player to read and query only their guest identities', async () => {
+    await seedGuestPlayer('guest-player-linked-1', {
+      claimStatus: 'claimed',
+      linkedPlayerId: 'player-1',
+    });
+    await seedGuestPlayer('guest-player-linked-2', {
+      claimStatus: 'claimed',
+      linkedPlayerId: 'player-2',
+    });
+
+    const ownerDb = testEnv.authenticatedContext('player-1').firestore();
+    const directSnapshot = await assertSucceeds(
+      getDoc(doc(ownerDb, 'guestPlayers', 'guest-player-linked-1')),
+    );
+    const querySnapshot = await assertSucceeds(
+      getDocs(
+        query(
+          collection(ownerDb, 'guestPlayers'),
+          where('linkedPlayerId', '==', 'player-1'),
+        ),
+      ),
+    );
+
+    assert.strictEqual(directSnapshot.exists(), true);
+    assert.deepStrictEqual(
+      querySnapshot.docs.map((entry) => entry.id),
+      ['guest-player-linked-1'],
+    );
+  });
+
+  it('denies linked guest records and broad queries to other players', async () => {
+    await seedGuestPlayer('guest-player-linked-1', {
+      claimStatus: 'claimed',
+      linkedPlayerId: 'player-1',
+    });
+
+    const attackerDb = testEnv.authenticatedContext('attacker-1').firestore();
+
+    await assertFails(
+      getDoc(doc(attackerDb, 'guestPlayers', 'guest-player-linked-1')),
+    );
+    await assertFails(getDocs(collection(attackerDb, 'guestPlayers')));
+    await assertFails(
+      getDocs(
+        query(
+          collection(attackerDb, 'guestPlayers'),
+          where('linkedPlayerId', '==', 'player-1'),
+        ),
+      ),
+    );
+  });
+
+  it('denies create and update bypasses that spoof linkedPlayerId', async () => {
+    await seedTeam('team-1', {ownerId: 'owner-1'});
+    await seedGuestPlayer('guest-player-unlinked', {
+      createdBy: 'owner-1',
+      linkedPlayerId: null,
+    });
+    const ownerDb = testEnv.authenticatedContext('owner-1').firestore();
+
+    await assertFails(
+      setDoc(doc(ownerDb, 'guestPlayers', 'guest-player-spoofed'), {
+        displayName: 'ضيف مزيف الربط',
+        normalizedName: 'ضيف مزيف الربط',
+        phoneNumber: null,
+        jerseyNumber: null,
+        preferredPosition: null,
+        teamId: 'team-1',
+        tournamentId: 'tournament-1',
+        createdBy: 'owner-1',
+        createdAt: now,
+        updatedAt: now,
+        claimCode: null,
+        notes: null,
+        claimStatus: 'guest',
+        linkedPlayerId: 'victim-1',
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(ownerDb, 'guestPlayers', 'guest-player-unlinked'), {
+        linkedPlayerId: 'victim-1',
+        claimStatus: 'claimed',
+        updatedAt: now + 1,
+      }),
+    );
   });
 
   it('denies guest team reads to unrelated users', async () => {

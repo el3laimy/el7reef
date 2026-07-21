@@ -13,6 +13,7 @@ import '../../../core/services/team_roster_service.dart';
 import '../../../domain/entities/guest_player.dart';
 import '../../../domain/entities/player.dart';
 import '../../../domain/entities/team.dart';
+import '../../../domain/entities/team_formation_entry.dart';
 import '../../../domain/entities/team_formation_template.dart';
 import '../../../domain/entities/team_membership.dart';
 import '../../../domain/entities/team_roster_snapshot.dart';
@@ -100,6 +101,8 @@ class TeamRosterController extends GetxController {
   final RxInt visualPlayerCount = 5.obs;
   final RxString visualFormationCode = getDefaultFormation(5).obs;
   final RxBool isLineupDirty = false.obs;
+  final Rxn<LineupDragPayload> selectedVisualPayload = Rxn<LineupDragPayload>();
+  TeamFormationTemplate? _currentLineupState;
 
   final RxBool isLoading = false.obs;
   final RxBool isSubmitting = false.obs;
@@ -197,6 +200,8 @@ class TeamRosterController extends GetxController {
       final templates = await _teamFormationService.getTeamTemplates(
         targetTeamId,
       );
+      final currentLineupState = await _teamFormationService
+          .getCurrentLineupState(targetTeamId);
       final snapshots = await _teamFormationService.getRecentSnapshots(
         targetTeamId,
       );
@@ -206,6 +211,7 @@ class TeamRosterController extends GetxController {
       );
       rosterMembers.assignAll(_sortedMembers(resolvedMembers));
       formationTemplates.assignAll(templates);
+      _currentLineupState = currentLineupState;
       rosterSnapshots.assignAll(snapshots);
 
       initVisualLineup(); // التهيئة البصرية فور تحميل البيانات
@@ -557,29 +563,149 @@ class TeamRosterController extends GetxController {
     );
   }
 
+  String _memberKeyForViewData(TeamRosterMemberViewData member) {
+    final membership = member.membership;
+    return membership.playerId != null
+        ? 'player:${membership.playerId}'
+        : 'guest:${membership.guestPlayerId}';
+  }
+
+  Map<String, LineupPlayer> _lineupPlayersByMemberKey() {
+    return {
+      for (final member in rosterMembers)
+        if (member.membership.status != TeamMembershipStatus.inactive)
+          _memberKeyForViewData(member): _toLineupPlayer(member),
+    };
+  }
+
+  SlotRole? _parseSlotRole(String? raw) {
+    if (raw == null) return null;
+    for (final role in SlotRole.values) {
+      if (role.name == raw) return role;
+    }
+    return null;
+  }
+
+  List<TeamFormationEntry> buildVisualFormationEntries() {
+    final slotsByMembershipId = <String, FormationSlot>{
+      for (final slot in visualSlots)
+        if (slot.playerId != null)
+          slot.playerId!: slot
+        else if (slot.guestPlayerId != null)
+          slot.guestPlayerId!: slot,
+    };
+
+    return rosterMembers
+        .map((member) {
+          final membership = member.membership;
+          final slot = slotsByMembershipId[membership.id];
+          final isVisualStarter = slot != null;
+          final status = membership.status == TeamMembershipStatus.inactive
+              ? TeamMembershipStatus.inactive
+              : isVisualStarter
+              ? TeamMembershipStatus.starter
+              : TeamMembershipStatus.bench;
+
+          return TeamFormationEntry(
+            playerId: membership.playerId,
+            guestPlayerId: membership.guestPlayerId,
+            role: membership.role,
+            status: status,
+            availability: membership.availability,
+            displayName: member.displayName,
+            position: member.position,
+            slotId: slot?.id,
+            slotRole: slot?.role.name,
+            lineIndex: slot?.lineIndex,
+            slotIndex: slot?.slotIndex,
+            slotX: slot?.x,
+            slotY: slot?.y,
+          );
+        })
+        .toList(growable: false);
+  }
+
   List<LineupPlayer> get allVisualPlayers {
     return rosterMembers
-        .where((member) => member.membership.status != TeamMembershipStatus.inactive)
+        .where(
+          (member) => member.membership.status != TeamMembershipStatus.inactive,
+        )
         .map(_toLineupPlayer)
         .toList();
   }
 
+  String? get selectedVisualPlayerKey =>
+      selectedVisualPayload.value?.player.key;
+
+  String? get selectedVisualPlayerName =>
+      selectedVisualPayload.value?.player.name;
+
+  bool get selectedVisualPlayerCanMoveToBench =>
+      selectedVisualPayload.value?.sourceSlotId != null;
+
+  void selectVisualPlayer(LineupPlayer player, {String? sourceSlotId}) {
+    if (!canManageRoster) return;
+    final current = selectedVisualPayload.value;
+    if (current?.player.key == player.key &&
+        current?.sourceSlotId == sourceSlotId) {
+      selectedVisualPayload.value = null;
+      return;
+    }
+    selectedVisualPayload.value = LineupDragPayload(
+      player: player,
+      sourceSlotId: sourceSlotId,
+    );
+  }
+
+  bool moveSelectedVisualPlayerToSlot(FormationSlot targetSlot) {
+    final payload = selectedVisualPayload.value;
+    if (!canManageRoster || payload == null) return false;
+    if (payload.sourceSlotId == targetSlot.id) {
+      selectedVisualPayload.value = null;
+      return true;
+    }
+    dropPlayerOnVisualSlot(targetSlot, payload);
+    selectedVisualPayload.value = null;
+    return true;
+  }
+
+  bool moveSelectedVisualPlayerToBench() {
+    final payload = selectedVisualPayload.value;
+    if (!canManageRoster || payload == null || payload.fromBench) {
+      return false;
+    }
+    movePlayerToVisualBench(payload.player);
+    selectedVisualPayload.value = null;
+    return true;
+  }
+
   void _refreshVisualBench() {
+    visualBench.assignAll(_playersOutsideVisualPitch());
+  }
+
+  List<LineupPlayer> _playersOutsideVisualPitch() {
     final onPitch = visualSlots
         .map((slot) => slot.occupantKey)
         .whereType<String>()
         .toSet();
-    final bench = allVisualPlayers
+    return allVisualPlayers
         .where((player) => !onPitch.contains(player.key))
         .toList();
-    visualBench.assignAll(bench);
   }
 
   void initVisualLineup() {
     isLineupDirty.value = false;
-    
+    selectedVisualPayload.value = null;
+
+    final restored = _tryRestoreVisualLineupFromState(_currentLineupState);
+    if (restored) {
+      return;
+    }
+
     final starters = rosterMembers
-        .where((member) => member.membership.status == TeamMembershipStatus.starter)
+        .where(
+          (member) => member.membership.status == TeamMembershipStatus.starter,
+        )
         .map(_toLineupPlayer)
         .toList();
 
@@ -604,34 +730,132 @@ class TeamRosterController extends GetxController {
     _refreshVisualBench();
   }
 
+  bool _tryRestoreVisualLineupFromState(TeamFormationTemplate? state) {
+    if (state == null) return false;
+
+    final playersByMemberKey = _lineupPlayersByMemberKey();
+    final starters = state.entries
+        .where((entry) => entry.status == TeamMembershipStatus.starter)
+        .where((entry) => entry.hasSlotAssignment)
+        .where((entry) => playersByMemberKey.containsKey(entry.memberKey))
+        .toList(growable: false);
+    final rawFormation = state.formationLabel?.trim() ?? '';
+    final inferredFormation = _formationCodeFromEntries(starters);
+    final rawFormationCount = getTotalPlayersForFormation(rawFormation);
+    final hasValidSavedFormation =
+        rawFormationCount >= 5 && rawFormationCount <= 11;
+    final effectiveFormation = hasValidSavedFormation
+        ? rawFormation
+        : inferredFormation;
+    final countFromLabel = getTotalPlayersForFormation(effectiveFormation);
+    if (effectiveFormation.isEmpty ||
+        countFromLabel < 5 ||
+        countFromLabel > 11) {
+      return false;
+    }
+    final count = normalizeMatchTeamSize(countFromLabel);
+    final code = isValidFormationForPlayerCount(count, effectiveFormation)
+        ? effectiveFormation
+        : getDefaultFormation(count);
+    final generated = FormationEngine.generateFormationSlots(
+      playerCount: count,
+      formationCode: code,
+    );
+    final slotMap = {for (final slot in generated) slot.id: slot.clearPlayer()};
+
+    for (final entry in starters) {
+      final slotId = entry.slotId;
+      final slot = slotId == null ? null : slotMap[slotId];
+      final player = playersByMemberKey[entry.memberKey];
+      if (slot == null || player == null) continue;
+      slotMap[slotId!] = slot
+          .copyWith(
+            role: _parseSlotRole(entry.slotRole) ?? slot.role,
+            lineIndex: entry.lineIndex ?? slot.lineIndex,
+            slotIndex: entry.slotIndex ?? slot.slotIndex,
+            x: entry.slotX ?? slot.x,
+            y: entry.slotY ?? slot.y,
+          )
+          .assignPlayer(player);
+    }
+
+    final restoredSlots = slotMap.values.toList(growable: false);
+
+    visualPlayerCount.value = count;
+    visualFormationCode.value = code;
+    visualSlots.assignAll(restoredSlots);
+    _refreshVisualBench();
+    return true;
+  }
+
+  String _formationCodeFromEntries(List<TeamFormationEntry> entries) {
+    final lineCounts = <int, int>{};
+    for (final entry in entries) {
+      final lineIndex = entry.lineIndex;
+      if (lineIndex == null || _parseSlotRole(entry.slotRole) == SlotRole.gk) {
+        continue;
+      }
+      lineCounts[lineIndex] = (lineCounts[lineIndex] ?? 0) + 1;
+    }
+    if (lineCounts.isEmpty) return '';
+    final indexes = lineCounts.keys.toList()..sort();
+    return indexes.map((index) => '${lineCounts[index]}').join('-');
+  }
+
   void changeVisualPlayerCount(int count) {
     if (!canManageRoster) return;
     final nextCount = clampSupportedPlayerCount(count);
+    if (nextCount == visualPlayerCount.value) return;
+    final isExpanding = nextCount > visualPlayerCount.value;
+    final promotionCandidates = isExpanding
+        ? _playersOutsideVisualPitch()
+        : const <LineupPlayer>[];
     visualPlayerCount.value = nextCount;
     if (!isValidFormationForPlayerCount(nextCount, visualFormationCode.value)) {
       visualFormationCode.value = getDefaultFormation(nextCount);
     }
-    
+
     final generated = FormationEngine.generateFormationSlots(
       playerCount: nextCount,
       formationCode: visualFormationCode.value,
     );
-    
+
     final result = LineupUtils.preserveAssignments(
       oldSlots: visualSlots,
       newSlots: generated,
       playersByKey: {for (final p in allVisualPlayers) p.key: p},
     );
-    
-    visualSlots.assignAll(result.slots);
+
+    final resizedSlots = promotionCandidates.isEmpty
+        ? result.slots
+        : _fillVacantVisualSlots(result.slots, promotionCandidates);
+    visualSlots.assignAll(resizedSlots);
     _refreshVisualBench();
     isLineupDirty.value = true;
+    selectedVisualPayload.value = null;
+  }
+
+  List<FormationSlot> _fillVacantVisualSlots(
+    List<FormationSlot> slots,
+    List<LineupPlayer> candidates,
+  ) {
+    final vacantSlots = slots.where((slot) => slot.isEmpty).toList();
+    final filledVacancies = LineupUtils.assignPlayersToGeneratedSlots(
+      slots: vacantSlots,
+      starters: candidates,
+    );
+    final vacanciesById = {
+      for (final slot in filledVacancies.slots) slot.id: slot,
+    };
+    return slots.map((slot) => vacanciesById[slot.id] ?? slot).toList();
   }
 
   void changeVisualFormation(String code) {
-    if (!canManageRoster || !isValidFormationForPlayerCount(visualPlayerCount.value, code)) {
+    if (!canManageRoster ||
+        !isValidFormationForPlayerCount(visualPlayerCount.value, code)) {
       return;
     }
+    if (code == visualFormationCode.value) return;
     visualFormationCode.value = code;
     final generated = FormationEngine.generateFormationSlots(
       playerCount: visualPlayerCount.value,
@@ -645,6 +869,7 @@ class TeamRosterController extends GetxController {
     visualSlots.assignAll(result.slots);
     _refreshVisualBench();
     isLineupDirty.value = true;
+    selectedVisualPayload.value = null;
   }
 
   void resetVisualLayout() {
@@ -664,6 +889,7 @@ class TeamRosterController extends GetxController {
     visualSlots.assignAll(result.slots);
     _refreshVisualBench();
     isLineupDirty.value = true;
+    selectedVisualPayload.value = null;
   }
 
   void assignPlayerToVisualSlot(LineupPlayer player, FormationSlot slot) {
@@ -677,57 +903,24 @@ class TeamRosterController extends GetxController {
     );
     _refreshVisualBench();
     isLineupDirty.value = true;
+    selectedVisualPayload.value = null;
   }
 
-  void dropPlayerOnVisualSlot(FormationSlot targetSlot, LineupPlayer draggedPlayer) {
+  void dropPlayerOnVisualSlot(
+    FormationSlot targetSlot,
+    LineupDragPayload payload,
+  ) {
     if (!canManageRoster) return;
-    final currentSlots = visualSlots.toList(growable: false);
-    final draggedKey = draggedPlayer.key;
-    final sourceIndex = currentSlots.indexWhere(
-      (slot) => slot.occupantKey == draggedKey,
+    _assignUniqueVisualSlots(
+      LineupUtils.movePlayerToSlot(
+        slots: visualSlots,
+        payload: payload,
+        targetSlotId: targetSlot.id,
+      ),
     );
-    final targetIndex = currentSlots.indexWhere(
-      (slot) => slot.id == targetSlot.id,
-    );
-    if (targetIndex == -1 || sourceIndex == targetIndex) {
-      return;
-    }
-
-    final updatedSlots = currentSlots.toList(growable: true);
-    final oldTargetSlot = updatedSlots[targetIndex];
-
-    if (sourceIndex == -1) {
-      updatedSlots[targetIndex] = oldTargetSlot.assignPlayer(draggedPlayer);
-      _assignUniqueVisualSlots(updatedSlots);
-      _refreshVisualBench();
-      isLineupDirty.value = true;
-      return;
-    }
-
-    final oldSourceSlot = updatedSlots[sourceIndex];
-    if (oldTargetSlot.isEmpty) {
-      updatedSlots[sourceIndex] = oldSourceSlot.clearPlayer();
-      updatedSlots[targetIndex] = oldTargetSlot.assignPlayer(draggedPlayer);
-      _assignUniqueVisualSlots(updatedSlots);
-      _refreshVisualBench();
-      isLineupDirty.value = true;
-      return;
-    }
-
-    final targetPlayerId = oldTargetSlot.playerId;
-    final targetGuestPlayerId = oldTargetSlot.guestPlayerId;
-    final targetMatchSidePlayerId = oldTargetSlot.matchSidePlayerId;
-    final targetIsCaptain = oldTargetSlot.isCaptain;
-    updatedSlots[targetIndex] = oldTargetSlot.assignPlayer(draggedPlayer);
-    updatedSlots[sourceIndex] = oldSourceSlot.copyWith(
-      playerId: targetPlayerId,
-      guestPlayerId: targetGuestPlayerId,
-      matchSidePlayerId: targetMatchSidePlayerId,
-      isCaptain: targetIsCaptain,
-    );
-    _assignUniqueVisualSlots(updatedSlots);
     _refreshVisualBench();
     isLineupDirty.value = true;
+    selectedVisualPayload.value = null;
   }
 
   void _assignUniqueVisualSlots(List<FormationSlot> updatedSlots) {
@@ -757,5 +950,6 @@ class TeamRosterController extends GetxController {
     );
     _refreshVisualBench();
     isLineupDirty.value = true;
+    selectedVisualPayload.value = null;
   }
 }

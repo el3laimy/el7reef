@@ -6,13 +6,18 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/constants/feature_flags.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/enums/tournament_enums.dart';
+import '../../../core/widgets/el7reef_brand_mark.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../core/widgets/rank_tier_badge.dart';
 import '../../../core/widgets/loading_shimmer.dart';
+import '../../../core/widgets/section_state_card.dart';
 import '../../../core/auth/auth_service.dart';
+import '../../../domain/entities/tournament.dart';
 import '../../match/views/match_discover_screen.dart';
 import '../../match/controllers/match_controller.dart';
 import '../../tournament/views/tournament_list_screen.dart';
+import '../../tournament/controllers/tournament_controller.dart';
 import '../../profile/views/profile_screen.dart';
 import '../../team/views/my_teams_screen.dart';
 import '../../social/widgets/activity_feed_widget.dart';
@@ -84,17 +89,14 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _currentIndex,
         children: [for (final destination in _destinations) destination.page],
       ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          border: Border(
-            top: BorderSide(color: AppColors.surfaceBorder, width: 0.5),
-          ),
-        ),
+      bottomNavigationBar: El7reefGlassSurface(
+        variant: El7reefGlassVariant.sheet,
+        padding: EdgeInsets.zero,
+        borderRadius: BorderRadius.zero,
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
           onTap: (index) => setState(() => _currentIndex = index),
-          backgroundColor: AppColors.surface,
+          backgroundColor: Colors.transparent,
           selectedItemColor: AppColors.primary,
           unselectedItemColor: AppColors.textMuted,
           type: BottomNavigationBarType.fixed,
@@ -212,15 +214,7 @@ class _HomeTab extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.asset(
-                                  'assets/images/logo_icon.png',
-                                  height: 36,
-                                  width: 36,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
+                              const El7reefBrandMark(size: 36),
                               const SizedBox(height: AppDimensions.sm),
                               Text(
                                 'أهلاً ${player?.name ?? 'يا حريف'} 👋',
@@ -259,15 +253,31 @@ class _HomeTab extends StatelessWidget {
                   ),
                 ),
 
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimensions.pagePadding,
+                    ),
+                    child: _NextActionHero(
+                      onNavigateToDestination: onNavigateToDestination,
+                    ).animate().fadeIn(duration: 320.ms).slideY(begin: 0.06),
+                  ),
+                ),
+
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: AppDimensions.md),
+                ),
+
                 if (player != null)
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppDimensions.pagePadding,
                       ),
-                      child: GlassmorphicContainer(
+                      child: El7reefGlassSurface(
+                        variant: El7reefGlassVariant.base,
                         padding: const EdgeInsets.all(AppDimensions.lg),
-                        borderRadius: AppDimensions.radiusLg,
+                        radius: AppDimensions.radiusLg,
                         child: Row(
                           children: [
                             Column(
@@ -325,7 +335,7 @@ class _HomeTab extends StatelessWidget {
                         Row(
                           children: [
                             _actionCard(
-                              '⚽',
+                              Icons.sports_soccer_rounded,
                               'المباريات',
                               AppColors.primary,
                               () => onNavigateToDestination(
@@ -334,7 +344,7 @@ class _HomeTab extends StatelessWidget {
                             ),
                             const SizedBox(width: AppDimensions.md),
                             _actionCard(
-                              '🏆',
+                              Icons.emoji_events_rounded,
                               'البطولات',
                               AppColors.secondary,
                               () => onNavigateToDestination(
@@ -343,7 +353,7 @@ class _HomeTab extends StatelessWidget {
                             ),
                             const SizedBox(width: AppDimensions.md),
                             _actionCard(
-                              '👥',
+                              Icons.groups_rounded,
                               'فرقي',
                               AppColors.accent,
                               () => onNavigateToDestination(
@@ -404,6 +414,7 @@ class _HomeTab extends StatelessWidget {
                   child: Obx(() {
                     final matchCtrl = Get.find<MatchController>();
                     final liveMatches = matchCtrl.liveMatches;
+                    final liveError = matchCtrl.liveMatchesErrorMessage.value;
 
                     if (matchCtrl.isLoading.value && liveMatches.isEmpty) {
                       return Padding(
@@ -414,14 +425,26 @@ class _HomeTab extends StatelessWidget {
                       );
                     }
 
+                    if (liveError.isNotEmpty && liveMatches.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppDimensions.pagePadding,
+                        ),
+                        child: SectionStateCard.error(
+                          message: liveError,
+                          onAction: matchCtrl.loadLiveMatches,
+                        ).animate().fadeIn(delay: 600.ms),
+                      );
+                    }
+
                     if (liveMatches.isEmpty) {
                       return Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppDimensions.pagePadding,
                         ),
-                        child: GlassmorphicContainer(
+                        child: El7reefGlassSurface(
+                          variant: El7reefGlassVariant.base,
                           padding: const EdgeInsets.all(AppDimensions.lg),
-                          borderRadius: AppDimensions.radiusLg,
                           child: Row(
                             children: [
                               const Text('⚽', style: TextStyle(fontSize: 32)),
@@ -494,6 +517,8 @@ class _HomeTab extends StatelessWidget {
                   child: Obx(() {
                     final matchCtrl = Get.find<MatchController>();
                     final myMatches = matchCtrl.myMatches;
+                    final myMatchesError =
+                        matchCtrl.myMatchesErrorMessage.value;
 
                     if (matchCtrl.isLoading.value && myMatches.isEmpty) {
                       return Padding(
@@ -504,14 +529,26 @@ class _HomeTab extends StatelessWidget {
                       );
                     }
 
+                    if (myMatchesError.isNotEmpty && myMatches.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppDimensions.pagePadding,
+                        ),
+                        child: SectionStateCard.error(
+                          message: myMatchesError,
+                          onAction: matchCtrl.loadMyMatches,
+                        ).animate().fadeIn(delay: 700.ms),
+                      );
+                    }
+
                     if (myMatches.isEmpty) {
                       return Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppDimensions.pagePadding,
                         ),
-                        child: GlassmorphicContainer(
+                        child: El7reefGlassSurface(
+                          variant: El7reefGlassVariant.base,
                           padding: const EdgeInsets.all(AppDimensions.lg),
-                          borderRadius: AppDimensions.radiusLg,
                           child: Row(
                             children: [
                               const Text('📋', style: TextStyle(fontSize: 32)),
@@ -583,7 +620,7 @@ class _HomeTab extends StatelessWidget {
   }
 
   Widget _actionCard(
-    String emoji,
+    IconData icon,
     String label,
     Color color,
     VoidCallback onTap,
@@ -600,7 +637,7 @@ class _HomeTab extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Text(emoji, style: const TextStyle(fontSize: 28)),
+              Icon(icon, color: color, size: 28),
               const SizedBox(height: 6),
               Text(
                 label,
@@ -613,4 +650,182 @@ class _HomeTab extends StatelessWidget {
       ),
     );
   }
+}
+
+class _NextActionHero extends StatelessWidget {
+  final void Function(_HomeDestinationKey key) onNavigateToDestination;
+
+  const _NextActionHero({required this.onNavigateToDestination});
+
+  @override
+  Widget build(BuildContext context) {
+    final authService = Get.find<AuthService>();
+    final tournamentController = Get.isRegistered<TournamentController>()
+        ? Get.find<TournamentController>()
+        : null;
+
+    return Obx(() {
+      final player = authService.currentPlayer.value;
+      final myTournaments = tournamentController?.myTournaments ?? const [];
+      final liveOrganized = tournamentController?.myOrganizedTournaments
+          .where(_isPlayableTournament)
+          .toList(growable: false);
+      final liveParticipating = tournamentController?.myParticipatingTournaments
+          .where(_isPlayableTournament)
+          .toList(growable: false);
+
+      final spec = _resolveNextAction(
+        hasPlayer: player != null,
+        organized: liveOrganized ?? const [],
+        participating: liveParticipating ?? const [],
+        anyTournamentCount: myTournaments.length,
+        onNavigateToDestination: onNavigateToDestination,
+      );
+
+      return El7reefGlassSurface(
+        variant: spec.variant,
+        padding: const EdgeInsets.all(AppDimensions.lg),
+        radius: AppDimensions.radiusXl,
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: spec.accentColor.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+                border: Border.all(
+                  color: spec.accentColor.withValues(alpha: 0.28),
+                ),
+              ),
+              child: Icon(spec.icon, color: spec.accentColor, size: 28),
+            ),
+            const SizedBox(width: AppDimensions.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(spec.title, style: AppTextStyles.titleMedium),
+                  const SizedBox(height: 4),
+                  Text(
+                    spec.subtitle,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSecondaryTinted,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppDimensions.sm),
+            IconButton.filled(
+              tooltip: spec.tooltip,
+              onPressed: spec.onTap,
+              style: IconButton.styleFrom(
+                backgroundColor: spec.accentColor,
+                foregroundColor: AppColors.textOnPrimary,
+                fixedSize: const Size(44, 44),
+              ),
+              icon: const Icon(Icons.arrow_back_rounded),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  static bool _isPlayableTournament(Tournament tournament) {
+    return tournament.status != TournamentStatus.completed &&
+        tournament.status != TournamentStatus.cancelled;
+  }
+
+  _NextActionSpec _resolveNextAction({
+    required bool hasPlayer,
+    required List<Tournament> organized,
+    required List<Tournament> participating,
+    required int anyTournamentCount,
+    required void Function(_HomeDestinationKey key) onNavigateToDestination,
+  }) {
+    if (!hasPlayer) {
+      return _NextActionSpec(
+        icon: Icons.login_rounded,
+        title: 'ادخل الملعب باسمك',
+        subtitle: 'سجل دخولك عشان بطولاتك وفرقك وكروت الفخر تبقى محفوظة.',
+        tooltip: 'تسجيل الدخول',
+        accentColor: AppColors.primary,
+        variant: El7reefGlassVariant.raised,
+        onTap: () => Get.toNamed(AppRoutes.login),
+      );
+    }
+
+    if (organized.isNotEmpty) {
+      final tournament = organized.first;
+      return _NextActionSpec(
+        icon: Icons.admin_panel_settings_rounded,
+        title: 'كمل تشغيل دورتك',
+        subtitle: tournament.name,
+        tooltip: 'فتح لوحة إدارة البطولة',
+        accentColor: AppColors.secondary,
+        variant: El7reefGlassVariant.pride,
+        onTap: () => Get.toNamed(
+          AppRoutes.organizerDashboardForTournament(tournament.id),
+        ),
+      );
+    }
+
+    if (participating.isNotEmpty) {
+      final tournament = participating.first;
+      return _NextActionSpec(
+        icon: Icons.emoji_events_rounded,
+        title: 'تابع بطولتك الحالية',
+        subtitle: tournament.name,
+        tooltip: 'فتح تفاصيل البطولة',
+        accentColor: AppColors.primary,
+        variant: El7reefGlassVariant.raised,
+        onTap: () => Get.toNamed(AppRoutes.tournamentDetailById(tournament.id)),
+      );
+    }
+
+    if (anyTournamentCount > 0) {
+      return _NextActionSpec(
+        icon: Icons.travel_explore_rounded,
+        title: 'اختار بطولتك التالية',
+        subtitle: 'راجع بطولاتك أو استكشف بطولة مفتوحة تناسب فريقك.',
+        tooltip: 'فتح البطولات',
+        accentColor: AppColors.primary,
+        variant: El7reefGlassVariant.raised,
+        onTap: () => onNavigateToDestination(_HomeDestinationKey.tournaments),
+      );
+    }
+
+    return _NextActionSpec(
+      icon: Icons.add_circle_outline_rounded,
+      title: 'ابدأ دورة شعبية',
+      subtitle: 'ضيف فرق مسجلة أو ضيوف، وبعد أول نتيجة تظهر كروت الفخر.',
+      tooltip: 'فتح البطولات',
+      accentColor: AppColors.secondary,
+      variant: El7reefGlassVariant.pride,
+      onTap: () => onNavigateToDestination(_HomeDestinationKey.tournaments),
+    );
+  }
+}
+
+class _NextActionSpec {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String tooltip;
+  final Color accentColor;
+  final El7reefGlassVariant variant;
+  final VoidCallback onTap;
+
+  const _NextActionSpec({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.tooltip,
+    required this.accentColor,
+    required this.variant,
+    required this.onTap,
+  });
 }

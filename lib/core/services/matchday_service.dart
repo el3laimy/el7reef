@@ -8,6 +8,7 @@ import '../../core/enums/match_status.dart';
 import '../../core/enums/team_member_availability.dart';
 import '../../core/enums/team_membership_role.dart';
 import '../../core/enums/team_membership_status.dart';
+import '../../core/enums/tournament_ops_enums.dart';
 import '../../core/enums/tournament_registration_status.dart';
 import '../../core/lineup/formation_library.dart';
 import '../../core/lineup/lineup_types.dart';
@@ -24,6 +25,7 @@ import '../../data/models/player_model.dart';
 import '../../data/models/team_membership_model.dart';
 import '../../data/models/team_model.dart';
 import '../../data/models/tournament_model.dart';
+import '../../data/models/tournament_participant_model.dart';
 import '../../data/models/tournament_registration_model.dart';
 import '../../domain/entities/guest_player.dart';
 import '../../domain/entities/guest_team.dart';
@@ -39,8 +41,10 @@ import '../../domain/entities/player.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/entities/team_membership.dart';
 import '../../domain/entities/tournament.dart';
+import '../../domain/entities/tournament_participant.dart';
 import '../../domain/entities/tournament_registration.dart';
 import 'team_roster_policy.dart';
+import 'tournament_fixture_service.dart';
 
 part 'matchday_service_base.dart';
 part 'matchday_check_in.dart';
@@ -109,26 +113,38 @@ class MatchdayService {
   final _MatchdayCheckInService _checkIn;
   final _MatchdayLineupService _lineup;
   final _MatchdaySubstitutionService _substitution;
+  final TournamentFixtureService _tournamentFixtures;
 
   MatchdayService({
     FirebaseFirestore? firestore,
     TeamRosterPolicy? teamRosterPolicy,
     Uuid? uuid,
   }) : _checkIn = _MatchdayCheckInService(
-          firestore: firestore,
-          teamRosterPolicy: teamRosterPolicy,
-          uuid: uuid,
-        ),
-        _lineup = _MatchdayLineupService(
-          firestore: firestore,
-          teamRosterPolicy: teamRosterPolicy,
-          uuid: uuid,
-        ),
-        _substitution = _MatchdaySubstitutionService(
-          firestore: firestore,
-          teamRosterPolicy: teamRosterPolicy,
-          uuid: uuid,
-        );
+         firestore: firestore,
+         teamRosterPolicy: teamRosterPolicy,
+         uuid: uuid,
+       ),
+       _lineup = _MatchdayLineupService(
+         firestore: firestore,
+         teamRosterPolicy: teamRosterPolicy,
+         uuid: uuid,
+       ),
+       _substitution = _MatchdaySubstitutionService(
+         firestore: firestore,
+         teamRosterPolicy: teamRosterPolicy,
+         uuid: uuid,
+       ),
+       _tournamentFixtures = TournamentFixtureService(firestore: firestore);
+
+  Future<Match> startTournamentMatch({
+    required String matchId,
+    required String actorId,
+    DateTime? now,
+  }) => _tournamentFixtures.startMatch(
+    matchId: matchId,
+    actorId: actorId,
+    now: now,
+  );
 
   Future<MatchdayCheckInResult> checkInRegisteredTeam({
     required String matchId,
@@ -137,15 +153,14 @@ class MatchdayService {
     Map<String, MatchAttendanceStatus> membershipStatuses = const {},
     String? notes,
     DateTime? now,
-  }) =>
-      _checkIn.checkInRegisteredTeam(
-        matchId: matchId,
-        teamId: teamId,
-        actorId: actorId,
-        membershipStatuses: membershipStatuses,
-        notes: notes,
-        now: now,
-      );
+  }) => _checkIn.checkInRegisteredTeam(
+    matchId: matchId,
+    teamId: teamId,
+    actorId: actorId,
+    membershipStatuses: membershipStatuses,
+    notes: notes,
+    now: now,
+  );
 
   Future<MatchdayCheckInResult> checkInGuestTeam({
     required String matchId,
@@ -154,15 +169,14 @@ class MatchdayService {
     required Map<String, MatchAttendanceStatus> guestPlayerStatuses,
     String? notes,
     DateTime? now,
-  }) =>
-      _checkIn.checkInGuestTeam(
-        matchId: matchId,
-        guestTeamId: guestTeamId,
-        actorId: actorId,
-        guestPlayerStatuses: guestPlayerStatuses,
-        notes: notes,
-        now: now,
-      );
+  }) => _checkIn.checkInGuestTeam(
+    matchId: matchId,
+    guestTeamId: guestTeamId,
+    actorId: actorId,
+    guestPlayerStatuses: guestPlayerStatuses,
+    notes: notes,
+    now: now,
+  );
 
   Future<MatchdayLineupValidationResult> validateRegisteredTeamLineup({
     required String matchId,
@@ -171,15 +185,14 @@ class MatchdayService {
     required List<String> starterMembershipIds,
     List<String> benchMembershipIds = const [],
     bool allowIncompleteFriendlyLineup = false,
-  }) =>
-      _lineup.validateRegisteredTeamLineup(
-        matchId: matchId,
-        teamId: teamId,
-        actorId: actorId,
-        starterMembershipIds: starterMembershipIds,
-        benchMembershipIds: benchMembershipIds,
-        allowIncompleteFriendlyLineup: allowIncompleteFriendlyLineup,
-      );
+  }) => _lineup.validateRegisteredTeamLineup(
+    matchId: matchId,
+    teamId: teamId,
+    actorId: actorId,
+    starterMembershipIds: starterMembershipIds,
+    benchMembershipIds: benchMembershipIds,
+    allowIncompleteFriendlyLineup: allowIncompleteFriendlyLineup,
+  );
 
   Future<MatchdayLineupValidationResult> validateGuestTeamLineup({
     required String matchId,
@@ -188,15 +201,14 @@ class MatchdayService {
     required List<String> starterGuestPlayerIds,
     List<String> benchGuestPlayerIds = const [],
     bool allowIncompleteFriendlyLineup = false,
-  }) =>
-      _lineup.validateGuestTeamLineup(
-        matchId: matchId,
-        guestTeamId: guestTeamId,
-        actorId: actorId,
-        starterGuestPlayerIds: starterGuestPlayerIds,
-        benchGuestPlayerIds: benchGuestPlayerIds,
-        allowIncompleteFriendlyLineup: allowIncompleteFriendlyLineup,
-      );
+  }) => _lineup.validateGuestTeamLineup(
+    matchId: matchId,
+    guestTeamId: guestTeamId,
+    actorId: actorId,
+    starterGuestPlayerIds: starterGuestPlayerIds,
+    benchGuestPlayerIds: benchGuestPlayerIds,
+    allowIncompleteFriendlyLineup: allowIncompleteFriendlyLineup,
+  );
 
   Future<MatchdayLineupLockResult> lockRegisteredTeamLineup({
     required String matchId,
@@ -210,20 +222,19 @@ class MatchdayService {
     String? notes,
     List<SlotAssignment> slotAssignments = const [],
     DateTime? now,
-  }) =>
-      _lineup.lockRegisteredTeamLineup(
-        matchId: matchId,
-        teamId: teamId,
-        actorId: actorId,
-        starterMembershipIds: starterMembershipIds,
-        benchMembershipIds: benchMembershipIds,
-        allowIncompleteFriendlyLineup: allowIncompleteFriendlyLineup,
-        formationCode: formationCode,
-        formationLabel: formationLabel,
-        notes: notes,
-        slotAssignments: slotAssignments,
-        now: now,
-      );
+  }) => _lineup.lockRegisteredTeamLineup(
+    matchId: matchId,
+    teamId: teamId,
+    actorId: actorId,
+    starterMembershipIds: starterMembershipIds,
+    benchMembershipIds: benchMembershipIds,
+    allowIncompleteFriendlyLineup: allowIncompleteFriendlyLineup,
+    formationCode: formationCode,
+    formationLabel: formationLabel,
+    notes: notes,
+    slotAssignments: slotAssignments,
+    now: now,
+  );
 
   Future<MatchdayLineupLockResult> lockGuestTeamLineup({
     required String matchId,
@@ -237,20 +248,19 @@ class MatchdayService {
     String? notes,
     List<SlotAssignment> slotAssignments = const [],
     DateTime? now,
-  }) =>
-      _lineup.lockGuestTeamLineup(
-        matchId: matchId,
-        guestTeamId: guestTeamId,
-        actorId: actorId,
-        starterGuestPlayerIds: starterGuestPlayerIds,
-        benchGuestPlayerIds: benchGuestPlayerIds,
-        allowIncompleteFriendlyLineup: allowIncompleteFriendlyLineup,
-        formationCode: formationCode,
-        formationLabel: formationLabel,
-        notes: notes,
-        slotAssignments: slotAssignments,
-        now: now,
-      );
+  }) => _lineup.lockGuestTeamLineup(
+    matchId: matchId,
+    guestTeamId: guestTeamId,
+    actorId: actorId,
+    starterGuestPlayerIds: starterGuestPlayerIds,
+    benchGuestPlayerIds: benchGuestPlayerIds,
+    allowIncompleteFriendlyLineup: allowIncompleteFriendlyLineup,
+    formationCode: formationCode,
+    formationLabel: formationLabel,
+    notes: notes,
+    slotAssignments: slotAssignments,
+    now: now,
+  );
 
   Future<MatchLineupSnapshot> lockMatchSideLineup({
     required String matchId,
@@ -264,31 +274,29 @@ class MatchdayService {
     String? notes,
     List<SlotAssignment> slotAssignments = const [],
     DateTime? now,
-  }) =>
-      _lineup.lockMatchSideLineup(
-        matchId: matchId,
-        matchSideId: matchSideId,
-        sideKey: sideKey,
-        actorId: actorId,
-        starterMatchSidePlayerIds: starterMatchSidePlayerIds,
-        benchMatchSidePlayerIds: benchMatchSidePlayerIds,
-        formationCode: formationCode,
-        formationLabel: formationLabel,
-        notes: notes,
-        slotAssignments: slotAssignments,
-        now: now,
-      );
+  }) => _lineup.lockMatchSideLineup(
+    matchId: matchId,
+    matchSideId: matchSideId,
+    sideKey: sideKey,
+    actorId: actorId,
+    starterMatchSidePlayerIds: starterMatchSidePlayerIds,
+    benchMatchSidePlayerIds: benchMatchSidePlayerIds,
+    formationCode: formationCode,
+    formationLabel: formationLabel,
+    notes: notes,
+    slotAssignments: slotAssignments,
+    now: now,
+  );
 
   Future<void> unlockLineup({
     required String matchId,
     required String snapshotId,
     required String actorId,
-  }) =>
-      _lineup.unlockLineup(
-        matchId: matchId,
-        snapshotId: snapshotId,
-        actorId: actorId,
-      );
+  }) => _lineup.unlockLineup(
+    matchId: matchId,
+    snapshotId: snapshotId,
+    actorId: actorId,
+  );
 
   Future<MatchdaySubstitutionResult> recordRegisteredTeamSubstitution({
     required String matchId,
@@ -299,17 +307,16 @@ class MatchdayService {
     required int minute,
     String? notes,
     DateTime? now,
-  }) =>
-      _substitution.recordRegisteredTeamSubstitution(
-        matchId: matchId,
-        teamId: teamId,
-        actorId: actorId,
-        outgoingAttendanceId: outgoingAttendanceId,
-        incomingAttendanceId: incomingAttendanceId,
-        minute: minute,
-        notes: notes,
-        now: now,
-      );
+  }) => _substitution.recordRegisteredTeamSubstitution(
+    matchId: matchId,
+    teamId: teamId,
+    actorId: actorId,
+    outgoingAttendanceId: outgoingAttendanceId,
+    incomingAttendanceId: incomingAttendanceId,
+    minute: minute,
+    notes: notes,
+    now: now,
+  );
 
   Future<MatchdaySubstitutionResult> recordGuestTeamSubstitution({
     required String matchId,
@@ -320,15 +327,14 @@ class MatchdayService {
     required int minute,
     String? notes,
     DateTime? now,
-  }) =>
-      _substitution.recordGuestTeamSubstitution(
-        matchId: matchId,
-        guestTeamId: guestTeamId,
-        actorId: actorId,
-        outgoingAttendanceId: outgoingAttendanceId,
-        incomingAttendanceId: incomingAttendanceId,
-        minute: minute,
-        notes: notes,
-        now: now,
-      );
+  }) => _substitution.recordGuestTeamSubstitution(
+    matchId: matchId,
+    guestTeamId: guestTeamId,
+    actorId: actorId,
+    outgoingAttendanceId: outgoingAttendanceId,
+    incomingAttendanceId: incomingAttendanceId,
+    minute: minute,
+    notes: notes,
+    now: now,
+  );
 }

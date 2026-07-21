@@ -2,5 +2,5 @@
 ///
 /// - [none]: Pickup friendly — no lineup needed.
 /// - [optional]: Friendly with teams — lineup is available but not mandatory.
-/// - [required]: Tournament match — lineup must be locked before kickoff.
+/// - [required]: Explicit competition rule requiring a locked lineup.
 enum LineupRequirement { none, optional, required }

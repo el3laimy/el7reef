@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="referrer" content="no-referrer" />
+    <title>الحريف</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --asphalt: oklch(0.15 0.014 145);
+        --surface: oklch(0.205 0.014 145);
+        --chalk: oklch(0.31 0.014 145);
+        --ink: oklch(0.96 0.01 145);
+        --muted: oklch(0.72 0.018 145);
+        --pitch: oklch(0.81 0.18 142);
+        --pitch-ink: oklch(0.18 0.025 145);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        background: var(--asphalt);
+        color: var(--ink);
+        font-family: Cairo, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(100% - 32px, 440px);
+        margin: 0 auto;
+        padding: 48px 0 32px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 40px;
+        color: var(--pitch);
+        font-size: 0.875rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+      }
+
+      .mark {
+        display: grid;
+        width: 40px;
+        height: 40px;
+        place-items: center;
+        border: 1px solid var(--pitch);
+        border-radius: 12px;
+        color: var(--pitch);
+        font-size: 1.25rem;
+        font-weight: 900;
+      }
+
+      section {
+        border: 1px solid var(--chalk);
+        border-radius: 20px;
+        background: var(--surface);
+        padding: 28px 20px 20px;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--pitch);
+        font-size: 0.75rem;
+        font-weight: 800;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.625rem;
+        font-weight: 800;
+        line-height: 1.35;
+      }
+
+      p {
+        margin: 14px 0 0;
+        color: var(--muted);
+        font-size: 0.98rem;
+        line-height: 1.8;
+      }
+
+      .actions {
+        display: grid;
+        gap: 12px;
+        margin-top: 28px;
+      }
+
+      button {
+        min-height: 48px;
+        border: 1px solid transparent;
+        border-radius: 12px;
+        padding: 12px 16px;
+        font: inherit;
+        font-weight: 800;
+        cursor: pointer;
+      }
+
+      .primary {
+        background: var(--pitch);
+        color: var(--pitch-ink);
+      }
+
+      .secondary {
+        border-color: var(--pitch);
+        background: transparent;
+        color: var(--pitch);
+      }
+
+      button:focus-visible {
+        outline: 3px solid oklch(0.9 0.12 142 / 0.72);
+        outline-offset: 3px;
+      }
+
+      .status {
+        min-height: 24px;
+        margin-top: 16px;
+        color: var(--muted);
+        font-size: 0.875rem;
+      }
+
+      .hint {
+        margin-top: 24px;
+        font-size: 0.875rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="brand" aria-label="الحريف">
+        <span class="mark" aria-hidden="true">ح</span>
+        <span>EL7REEF</span>
+      </div>
+      <section aria-labelledby="page-title">
+        <p class="eyebrow" id="eyebrow">رابط الحريف</p>
+        <h1 id="page-title">افتح الرابط من تطبيق الحريف</h1>
+        <p id="description">
+          افتح التطبيق لإكمال خطوتك داخل البطولة بشكل آمن.
+        </p>
+        <div class="actions">
+          <button class="primary" id="open-app" type="button">فتح التطبيق</button>
+          <button class="secondary" id="copy-link" type="button">نسخ الرابط</button>
+        </div>
+        <p class="status" id="status" aria-live="polite"></p>
+        <p class="hint" id="hint">
+          لو التطبيق غير مثبت، اطلب نسخة الاختبار من منظم البطولة ثم افتح نفس الرابط.
+        </p>
+      </section>
+    </main>
+    <script>
+      const claimSafeKeys = new Set([
+        "v",
+        "code",
+        "type",
+        "targetId",
+        "scope",
+        "requiresApproval",
+        "expiresAt",
+        "status",
+        "teamId",
+        "tournamentId",
+        "shareCardType",
+        "shareEntityType",
+        "shareEntityId",
+        "shareTournamentId",
+        "shareMatchId",
+        "shareCampaignSource",
+        "shareSchemaVersion",
+      ]);
+      const pathSegments = window.location.pathname.split("/").filter(Boolean);
+      const entry = pathSegments[0] || "";
+      const validId = (value) => /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value);
+      const safeClaimParameters = new URLSearchParams();
+
+      for (const [key, value] of new URLSearchParams(window.location.search)) {
+        if (claimSafeKeys.has(key) && value.trim()) {
+          safeClaimParameters.set(key, value);
+        }
+      }
+
+      const title = document.getElementById("page-title");
+      const description = document.getElementById("description");
+      const eyebrow = document.getElementById("eyebrow");
+      const openAppButton = document.getElementById("open-app");
+      const copyLinkButton = document.getElementById("copy-link");
+      const status = document.getElementById("status");
+      const hint = document.getElementById("hint");
+      let appDestination = null;
+
+      if ((entry === "claim" || entry === "invite") && pathSegments.length === 1) {
+        const label = entry === "claim" ? "استلام مكانك" : "دعوة فريق";
+        eyebrow.textContent = label;
+        title.textContent = entry === "claim"
+          ? "كمّل استلام مكانك من تطبيق الحريف"
+          : "افتح دعوتك من تطبيق الحريف";
+        description.textContent = "الرابط لا يعرض أي بيانات شخصية هنا. افتح التطبيق لإكمال الخطوة.";
+        appDestination = `el7reef://${entry}?${safeClaimParameters.toString()}`;
+      } else if (entry === "match" && pathSegments.length === 2 && validId(pathSegments[1])) {
+        const showLineup = new URLSearchParams(window.location.search).get("view") === "lineup";
+        eyebrow.textContent = showLineup ? "تشكيلة المباراة" : "نتيجة المباراة";
+        title.textContent = showLineup ? "شاهد التشكيلة من تطبيق الحريف" : "شاهد تفاصيل المباراة من تطبيق الحريف";
+        description.textContent = "افتح التطبيق لرؤية النتيجة والتفاصيل الحالية للمباراة.";
+        appDestination = `el7reef://match/${encodeURIComponent(pathSegments[1])}${showLineup ? "?view=lineup" : ""}`;
+      } else if (entry === "tournament" && pathSegments.length === 2 && validId(pathSegments[1])) {
+        eyebrow.textContent = "ترتيب البطولة";
+        title.textContent = "شاهد هدافي البطولة من تطبيق الحريف";
+        description.textContent = "افتح التطبيق لرؤية الترتيب والهدافين والمباريات الحالية.";
+        appDestination = `el7reef://tournament/${encodeURIComponent(pathSegments[1])}`;
+      } else if (
+        entry === "player" &&
+        pathSegments.length === 3 &&
+        (pathSegments[1] === "player" || pathSegments[1] === "guestPlayer") &&
+        validId(pathSegments[2])
+      ) {
+        eyebrow.textContent = "نجم المباراة";
+        title.textContent = "شاهد بطاقة اللاعب من تطبيق الحريف";
+        description.textContent = "افتح التطبيق لعرض هوية اللاعب وإحصاءاته المتاحة.";
+        appDestination = `el7reef://player/${encodeURIComponent(pathSegments[1])}/${encodeURIComponent(pathSegments[2])}`;
+      } else if (
+        entry === "team" &&
+        pathSegments.length === 3 &&
+        (pathSegments[1] === "registeredTeam" || pathSegments[1] === "guestTeam") &&
+        validId(pathSegments[2])
+      ) {
+        eyebrow.textContent = "بطاقة الفريق";
+        title.textContent = "شاهد بطاقة الفريق من تطبيق الحريف";
+        description.textContent = "افتح التطبيق لعرض هوية الفريق ومشاركته داخل البطولة.";
+        appDestination = `el7reef://team/${encodeURIComponent(pathSegments[1])}/${encodeURIComponent(pathSegments[2])}`;
+      } else {
+        eyebrow.textContent = "رابط غير مكتمل";
+        title.textContent = "لا يمكن فتح هذا الرابط داخل التطبيق";
+        description.textContent = "اطلب رابطًا جديدًا من منظم البطولة أو انسخ هذا الرابط للتحقق منه لاحقًا.";
+        openAppButton.hidden = true;
+        hint.hidden = true;
+      }
+
+      openAppButton.addEventListener("click", () => {
+        if (!appDestination) return;
+        window.location.href = appDestination;
+        window.setTimeout(() => {
+          status.textContent = "لو التطبيق لم يفتح، ثبّت نسخة الاختبار ثم أعد فتح نفس الرابط.";
+        }, 900);
+      });
+
+      copyLinkButton.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(window.location.href);
+          status.textContent = "تم نسخ الرابط.";
+        } catch (_) {
+          const textarea = document.createElement("textarea");
+          textarea.value = window.location.href;
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand("copy");
+          textarea.remove();
+          status.textContent = "تم نسخ الرابط.";
+        }
+      });
+    </script>
+  </body>
+</html>

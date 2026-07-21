@@ -1,11 +1,14 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 
+import 'package:el7reef/app/routes/app_routes.dart';
 import 'package:el7reef/core/constants/firebase_paths.dart';
 import 'package:el7reef/core/enums/match_attendance_status.dart';
 import 'package:el7reef/core/enums/match_status.dart';
+import 'package:el7reef/core/enums/tournament_ops_enums.dart';
 import 'package:el7reef/core/enums/team_member_availability.dart';
 import 'package:el7reef/core/enums/team_membership_role.dart';
 import 'package:el7reef/core/services/match_event_service.dart';
@@ -24,18 +27,21 @@ import 'package:el7reef/data/repositories/match_side_player_repository_impl.dart
 import 'package:el7reef/data/repositories/match_side_repository_impl.dart';
 import 'package:el7reef/data/repositories/team_repository_impl.dart';
 import 'package:el7reef/data/repositories/tournament_assistant_permission_repository_impl.dart';
+import 'package:el7reef/data/repositories/tournament_participant_repository_impl.dart';
 import 'package:el7reef/data/repositories/tournament_repository_impl.dart';
 import 'package:el7reef/domain/entities/guest_player.dart';
 import 'package:el7reef/domain/entities/match.dart';
-import 'package:el7reef/domain/entities/match_event.dart';
 import 'package:el7reef/domain/entities/match_lineup_entry.dart';
 import 'package:el7reef/domain/entities/match_lineup_snapshot.dart';
 import 'package:el7reef/domain/entities/match_participant_roster.dart';
 import 'package:el7reef/domain/entities/match_side_player.dart';
 import 'package:el7reef/domain/entities/participant_ref.dart';
+import 'package:el7reef/domain/entities/penalty_shootout_result.dart';
 import 'package:el7reef/domain/entities/player.dart';
 import 'package:el7reef/domain/entities/player_match_stats.dart';
 import 'package:el7reef/features/match/controllers/score_submit_controller.dart';
+import 'package:el7reef/features/match/models/score_submit_draft.dart';
+import 'package:el7reef/features/match/services/score_submit_draft_store.dart';
 import 'package:el7reef/features/match/views/score_submit_screen.dart';
 
 void main() {
@@ -596,6 +602,157 @@ void main() {
       controller.onClose();
     });
 
+    test('restores a match draft after recreating the controller', () async {
+      await _saveMatch(
+        firestore,
+        _match(
+          id: 'match-local-draft',
+          teamAPlayerIds: const ['player-a'],
+          teamBPlayerIds: const ['player-b'],
+        ),
+      );
+      await _savePlayer(firestore, _player(id: 'player-a', name: 'أحمد'));
+      await _savePlayer(firestore, _player(id: 'player-b', name: 'باسم'));
+      final draftStore = _InMemoryScoreSubmitDraftStore();
+      final firstController = _controller(
+        firestore: firestore,
+        matchId: 'match-local-draft',
+        draftStore: draftStore,
+      );
+      await firstController.loadMatchAndPlayers();
+      firstController.teamAScoreController.text = '5';
+      firstController.teamBScoreController.text = '0';
+      firstController.setParticipantGoals(
+        firstController.teamAParticipants.single,
+        2,
+      );
+      firstController.selectMvp(
+        firstController.participantKey(
+          firstController.teamAParticipants.single,
+        ),
+      );
+      await firstController.flushDraft();
+      firstController.onClose();
+
+      final restoredController = _controller(
+        firestore: firestore,
+        matchId: 'match-local-draft',
+        draftStore: draftStore,
+      );
+      await restoredController.loadMatchAndPlayers();
+
+      expect(restoredController.restoredDraft.value, isTrue);
+      expect(restoredController.isDirty.value, isTrue);
+      expect(restoredController.teamAScoreController.text, '5');
+      expect(restoredController.teamBScoreController.text, '0');
+      expect(restoredController.totalDraftGoalsForSide('A'), 2);
+      expect(restoredController.teamAGoalSummary.attributedGoals, 2);
+      expect(restoredController.teamAGoalSummary.unattributedGoals, 3);
+      expect(restoredController.selectedMvpSelection?.actor.id, 'player-a');
+      restoredController.onClose();
+    });
+
+    testWidgets('newer match result blocks stale draft submission', (
+      tester,
+    ) async {
+      await _saveMatch(firestore, _match(id: 'match-stale-draft'));
+      final controller = _controller(
+        firestore: firestore,
+        matchId: 'match-stale-draft',
+      );
+      await controller.loadMatchAndPlayers();
+      await tester.pumpWidget(const GetMaterialApp(home: SizedBox()));
+      controller.teamAScoreController.text = '1';
+      controller.teamBScoreController.text = '0';
+
+      await MatchRepositoryImpl(db: firestore).updateMatch(
+        _match(id: 'match-stale-draft').copyWith(
+          status: MatchStatus.completed,
+          scoreTeamA: 4,
+          scoreTeamB: 3,
+          completedAt: now,
+        ),
+      );
+
+      final submitted = await controller.submit();
+      final latest = await MatchRepositoryImpl(
+        db: firestore,
+      ).getMatch('match-stale-draft');
+
+      expect(submitted, isNull);
+      expect(controller.errorMessage.value, contains('تغيّرت نتيجة المباراة'));
+      expect(latest?.scoreTeamA, 4);
+      expect(latest?.scoreTeamB, 3);
+      await _drainSnackbars(tester);
+      controller.onClose();
+    });
+
+    testWidgets(
+      'source refresh failure keeps the score retryable without settling it',
+      (tester) async {
+        await tester.pumpWidget(const GetMaterialApp(home: SizedBox()));
+        await _saveMatch(firestore, _match(id: 'match-refresh-failure'));
+        final matchRepository = _ControllableMatchRepository(firestore);
+        final controller = _controller(
+          firestore: firestore,
+          matchId: 'match-refresh-failure',
+          matchRepository: matchRepository,
+        );
+        await controller.loadMatchAndPlayers();
+        controller.teamAScoreController.text = '2';
+        controller.teamBScoreController.text = '1';
+        matchRepository.failReads = true;
+
+        final failedSubmission = await controller.submit();
+        final matchAfterFailure = await firestore
+            .collection(FirebasePaths.matches)
+            .doc('match-refresh-failure')
+            .get();
+
+        expect(failedSubmission, isNull);
+        expect(controller.isLoading.value, isFalse);
+        expect(controller.errorMessage.value, contains('حاول مرة أخرى'));
+        expect(matchAfterFailure.data()?['scoreTeamA'], isNull);
+        expect(matchAfterFailure.data()?['scoreTeamB'], isNull);
+
+        matchRepository.failReads = false;
+        final retriedSubmission = await controller.submit();
+
+        expect(retriedSubmission?.scoreTeamA, 2);
+        expect(retriedSubmission?.scoreTeamB, 1);
+        expect(controller.isLoading.value, isFalse);
+        expect(controller.errorMessage.value, isEmpty);
+        await _drainSnackbars(tester);
+        controller.onClose();
+      },
+    );
+
+    testWidgets('successful submission clears the local match draft', (
+      tester,
+    ) async {
+      await _saveMatch(firestore, _match(id: 'match-clear-local-draft'));
+      final draftStore = _InMemoryScoreSubmitDraftStore();
+      final controller = _controller(
+        firestore: firestore,
+        matchId: 'match-clear-local-draft',
+        draftStore: draftStore,
+      );
+      await controller.loadMatchAndPlayers();
+      await tester.pumpWidget(const GetMaterialApp(home: SizedBox()));
+      controller.teamAScoreController.text = '1';
+      controller.teamBScoreController.text = '0';
+      await controller.flushDraft();
+      expect(draftStore.drafts, contains('match-clear-local-draft'));
+
+      final submitted = await controller.submit();
+
+      expect(submitted, isNotNull);
+      expect(draftStore.drafts, isEmpty);
+      expect(controller.isDirty.value, isFalse);
+      await _drainSnackbars(tester);
+      controller.onClose();
+    });
+
     testWidgets('submit with registered goal drafts writes goal MatchEvents', (
       tester,
     ) async {
@@ -794,6 +951,48 @@ void main() {
       },
     );
 
+    test(
+      'tournament score flow resolves guest team participant names',
+      () async {
+        await _saveTournament(firestore, 'tournament-side-names');
+        await _saveTournamentParticipant(
+          firestore,
+          id: 'participant-france',
+          tournamentId: 'tournament-side-names',
+          sourceEntityId: 'guest-team-france',
+          displayName: 'فرنسا (FRA)',
+        );
+        await _saveTournamentParticipant(
+          firestore,
+          id: 'participant-england',
+          tournamentId: 'tournament-side-names',
+          sourceEntityId: 'guest-team-england',
+          displayName: 'إنجلترا (ENG)',
+        );
+        await _saveMatch(
+          firestore,
+          _match(
+            id: 'match-tournament-side-names',
+            tournamentId: 'tournament-side-names',
+            teamAId: 'guest-team-france',
+            teamBId: 'guest-team-england',
+            teamAParticipantId: 'participant-france',
+            teamBParticipantId: 'participant-england',
+          ),
+        );
+        final controller = _controller(
+          firestore: firestore,
+          matchId: 'match-tournament-side-names',
+        );
+
+        await controller.loadMatchAndPlayers();
+
+        expect(controller.teamASideName.value, 'فرنسا (FRA)');
+        expect(controller.teamBSideName.value, 'إنجلترا (ENG)');
+        controller.onClose();
+      },
+    );
+
     testWidgets(
       'submit with temporary match-side goal drafts writes goal MatchEvents',
       (tester) async {
@@ -912,10 +1111,9 @@ void main() {
       expect(controller.teamAGoalSummary.teamScore, 5);
       expect(controller.teamAGoalSummary.attributedGoals, 2);
       expect(controller.teamAGoalSummary.unattributedGoals, 3);
-      expect(find.text('نتيجة الفريق: 5'), findsOneWidget);
-      expect(find.text('الأهداف المنسوبة: 2'), findsOneWidget);
-      expect(find.text('أهداف غير منسوبة: 3'), findsOneWidget);
-      expect(find.text('لن تظهر في الهدافين.'), findsOneWidget);
+      await tester.tap(find.text('التالي: الهدافون'));
+      await tester.pumpAndSettle();
+      expect(find.text('متبقي 3 أهداف غير منسوبة.'), findsOneWidget);
 
       final updatedMatch = await controller.submit();
 
@@ -1165,7 +1363,6 @@ void main() {
       final controller = _controller(
         firestore: firestore,
         matchId: 'match-zero-goals-voids',
-        matchEventService: matchEventService,
       );
       await controller.loadMatchAndPlayers();
       await matchEventService.recordGoal(
@@ -1247,7 +1444,7 @@ void main() {
     });
 
     testWidgets(
-      'event recording failure surfaces safe error and no success sheet',
+      'settlement failure surfaces safe error and no partial score write',
       (tester) async {
         await _saveMatch(
           firestore,
@@ -1262,7 +1459,9 @@ void main() {
         final controller = _controller(
           firestore: firestore,
           matchId: 'match-event-write-failure',
-          matchEventService: _FailingMatchEventService(firestore: firestore),
+          settlementService: _FailingMatchSettlementService(
+            firestore: firestore,
+          ),
         );
         Get.put<ScoreSubmitController>(controller);
         await controller.loadMatchAndPlayers();
@@ -1274,15 +1473,21 @@ void main() {
           const GetMaterialApp(home: ScoreSubmitScreen()),
         );
         await tester.pumpAndSettle();
+        await tester.tap(find.text('التالي: الهدافون'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('التالي: MVP'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('التالي: المراجعة'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('اعتمد النتيجة وجهّز الفخر'));
         await tester.pumpAndSettle();
 
-        expect(controller.errorMessage.value, contains('فشل تسجيل أحداث'));
+        expect(controller.errorMessage.value, contains('فشل حفظ النتيجة'));
         expect(
           controller.errorMessage.value,
-          isNot(contains('event write failed')),
+          isNot(contains('settlement failed')),
         );
-        expect(controller.pendingPrideEventRetry.value, isTrue);
+        expect(controller.pendingPrideEventRetry.value, isFalse);
         expect(find.text('تم تسجيل النتيجة ✅'), findsNothing);
         expect(
           await _activeGoalEvents(firestore, 'match-event-write-failure'),
@@ -1292,8 +1497,8 @@ void main() {
             .collection(FirebasePaths.matches)
             .doc('match-event-write-failure')
             .get();
-        expect(savedMatch.data()?['scoreTeamA'], 1);
-        expect(savedMatch.data()?['prideEventsPending'], isTrue);
+        expect(savedMatch.data()?['scoreTeamA'], isNull);
+        expect(savedMatch.data()?['prideEventsPending'], isFalse);
         await _drainSnackbars(tester);
         await tester.pumpAndSettle();
         controller.onClose();
@@ -1331,7 +1536,7 @@ void main() {
     );
 
     testWidgets(
-      'pending pride retry after reload uses persisted goal payload',
+      'pending pride retry preserves stored penalties for tied knockout',
       (tester) async {
         await tester.pumpWidget(const GetMaterialApp(home: SizedBox.shrink()));
         await _saveMatch(
@@ -1340,8 +1545,11 @@ void main() {
             id: 'match-pride-retry-payload',
             teamAPlayerIds: const ['player-a'],
             teamBPlayerIds: const ['player-b'],
-            scoreTeamA: 1,
-            scoreTeamB: 0,
+            scoreTeamA: 2,
+            scoreTeamB: 2,
+            penaltyScoreTeamA: 5,
+            penaltyScoreTeamB: 4,
+            stageType: TournamentStageType.knockoutStage,
             status: MatchStatus.completed,
             prideEventsPending: true,
           ),
@@ -1356,8 +1564,8 @@ void main() {
             .set({
               'version': 1,
               'matchId': 'match-pride-retry-payload',
-              'scoreTeamA': 1,
-              'scoreTeamB': 0,
+              'scoreTeamA': 2,
+              'scoreTeamB': 2,
               'goals': [
                 {
                   'sideKey': 'A',
@@ -1375,32 +1583,28 @@ void main() {
               'createdBy': 'organizer-1',
               'createdAt': now.millisecondsSinceEpoch,
             });
+        final settlementService = _RetryPenaltyBoundarySettlementService(
+          firestore: firestore,
+          expectedPenaltyShootout: const PenaltyShootoutResult(
+            scoreTeamA: 5,
+            scoreTeamB: 4,
+          ),
+        );
         final controller = _controller(
           firestore: firestore,
           matchId: 'match-pride-retry-payload',
+          settlementService: settlementService,
         );
         await controller.loadMatchAndPlayers();
 
         final updatedMatch = await controller.submit();
 
         expect(updatedMatch, isNotNull);
-        final goals = await _activeGoalEvents(
-          firestore,
-          'match-pride-retry-payload',
-        );
-        expect(goals, hasLength(1));
-        final savedMatch = await firestore
-            .collection(FirebasePaths.matches)
-            .doc('match-pride-retry-payload')
-            .get();
-        expect(savedMatch.data()?['prideEventsPending'], isFalse);
-        final payload = await firestore
-            .collection(FirebasePaths.matches)
-            .doc('match-pride-retry-payload')
-            .collection(PendingPrideEventsService.collectionName)
-            .doc(PendingPrideEventsService.currentDocumentId)
-            .get();
-        expect(payload.exists, isFalse);
+        expect(updatedMatch?.penaltyShootoutResult?.scoreTeamA, 5);
+        expect(updatedMatch?.penaltyShootoutResult?.scoreTeamB, 4);
+        expect(updatedMatch?.resolvedKnockoutDecision, KnockoutDecision.teamA);
+        expect(controller.pendingPrideEventRetry.value, isFalse);
+        expect(controller.errorMessage.value, isEmpty);
         await _drainSnackbars(tester);
         controller.onClose();
       },
@@ -1665,6 +1869,8 @@ void main() {
 
       await tester.pumpWidget(const GetMaterialApp(home: ScoreSubmitScreen()));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('التالي: الهدافون'));
+      await tester.pumpAndSettle();
 
       expect(find.text('ضيف الواجهة'), findsOneWidget);
       expect(find.text('أهداف'), findsOneWidget);
@@ -1685,10 +1891,10 @@ void main() {
         ParticipantRefKind.guestPlayer,
       );
 
-      await tester.drag(find.byType(ListView), const Offset(0, -500));
+      await tester.tap(find.text('التالي: MVP'));
       await tester.pumpAndSettle();
 
-      expect(find.text('أفضل لاعب (MVP)'), findsOneWidget);
+      expect(find.text('اختار نجم المباراة'), findsOneWidget);
       expect(find.text('ضيف الواجهة (ضيف)'), findsOneWidget);
     });
 
@@ -1710,7 +1916,18 @@ void main() {
       Get.put<ScoreSubmitController>(controller);
       await controller.loadMatchAndPlayers();
 
+      expect(
+        controller.emptyScoringParticipantsRouteForSide('A'),
+        AppRoutes.matchLobbyById('match-empty-score-ui'),
+      );
+      expect(
+        controller.emptyScoringParticipantsRouteForSide('B'),
+        AppRoutes.matchLobbyById('match-empty-score-ui'),
+      );
+
       await tester.pumpWidget(const GetMaterialApp(home: ScoreSubmitScreen()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('التالي: الهدافون'));
       await tester.pumpAndSettle();
 
       expect(
@@ -1719,12 +1936,137 @@ void main() {
         ),
         findsNWidgets(2),
       );
+      expect(find.text('إضافة لاعبين للمباراة'), findsNWidgets(2));
       expect(
         find.text(
           'لا يوجد لاعبون مسجلون لهذا الطرف. اللاعبون المؤقتون لا تُسجل لهم إحصائيات.',
         ),
         findsNothing,
       );
+    });
+
+    testWidgets('dirty score draft warns before exit and can be discarded', (
+      tester,
+    ) async {
+      await _saveMatch(firestore, _match(id: 'match-dirty-exit'));
+      final draftStore = _InMemoryScoreSubmitDraftStore();
+      final controller = _controller(
+        firestore: firestore,
+        matchId: 'match-dirty-exit',
+        draftStore: draftStore,
+      );
+      Get.put<ScoreSubmitController>(controller);
+      await controller.loadMatchAndPlayers();
+      await tester.pumpWidget(const GetMaterialApp(home: ScoreSubmitScreen()));
+
+      controller.teamAScoreController.text = '1';
+      await controller.flushDraft();
+      await tester.pump();
+      expect(controller.isDirty.value, isTrue);
+      expect(draftStore.drafts, contains('match-dirty-exit'));
+
+      await tester.tap(find.byTooltip('إغلاق تسجيل النتيجة'));
+      await tester.pumpAndSettle();
+      expect(find.text('تخرج من تسجيل النتيجة؟'), findsOneWidget);
+
+      await tester.tap(find.text('كمّل التسجيل'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ScoreSubmitScreen), findsOneWidget);
+
+      await tester.tap(find.byTooltip('إغلاق تسجيل النتيجة'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('احذف واخرج'));
+      await tester.pumpAndSettle();
+      expect(draftStore.drafts, isEmpty);
+    });
+
+    testWidgets('four score steps fit 360 width at 200 percent text scale', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await _saveMatch(
+        firestore,
+        _match(
+          id: 'match-accessible-steps',
+          teamAPlayerIds: const ['player-access-a'],
+          teamBPlayerIds: const ['player-access-b'],
+        ),
+      );
+      await _savePlayer(
+        firestore,
+        _player(id: 'player-access-a', name: 'عبد الرحمن الحريف الهداف'),
+      );
+      await _savePlayer(
+        firestore,
+        _player(id: 'player-access-b', name: 'محمد أبو زيد حارس الميدان'),
+      );
+      final controller = _controller(
+        firestore: firestore,
+        matchId: 'match-accessible-steps',
+      );
+      Get.put<ScoreSubmitController>(controller);
+      await controller.loadMatchAndPlayers();
+
+      await tester.pumpWidget(
+        const GetMaterialApp(
+          home: MediaQuery(
+            data: MediaQueryData(textScaler: TextScaler.linear(2)),
+            child: ScoreSubmitScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.byType(BackdropFilter), findsNothing);
+
+      await tester.tap(find.text('التالي: الهدافون'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      final incrementTarget = tester.getSize(
+        find.bySemanticsLabel('زيادة القيمة').first,
+      );
+      expect(incrementTarget.width, greaterThanOrEqualTo(48));
+      expect(incrementTarget.height, greaterThanOrEqualTo(48));
+      expect(find.byType(BackdropFilter), findsNothing);
+
+      await tester.tap(find.text('التالي: MVP'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('التالي: المراجعة'));
+      await tester.pumpAndSettle();
+      expect(find.text('راجع قبل الاعتماد'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      controller.onClose();
+    });
+
+    test('empty scorer state routes registered sides to team roster', () async {
+      await _saveMatch(
+        firestore,
+        _match(id: 'match-empty-team-route', teamAId: 'team-alpha'),
+      );
+      final controller = _controller(
+        firestore: firestore,
+        matchId: 'match-empty-team-route',
+      );
+
+      await controller.loadMatchAndPlayers();
+
+      expect(
+        controller.emptyScoringParticipantsRouteForSide('A'),
+        AppRoutes.teamProfileById('team-alpha'),
+      );
+      expect(
+        controller.emptyScoringParticipantsActionLabelForSide('A'),
+        'إدارة قائمة الفريق',
+      );
+      expect(
+        controller.emptyScoringParticipantsRouteForSide('B'),
+        AppRoutes.matchLobbyById('match-empty-team-route'),
+      );
+      controller.onClose();
     });
 
     testWidgets('full roster loading error is visible in score screen', (
@@ -1764,19 +2106,81 @@ void main() {
       );
       controller.onClose();
     });
+
+    testWidgets(
+      'tied knockout stays on score step until penalties pick one winner',
+      (tester) async {
+        await _saveMatch(
+          firestore,
+          _match(
+            id: 'match-knockout-penalties',
+            tournamentId: 'tournament-1',
+            stageType: TournamentStageType.knockoutStage,
+          ),
+        );
+        final settlementService = _RecordingMatchSettlementService(
+          firestore: firestore,
+        );
+        final controller = _controller(
+          firestore: firestore,
+          matchId: 'match-knockout-penalties',
+          settlementService: settlementService,
+        );
+        Get.put<ScoreSubmitController>(controller);
+        await controller.loadMatchAndPlayers();
+
+        await tester.pumpWidget(
+          const GetMaterialApp(home: ScoreSubmitScreen()),
+        );
+        controller.teamAScoreController.text = '2';
+        controller.teamBScoreController.text = '2';
+        await tester.pump();
+
+        expect(find.text('ركلات الترجيح'), findsOneWidget);
+        expect(
+          find.textContaining('لا تُضاف للأهداف أو ترتيب الهدافين'),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.text('التالي: الهدافون'));
+        await tester.pump();
+        expect(controller.currentStepIndex.value, 0);
+
+        controller.teamAPenaltyScoreController.text = '5';
+        controller.teamBPenaltyScoreController.text = '5';
+        await tester.tap(find.text('التالي: الهدافون'));
+        await tester.pump();
+        expect(controller.currentStepIndex.value, 0);
+
+        controller.teamBPenaltyScoreController.text = '4';
+        await tester.tap(find.text('التالي: الهدافون'));
+        await tester.pump();
+        expect(controller.currentStepIndex.value, 1);
+
+        await controller.submit();
+
+        expect(settlementService.lastPenaltyShootout?.scoreTeamA, 5);
+        expect(settlementService.lastPenaltyShootout?.scoreTeamB, 4);
+        expect(controller.teamAGoalSummary.teamScore, 2);
+        expect(controller.teamBGoalSummary.teamScore, 2);
+        await _drainSnackbars(tester);
+        controller.onClose();
+      },
+    );
   });
 }
 
 ScoreSubmitController _controller({
   required FakeFirebaseFirestore firestore,
   required String matchId,
+  MatchRepositoryImpl? matchRepository,
   OfficialMatchRosterService? officialRosterService,
   MatchSettlementService? settlementService,
-  MatchEventService? matchEventService,
+  ScoreSubmitDraftStore? draftStore,
 }) {
   return ScoreSubmitController(
     matchId: matchId,
-    matchRepository: MatchRepositoryImpl(db: firestore),
+    matchRepository: matchRepository ?? MatchRepositoryImpl(db: firestore),
     settlementService:
         settlementService ??
         MatchSettlementService(
@@ -1784,12 +2188,7 @@ ScoreSubmitController _controller({
           tournamentLifecycleService: TournamentLifecycleService(
             firestore: firestore,
           ),
-        ),
-    matchEventService:
-        matchEventService ??
-        MatchEventService(
-          repository: MatchEventRepositoryImpl(firestore: firestore),
-          firestore: firestore,
+          allowLocalFallback: true,
         ),
     officialRosterService:
         officialRosterService ??
@@ -1797,13 +2196,53 @@ ScoreSubmitController _controller({
     sideRepository: MatchSideRepositoryImpl(firestore: firestore),
     sidePlayerRepository: MatchSidePlayerRepositoryImpl(firestore: firestore),
     teamRepository: TeamRepositoryImpl(firestore: firestore),
+    participantRepository: TournamentParticipantRepositoryImpl(
+      firestore: firestore,
+    ),
     tournamentRepository: TournamentRepositoryImpl(firestore: firestore),
     assistantPermissionRepository: TournamentAssistantPermissionRepositoryImpl(
       firestore: firestore,
     ),
     pendingPrideEventsService: PendingPrideEventsService(firestore: firestore),
+    draftStore: draftStore ?? _InMemoryScoreSubmitDraftStore(),
     currentUserIdProvider: () => 'organizer-1',
   );
+}
+
+class _ControllableMatchRepository extends MatchRepositoryImpl {
+  _ControllableMatchRepository(FakeFirebaseFirestore firestore)
+    : super(db: firestore);
+
+  bool failReads = false;
+
+  @override
+  Future<Match?> getMatch(String matchId) {
+    if (failReads) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'unavailable',
+        message: 'network unavailable',
+      );
+    }
+    return super.getMatch(matchId);
+  }
+}
+
+class _InMemoryScoreSubmitDraftStore implements ScoreSubmitDraftStore {
+  final Map<String, ScoreSubmitDraft> drafts = {};
+
+  @override
+  Future<ScoreSubmitDraft?> load(String matchId) async => drafts[matchId];
+
+  @override
+  Future<void> save(ScoreSubmitDraft draft) async {
+    drafts[draft.matchId] = draft;
+  }
+
+  @override
+  Future<void> clear(String matchId) async {
+    drafts.remove(matchId);
+  }
 }
 
 class _FailingMatchSettlementService extends MatchSettlementService {
@@ -1818,8 +2257,71 @@ class _FailingMatchSettlementService extends MatchSettlementService {
     required int scoreB,
     String? mvpPlayerId,
     List<PlayerMatchStats> detailedStats = const [],
+    List<MatchSettlementGoalDraft> goalDrafts = const [],
+    MatchSettlementMvpDraft? mvpDraft,
+    PenaltyShootoutResult? penaltyShootout,
   }) async {
     throw StateError('settlement failed');
+  }
+}
+
+class _RecordingMatchSettlementService extends MatchSettlementService {
+  _RecordingMatchSettlementService({required FakeFirebaseFirestore firestore})
+    : super(firestore: firestore);
+
+  PenaltyShootoutResult? lastPenaltyShootout;
+
+  @override
+  Future<MatchSettlementResult> submitScore({
+    required String matchId,
+    required String actorId,
+    required int scoreA,
+    required int scoreB,
+    String? mvpPlayerId,
+    List<PlayerMatchStats> detailedStats = const [],
+    List<MatchSettlementGoalDraft> goalDrafts = const [],
+    MatchSettlementMvpDraft? mvpDraft,
+    PenaltyShootoutResult? penaltyShootout,
+  }) async {
+    lastPenaltyShootout = penaltyShootout;
+    return const MatchSettlementResult(
+      status: MatchStatus.completed,
+      ratingsApplied: false,
+      alreadySettled: true,
+    );
+  }
+}
+
+class _RetryPenaltyBoundarySettlementService extends MatchSettlementService {
+  final PenaltyShootoutResult expectedPenaltyShootout;
+
+  _RetryPenaltyBoundarySettlementService({
+    required FakeFirebaseFirestore firestore,
+    required this.expectedPenaltyShootout,
+  }) : super(firestore: firestore);
+
+  @override
+  Future<MatchSettlementResult> submitScore({
+    required String matchId,
+    required String actorId,
+    required int scoreA,
+    required int scoreB,
+    String? mvpPlayerId,
+    List<PlayerMatchStats> detailedStats = const [],
+    List<MatchSettlementGoalDraft> goalDrafts = const [],
+    MatchSettlementMvpDraft? mvpDraft,
+    PenaltyShootoutResult? penaltyShootout,
+  }) async {
+    if (scoreA != scoreB ||
+        penaltyShootout?.scoreTeamA != expectedPenaltyShootout.scoreTeamA ||
+        penaltyShootout?.scoreTeamB != expectedPenaltyShootout.scoreTeamB) {
+      throw StateError('retry did not preserve the stored penalty shootout');
+    }
+    return const MatchSettlementResult(
+      status: MatchStatus.completed,
+      ratingsApplied: false,
+      alreadySettled: true,
+    );
   }
 }
 
@@ -1836,35 +2338,20 @@ class _FailingParticipantRosterService extends OfficialMatchRosterService {
   }
 }
 
-class _FailingMatchEventService extends MatchEventService {
-  _FailingMatchEventService({required FakeFirebaseFirestore firestore})
-    : super(
-        repository: MatchEventRepositoryImpl(firestore: firestore),
-        firestore: firestore,
-      );
-
-  @override
-  Future<MatchEvent> recordGoal({
-    String? eventId,
-    required String matchId,
-    String? tournamentId,
-    required String sideKey,
-    required ParticipantRef actor,
-    int? minute,
-    required String createdBy,
-    DateTime? now,
-  }) {
-    throw StateError('event write failed');
-  }
-}
-
 Match _match({
   required String id,
   String? tournamentId,
+  String? teamAId,
+  String? teamBId,
+  String? teamAParticipantId,
+  String? teamBParticipantId,
   List<String> teamAPlayerIds = const [],
   List<String> teamBPlayerIds = const [],
   int? scoreTeamA,
   int? scoreTeamB,
+  int? penaltyScoreTeamA,
+  int? penaltyScoreTeamB,
+  TournamentStageType? stageType,
   MatchStatus status = MatchStatus.live,
   bool prideEventsPending = false,
 }) {
@@ -1872,10 +2359,17 @@ Match _match({
     id: id,
     organizerId: 'organizer-1',
     tournamentId: tournamentId,
+    teamAId: teamAId,
+    teamBId: teamBId,
+    teamAParticipantId: teamAParticipantId,
+    teamBParticipantId: teamBParticipantId,
     teamAPlayerIds: teamAPlayerIds,
     teamBPlayerIds: teamBPlayerIds,
     scoreTeamA: scoreTeamA,
     scoreTeamB: scoreTeamB,
+    penaltyScoreTeamA: penaltyScoreTeamA,
+    penaltyScoreTeamB: penaltyScoreTeamB,
+    stageType: stageType,
     status: status,
     prideEventsPending: prideEventsPending,
     createdAt: DateTime(2026, 5, 4, 20),
@@ -1945,6 +2439,25 @@ Future<void> _saveTournament(
     'assistants': <Map<String, dynamic>>[],
     'isFantasyEnabled': false,
     'createdAt': DateTime(2026, 5, 4, 20).millisecondsSinceEpoch,
+  });
+}
+
+Future<void> _saveTournamentParticipant(
+  FakeFirebaseFirestore firestore, {
+  required String id,
+  required String tournamentId,
+  required String sourceEntityId,
+  required String displayName,
+}) async {
+  final timestamp = DateTime(2026, 5, 4, 20).millisecondsSinceEpoch;
+  await firestore.collection(FirebasePaths.tournamentParticipants).doc(id).set({
+    'tournamentId': tournamentId,
+    'sourceType': TournamentParticipantSourceType.guestTeam.name,
+    'sourceEntityId': sourceEntityId,
+    'displayName': displayName,
+    'status': TournamentParticipantStatus.finalized.name,
+    'createdAt': timestamp,
+    'updatedAt': timestamp,
   });
 }
 

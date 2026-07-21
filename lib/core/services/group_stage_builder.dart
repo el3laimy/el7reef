@@ -53,6 +53,7 @@ class GroupStageBuilder {
     final groupsCount = _determineGroupCount(
       participantCount: finalizedParticipants.length,
       format: tournament.format,
+      requestedGroupCount: tournament.groupAdvancementConfig.groupCount,
     );
     final distributedGroups = List<List<TournamentParticipant>>.generate(
       groupsCount,
@@ -69,7 +70,15 @@ class GroupStageBuilder {
     final fixtures = <Match>[];
     final standings = <GroupStandingSnapshot>[];
     final qualifiersPerGroup =
-        tournament.format == TournamentFormat.groupsThenKnockout ? 2 : 0;
+        tournament.format == TournamentFormat.groupsThenKnockout
+        ? tournament.groupAdvancementConfig.automaticQualifiersPerGroup
+        : 0;
+    _validateAdvancementConfig(
+      tournament: tournament,
+      participantCount: finalizedParticipants.length,
+      groupsCount: groupsCount,
+      qualifiersPerGroup: qualifiersPerGroup,
+    );
 
     for (
       int groupIndex = 0;
@@ -127,19 +136,12 @@ class GroupStageBuilder {
       );
 
       int slotNumber = 0;
-      for (
-        int homeIndex = 0;
-        homeIndex < groupParticipants.length;
-        homeIndex++
-      ) {
-        for (
-          int awayIndex = homeIndex + 1;
-          awayIndex < groupParticipants.length;
-          awayIndex++
-        ) {
+      final rounds = _roundRobinRounds(groupParticipants);
+      for (int roundIndex = 0; roundIndex < rounds.length; roundIndex++) {
+        for (final pairing in rounds[roundIndex]) {
           slotNumber += 1;
-          final homeParticipant = groupParticipants[homeIndex];
-          final awayParticipant = groupParticipants[awayIndex];
+          final homeParticipant = pairing.$1;
+          final awayParticipant = pairing.$2;
           fixtures.add(
             Match(
               id: 'fixture::$groupStageId::$groupId::$slotNumber',
@@ -155,7 +157,7 @@ class GroupStageBuilder {
               stageType: TournamentStageType.groupStage,
               groupId: groupId,
               groupStageId: groupStageId,
-              roundIndex: groupIndex + 1,
+              roundIndex: roundIndex,
               slotNumber: slotNumber,
               fixtureStatus: FixtureStatus.draft,
               createdAt: now,
@@ -172,6 +174,65 @@ class GroupStageBuilder {
       standings: standings,
     );
   }
+
+  /// Reconstructs correct visual rounds for legacy fixtures without rewriting
+  /// their stored roundIndex values.
+  Map<String, int> deriveDisplayRoundIndexes({
+    required Iterable<Match> fixtures,
+    required Iterable<String> participantIds,
+  }) {
+    final roundByPair = <String, int>{};
+    final rounds = _roundRobinRounds(participantIds.toList(growable: false));
+    for (int roundIndex = 0; roundIndex < rounds.length; roundIndex++) {
+      for (final pairing in rounds[roundIndex]) {
+        roundByPair[_pairKey(pairing.$1, pairing.$2)] = roundIndex;
+      }
+    }
+
+    final result = <String, int>{};
+    for (final fixture in fixtures) {
+      final participantAId = fixture.teamAParticipantId;
+      final participantBId = fixture.teamBParticipantId;
+      if (participantAId == null || participantBId == null) continue;
+      final roundIndex = roundByPair[_pairKey(participantAId, participantBId)];
+      if (roundIndex != null) {
+        result[fixture.id] = roundIndex;
+      }
+    }
+    return result;
+  }
+
+  List<List<(T, T)>> _roundRobinRounds<T>(List<T> participants) {
+    if (participants.length < 2) return const [];
+
+    final rotation = <T?>[...participants];
+    if (rotation.length.isOdd) {
+      rotation.add(null);
+    }
+    final rounds = <List<(T, T)>>[];
+    final roundCount = rotation.length - 1;
+    final matchesPerRound = rotation.length ~/ 2;
+
+    for (int roundIndex = 0; roundIndex < roundCount; roundIndex++) {
+      final pairings = <(T, T)>[];
+      for (int pairIndex = 0; pairIndex < matchesPerRound; pairIndex++) {
+        final left = rotation[pairIndex];
+        final right = rotation[rotation.length - 1 - pairIndex];
+        if (left == null || right == null) continue;
+        pairings.add(
+          (roundIndex + pairIndex).isEven ? (left, right) : (right, left),
+        );
+      }
+      rounds.add(pairings);
+
+      final last = rotation.removeLast();
+      rotation.insert(1, last);
+    }
+    return rounds;
+  }
+
+  String _pairKey(String left, String right) =>
+      left.compareTo(right) <= 0 ? '$left\u0000$right' : '$right\u0000$left';
 
   GroupStandingSnapshot recalculateSnapshot({
     required Tournament tournament,
@@ -258,7 +319,9 @@ class GroupStageBuilder {
       tournament.groupStandingsConfig.tiebreakerOrder,
     );
     final qualifiersPerGroup =
-        tournament.format == TournamentFormat.groupsThenKnockout ? 2 : 0;
+        tournament.format == TournamentFormat.groupsThenKnockout
+        ? tournament.groupAdvancementConfig.automaticQualifiersPerGroup
+        : 0;
     return GroupStandingSnapshot(
       id: 'standing::${group.groupStageId}::${group.id}',
       tournamentId: group.tournamentId,
@@ -280,7 +343,17 @@ class GroupStageBuilder {
   int _determineGroupCount({
     required int participantCount,
     required TournamentFormat format,
+    required int? requestedGroupCount,
   }) {
+    if (requestedGroupCount != null) {
+      if (requestedGroupCount < 1 || requestedGroupCount > 26) {
+        throw Exception('عدد المجموعات يجب أن يكون بين 1 و26.');
+      }
+      if (requestedGroupCount > participantCount ~/ 2) {
+        throw Exception('كل مجموعة تحتاج فريقين على الأقل.');
+      }
+      return requestedGroupCount;
+    }
     if (format == TournamentFormat.groupsOnly || participantCount <= 4) {
       return 1;
     }
@@ -291,6 +364,36 @@ class GroupStageBuilder {
       }
     }
     return 1;
+  }
+
+  void _validateAdvancementConfig({
+    required Tournament tournament,
+    required int participantCount,
+    required int groupsCount,
+    required int qualifiersPerGroup,
+  }) {
+    if (tournament.format != TournamentFormat.groupsThenKnockout) {
+      return;
+    }
+    final additional =
+        tournament.groupAdvancementConfig.bestRankedAdditionalQualifiers;
+    if (qualifiersPerGroup < 1) {
+      throw Exception('يجب تأهيل فريق واحد على الأقل من كل مجموعة.');
+    }
+    final smallestGroupSize = participantCount ~/ groupsCount;
+    if (qualifiersPerGroup > smallestGroupSize) {
+      throw Exception('عدد المتأهلين المباشرين أكبر من حجم أصغر مجموعة.');
+    }
+    if (additional < 0 || additional > groupsCount) {
+      throw Exception('عدد أفضل المراكز الإضافية غير صالح.');
+    }
+    if (additional > 0 && qualifiersPerGroup >= smallestGroupSize) {
+      throw Exception('لا توجد مراكز إضافية متاحة للمفاضلة بين المجموعات.');
+    }
+    final totalQualifiers = (qualifiersPerGroup * groupsCount) + additional;
+    if (totalQualifiers < 2 || totalQualifiers > participantCount) {
+      throw Exception('إجمالي المتأهلين إلى الإقصائيات غير صالح.');
+    }
   }
 
   GroupStandingEntry _applyResult(

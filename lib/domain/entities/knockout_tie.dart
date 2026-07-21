@@ -1,3 +1,5 @@
+import '../../core/enums/tournament_ops_enums.dart';
+
 class KnockoutTie {
   final String id;
   final String tournamentId;
@@ -9,6 +11,7 @@ class KnockoutTie {
   final String? winnerParticipantId;
   final String? matchId;
   final String? nextTieId;
+  final KnockoutTieResolution resolutionType;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -23,6 +26,7 @@ class KnockoutTie {
     this.winnerParticipantId,
     this.matchId,
     this.nextTieId,
+    this.resolutionType = KnockoutTieResolution.pending,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -44,6 +48,7 @@ class KnockoutTie {
     Object? winnerParticipantId = _unsetTieValue,
     Object? matchId = _unsetTieValue,
     Object? nextTieId = _unsetTieValue,
+    KnockoutTieResolution? resolutionType,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -68,6 +73,7 @@ class KnockoutTie {
       nextTieId: identical(nextTieId, _unsetTieValue)
           ? this.nextTieId
           : nextTieId as String?,
+      resolutionType: resolutionType ?? this.resolutionType,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

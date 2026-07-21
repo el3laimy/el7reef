@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 
 import '../../../app/routes/app_routes.dart';
@@ -9,8 +8,10 @@ import '../../../app/theme/app_text_styles.dart';
 import '../../../core/enums/tournament_enums.dart';
 import '../../../core/widgets/el7reef_badge.dart';
 import '../../../core/widgets/el7reef_surface.dart';
+import '../../../core/widgets/section_state_card.dart';
 import '../controllers/tournament_operations_controller.dart';
 import '../widgets/tournament_widgets.dart';
+import '../widgets/tournament_visual_language.dart';
 
 /// شاشة غرفة تحكم البطولة للمنظم — مطورة بالكامل لتسهيل التشغيل والإدارة بصرياً
 class TournamentOperationsDashboardScreen
@@ -77,13 +78,16 @@ class TournamentOperationsDashboardScreen
                     statusLabel: controller.statusLabelFor(tournament.status),
                     activeParticipantsCount: controller.activeParticipantsCount,
                     isFinalized: tournament.participantListFinalizedAt != null,
-                  ).animate().fadeIn(duration: 350.ms).slideY(begin: 0.05),
+                  ),
 
                   // ── رسائل الخطأ والتنبيهات ──
                   if (controller.errorMessage.value.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: AppDimensions.md),
-                      child: _ErrorCard(message: controller.errorMessage.value),
+                      child: SectionStateCard.error(
+                        message: controller.errorMessage.value,
+                        actionLabel: null,
+                      ),
                     ),
 
                   // ── تحذير ترحيل البيانات ──
@@ -100,128 +104,40 @@ class TournamentOperationsDashboardScreen
                   const SizedBox(height: AppDimensions.md),
 
                   // ── معالج تشغيل البطولة والخطوة الأساسية ──
-                  _OperationsWizardCard(
-                    controller: controller,
-                  ).animate().fadeIn(duration: 400.ms),
+                  _OperationsWizardCard(controller: controller),
 
                   const SizedBox(height: AppDimensions.md),
 
                   // ── نبض البطولة (العدادات السريعة) ──
-                  TournamentOperationsMetricsCard(
+                  TournamentOperationsMetricsCard(controller: controller),
+
+                  const SizedBox(height: AppDimensions.lg),
+
+                  Text(
+                    'ملعب المنافسة',
+                    style: AppTextStyles.titleLarge.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: AppDimensions.sm),
+                  _CompetitionCommandDeck(
                     controller: controller,
-                  ).animate().fadeIn(duration: 450.ms),
+                    tournamentId: tournament.id,
+                  ),
 
                   const SizedBox(height: AppDimensions.lg),
 
-                  // ── روابط وإجراءات المنافسة والجدولة 📊 ──
                   Text(
-                    'المنافسات والجدولة 📊',
+                    'أهل البطولة',
                     style: AppTextStyles.titleLarge.copyWith(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                   const SizedBox(height: AppDimensions.sm),
-                  El7reefSurface(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimensions.xs,
-                      vertical: AppDimensions.sm,
-                    ),
-                    child: Column(
-                      children: [
-                        TournamentLinkTile(
-                          title: 'المجموعات',
-                          subtitle:
-                              '${controller.groups.length} مجموعات فعالة بالبطولة',
-                          icon: Icons.grid_view_rounded,
-                          onTap: () => Get.toNamed(
-                            AppRoutes.tournamentGroupsById(tournament.id),
-                          ),
-                        ),
-                        const Divider(
-                          color: AppColors.surfaceBorder,
-                          height: 1,
-                        ),
-                        TournamentLinkTile(
-                          title: 'المباريات',
-                          subtitle:
-                              '${controller.fixtures.length} مباراة إجمالية مدرجة',
-                          icon: Icons.sports_soccer_rounded,
-                          onTap: () => Get.toNamed(
-                            AppRoutes.tournamentFixturesById(tournament.id),
-                          ),
-                        ),
-                        const Divider(
-                          color: AppColors.surfaceBorder,
-                          height: 1,
-                        ),
-                        TournamentLinkTile(
-                          title: 'الترتيب',
-                          subtitle:
-                              '${controller.standings.length} سجل ترتيب للمجموعات',
-                          icon: Icons.leaderboard_rounded,
-                          onTap: () => Get.toNamed(
-                            AppRoutes.tournamentStandingsById(tournament.id),
-                          ),
-                        ),
-                        const Divider(
-                          color: AppColors.surfaceBorder,
-                          height: 1,
-                        ),
-                        TournamentLinkTile(
-                          title: 'الإقصائيات',
-                          subtitle: controller.knockoutBracket.value == null
-                              ? 'تبدأ بعد انتهاء دور المجموعات'
-                              : '${controller.knockoutTies.length} مواجهات إقصائية نارية',
-                          icon: Icons.account_tree_rounded,
-                          onTap: () => Get.toNamed(
-                            AppRoutes.tournamentBracketById(tournament.id),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ).animate().fadeIn(duration: 480.ms),
-
-                  const SizedBox(height: AppDimensions.lg),
-
-                  // ── شؤون المشاركين والمساعدين 👥 ──
-                  Text(
-                    'شؤون المشاركين والمساعدين 👥',
-                    style: AppTextStyles.titleLarge.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                  _PeopleCommandDeck(
+                    controller: controller,
+                    tournamentId: tournament.id,
                   ),
-                  const SizedBox(height: AppDimensions.sm),
-                  El7reefSurface(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimensions.xs,
-                      vertical: AppDimensions.sm,
-                    ),
-                    child: Column(
-                      children: [
-                        TournamentLinkTile(
-                          title: 'الفرق المشاركة',
-                          subtitle:
-                              '${controller.participants.length} فرق في البطولة الحالية',
-                          icon: Icons.groups_rounded,
-                          onTap: () => Get.toNamed(
-                            AppRoutes.tournamentParticipantsById(tournament.id),
-                          ),
-                        ),
-                        const Divider(
-                          color: AppColors.surfaceBorder,
-                          height: 1,
-                        ),
-                        TournamentLinkTile(
-                          title: 'المساعدين',
-                          subtitle: 'إدارة صلاحيات المساعدين المحددة للبطولة',
-                          icon: Icons.admin_panel_settings_rounded,
-                          onTap: () => Get.toNamed(
-                            AppRoutes.tournamentAssistantsById(tournament.id),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ).animate().fadeIn(duration: 500.ms),
 
                   const SizedBox(height: AppDimensions.md),
 
@@ -257,6 +173,244 @@ class TournamentOperationsDashboardScreen
   }
 }
 
+class _CompetitionCommandDeck extends StatelessWidget {
+  final TournamentOperationsController controller;
+  final String tournamentId;
+
+  const _CompetitionCommandDeck({
+    required this.controller,
+    required this.tournamentId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final groupsTile = _CommandTile.stacked(
+      title: 'المجموعات',
+      value: '${controller.groups.length}',
+      detail: 'مجموعات البطولة',
+      icon: Icons.grid_view_rounded,
+      accent: AppColors.primary,
+      onTap: () => Get.toNamed(AppRoutes.tournamentGroupsById(tournamentId)),
+    );
+    final standingsTile = _CommandTile.stacked(
+      title: 'الترتيب',
+      value: '${controller.standings.length}',
+      detail: 'جداول محدثة',
+      icon: Icons.leaderboard_rounded,
+      accent: AppColors.info,
+      onTap: () => Get.toNamed(AppRoutes.tournamentStandingsById(tournamentId)),
+    );
+    final stackTiles = MediaQuery.textScalerOf(context).scale(1) >= 1.5;
+
+    return Column(
+      children: [
+        _CommandTile.prominent(
+          title: 'المباريات',
+          value: '${controller.fixtures.length}',
+          detail: 'افتح جدول اللعب وسجّل النتائج',
+          icon: Icons.sports_soccer_rounded,
+          accent: AppColors.primary,
+          onTap: () =>
+              Get.toNamed(AppRoutes.tournamentFixturesById(tournamentId)),
+        ),
+        const SizedBox(height: AppDimensions.sm),
+        if (stackTiles) ...[
+          groupsTile,
+          const SizedBox(height: AppDimensions.sm),
+          standingsTile,
+        ] else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: groupsTile),
+              const SizedBox(width: AppDimensions.sm),
+              Expanded(child: standingsTile),
+            ],
+          ),
+        const SizedBox(height: AppDimensions.sm),
+        _CommandTile.horizontal(
+          title: 'الإقصائيات',
+          value: controller.knockoutBracket.value == null
+              ? 'لم تبدأ'
+              : '${controller.knockoutTies.length} مواجهة',
+          detail: controller.knockoutBracket.value == null
+              ? 'تُفتح بعد اكتمال التأهل'
+              : 'تابع الطريق حتى البطل',
+          icon: Icons.account_tree_rounded,
+          accent: AppColors.accent,
+          onTap: () =>
+              Get.toNamed(AppRoutes.tournamentBracketById(tournamentId)),
+        ),
+      ],
+    );
+  }
+}
+
+class _PeopleCommandDeck extends StatelessWidget {
+  final TournamentOperationsController controller;
+  final String tournamentId;
+
+  const _PeopleCommandDeck({
+    required this.controller,
+    required this.tournamentId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        TournamentLinkTile(
+          title: 'الفرق المشاركة',
+          subtitle: '${controller.participants.length} فريق في البطولة',
+          icon: Icons.groups_rounded,
+          onTap: () =>
+              Get.toNamed(AppRoutes.tournamentParticipantsById(tournamentId)),
+        ),
+        TournamentLinkTile(
+          title: 'المساعدين',
+          subtitle: 'الصلاحيات ومسؤوليات يوم المباراة',
+          icon: Icons.admin_panel_settings_rounded,
+          onTap: () =>
+              Get.toNamed(AppRoutes.tournamentAssistantsById(tournamentId)),
+        ),
+      ],
+    );
+  }
+}
+
+class _CommandTile extends StatelessWidget {
+  final String title;
+  final String value;
+  final String detail;
+  final IconData icon;
+  final Color accent;
+  final VoidCallback onTap;
+  final _CommandTileLayout layout;
+
+  const _CommandTile.prominent({
+    required this.title,
+    required this.value,
+    required this.detail,
+    required this.icon,
+    required this.accent,
+    required this.onTap,
+  }) : layout = _CommandTileLayout.prominent;
+
+  const _CommandTile.horizontal({
+    required this.title,
+    required this.value,
+    required this.detail,
+    required this.icon,
+    required this.accent,
+    required this.onTap,
+  }) : layout = _CommandTileLayout.horizontal;
+
+  const _CommandTile.stacked({
+    required this.title,
+    required this.value,
+    required this.detail,
+    required this.icon,
+    required this.accent,
+    required this.onTap,
+  }) : layout = _CommandTileLayout.stacked;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = layout != _CommandTileLayout.stacked
+        ? Row(
+            children: [
+              _iconBox(),
+              const SizedBox(width: AppDimensions.md),
+              Expanded(child: _copy()),
+              const Icon(
+                Icons.chevron_left_rounded,
+                color: AppColors.textSecondaryTinted,
+              ),
+            ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _iconBox(),
+              const SizedBox(height: AppDimensions.sm),
+              _copy(),
+            ],
+          );
+
+    return Material(
+      color: layout == _CommandTileLayout.prominent
+          ? AppColors.surfaceRaised
+          : accent.withValues(alpha: 0.08),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+        side: BorderSide(color: accent.withValues(alpha: 0.24)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: layout == _CommandTileLayout.prominent ? 96 : 104,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppDimensions.md),
+            child: content,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _iconBox() {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+      ),
+      child: Icon(icon, color: accent, size: 21),
+    );
+  }
+
+  Widget _copy() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          title,
+          style: AppTextStyles.titleMedium.copyWith(
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textDirection: TextDirection.rtl,
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: accent,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          detail,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.bodySmall.copyWith(
+            color: AppColors.textSecondaryTinted,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+enum _CommandTileLayout { prominent, horizontal, stacked }
+
 // ══════════════════════════════════════════
 // ── لوحة ترويسة التشغيل (Dashboard Hero) ──
 // ══════════════════════════════════════════
@@ -277,157 +431,113 @@ class _DashboardHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final baseSpec = tournamentVisualSpec(status);
+    final spec = TournamentVisualSpec(
+      statusLabel: statusLabel,
+      stageLabel: baseSpec.stageLabel,
+      icon: baseSpec.icon,
+      accent: baseSpec.accent,
+      stageIndex: baseSpec.stageIndex,
+    );
     return El7reefSurface(
       elevated: true,
-      borderColor: AppColors.primary.withValues(alpha: 0.28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              El7reefBadge(
-                label: statusLabel,
-                color: AppColors.primary,
-                icon: Icons.sports_soccer_rounded,
+      padding: EdgeInsets.zero,
+      borderColor: spec.accent.withValues(alpha: 0.28),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+        child: TournamentFieldPattern(
+          color: spec.accent,
+          child: ColoredBox(
+            color: AppColors.surfaceRaised.withValues(alpha: 0.92),
+            child: Padding(
+              padding: const EdgeInsets.all(AppDimensions.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: AppDimensions.sm,
+                    runSpacing: AppDimensions.sm,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      TournamentStatusPill(spec: spec),
+                      _DashboardLockPill(isFinalized: isFinalized),
+                    ],
+                  ),
+                  const SizedBox(height: AppDimensions.lg),
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.headlineLarge.copyWith(
+                      fontWeight: FontWeight.w900,
+                      height: 1.15,
+                    ),
+                  ),
+                  const SizedBox(height: AppDimensions.sm),
+                  Row(
+                    children: [
+                      Icon(Icons.groups_rounded, color: spec.accent, size: 18),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '$activeParticipantsCount فريق نشط جاهز',
+                          style: AppTextStyles.labelMedium.copyWith(
+                            color: AppColors.textPrimaryTinted,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppDimensions.lg),
+                  TournamentStageRail(
+                    activeIndex: spec.stageIndex,
+                    accent: spec.accent,
+                    semanticsLabel: spec.stageLabel,
+                  ),
+                ],
               ),
-              const Spacer(),
-              _buildTimelineProgressIndicator(),
-            ],
-          ),
-          const SizedBox(height: AppDimensions.md),
-          Text(
-            title,
-            style: AppTextStyles.headlineLarge.copyWith(
-              fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: AppDimensions.md),
-          const Divider(color: AppColors.surfaceBorder, height: 1),
-          const SizedBox(height: AppDimensions.md),
-          Row(
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.groups_rounded,
-                      color: AppColors.primary,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '$activeParticipantsCount فريق نشط جاهز',
-                      style: AppTextStyles.labelMedium.copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: isFinalized
-                      ? AppColors.success.withValues(alpha: 0.12)
-                      : AppColors.warning.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-                  border: Border.all(
-                    color: isFinalized
-                        ? AppColors.success.withValues(alpha: 0.3)
-                        : AppColors.warning.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isFinalized
-                          ? Icons.lock_rounded
-                          : Icons.lock_open_rounded,
-                      color: isFinalized
-                          ? AppColors.success
-                          : AppColors.warning,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      isFinalized ? 'مغلقة تماماً' : 'مفتوحة للتعديل',
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: isFinalized
-                            ? AppColors.success
-                            : AppColors.warning,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
+}
 
-  // مؤشر خط الزمن الذكي لمراحل البطولة
-  Widget _buildTimelineProgressIndicator() {
-    int activeIndex = 0;
-    if (status == TournamentStatus.upcoming ||
-        status == TournamentStatus.registration) {
-      activeIndex = 0;
-    } else if (status == TournamentStatus.groupStage ||
-        status == TournamentStatus.transferWindow) {
-      activeIndex = 1;
-    } else if (status == TournamentStatus.knockoutStage) {
-      activeIndex = 2;
-    } else if (status == TournamentStatus.completed) {
-      activeIndex = 3;
-    }
+class _DashboardLockPill extends StatelessWidget {
+  final bool isFinalized;
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(4, (index) {
-        final isPassed = index <= activeIndex;
-        final isCurrent = index == activeIndex;
+  const _DashboardLockPill({required this.isFinalized});
 
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: isCurrent
-                    ? AppColors.primary
-                    : isPassed
-                    ? AppColors.primary.withValues(alpha: 0.5)
-                    : AppColors.surfaceBorder,
-                shape: BoxShape.circle,
-                boxShadow: isCurrent
-                    ? [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.4),
-                          blurRadius: 6,
-                        ),
-                      ]
-                    : null,
-              ),
+  @override
+  Widget build(BuildContext context) {
+    final color = isFinalized ? AppColors.success : AppColors.warning;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isFinalized ? Icons.lock_rounded : Icons.lock_open_rounded,
+            color: color,
+            size: 14,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            isFinalized ? 'مغلقة تماماً' : 'مفتوحة للتعديل',
+            style: AppTextStyles.labelSmall.copyWith(
+              color: color,
+              fontWeight: FontWeight.w800,
             ),
-            if (index < 3)
-              Container(
-                width: 12,
-                height: 2,
-                color: isPassed
-                    ? AppColors.primary.withValues(alpha: 0.4)
-                    : AppColors.surfaceBorder,
-              ),
-          ],
-        );
-      }),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -598,7 +708,7 @@ class _OperationsWizardCard extends StatelessWidget {
       _WizardStepData(
         title: 'نشر الجدول',
         detail: hasPublishedFixtures
-            ? 'تم نشر ${controller.publishedFixturesCount} مباراة لتظهر للفرق.'
+            ? 'تم إتاحة ${controller.releasedFixturesCount} مباراة للفرق.'
             : controller.canPublishFixtures
             ? 'راجع المسودات ثم انشر ${controller.draftFixturesCount} مباراة.'
             : controller.fixtures.isEmpty
@@ -707,96 +817,54 @@ class _OperationsWizardCard extends StatelessWidget {
   }
 
   _OpsAction? _nextAction() {
-    if (controller.canFinalizeParticipantsAction) {
-      return _OpsAction(
-        label: 'قفل قائمة الفرق',
-        icon: Icons.verified_rounded,
-        onPressed: controller.finalizeParticipantList,
-        needsConfirmation: true,
-        confirmTitle: 'تأكيد قفل قائمة الفرق',
-        confirmMessage:
-            'بعد القفل، لن تتمكن من إضافة أي فرق جديدة لهذه الدورة كمنظم. هل تريد المتابعة قفل القائمة؟',
-        detail:
-            'لدينا الآن ${controller.activeParticipantsCount} فرق جاهزة ومكتملة، قم بقفل القائمة لبدء الجدول.',
-        requirements: const <String>[
-          'وجود فريقين نشطين على الأقل.',
-          'عدم بدء أي مرحلة تشغيل بعد.',
-          'مراجعة التسجيلات قبل القفل.',
-        ],
-      );
-    }
-    if (controller.canStartGroupStageAction) {
-      return _OpsAction(
-        label: 'بدء دور المجموعات',
-        icon: Icons.groups_2_rounded,
-        onPressed: controller.startGroupStage,
-        needsConfirmation: true,
-        confirmTitle: 'توليد مباريات ومجموعات البطولة',
-        confirmMessage:
-            'سيقوم النظام بتوزيع الفرق آلياً على المجموعات وتوليد جدول المباريات الكامل. هل تريد البدء؟',
-        detail:
-            'تم قفل المشاركين بنجاح. الخطوة الحالية هي توليد المجموعات والمباريات الدورية لبدء اللعب.',
-        requirements: const <String>[
-          'قائمة الفرق مقفلة.',
-          'لم يتم إنشاء دور مجموعات من قبل.',
-          'عدد الفرق يسمح بتوليد المباريات.',
-        ],
-      );
-    }
-    if (controller.canPublishFixtures) {
-      return _OpsAction(
-        label: 'نشر جدول المباريات',
-        icon: Icons.publish_rounded,
-        onPressed: controller.publishFixtures,
-        needsConfirmation: true,
-        confirmTitle: 'نشر المباريات رسمياً للاعبين',
-        confirmMessage:
-            'سيتم تحويل ${controller.draftFixturesCount} مباراة من مسودة إلى منشورة لتظهر رسمياً للفرق. هل تؤكد؟',
-        detail:
-            'جدول المباريات جاهز كمسودة للتحقق الفني. انشره الآن لتظهر المباريات في حسابات اللاعبين على التطبيق.',
-        requirements: <String>[
-          'وجود ${controller.draftFixturesCount} مباراة مسودة.',
-          'مراجعة المواعيد والفرق قبل النشر.',
-        ],
-      );
-    }
-    if (controller.canStartKnockoutAction) {
-      return _OpsAction(
-        label: 'بدء الإقصائيات',
-        icon: Icons.account_tree_rounded,
-        onPressed: controller.startKnockout,
-        needsConfirmation: true,
-        confirmTitle: 'بدء التصفيات والإقصائيات خروج المغلوب',
-        confirmMessage:
-            'سيقوم النظام بفرز المجموعات وتحديد المتأهلين تلقائياً لتوليد شجرة الإقصاء. هل تريد الاستمرار؟',
-        detail:
-            'انتهت مباريات دور المجموعات وتم تحديد الترتيب. ابدأ مرحلة خروج المغلوب لمعرفة بطل الحواري.',
-        requirements: const <String>[
-          'اكتمال النتائج الرسمية للمرحلة السابقة.',
-          'عدم وجود شجرة إقصاء منشأة مسبقًا.',
-          'تثبيت المؤهلين قبل التوليد.',
-        ],
-      );
-    }
-    if (controller.canCompleteTournamentAction) {
-      return _OpsAction(
-        label: 'تتويج البطولة',
-        icon: Icons.emoji_events_rounded,
-        onPressed: controller.completeTournament,
-        needsConfirmation: true,
-        confirmTitle: 'تتويج بطل الحواري وإغلاق الدورة',
-        confirmMessage:
-            'سيتم توثيق البطل الحقيقي وتوزيع ميداليات الشرف وتثبيت الإحصائيات نهائياً. هل تؤكد؟',
-        detail:
-            'تم حسم النهائي وتحديد البطل. حان وقت إغلاق البطولة رسمياً للاحتفال وتوليد بطاقة فخر البطل.',
-        requirements: const <String>[
-          'تحديد بطل البطولة.',
-          'اعتماد آخر نتيجة رسمية.',
-          'التأكد من جاهزية لحظة المشاركة.',
-        ],
-      );
-    }
-    return null;
+    final action = controller.nextOperationalAction;
+    if (action == null) return null;
+    return _OpsAction(
+      label: action.label,
+      icon: _nextActionIcon(action.kind),
+      onPressed: _nextActionCallback(action),
+      detail: action.detail,
+      requirements: action.requirements,
+      needsConfirmation: action.needsConfirmation,
+      confirmTitle: action.confirmTitle,
+      confirmMessage: action.confirmMessage,
+    );
+  }
+
+  IconData _nextActionIcon(TournamentOpsNextActionKind kind) => switch (kind) {
+    TournamentOpsNextActionKind.recordLiveScore => Icons.sports_score_rounded,
+    TournamentOpsNextActionKind.reviewPendingScore => Icons.fact_check_rounded,
+    TournamentOpsNextActionKind.prepareUpcomingFixture =>
+      Icons.sports_soccer_rounded,
+    TournamentOpsNextActionKind.addParticipant => Icons.group_add_rounded,
+    TournamentOpsNextActionKind.finalizeParticipants => Icons.verified_rounded,
+    TournamentOpsNextActionKind.startGroupStage => Icons.groups_2_rounded,
+    TournamentOpsNextActionKind.publishFixtures => Icons.publish_rounded,
+    TournamentOpsNextActionKind.startKnockout => Icons.account_tree_rounded,
+    TournamentOpsNextActionKind.completeTournament =>
+      Icons.emoji_events_rounded,
+  };
+
+  VoidCallback _nextActionCallback(TournamentOpsNextAction action) {
+    return switch (action.kind) {
+      TournamentOpsNextActionKind.recordLiveScore ||
+      TournamentOpsNextActionKind.reviewPendingScore => () => Get.toNamed(
+        AppRoutes.scoreApprovalForMatch(action.matchId!),
+      ),
+      TournamentOpsNextActionKind.prepareUpcomingFixture => () => Get.toNamed(
+        AppRoutes.matchDetailsById(action.matchId!),
+      ),
+      TournamentOpsNextActionKind.addParticipant => () => Get.toNamed(
+        AppRoutes.tournamentParticipantsById(controller.tournamentId!),
+      ),
+      TournamentOpsNextActionKind.finalizeParticipants =>
+        controller.finalizeParticipantList,
+      TournamentOpsNextActionKind.startGroupStage => controller.startGroupStage,
+      TournamentOpsNextActionKind.publishFixtures => controller.publishFixtures,
+      TournamentOpsNextActionKind.startKnockout => controller.startKnockout,
+      TournamentOpsNextActionKind.completeTournament =>
+        controller.completeTournament,
+    };
   }
 }
 
@@ -962,8 +1030,8 @@ class _WizardDecisionPanel extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
@@ -1075,11 +1143,14 @@ class _RequirementChip extends StatelessWidget {
             size: 14,
           ),
           const SizedBox(width: 4),
-          Text(
-            label,
-            style: AppTextStyles.labelSmall.copyWith(
-              color: AppColors.textSecondaryTinted,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              label,
+              softWrap: true,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.textSecondaryTinted,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -1280,40 +1351,7 @@ class _MaintenanceSection extends StatelessWidget {
   }
 }
 
-// ── شارات ومكونات الأخطاء والتحذيرات ──
-class _ErrorCard extends StatelessWidget {
-  final String message;
-  const _ErrorCard({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return El7reefSurface(
-      color: AppColors.errorSurface,
-      borderColor: AppColors.error.withValues(alpha: 0.28),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            color: AppColors.error,
-            size: 20,
-          ),
-          const SizedBox(width: AppDimensions.sm),
-          Expanded(
-            child: Text(
-              message,
-              style: AppTextStyles.bodySmall.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
+// ── شارات ومكونات التحذيرات ──
 class _WarningCard extends StatelessWidget {
   final String title;
   final String message;

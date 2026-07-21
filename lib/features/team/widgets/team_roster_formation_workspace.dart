@@ -5,7 +5,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/widgets/el7reef_button.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../controllers/team_roster_controller.dart';
 import 'team_roster_dialogs.dart';
 import 'team_roster_snapshot_card.dart';
@@ -18,8 +18,9 @@ class TeamRosterFormationWorkspace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassmorphicContainer(
-      borderRadius: AppDimensions.radiusXl,
+    return El7reefGlassSurface(
+      variant: El7reefGlassVariant.base,
+      radius: AppDimensions.radiusXl,
       padding: const EdgeInsets.all(AppDimensions.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,9 +103,7 @@ class TeamRosterFormationWorkspace extends StatelessWidget {
 
             return Column(
               children: controller.rosterSnapshots
-                  .map(
-                    (snapshot) => TeamRosterSnapshotCard(snapshot: snapshot),
-                  )
+                  .map((snapshot) => TeamRosterSnapshotCard(snapshot: snapshot))
                   .toList(growable: false),
             );
           }),

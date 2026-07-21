@@ -56,6 +56,40 @@ class CloudSensitiveOpsService {
     return _invokeMap(functionName: 'settleFantasyRound', payload: payload);
   }
 
+  Future<bool> deleteAccountData() async {
+    final result = await _invokeMap(
+      functionName: 'deleteAccountData',
+      payload: const <String, dynamic>{},
+    );
+    return result?['deleted'] == true;
+  }
+
+  Future<bool> reportUserContent({
+    required String targetKind,
+    required String targetId,
+    required String reason,
+    String details = '',
+  }) async {
+    final result = await _invokeMap(
+      functionName: 'reportUserContent',
+      payload: {
+        'targetKind': targetKind,
+        'targetId': targetId,
+        'reason': reason,
+        'details': details,
+      },
+    );
+    return result?['accepted'] == true;
+  }
+
+  Future<bool> blockUser(String blockedId) async {
+    final result = await _invokeMap(
+      functionName: 'blockUser',
+      payload: {'blockedId': blockedId},
+    );
+    return result?['blocked'] == true;
+  }
+
   Future<Map<String, dynamic>?> _invokeMap({
     required String functionName,
     required Map<String, dynamic> payload,

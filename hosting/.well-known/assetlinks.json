@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.el7reef.app",
+      "sha256_cert_fingerprints": [
+        "05:6C:02:29:1B:E4:7F:F9:90:57:E2:C4:69:D7:13:9E:67:01:95:52:2F:89:97:D8:49:B6:9E:DD:46:95:9F:0C"
+      ]
+    }
+  }
+]

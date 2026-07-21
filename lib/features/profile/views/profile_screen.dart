@@ -10,11 +10,10 @@ import '../../../app/theme/app_text_styles.dart';
 import '../../../core/constants/feature_flags.dart';
 import '../../../core/services/photo_upload_service.dart';
 import '../../../core/widgets/dynamic_frame_widget.dart';
-import '../../../core/widgets/glassmorphic_container.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../core/widgets/qr_code_widget.dart';
 import '../../../core/widgets/rank_tier_badge.dart';
 import '../../../domain/entities/player.dart';
-import '../../../data/repositories/player_repository_impl.dart';
 import '../controllers/profile_controller.dart';
 
 /// شاشة البروفايل — Task 6.3.4 + 6.2.5
@@ -78,11 +77,16 @@ class ProfileScreen extends GetView<ProfileController> {
                 ),
               ),
 
-              // ── زر الخروج ──
+              // ── الحساب والخصوصية ──
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.all(AppDimensions.pagePadding),
-                  child: _buildSignOutButton(),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppDimensions.pagePadding,
+                    AppDimensions.lg,
+                    AppDimensions.pagePadding,
+                    AppDimensions.pagePadding,
+                  ),
+                  child: _buildAccountActions(context),
                 ),
               ),
 
@@ -235,12 +239,13 @@ class ProfileScreen extends GetView<ProfileController> {
           const SizedBox(height: AppDimensions.md),
 
           // ── Rating الكبير ──
-          GlassmorphicContainer(
+          El7reefGlassSurface(
+            variant: El7reefGlassVariant.base,
             padding: const EdgeInsets.symmetric(
               horizontal: AppDimensions.xl,
               vertical: AppDimensions.md,
             ),
-            borderRadius: AppDimensions.radiusXl,
+            radius: AppDimensions.radiusXl,
             child: Column(
               children: [
                 Text('${player.rating}', style: AppTextStyles.ratingLarge),
@@ -330,9 +335,10 @@ class ProfileScreen extends GetView<ProfileController> {
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
-        child: GlassmorphicContainer(
+        child: El7reefGlassSurface(
+          variant: El7reefGlassVariant.base,
           padding: const EdgeInsets.symmetric(vertical: 12),
-          borderRadius: AppDimensions.radiusMd,
+          radius: AppDimensions.radiusMd,
           child: Column(
             children: [
               Stack(
@@ -402,13 +408,10 @@ class ProfileScreen extends GetView<ProfileController> {
     );
 
     if (result != null) {
-      final repo = PlayerRepositoryImpl();
-      final updated = player.copyWith(
+      await controller.updateProfilePhoto(
         photoUrl: result.fullUrl,
         photoThumbUrl: result.thumbUrl,
       );
-      await repo.updatePlayer(updated);
-      await controller.refreshProfile();
 
       Get.snackbar(
         'تم ✅',
@@ -426,9 +429,10 @@ class ProfileScreen extends GetView<ProfileController> {
 
   /// ── Stats Grid ──
   Widget _buildStatsGrid(Player player) {
-    return GlassmorphicContainer(
+    return El7reefGlassSurface(
+      variant: El7reefGlassVariant.base,
       padding: const EdgeInsets.all(AppDimensions.md),
-      borderRadius: AppDimensions.radiusLg,
+      radius: AppDimensions.radiusLg,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -512,9 +516,10 @@ class ProfileScreen extends GetView<ProfileController> {
 
   /// ── اختيار المركز ──
   Widget _buildPositionSection() {
-    return GlassmorphicContainer(
+    return El7reefGlassSurface(
+      variant: El7reefGlassVariant.base,
       padding: const EdgeInsets.all(AppDimensions.md),
-      borderRadius: AppDimensions.radiusLg,
+      radius: AppDimensions.radiusLg,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -568,9 +573,10 @@ class ProfileScreen extends GetView<ProfileController> {
 
   /// ── معلومات إضافية ──
   Widget _buildInfoSection(Player player) {
-    return GlassmorphicContainer(
+    return El7reefGlassSurface(
+      variant: El7reefGlassVariant.base,
       padding: const EdgeInsets.all(AppDimensions.md),
-      borderRadius: AppDimensions.radiusLg,
+      radius: AppDimensions.radiusLg,
       child: Column(
         children: [
           _infoRow(
@@ -625,5 +631,97 @@ class ProfileScreen extends GetView<ProfileController> {
         style: AppTextStyles.labelLarge.copyWith(color: AppColors.error),
       ),
     ).animate().fadeIn(delay: 800.ms);
+  }
+
+  Widget _buildAccountActions(BuildContext context) {
+    return El7reefGlassSurface(
+      variant: El7reefGlassVariant.base,
+      padding: const EdgeInsets.all(AppDimensions.md),
+      radius: AppDimensions.radiusLg,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('الحساب والخصوصية', style: AppTextStyles.titleMedium),
+          const SizedBox(height: AppDimensions.sm),
+          TextButton.icon(
+            onPressed: () => Get.toNamed(AppRoutes.privacyPolicy),
+            icon: const Icon(Icons.privacy_tip_outlined),
+            label: const Text('سياسة الخصوصية والبيانات'),
+          ),
+          _buildSignOutButton(),
+          const Divider(),
+          Obx(
+            () => OutlinedButton.icon(
+              onPressed: controller.isDeletingAccount.value
+                  ? null
+                  : () => _confirmAccountDeletion(context),
+              icon: controller.isDeletingAccount.value
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.delete_forever_rounded),
+              label: Text(
+                controller.isDeletingAccount.value
+                    ? 'جاري حذف الحساب…'
+                    : 'حذف الحساب نهائيًا',
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.error,
+                minimumSize: const Size.fromHeight(48),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(delay: 800.ms);
+  }
+
+  Future<void> _confirmAccountDeletion(BuildContext context) async {
+    final confirmationController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('حذف الحساب نهائيًا'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'سيُحذف تسجيل الدخول والبروفايل والصور والعلاقات الشخصية. تُحفظ نتائج البطولات بعد فصلها عن هويتك لحماية نزاهة المنافسة.',
+            ),
+            const SizedBox(height: AppDimensions.md),
+            const Text('اكتب «حذف» للتأكيد:'),
+            const SizedBox(height: AppDimensions.xs),
+            TextField(
+              controller: confirmationController,
+              autofocus: true,
+              decoration: const InputDecoration(hintText: 'حذف'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: confirmationController,
+            builder: (_, value, _) => FilledButton(
+              onPressed: value.text.trim() == 'حذف'
+                  ? () => Navigator.of(dialogContext).pop(true)
+                  : null,
+              style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+              child: const Text('احذف حسابي'),
+            ),
+          ),
+        ],
+      ),
+    );
+    confirmationController.dispose();
+    if (confirmed == true) {
+      await controller.deleteAccount();
+    }
   }
 }

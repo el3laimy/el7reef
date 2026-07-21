@@ -18,6 +18,9 @@ class MatchModel {
   final String status;
   final int? scoreTeamA;
   final int? scoreTeamB;
+  final int? penaltyScoreTeamA;
+  final int? penaltyScoreTeamB;
+  final String? knockoutDecision;
   final String? mvpPlayerId;
   final bool prideEventsPending;
   final String? location;
@@ -34,6 +37,7 @@ class MatchModel {
   final String? groupId;
   final String? groupStageId;
   final String? knockoutTieId;
+  final String? knockoutMatchRole;
   final int? roundIndex;
   final int? slotNumber;
   final DateTime? scheduledAt;
@@ -60,6 +64,9 @@ class MatchModel {
     this.status = 'open',
     this.scoreTeamA,
     this.scoreTeamB,
+    this.penaltyScoreTeamA,
+    this.penaltyScoreTeamB,
+    this.knockoutDecision,
     this.mvpPlayerId,
     this.prideEventsPending = false,
     this.location,
@@ -76,6 +83,7 @@ class MatchModel {
     this.groupId,
     this.groupStageId,
     this.knockoutTieId,
+    this.knockoutMatchRole,
     this.roundIndex,
     this.slotNumber,
     this.scheduledAt,
@@ -120,6 +128,9 @@ class MatchModel {
       status: json['status'] as String? ?? 'open',
       scoreTeamA: (json['scoreTeamA'] as num?)?.toInt(),
       scoreTeamB: (json['scoreTeamB'] as num?)?.toInt(),
+      penaltyScoreTeamA: (json['penaltyScoreTeamA'] as num?)?.toInt(),
+      penaltyScoreTeamB: (json['penaltyScoreTeamB'] as num?)?.toInt(),
+      knockoutDecision: json['knockoutDecision'] as String?,
       mvpPlayerId: json['mvpPlayerId'] as String?,
       prideEventsPending: json['prideEventsPending'] as bool? ?? false,
       location: json['location'] as String?,
@@ -136,6 +147,7 @@ class MatchModel {
       groupId: json['groupId'] as String?,
       groupStageId: json['groupStageId'] as String?,
       knockoutTieId: json['knockoutTieId'] as String?,
+      knockoutMatchRole: json['knockoutMatchRole'] as String?,
       roundIndex: (json['roundIndex'] as num?)?.toInt(),
       slotNumber: (json['slotNumber'] as num?)?.toInt(),
       scheduledAt: json['scheduledAt'] != null
@@ -188,6 +200,9 @@ class MatchModel {
     'status': status,
     'scoreTeamA': scoreTeamA,
     'scoreTeamB': scoreTeamB,
+    'penaltyScoreTeamA': penaltyScoreTeamA,
+    'penaltyScoreTeamB': penaltyScoreTeamB,
+    'knockoutDecision': knockoutDecision,
     'mvpPlayerId': mvpPlayerId,
     'prideEventsPending': prideEventsPending,
     'location': location,
@@ -204,6 +219,7 @@ class MatchModel {
     'groupId': groupId,
     'groupStageId': groupStageId,
     'knockoutTieId': knockoutTieId,
+    'knockoutMatchRole': knockoutMatchRole,
     'roundIndex': roundIndex,
     'slotNumber': slotNumber,
     'scheduledAt': scheduledAt?.millisecondsSinceEpoch,
@@ -231,6 +247,9 @@ class MatchModel {
     status: _parseStatus(status),
     scoreTeamA: scoreTeamA,
     scoreTeamB: scoreTeamB,
+    penaltyScoreTeamA: penaltyScoreTeamA,
+    penaltyScoreTeamB: penaltyScoreTeamB,
+    knockoutDecision: _parseKnockoutDecision(knockoutDecision),
     mvpPlayerId: mvpPlayerId,
     prideEventsPending: prideEventsPending,
     location: location,
@@ -252,6 +271,7 @@ class MatchModel {
     groupId: groupId,
     groupStageId: groupStageId,
     knockoutTieId: knockoutTieId,
+    knockoutMatchRole: _parseKnockoutMatchRole(knockoutMatchRole),
     roundIndex: roundIndex,
     slotNumber: slotNumber,
     scheduledAt: scheduledAt,
@@ -285,6 +305,9 @@ class MatchModel {
     status: m.status.name,
     scoreTeamA: m.scoreTeamA,
     scoreTeamB: m.scoreTeamB,
+    penaltyScoreTeamA: m.penaltyScoreTeamA,
+    penaltyScoreTeamB: m.penaltyScoreTeamB,
+    knockoutDecision: m.knockoutDecision?.name,
     mvpPlayerId: m.mvpPlayerId,
     prideEventsPending: m.prideEventsPending,
     location: m.location,
@@ -301,6 +324,7 @@ class MatchModel {
     groupId: m.groupId,
     groupStageId: m.groupStageId,
     knockoutTieId: m.knockoutTieId,
+    knockoutMatchRole: m.knockoutMatchRole?.name,
     roundIndex: m.roundIndex,
     slotNumber: m.slotNumber,
     scheduledAt: m.scheduledAt,
@@ -320,4 +344,20 @@ class MatchModel {
     (e) => e.name == v,
     orElse: () => MatchStatus.open,
   );
+
+  static KnockoutDecision? _parseKnockoutDecision(String? value) {
+    if (value == null) return null;
+    for (final candidate in KnockoutDecision.values) {
+      if (candidate.name == value) return candidate;
+    }
+    return null;
+  }
+
+  static KnockoutMatchRole? _parseKnockoutMatchRole(String? value) {
+    if (value == null) return null;
+    for (final candidate in KnockoutMatchRole.values) {
+      if (candidate.name == value) return candidate;
+    }
+    return null;
+  }
 }

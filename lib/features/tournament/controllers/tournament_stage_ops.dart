@@ -93,6 +93,7 @@ extension TournamentStageOps on TournamentOperationsController {
       ),
       onSuccess: (updatedTournament) async {
         tournament.value = updatedTournament;
+        await showChampionCelebration(updatedTournament);
       },
     );
   }

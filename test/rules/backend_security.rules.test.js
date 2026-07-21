@@ -99,7 +99,44 @@ function challengeMatchData(overrides = {}) {
 function analyticsEventData(overrides = {}) {
   return {
     eventName: 'invite_sent',
-    parameters: { targetId: 'target-1' },
+    actorId: 'actor-1',
+    parameters: {
+      type: 'team_invite',
+      targetId: 'target-1',
+      actorId: 'actor-1',
+    },
+    createdAt: now,
+    ...overrides,
+  };
+}
+
+function prideAnalyticsEventData(overrides = {}) {
+  return {
+    eventName: 'pride_card_viewed',
+    parameters: {
+      cardType: 'mvp',
+      entityType: 'guestPlayer',
+      entityId: 'guest-player-1',
+      tournamentId: 'tournament-1',
+      matchId: 'match-1',
+      campaignSource: 'post_match_mvp',
+      schemaVersion: 1,
+    },
+    createdAt: now,
+    ...overrides,
+  };
+}
+
+function prideExportAnalyticsEventData(overrides = {}) {
+  return {
+    eventName: 'pride_export_finished',
+    parameters: {
+      cardType: 'matchResult',
+      format: 'story9x16',
+      mediaType: 'video',
+      exportDurationMs: 11800,
+      fallbackUsed: false,
+    },
     createdAt: now,
     ...overrides,
   };
@@ -306,8 +343,250 @@ describe('backend security Firestore rules', () => {
     await assertSucceeds(
       setDoc(
         doc(actorDb, 'analyticsEvents', 'event-2'),
-        analyticsEventData({ actorId: 'actor-1' }),
+        analyticsEventData(),
       ),
+    );
+  });
+
+  it('allows only the current invite, claim, and join analytics schemas', async () => {
+    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
+
+    await assertSucceeds(
+      setDoc(
+        doc(actorDb, 'analyticsEvents', 'invite-valid'),
+        analyticsEventData(),
+      ),
+    );
+    await assertSucceeds(
+      setDoc(doc(actorDb, 'analyticsEvents', 'claim-open-valid'), {
+        eventName: 'claim_open',
+        parameters: { type: 'guestPlayer', targetId: 'guest-player-1' },
+        createdAt: now,
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(actorDb, 'analyticsEvents', 'claim-complete-valid'), {
+        eventName: 'claim_completion',
+        actorId: 'actor-1',
+        parameters: {
+          type: 'guest_player',
+          targetId: 'guest-player-1',
+          actorId: 'actor-1',
+        },
+        createdAt: now,
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(actorDb, 'analyticsEvents', 'join-valid'), {
+        eventName: 'join_completion',
+        actorId: 'actor-1',
+        parameters: {
+          type: 'team_invite',
+          targetId: 'team-1',
+          actorId: 'actor-1',
+        },
+        createdAt: now,
+      }),
+    );
+  });
+
+  it('allows privacy-safe pride funnel and export analytics events', async () => {
+    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
+
+    await assertSucceeds(
+      setDoc(
+        doc(actorDb, 'analyticsEvents', 'pride-valid'),
+        prideAnalyticsEventData(),
+      ),
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(actorDb, 'analyticsEvents', 'export-valid'),
+        prideExportAnalyticsEventData({
+          parameters: {
+            ...prideExportAnalyticsEventData().parameters,
+            fallbackUsed: true,
+            failureCode: 'encoder_unavailable',
+          },
+        }),
+      ),
+    );
+  });
+
+  it('rejects PII and extra fields in analytics parameters', async () => {
+    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
+
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'analyticsEvents', 'pride-player-name'),
+        prideAnalyticsEventData({
+          parameters: {
+            ...prideAnalyticsEventData().parameters,
+            playerName: 'Secret Player',
+          },
+        }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'analyticsEvents', 'pride-top-level-extra'),
+        prideAnalyticsEventData({ email: 'player@example.com' }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'analyticsEvents', 'export-extra'),
+        prideExportAnalyticsEventData({
+          parameters: {
+            ...prideExportAnalyticsEventData().parameters,
+            targetUrl: 'https://example.com/private',
+          },
+        }),
+      ),
+    );
+  });
+
+  it('rejects invalid pride analytics enums, types, and ranges', async () => {
+    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
+
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'analyticsEvents', 'pride-bad-card'),
+        prideAnalyticsEventData({
+          parameters: {
+            ...prideAnalyticsEventData().parameters,
+            cardType: 'fakeAward',
+          },
+        }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'analyticsEvents', 'pride-bad-schema'),
+        prideAnalyticsEventData({
+          parameters: {
+            ...prideAnalyticsEventData().parameters,
+            schemaVersion: 2,
+          },
+        }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'analyticsEvents', 'pride-bad-entity'),
+        prideAnalyticsEventData({
+          parameters: {
+            ...prideAnalyticsEventData().parameters,
+            entityType: 'profile',
+          },
+        }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'analyticsEvents', 'export-bad-format'),
+        prideExportAnalyticsEventData({
+          parameters: {
+            ...prideExportAnalyticsEventData().parameters,
+            format: 'portrait',
+          },
+        }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'analyticsEvents', 'export-bad-media'),
+        prideExportAnalyticsEventData({
+          parameters: {
+            ...prideExportAnalyticsEventData().parameters,
+            mediaType: 'gif',
+          },
+        }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'analyticsEvents', 'export-bad-duration-type'),
+        prideExportAnalyticsEventData({
+          parameters: {
+            ...prideExportAnalyticsEventData().parameters,
+            exportDurationMs: '11800',
+          },
+        }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'analyticsEvents', 'export-bad-fallback-type'),
+        prideExportAnalyticsEventData({
+          parameters: {
+            ...prideExportAnalyticsEventData().parameters,
+            fallbackUsed: 'false',
+          },
+        }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'analyticsEvents', 'export-bad-failure-code'),
+        prideExportAnalyticsEventData({
+          parameters: {
+            ...prideExportAnalyticsEventData().parameters,
+            failureCode: 'encoder failed: player@example.com',
+          },
+        }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'analyticsEvents', 'legacy-bad-type'),
+        analyticsEventData({
+          parameters: {
+            ...analyticsEventData().parameters,
+            type: 'guestPlayer',
+          },
+        }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'analyticsEvents', 'export-bad-duration-range'),
+        prideExportAnalyticsEventData({
+          parameters: {
+            ...prideExportAnalyticsEventData().parameters,
+            exportDurationMs: 600001,
+          },
+        }),
+      ),
+    );
+  });
+
+  it('rejects analytics actor spoofing and unsupported events', async () => {
+    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
+
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'analyticsEvents', 'spoofed-top-level-actor'),
+        analyticsEventData({ actorId: 'attacker-1' }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'analyticsEvents', 'spoofed-parameter-actor'),
+        analyticsEventData({
+          parameters: {
+            ...analyticsEventData().parameters,
+            actorId: 'attacker-1',
+          },
+        }),
+      ),
+    );
+    await assertFails(
+      setDoc(doc(actorDb, 'analyticsEvents', 'unsupported-event'), {
+        eventName: 'player_profile_viewed',
+        parameters: {},
+        createdAt: now,
+      }),
     );
   });
 

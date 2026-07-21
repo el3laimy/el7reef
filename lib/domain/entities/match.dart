@@ -1,6 +1,7 @@
 import '../../core/enums/lineup_requirement.dart';
 import '../../core/enums/match_status.dart';
 import '../../core/enums/tournament_ops_enums.dart';
+import 'penalty_shootout_result.dart';
 
 /// كيان المباراة — قلب نظام التقييم
 class Match {
@@ -15,6 +16,9 @@ class Match {
   final MatchStatus status;
   final int? scoreTeamA;
   final int? scoreTeamB;
+  final int? penaltyScoreTeamA;
+  final int? penaltyScoreTeamB;
+  final KnockoutDecision? knockoutDecision;
   final String? mvpPlayerId;
   final bool prideEventsPending;
   final String? location;
@@ -31,6 +35,7 @@ class Match {
   final String? groupId;
   final String? groupStageId;
   final String? knockoutTieId;
+  final KnockoutMatchRole? knockoutMatchRole;
   final int? roundIndex;
   final int? slotNumber;
   final DateTime? scheduledAt;
@@ -57,6 +62,9 @@ class Match {
     this.status = MatchStatus.open,
     this.scoreTeamA,
     this.scoreTeamB,
+    this.penaltyScoreTeamA,
+    this.penaltyScoreTeamB,
+    this.knockoutDecision,
     this.mvpPlayerId,
     this.prideEventsPending = false,
     this.location,
@@ -73,6 +81,7 @@ class Match {
     this.groupId,
     this.groupStageId,
     this.knockoutTieId,
+    this.knockoutMatchRole,
     this.roundIndex,
     this.slotNumber,
     this.scheduledAt,
@@ -96,7 +105,15 @@ class Match {
 
   /// نتائج البطولة لا تُحتسب إلا بعد الاعتماد النهائي.
   bool get isOfficialTournamentResult =>
-      status == MatchStatus.settled && scoreTeamA != null && scoreTeamB != null;
+      status == MatchStatus.settled && hasValidRegulationScore;
+
+  bool get hasValidRegulationScore =>
+      scoreTeamA != null &&
+      scoreTeamA! >= 0 &&
+      scoreTeamA! <= PenaltyShootoutResult.maxScore &&
+      scoreTeamB != null &&
+      scoreTeamB! >= 0 &&
+      scoreTeamB! <= PenaltyShootoutResult.maxScore;
 
   /// هل النتيجة شاذة؟ (مثل 15-0)
   bool get hasAnomalousScore {
@@ -110,7 +127,54 @@ class Match {
     if (scoreTeamA == null || scoreTeamB == null) return null;
     if (scoreTeamA! > scoreTeamB!) return 'A';
     if (scoreTeamB! > scoreTeamA!) return 'B';
+    if (stageType == TournamentStageType.knockoutStage) {
+      return switch (resolvedKnockoutDecision) {
+        KnockoutDecision.teamA => 'A',
+        KnockoutDecision.teamB => 'B',
+        null => 'draw',
+      };
+    }
     return 'draw';
+  }
+
+  PenaltyShootoutResult? get penaltyShootoutResult {
+    final scoreA = penaltyScoreTeamA;
+    final scoreB = penaltyScoreTeamB;
+    if (scoreA == null || scoreB == null) return null;
+    return PenaltyShootoutResult(scoreTeamA: scoreA, scoreTeamB: scoreB);
+  }
+
+  /// Resolves a knockout winner without ever adding penalties to match goals.
+  KnockoutDecision? get resolvedKnockoutDecision {
+    final scoreA = scoreTeamA;
+    final scoreB = scoreTeamB;
+    if (stageType != TournamentStageType.knockoutStage ||
+        scoreA == null ||
+        scoreB == null) {
+      return null;
+    }
+
+    if (scoreA != scoreB &&
+        (penaltyScoreTeamA != null || penaltyScoreTeamB != null)) {
+      return null;
+    }
+    final derivedDecision = scoreA == scoreB
+        ? penaltyShootoutResult?.decision
+        : scoreA > scoreB
+        ? KnockoutDecision.teamA
+        : KnockoutDecision.teamB;
+    if (derivedDecision == null) return null;
+    if (knockoutDecision != null && knockoutDecision != derivedDecision) {
+      return null;
+    }
+    return derivedDecision;
+  }
+
+  KnockoutTieResolution? get knockoutResolution {
+    if (resolvedKnockoutDecision == null) return null;
+    return scoreTeamA == scoreTeamB
+        ? KnockoutTieResolution.penalties
+        : KnockoutTieResolution.regularTime;
   }
 
   Match copyWith({
@@ -125,6 +189,9 @@ class Match {
     MatchStatus? status,
     int? scoreTeamA,
     int? scoreTeamB,
+    Object? penaltyScoreTeamA = _unsetMatchValue,
+    Object? penaltyScoreTeamB = _unsetMatchValue,
+    Object? knockoutDecision = _unsetMatchValue,
     String? mvpPlayerId,
     bool? prideEventsPending,
     String? location,
@@ -141,6 +208,7 @@ class Match {
     String? groupId,
     String? groupStageId,
     String? knockoutTieId,
+    KnockoutMatchRole? knockoutMatchRole,
     int? roundIndex,
     int? slotNumber,
     DateTime? scheduledAt,
@@ -167,6 +235,15 @@ class Match {
       status: status ?? this.status,
       scoreTeamA: scoreTeamA ?? this.scoreTeamA,
       scoreTeamB: scoreTeamB ?? this.scoreTeamB,
+      penaltyScoreTeamA: identical(penaltyScoreTeamA, _unsetMatchValue)
+          ? this.penaltyScoreTeamA
+          : penaltyScoreTeamA as int?,
+      penaltyScoreTeamB: identical(penaltyScoreTeamB, _unsetMatchValue)
+          ? this.penaltyScoreTeamB
+          : penaltyScoreTeamB as int?,
+      knockoutDecision: identical(knockoutDecision, _unsetMatchValue)
+          ? this.knockoutDecision
+          : knockoutDecision as KnockoutDecision?,
       mvpPlayerId: mvpPlayerId ?? this.mvpPlayerId,
       prideEventsPending: prideEventsPending ?? this.prideEventsPending,
       location: location ?? this.location,
@@ -183,6 +260,7 @@ class Match {
       groupId: groupId ?? this.groupId,
       groupStageId: groupStageId ?? this.groupStageId,
       knockoutTieId: knockoutTieId ?? this.knockoutTieId,
+      knockoutMatchRole: knockoutMatchRole ?? this.knockoutMatchRole,
       roundIndex: roundIndex ?? this.roundIndex,
       slotNumber: slotNumber ?? this.slotNumber,
       scheduledAt: scheduledAt ?? this.scheduledAt,
@@ -199,3 +277,5 @@ class Match {
     );
   }
 }
+
+const Object _unsetMatchValue = Object();

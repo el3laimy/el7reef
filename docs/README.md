@@ -13,6 +13,17 @@
 | 3 | `03_SAD_System_Architecture_Document.md` | هيكلية النظام والتصميم عالي المستوى |
 | 4 | `04_UI_UX_Designs.md` | تصميمات واجهة وتجربة المستخدم |
 | 5 | `05_Project_Roadmap_and_Sprint_Plan.md` | خطة المشروع والـ Sprint Plan |
+| 6 | `06_UX_Hardening_And_Liquid_Glass_Plan.md` | خطة تقوية تجربة المستخدم وحالات الاستخدام واتجاه Liquid Glass |
+| 7 | `07_Tournament_Ego_UX_Audit_And_Repair_Plan.md` | تدقيق رحلة البطولة والمشاركة قبل توحيد الخطط |
+| 8 | `08_Unified_V1_Completion_And_Workspace_Plan.md` | **الخطة التنفيذية الوحيدة النشطة لإكمال V1 وترتيب مساحة العمل** |
+| 9 | `09_Workspace_Change_Manifest.md` | Manifest الحزمة الحالية وتقسيمها إلى checkpoints قابلة للمراجعة |
+| 10 | `10_Documentation_Claim_Audit.md` | تدقيق الادعاءات الحية واللقطات التاريخية لوثائق التنفيذ |
+| 11 | `11_Tournament_Membership_Migration_Runbook.md` | تشغيل آمن لترحيل عضويات منظمي البطولات القديمة |
+| 12 | `12_Data_Inventory_Retention_And_Data_Safety.md` | جرد البيانات ومصفوفة الاحتفاظ وورقة Data Safety |
+| 13 | `13_Play_Review_And_Moderation_Runbook.md` | حزمة مراجعة Play ومسار الإشراف على المحتوى |
+| 14 | `14_Execution_Progress_Report.md` | تقرير التقدم الحي ومحاولات التحقق ومنع الدوران |
+
+> ابتداءً من 2026-07-11، الوثيقة رقم 8 هي مصدر ترتيب التنفيذ والقبول الوحيد. الوثائق والخطط الأقدم تبقى مراجع قرار وأدلة تاريخية، ولا تُستخدم كـ backlog موازية.
 
 ---
 

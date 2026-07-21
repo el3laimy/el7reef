@@ -19,8 +19,6 @@ dependencies:
   firebase_auth: ^5.6.1
   cloud_firestore: ^5.6.5
   firebase_storage: ^12.4.5
-  firebase_messaging: ^15.2.5
-  firebase_analytics: ^11.5.5
   cloud_functions: ^5.6.2
 
   # UI & Animations
@@ -28,15 +26,9 @@ dependencies:
   lottie: ^3.3.1
   shimmer: ^3.0.0
   fl_chart: ^0.70.2
-  google_fonts: ^6.2.1
   google_sign_in: ^6.2.2
   cached_network_image: ^3.4.1
   flutter_svg: ^2.0.17
-
-  # Maps & Location
-  google_maps_flutter: ^2.12.1
-  geolocator: ^13.0.2
-  geocoding: ^3.0.0
 
   # Utilities
   intl: ^0.20.2
@@ -44,7 +36,6 @@ dependencies:
   share_plus: ^10.1.4
   path_provider: ^2.1.5
   image_picker: ^1.1.2
-  connectivity_plus: ^6.1.4
 
   # QR Code (Phase 6)
   qr_flutter: ^4.1.0
@@ -52,10 +43,9 @@ dependencies:
 
   # Local Storage
   shared_preferences: ^2.5.3
-  hive: ^2.2.3
-  hive_flutter: ^1.1.0
   firebase_crashlytics: ^4.3.10
   firebase_remote_config: ^5.5.0
+  app_links: ^7.2.1
 
 dev_dependencies:
   flutter_test:
@@ -67,4 +57,9 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/brand/
     - assets/images/
+  fonts:
+    - family: Cairo
+      fonts:
+        - asset: assets/fonts/Cairo-Variable.ttf

@@ -1,0 +1,48 @@
+name: Quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  static-and-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.2'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm --prefix functions ci
+      - run: flutter pub get
+      - run: npm run check:format:changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      - run: dart analyze lib/
+      - run: flutter test --no-pub
+      - run: npm run test:functions
+      - run: npm run check:architecture
+      - run: npm run check:indexes
+      - run: npm run check:hotspots
+      - run: git diff --check
+
+  firebase-emulator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm --prefix functions ci
+      - run: npm run test:rules:emulator
+      - run: npm run test:functions:emulator

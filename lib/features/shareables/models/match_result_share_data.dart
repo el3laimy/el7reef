@@ -1,5 +1,20 @@
 import 'package:flutter/material.dart';
 
+import '../../../domain/entities/share_payload.dart';
+
+@immutable
+class MatchResultScorerData {
+  final String displayName;
+  final String sideKey;
+  final int goals;
+
+  const MatchResultScorerData({
+    required this.displayName,
+    required this.sideKey,
+    required this.goals,
+  }) : assert(goals > 0);
+}
+
 @immutable
 class MatchResultShareData {
   final String matchId;
@@ -31,7 +46,9 @@ class MatchResultShareData {
   /// Real loaded tournament name only. Keep null when the name is unavailable.
   final String? tournamentName;
   final String? mvpName;
+  final List<MatchResultScorerData> scorers;
   final DateTime? playedAt;
+  final SharePayload? sharePayload;
 
   const MatchResultShareData({
     required this.matchId,
@@ -51,6 +68,8 @@ class MatchResultShareData {
     this.winnerSide,
     this.tournamentName,
     this.mvpName,
+    this.scorers = const [],
     this.playedAt,
+    this.sharePayload,
   });
 }

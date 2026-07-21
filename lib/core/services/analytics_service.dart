@@ -6,9 +6,19 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:uuid/uuid.dart';
 
 import '../constants/firebase_paths.dart';
+import '../../domain/entities/share_payload.dart';
+import '../../features/shareables/models/pride_export.dart';
 import '../utils/app_logger.dart';
 
 class AnalyticsService {
+  static const String prideCardViewedEvent = 'pride_card_viewed';
+  static const String shareStartedEvent = 'share_started';
+  static const String shareSheetReturnedEvent = 'share_sheet_returned';
+  static const String prideExportFinishedEvent = 'pride_export_finished';
+  static const String shareLinkOpenedEvent = 'share_link_opened';
+  static const String claimStartedFromCardEvent = 'claim_started_from_card';
+  static const String claimCompletedFromCardEvent = 'claim_completed_from_card';
+
   final FirebaseFirestore? _firestore;
   final Uuid _uuid;
 
@@ -112,5 +122,47 @@ class AnalyticsService {
       'join_completion',
       parameters: {'type': type, 'targetId': targetId, 'actorId': actorId},
     );
+  }
+
+  void trackPrideCardViewed(SharePayload payload) {
+    _trackPrideFunnelEvent(prideCardViewedEvent, payload);
+  }
+
+  void trackShareStarted(SharePayload payload) {
+    _trackPrideFunnelEvent(shareStartedEvent, payload);
+  }
+
+  void trackShareSheetReturned(SharePayload payload) {
+    _trackPrideFunnelEvent(shareSheetReturnedEvent, payload);
+  }
+
+  void trackPrideExportFinished(PrideExportResult result) {
+    trackEvent(
+      prideExportFinishedEvent,
+      parameters: {
+        'cardType': result.request.cardType.name,
+        'format': result.request.format.name,
+        'mediaType': result.request.mediaType.name,
+        'exportDurationMs': result.exportDuration.inMilliseconds,
+        'fallbackUsed': result.fallbackUsed,
+        if (result.failureCode != null) 'failureCode': result.failureCode,
+      },
+    );
+  }
+
+  void trackShareLinkOpened(SharePayload payload) {
+    _trackPrideFunnelEvent(shareLinkOpenedEvent, payload);
+  }
+
+  void trackClaimStartedFromCard(SharePayload payload) {
+    _trackPrideFunnelEvent(claimStartedFromCardEvent, payload);
+  }
+
+  void trackClaimCompletedFromCard(SharePayload payload) {
+    _trackPrideFunnelEvent(claimCompletedFromCardEvent, payload);
+  }
+
+  void _trackPrideFunnelEvent(String eventName, SharePayload payload) {
+    trackEvent(eventName, parameters: payload.analyticsParameters);
   }
 }

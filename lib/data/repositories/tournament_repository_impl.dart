@@ -20,6 +20,8 @@ class TournamentRepositoryImpl implements TournamentRepository {
       _firestore.collection(FirebasePaths.tournaments);
   CollectionReference<Map<String, dynamic>> get _participantsRef =>
       _firestore.collection(FirebasePaths.tournamentParticipants);
+  CollectionReference<Map<String, dynamic>> get _membershipsRef =>
+      _firestore.collection(FirebasePaths.tournamentMemberships);
 
   CollectionReference<Map<String, dynamic>> _followersRef(String tournamentId) {
     return _firestore
@@ -44,7 +46,19 @@ class TournamentRepositoryImpl implements TournamentRepository {
   Future<void> createTournament(Tournament tournament) async {
     return FirebaseErrorHandler.guard(() async {
       final model = TournamentModel.fromEntity(tournament);
-      await _col.doc(tournament.id).set(model.toJson());
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final batch = _firestore.batch();
+      batch.set(_col.doc(tournament.id), model.toJson());
+      batch.set(
+        _membershipsRef.doc('${tournament.organizerId}_${tournament.id}'),
+        {
+          'tournamentId': tournament.id,
+          'userId': tournament.organizerId,
+          'role': 'organizer',
+          'createdAt': now,
+        },
+      );
+      await batch.commit();
     });
   }
 
@@ -59,53 +73,52 @@ class TournamentRepositoryImpl implements TournamentRepository {
   @override
   Future<List<Tournament>> getDiscoverableTournaments({int limit = 20}) async {
     return FirebaseErrorHandler.guard(() async {
-      final snap = await _col
-          .where('discoverable', isEqualTo: true)
-          .where('visibility', isEqualTo: TournamentVisibility.public.name)
-          .where(
-            'status',
-            whereIn: [
-              TournamentStatus.registration.name,
-              TournamentStatus.groupStage.name,
-              TournamentStatus.knockoutStage.name,
-            ],
-          )
-          .orderBy('createdAt', descending: true)
-          .limit(limit)
-          .get();
-
-      final byId = <String, Tournament>{
-        for (final tournament in _mapTournamentDocs(snap.docs))
-          tournament.id: tournament,
-      };
-
-      // Legacy tournaments created before visibility/discoverable still need to
-      // appear in Explore. Firestore cannot query missing fields, so merge the
-      // old live query and let the entity defaults filter safely in memory.
-      if (byId.length < limit) {
-        final legacySnap = await _col
+      final snapshots = await Future.wait([
+        _col
+            .where('discoverable', isEqualTo: true)
+            .where('visibility', isEqualTo: TournamentVisibility.public.name)
+            .where('isFeatured', isEqualTo: true)
+            .orderBy('featuredPriority')
+            .limit(5)
+            .get(),
+        _col
+            .where('discoverable', isEqualTo: true)
+            .where('visibility', isEqualTo: TournamentVisibility.public.name)
             .where(
               'status',
               whereIn: [
+                TournamentStatus.upcoming.name,
                 TournamentStatus.registration.name,
                 TournamentStatus.groupStage.name,
+                TournamentStatus.transferWindow.name,
                 TournamentStatus.knockoutStage.name,
               ],
             )
             .orderBy('createdAt', descending: true)
             .limit(limit)
-            .get();
-        for (final tournament in _mapTournamentDocs(legacySnap.docs)) {
-          if (tournament.isDiscoverable) {
-            byId.putIfAbsent(tournament.id, () => tournament);
-          }
-        }
-      }
+            .get(),
+      ]);
+
+      final byId = <String, Tournament>{
+        for (final tournament in _mapTournamentDocs(snapshots.first.docs))
+          tournament.id: tournament,
+        for (final tournament in _mapTournamentDocs(snapshots.last.docs))
+          tournament.id: tournament,
+      };
 
       final tournaments = byId.values.toList(growable: true);
-      tournaments.sort(
-        (left, right) => right.createdAt.compareTo(left.createdAt),
-      );
+      tournaments.sort((left, right) {
+        if (left.isFeatured != right.isFeatured) {
+          return left.isFeatured ? -1 : 1;
+        }
+        if (left.isFeatured) {
+          final priority = left.featuredPriority.compareTo(
+            right.featuredPriority,
+          );
+          if (priority != 0) return priority;
+        }
+        return right.createdAt.compareTo(left.createdAt);
+      });
       return tournaments.take(limit).toList(growable: false);
     });
   }
@@ -118,12 +131,29 @@ class TournamentRepositoryImpl implements TournamentRepository {
   @override
   Future<List<Tournament>> getOrganizerTournaments(String organizerId) async {
     return FirebaseErrorHandler.guard(() async {
-      final snap = await _col
-          .where('organizerId', isEqualTo: organizerId)
-          .orderBy('createdAt', descending: true)
+      final snap = await _membershipsRef
+          .where('userId', isEqualTo: organizerId)
+          .where('role', isEqualTo: 'organizer')
           .get();
+      final tournamentIds = snap.docs
+          .map((doc) => doc.data()['tournamentId'] as String?)
+          .whereType<String>()
+          .toSet()
+          .toList(growable: false);
+      if (tournamentIds.isEmpty) {
+        return const <Tournament>[];
+      }
 
-      return _mapTournamentDocs(snap.docs);
+      final docs = await Future.wait(
+        tournamentIds.map((id) => _col.doc(id).get()),
+      );
+      final tournaments = _mapTournamentDocs(
+        docs.where((doc) => doc.exists && doc.data() != null),
+      );
+      tournaments.sort(
+        (left, right) => right.createdAt.compareTo(left.createdAt),
+      );
+      return tournaments;
     });
   }
 

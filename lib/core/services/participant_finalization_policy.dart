@@ -36,13 +36,10 @@ class ParticipantFinalizationPolicy {
     });
 
     return activeParticipants
-        .asMap()
-        .entries
         .map(
-          (entry) => entry.value.copyWith(
-            seed: entry.value.seed ?? entry.key + 1,
+          (participant) => participant.copyWith(
             status: TournamentParticipantStatus.finalized,
-            finalizedAt: entry.value.finalizedAt ?? now,
+            finalizedAt: participant.finalizedAt ?? now,
             updatedAt: now,
           ),
         )

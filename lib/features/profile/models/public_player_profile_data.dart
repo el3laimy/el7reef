@@ -4,6 +4,7 @@ class PublicPlayerProfileData {
   final ParticipantRefKind kind;
   final String id;
   final String displayName;
+  final String? photoUrl;
   final int totalGoals;
   final int totalMvps;
   final String? linkedPlayerId;
@@ -13,6 +14,7 @@ class PublicPlayerProfileData {
     required this.kind,
     required this.id,
     required this.displayName,
+    this.photoUrl,
     required this.totalGoals,
     required this.totalMvps,
     this.linkedPlayerId,

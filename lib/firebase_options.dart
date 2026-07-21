@@ -50,19 +50,18 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCG0kojRrJ4WCFfaFsFAMpcE_mGPbZ4JXs',
-    appId: '1:807857485912:android:a0d2caccaebd4ea2d8f22d',
-    messagingSenderId: '807857485912',
-    projectId: 'el7reef-app-2026',
-    storageBucket: 'el7reef-app-2026.firebasestorage.app',
+    apiKey: 'AIzaSyCoOckdNHa1qXfaq64G6R9R2aXZN7-1l78',
+    appId: '1:876861689777:android:0d2a83f5ba8026f0c7f790',
+    messagingSenderId: '876861689777',
+    projectId: 'el7reef-app',
+    storageBucket: 'el7reef-app.firebasestorage.app',
   );
 
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyArOolvg2CFS9C8lpaTYGefSSVLT6SWZHQ',
-    appId: '1:807857485912:ios:4068f942ababc771d8f22d',
-    messagingSenderId: '807857485912',
-    projectId: 'el7reef-app-2026',
-    storageBucket: 'el7reef-app-2026.firebasestorage.app',
-    iosBundleId: 'com.el7reef.app',
-  );
+  static FirebaseOptions get ios {
+    throw UnsupportedError(
+      'iOS Firebase is intentionally disabled for the current Android-only QA '
+      'scope. Create the iOS app inside Firebase project el7reef-app, download '
+      'ios/Runner/GoogleService-Info.plist, then regenerate firebase_options.dart.',
+    );
+  }
 }

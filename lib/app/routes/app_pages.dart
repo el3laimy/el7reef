@@ -7,6 +7,7 @@ import '../../features/splash/views/splash_screen.dart';
 import '../../features/splash/bindings/splash_binding.dart';
 import '../../features/auth/views/onboarding_screen.dart';
 import '../../features/auth/views/login_screen.dart';
+import '../../features/auth/views/profile_repair_screen.dart';
 import '../../features/auth/bindings/auth_binding.dart';
 import '../../features/home/views/home_screen.dart';
 import '../../features/home/bindings/home_binding.dart';
@@ -14,10 +15,14 @@ import '../../features/profile/views/profile_screen.dart';
 import '../../features/profile/bindings/profile_binding.dart';
 import '../../features/profile/views/public_player_profile_screen.dart';
 import '../../features/profile/bindings/public_player_profile_binding.dart';
+import '../../features/legal/views/privacy_policy_screen.dart';
+import '../../features/legal/views/community_guidelines_screen.dart';
 import '../../features/team/views/my_teams_screen.dart';
 import '../../features/team/bindings/team_binding.dart';
 import '../../features/team/views/team_roster_screen.dart';
 import '../../features/team/bindings/team_roster_binding.dart';
+import '../../features/team/views/public_team_profile_screen.dart';
+import '../../features/team/bindings/public_team_profile_binding.dart';
 import '../../features/match/views/match_discover_screen.dart';
 import '../../features/match/views/matchday_screen.dart';
 import '../../features/match/views/score_submit_screen.dart';
@@ -104,11 +109,28 @@ class AppPages {
       transitionDuration: const Duration(milliseconds: 500),
     ),
 
+    GetPage(
+      name: AppRoutes.privacyPolicy,
+      page: () => const PrivacyPolicyScreen(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+    GetPage(
+      name: AppRoutes.communityGuidelines,
+      page: () => const CommunityGuidelinesScreen(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
     // ── Login (Google Sign-In) ──
     GetPage(
       name: AppRoutes.login,
       page: () => const LoginScreen(),
       binding: AuthBinding(),
+      transition: Transition.fadeIn,
+    ),
+
+    GetPage(
+      name: AppRoutes.profileRepair,
+      page: () => const ProfileRepairScreen(),
       transition: Transition.fadeIn,
     ),
 
@@ -140,10 +162,24 @@ class AppPages {
       transition: Transition.rightToLeftWithFade,
     ),
 
+    GetPage(
+      name: AppRoutes.publicTeamProfile,
+      page: () => const PublicTeamProfileScreen(),
+      binding: PublicTeamProfileBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
     // ── My Teams ──
     GetPage(
       name: AppRoutes.myTeams,
       page: () => const MyTeamsScreen(),
+      binding: TeamBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    GetPage(
+      name: AppRoutes.createTeam,
+      page: () => const CreateTeamIntentScreen(),
       binding: TeamBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
@@ -243,6 +279,13 @@ class AppPages {
     ),
 
     GetPage(
+      name: AppRoutes.createTournament,
+      page: () => const CreateTournamentIntentScreen(),
+      binding: TournamentBinding(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+
+    GetPage(
       name: AppRoutes.tournamentExplore,
       page: () => const TournamentExploreScreen(),
       binding: TournamentBinding(),
@@ -303,13 +346,7 @@ class AppPages {
     // ── Tournament Registration Hub ──
     GetPage(
       name: AppRoutes.teamRegistration,
-      page: () => FeatureFlags.hybridTournamentRegistrationEnabled
-          ? const TournamentRegistrationScreen()
-          : const FeatureUnavailableScreen(
-              title: 'تسجيل البطولة غير متاح',
-              message:
-                  'واجهات التسجيل الهجين ما زالت متوقفة في هذا البناء حتى يتم تفعيلها بشكل كامل.',
-            ),
+      page: () => const TournamentRegistrationScreen(),
       binding: TournamentRegistrationBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
@@ -317,13 +354,7 @@ class AppPages {
     // ── Create Guest Team For Tournament ──
     GetPage(
       name: AppRoutes.tournamentGuestTeamCreate,
-      page: () => FeatureFlags.hybridTournamentRegistrationEnabled
-          ? const TournamentGuestTeamCreateScreen()
-          : const FeatureUnavailableScreen(
-              title: 'إنشاء فريق ضيف غير متاح',
-              message:
-                  'هذه الشاشة تعتمد على تدفقات التسجيل الهجين التي ما زالت غير مفعلة في هذا البناء.',
-            ),
+      page: () => const TournamentGuestTeamCreateScreen(),
       binding: TournamentGuestTeamCreateBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
@@ -331,13 +362,7 @@ class AppPages {
     // ── Tournament Registration Review ──
     GetPage(
       name: AppRoutes.tournamentRegistrationReview,
-      page: () => FeatureFlags.hybridTournamentRegistrationEnabled
-          ? const TournamentRegistrationReviewScreen()
-          : const FeatureUnavailableScreen(
-              title: 'مراجعة التسجيل غير متاحة',
-              message:
-                  'تم إيقاف واجهة مراجعة التسجيلات مؤقتًا لحين تفعيل التسجيل الهجين بالكامل.',
-            ),
+      page: () => const TournamentRegistrationReviewScreen(),
       binding: TournamentRegistrationReviewBinding(),
       transition: Transition.rightToLeftWithFade,
     ),

@@ -1,3 +1,5 @@
+import 'dart:ui' show SemanticsRole;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
@@ -7,9 +9,12 @@ import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/enums/tournament_enums.dart';
 import '../../../core/widgets/el7reef_button.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../core/widgets/el7reef_surface.dart';
+import '../../../core/widgets/section_state_card.dart';
 import '../../../domain/entities/tournament.dart';
 import '../controllers/tournament_controller.dart';
+import '../widgets/tournament_visual_language.dart';
 
 /// شاشة بطولاتي — لا تعرض بطولات عامة عشوائية داخل مساحة المستخدم الشخصية
 class TournamentListScreen extends GetView<TournamentController> {
@@ -22,7 +27,7 @@ class TournamentListScreen extends GetView<TournamentController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('بطولاتي 🏆'),
+        title: const Text('بطولاتي'),
         centerTitle: true,
         actions: [
           IconButton(
@@ -60,6 +65,11 @@ class TournamentListScreen extends GetView<TournamentController> {
             }
           }).toList();
           final followedList = controller.followedOnlyTournaments;
+          final hasBlockingMyTournamentsError =
+              controller.myTournamentsErrorMessage.value.isNotEmpty &&
+              myTournaments.isEmpty;
+          final showCreateActionAboveList =
+              myTournaments.isNotEmpty || hasBlockingMyTournamentsError;
 
           return RefreshIndicator(
             onRefresh: controller.loadMyTournaments,
@@ -67,105 +77,20 @@ class TournamentListScreen extends GetView<TournamentController> {
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
-                // ── ترويسة الشاشة الجذابة (Hero Header) ──
                 SliverToBoxAdapter(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: AppDimensions.pagePadding,
-                      vertical: AppDimensions.md,
-                    ),
-                    padding: const EdgeInsets.all(AppDimensions.cardPadding),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          AppColors.backgroundLight,
-                          AppColors.backgroundDeep,
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(
-                        AppDimensions.radiusLg,
-                      ),
-                      border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.15),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'بطولاتك أنت ⚽',
-                                style: AppTextStyles.headlineMedium.copyWith(
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'هنا تظهر البطولات التي تنظمها أو يشارك فيها فريقك. البطولات العامة لها مساحة استكشاف منفصلة.',
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.textSecondaryTinted,
-                                  height: 1.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: AppDimensions.md),
-                        Container(
-                          padding: const EdgeInsets.all(AppDimensions.md),
-                          decoration: BoxDecoration(
-                            color: AppColors.primarySurface,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primary.withValues(
-                                  alpha: 0.25,
-                                ),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.emoji_events_rounded,
-                            color: AppColors.primary,
-                            size: 32,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.05),
-                ),
-
-                // ── إجراءات بطولاتي ──
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimensions.pagePadding,
-                      vertical: AppDimensions.xs,
-                    ),
-                    child: Column(
-                      children: [
-                        El7reefButton(
-                          text: 'استكشف بطولات مفتوحة',
-                          icon: Icons.travel_explore_rounded,
-                          onPressed: () =>
-                              Get.toNamed(AppRoutes.tournamentExplore),
-                        ),
-                        const SizedBox(height: AppDimensions.sm),
-                        El7reefButton(
-                          text: 'أنشئ دورة جديدة الآن',
-                          icon: Icons.add_circle_outline_rounded,
-                          onPressed: () => _showCreateSheet(context),
-                        ),
-                      ],
-                    ).animate().fadeIn(duration: 450.ms),
+                  child: _TournamentPortfolioHeader(
+                    tournamentCount: myTournaments.length,
+                    activeCount: myTournaments
+                        .where(
+                          (tournament) =>
+                              tournament.status != TournamentStatus.completed &&
+                              tournament.status != TournamentStatus.cancelled,
+                        )
+                        .length,
+                    onCreate: showCreateActionAboveList
+                        ? () => _showCreateSheet(context)
+                        : null,
+                    onExplore: () => Get.toNamed(AppRoutes.tournamentExplore),
                   ),
                 ),
 
@@ -173,72 +98,97 @@ class TournamentListScreen extends GetView<TournamentController> {
                   child: SizedBox(height: AppDimensions.md),
                 ),
 
-                // ── شريط الفلترة التفاعلي (Chips) ──
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimensions.pagePadding,
-                    ),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      child: Row(
+                if (myTournaments.isNotEmpty) ...[
+                  // ── شريط الفلترة التفاعلي (Chips) ──
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppDimensions.pagePadding,
+                      ),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        child: Row(
+                          children: [
+                            _buildFilterChip(
+                              label: 'كل بطولاتي',
+                              filter: 'all',
+                            ),
+                            const SizedBox(width: AppDimensions.sm),
+                            _buildFilterChip(
+                              label: 'تسجيل مفتوح',
+                              filter: 'registration',
+                            ),
+                            const SizedBox(width: AppDimensions.sm),
+                            _buildFilterChip(
+                              label: 'جارية الآن',
+                              filter: 'active',
+                            ),
+                            const SizedBox(width: AppDimensions.sm),
+                            _buildFilterChip(
+                              label: 'منتهية',
+                              filter: 'completed',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ).animate().fadeIn(duration: 500.ms),
+                  ),
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: AppDimensions.md),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppDimensions.pagePadding,
+                      ),
+                      child: Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: AppDimensions.md,
+                        runSpacing: AppDimensions.xs,
                         children: [
-                          _buildFilterChip(label: 'كل بطولاتي', filter: 'all'),
-                          const SizedBox(width: AppDimensions.sm),
-                          _buildFilterChip(
-                            label: '✅ تسجيل مفتوح',
-                            filter: 'registration',
+                          Text(
+                            _getFilterTitle(),
+                            style: AppTextStyles.titleLarge.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                          const SizedBox(width: AppDimensions.sm),
-                          _buildFilterChip(
-                            label: '🔵 جارية الآن',
-                            filter: 'active',
-                          ),
-                          const SizedBox(width: AppDimensions.sm),
-                          _buildFilterChip(
-                            label: '🏆 منتهية',
-                            filter: 'completed',
-                          ),
+                          _CountBadge(count: filteredList.length),
                         ],
                       ),
                     ),
-                  ).animate().fadeIn(duration: 500.ms),
-                ),
+                  ),
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: AppDimensions.sm),
+                  ),
+                ],
 
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: AppDimensions.md),
-                ),
-
-                // ── عدد البطولات المصنفة ──
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimensions.pagePadding,
-                    ),
-                    child: Row(
-                      children: [
-                        Text(
-                          _getFilterTitle(),
-                          style: AppTextStyles.titleLarge.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const Spacer(),
-                        _CountBadge(count: filteredList.length),
-                      ],
+                if (controller.myTournamentsErrorMessage.value.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppDimensions.pagePadding,
+                        0,
+                        AppDimensions.pagePadding,
+                        AppDimensions.md,
+                      ),
+                      child: SectionStateCard.error(
+                        message: controller.myTournamentsErrorMessage.value,
+                        onAction: controller.loadMyTournaments,
+                      ),
                     ),
                   ),
-                ),
-
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: AppDimensions.sm),
-                ),
 
                 // ── قائمة البطولات المفلترة ──
-                filteredList.isEmpty
+                hasBlockingMyTournamentsError
+                    ? const SliverToBoxAdapter(child: SizedBox.shrink())
+                    : filteredList.isEmpty
                     ? SliverToBoxAdapter(
-                        child: _buildEmpty(compact: followedList.isNotEmpty),
+                        child: _buildEmpty(
+                          context,
+                          compact: followedList.isNotEmpty,
+                        ),
                       )
                     : SliverList(
                         delegate: SliverChildBuilderDelegate(
@@ -247,10 +197,7 @@ class TournamentListScreen extends GetView<TournamentController> {
                               horizontal: AppDimensions.pagePadding,
                               vertical: AppDimensions.xs,
                             ),
-                            child: _TournamentCard(
-                              tournament: filteredList[i],
-                              index: i,
-                            ),
+                            child: _TournamentCard(tournament: filteredList[i]),
                           ),
                           childCount: filteredList.length,
                         ),
@@ -289,15 +236,30 @@ class TournamentListScreen extends GetView<TournamentController> {
                           horizontal: AppDimensions.pagePadding,
                           vertical: AppDimensions.xs,
                         ),
-                        child: _TournamentCard(
-                          tournament: followedList[i],
-                          index: filteredList.length + i,
-                        ),
+                        child: _TournamentCard(tournament: followedList[i]),
                       ),
                       childCount: followedList.length,
                     ),
                   ),
                 ],
+
+                if (!hasBlockingMyTournamentsError &&
+                    controller.followedTournamentsErrorMessage.value.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppDimensions.pagePadding,
+                        AppDimensions.md,
+                        AppDimensions.pagePadding,
+                        0,
+                      ),
+                      child: SectionStateCard.error(
+                        message:
+                            controller.followedTournamentsErrorMessage.value,
+                        onAction: controller.loadMyTournaments,
+                      ),
+                    ),
+                  ),
 
                 const SliverToBoxAdapter(
                   child: SizedBox(height: AppDimensions.xxl),
@@ -342,7 +304,8 @@ class TournamentListScreen extends GetView<TournamentController> {
     };
   }
 
-  Widget _buildEmpty({bool compact = false}) {
+  Widget _buildEmpty(BuildContext context, {bool compact = false}) {
+    final isAllFilter = _selectedFilter.value == 'all';
     return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: AppDimensions.xxl,
@@ -358,7 +321,11 @@ class TournamentListScreen extends GetView<TournamentController> {
                 color: AppColors.surfaceBorder.withValues(alpha: 0.3),
                 shape: BoxShape.circle,
               ),
-              child: const Text('🏆', style: TextStyle(fontSize: 64)),
+              child: const Icon(
+                Icons.emoji_events_rounded,
+                size: 56,
+                color: AppColors.secondary,
+              ),
             ),
             const SizedBox(height: AppDimensions.md),
             Text(
@@ -369,13 +336,27 @@ class TournamentListScreen extends GetView<TournamentController> {
             ),
             const SizedBox(height: AppDimensions.xs),
             Text(
-              _selectedFilter.value == 'all'
-                  ? 'يمكنك إنشاء بطولة جديدة أو استكشاف البطولات المفتوحة بإرادتك.'
+              isAllFilter
+                  ? 'ابدأ بطولة شعبية وسجل الفرق والنتائج عشان تظهر كروت الفخر.'
                   : 'لا توجد بطولات تطابق هذا التصنيف حالياً.',
               style: AppTextStyles.bodyMedium.copyWith(
                 color: AppColors.textSecondary,
               ),
               textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppDimensions.lg),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
+              child: El7reefButton(
+                text: isAllFilter ? 'ابدأ دورة شعبية' : 'عرض كل بطولاتي',
+                icon: isAllFilter
+                    ? Icons.add_circle_outline_rounded
+                    : Icons.filter_alt_off_rounded,
+                isOutlined: !isAllFilter,
+                onPressed: isAllFilter
+                    ? () => _showCreateSheet(context)
+                    : () => _selectedFilter.value = 'all',
+              ),
             ),
           ],
         ),
@@ -384,11 +365,283 @@ class TournamentListScreen extends GetView<TournamentController> {
   }
 
   void _showCreateSheet(BuildContext context) {
+    controller.createTournamentErrorMessage.value = '';
     Get.bottomSheet(
       _CreateTournamentSheet(controller: controller),
       isScrollControlled: true,
     );
   }
+}
+
+class _TournamentPortfolioHeader extends StatelessWidget {
+  final int tournamentCount;
+  final int activeCount;
+  final VoidCallback? onCreate;
+  final VoidCallback onExplore;
+
+  const _TournamentPortfolioHeader({
+    required this.tournamentCount,
+    required this.activeCount,
+    required this.onCreate,
+    required this.onExplore,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppDimensions.pagePadding,
+        AppDimensions.md,
+        AppDimensions.pagePadding,
+        AppDimensions.xs,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
+        child: TournamentFieldPattern(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceRaised,
+              border: Border.all(color: AppColors.surfaceBorderStrong),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AppDimensions.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: AppColors.primarySurface,
+                          borderRadius: BorderRadius.circular(
+                            AppDimensions.radiusMd,
+                          ),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.28),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.emoji_events_outlined,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: AppDimensions.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'ملعب بطولاتك',
+                              style: AppTextStyles.headlineMedium.copyWith(
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              tournamentCount == 0
+                                  ? 'ابدأ أول بطولة، وسجّل كل لحظة فيها.'
+                                  : '$tournamentCount بطولة، منها $activeCount في الملعب الآن',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textSecondaryTinted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppDimensions.lg),
+                  if (onCreate != null) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      height: AppDimensions.buttonHeightLg,
+                      child: FilledButton.icon(
+                        onPressed: onCreate,
+                        icon: const Icon(Icons.add_rounded),
+                        label: const Text('أنشئ دورة جديدة الآن'),
+                      ),
+                    ),
+                    const SizedBox(height: AppDimensions.xs),
+                  ],
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: TextButton.icon(
+                      onPressed: onExplore,
+                      icon: const Icon(Icons.travel_explore_rounded),
+                      label: const Text('استكشف بطولات مفتوحة'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TournamentDefaultsSummary extends StatelessWidget {
+  final String formatLabel;
+  final int teamSize;
+  final int maxTeams;
+  final bool isPublic;
+
+  const _TournamentDefaultsSummary({
+    required this.formatLabel,
+    required this.teamSize,
+    required this.maxTeams,
+    required this.isPublic,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final summary =
+        '$formatLabel، $teamSize ضد $teamSize، $maxTeams فرق، ${isPublic ? 'عامة' : 'خاصة'}';
+    final expandedChips = MediaQuery.textScalerOf(context).scale(1) >= 1.5;
+    final setupChips = [
+      _TournamentSetupChip(
+        icon: Icons.account_tree_rounded,
+        label: formatLabel,
+        expanded: expandedChips,
+      ),
+      _TournamentSetupChip(
+        icon: Icons.sports_soccer_rounded,
+        label: '$teamSize ضد $teamSize',
+        expanded: expandedChips,
+      ),
+      _TournamentSetupChip(
+        icon: Icons.groups_rounded,
+        label: '$maxTeams فرق',
+        expanded: expandedChips,
+      ),
+      _TournamentSetupChip(
+        icon: isPublic ? Icons.public_rounded : Icons.lock_outline_rounded,
+        label: isPublic ? 'عامة' : 'خاصة',
+        expanded: expandedChips,
+      ),
+    ];
+    return Semantics(
+      container: true,
+      label: 'إعداد البطولة الحالي: $summary',
+      child: El7reefSurface(
+        color: AppColors.primarySurface,
+        borderColor: AppColors.primary.withValues(alpha: 0.32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.bolt_rounded,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: AppDimensions.xs),
+                Expanded(
+                  child: Text(
+                    'الإعداد السريع الجاهز',
+                    style: AppTextStyles.titleMedium.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppDimensions.sm),
+            if (expandedChips)
+              Column(
+                spacing: AppDimensions.xs,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: setupChips,
+              )
+            else
+              Wrap(
+                spacing: AppDimensions.xs,
+                runSpacing: AppDimensions.xs,
+                children: setupChips,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TournamentSetupChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool expanded;
+
+  const _TournamentSetupChip({
+    required this.icon,
+    required this.label,
+    required this.expanded,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: expanded ? double.infinity : null,
+      constraints: const BoxConstraints(minHeight: 40),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimensions.sm,
+        vertical: AppDimensions.xs,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+        border: Border.all(color: AppColors.surfaceBorder),
+      ),
+      child: Row(
+        mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
+        children: [
+          Icon(icon, color: AppColors.primary, size: 16),
+          const SizedBox(width: 4),
+          if (expanded)
+            Expanded(child: Text(label, style: AppTextStyles.labelMedium))
+          else
+            Text(label, style: AppTextStyles.labelMedium),
+        ],
+      ),
+    );
+  }
+}
+
+class CreateTournamentIntentScreen extends StatefulWidget {
+  const CreateTournamentIntentScreen({super.key});
+
+  @override
+  State<CreateTournamentIntentScreen> createState() =>
+      _CreateTournamentIntentScreenState();
+}
+
+class _CreateTournamentIntentScreenState
+    extends State<CreateTournamentIntentScreen> {
+  bool _opened = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_opened) return;
+    _opened = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final controller = Get.find<TournamentController>();
+      controller.createTournamentErrorMessage.value = '';
+      Get.bottomSheet(
+        _CreateTournamentSheet(controller: controller),
+        isScrollControlled: true,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => const TournamentListScreen();
 }
 
 /// شاشة استكشاف البطولات العامة المفتوحة. لا تحتوي على أدوات إدارة.
@@ -435,6 +688,12 @@ class _TournamentExploreScreenState extends State<TournamentExploreScreen> {
             );
           }
           final tournaments = controller.discoverableTournaments;
+          final featuredTournaments = tournaments
+              .where((tournament) => tournament.isFeatured)
+              .toList(growable: false);
+          final publicTournaments = tournaments
+              .where((tournament) => !tournament.isFeatured)
+              .toList(growable: false);
           return RefreshIndicator(
             color: AppColors.primary,
             onRefresh: controller.loadDiscoverableTournaments,
@@ -449,14 +708,14 @@ class _TournamentExploreScreenState extends State<TournamentExploreScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'بطولات عامة يمكنك متابعتها أو تسجيل فريقك فيها',
+                            'البطولات التي تستحق المتابعة',
                             style: AppTextStyles.titleLarge.copyWith(
                               fontWeight: FontWeight.w800,
                             ),
                           ),
                           const SizedBox(height: AppDimensions.xs),
                           Text(
-                            'هذه ليست قائمة بطولاتك الشخصية. اختر بطولة وافتح تفاصيلها للمشاهدة أو التسجيل.',
+                            'شاهد النتائج والترتيب وطريق الفرق نحو الكأس، أو تابع بطولة مفتوحة.',
                             style: AppTextStyles.bodySmall.copyWith(
                               color: AppColors.textSecondaryTinted,
                             ),
@@ -466,9 +725,64 @@ class _TournamentExploreScreenState extends State<TournamentExploreScreen> {
                     ),
                   ),
                 ),
-                if (tournaments.isEmpty)
+                if (controller.errorMessage.value.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppDimensions.pagePadding,
+                        0,
+                        AppDimensions.pagePadding,
+                        AppDimensions.md,
+                      ),
+                      child: SectionStateCard.error(
+                        title: tournaments.isEmpty
+                            ? 'تعذر فتح الاستكشاف'
+                            : 'تعذر تحديث القائمة',
+                        message: controller.errorMessage.value,
+                        onAction: controller.loadDiscoverableTournaments,
+                      ),
+                    ),
+                  ),
+                if (tournaments.isEmpty &&
+                    controller.errorMessage.value.isEmpty)
                   SliverToBoxAdapter(child: _buildExploreEmpty())
-                else
+                else ...[
+                  if (featuredTournaments.isNotEmpty) ...[
+                    const SliverToBoxAdapter(
+                      child: _ExploreSectionHeader(
+                        title: 'بطولات مميزة',
+                        subtitle: 'اختيارات الحريف التي تستحق المشاهدة',
+                        icon: Icons.workspace_premium_rounded,
+                      ),
+                    ),
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (_, i) => Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppDimensions.pagePadding,
+                            0,
+                            AppDimensions.pagePadding,
+                            AppDimensions.md,
+                          ),
+                          child: _FeaturedTournamentCard(
+                            tournament: featuredTournaments[i],
+                          ),
+                        ),
+                        childCount: featuredTournaments.length,
+                      ),
+                    ),
+                  ],
+                  if (publicTournaments.isNotEmpty) ...[
+                    const SliverToBoxAdapter(
+                      child: _ExploreSectionHeader(
+                        title: 'بطولات عامة',
+                        subtitle: 'بطولات جارية يمكنك متابعتها أو التسجيل فيها',
+                        icon: Icons.public_rounded,
+                      ),
+                    ),
+                  ],
+                ],
+                if (publicTournaments.isNotEmpty)
                   SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (_, i) => Padding(
@@ -477,11 +791,10 @@ class _TournamentExploreScreenState extends State<TournamentExploreScreen> {
                           vertical: AppDimensions.xs,
                         ),
                         child: _TournamentCard(
-                          tournament: tournaments[i],
-                          index: i,
+                          tournament: publicTournaments[i],
                         ),
                       ),
-                      childCount: tournaments.length,
+                      childCount: publicTournaments.length,
                     ),
                   ),
                 const SliverToBoxAdapter(
@@ -526,132 +839,325 @@ class _TournamentExploreScreenState extends State<TournamentExploreScreen> {
   }
 }
 
+class _ExploreSectionHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+
+  const _ExploreSectionHeader({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppDimensions.pagePadding,
+        AppDimensions.sm,
+        AppDimensions.pagePadding,
+        AppDimensions.sm,
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.primary, size: 20),
+          const SizedBox(width: AppDimensions.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: AppTextStyles.titleLarge.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondaryTinted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeaturedTournamentCard extends StatelessWidget {
+  final Tournament tournament;
+
+  const _FeaturedTournamentCard({required this.tournament});
+
+  @override
+  Widget build(BuildContext context) {
+    final spec = tournamentVisualSpec(tournament.status);
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    return Semantics(
+      button: true,
+      label: 'بطولة مميزة، ${tournament.name}، ${spec.statusLabel}',
+      child: Material(
+        key: ValueKey('featured-tournament-${tournament.id}'),
+        color: AppColors.surfaceRaised,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
+          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.48)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () =>
+              Get.toNamed(AppRoutes.tournamentDetailById(tournament.id)),
+          child: TournamentFieldPattern(
+            color: AppColors.primary,
+            child: Padding(
+              padding: const EdgeInsets.all(AppDimensions.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: AppDimensions.sm,
+                    runSpacing: AppDimensions.sm,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppDimensions.sm,
+                          vertical: AppDimensions.xs,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(
+                            AppDimensions.radiusFull,
+                          ),
+                        ),
+                        child: Text(
+                          'بطولة مميزة',
+                          style: AppTextStyles.labelLarge.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      TournamentStatusPill(spec: spec),
+                    ],
+                  ),
+                  const SizedBox(height: AppDimensions.md),
+                  Text(
+                    tournament.name,
+                    maxLines: textScale >= 1.5 ? 3 : 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.headlineLarge.copyWith(
+                      color: AppColors.textPrimaryTinted,
+                      fontWeight: FontWeight.w900,
+                      height: 1.15,
+                    ),
+                  ),
+                  if (tournament.description?.trim().isNotEmpty ?? false) ...[
+                    const SizedBox(height: AppDimensions.sm),
+                    Text(
+                      tournament.description!.trim(),
+                      maxLines: textScale >= 1.5 ? 4 : 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSecondaryTinted,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: AppDimensions.md),
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: AppDimensions.sm,
+                    runSpacing: AppDimensions.sm,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.groups_rounded,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                          const SizedBox(width: AppDimensions.xs),
+                          Text(
+                            '${tournament.teamCount} منتخب',
+                            style: AppTextStyles.labelLarge.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'شاهد البطولة',
+                            style: AppTextStyles.labelLarge.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(width: AppDimensions.xs),
+                          const Icon(
+                            Icons.arrow_back_rounded,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ══════════════════════════════════════════
 // ── بطاقة الدورة المطورة بصرياً ──
 // ══════════════════════════════════════════
 class _TournamentCard extends StatelessWidget {
   final Tournament tournament;
-  final int index;
-  const _TournamentCard({required this.tournament, required this.index});
+  const _TournamentCard({required this.tournament});
 
   @override
   Widget build(BuildContext context) {
-    final (Color statusColor, String statusLabel) = _statusInfo(
-      tournament.status,
-    );
-    final isReg = tournament.status == TournamentStatus.registration;
-    final isCompleted = tournament.status == TournamentStatus.completed;
+    final spec = tournamentVisualSpec(tournament.status);
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final showLocation = tournament.location?.trim().isNotEmpty ?? false;
 
-    // تحديد إطار ولمعة الكارد بناءً على الحالة
-    final Color cardBorderColor = isReg
-        ? AppColors.primary.withValues(alpha: 0.35)
-        : isCompleted
-        ? AppColors.secondary.withValues(alpha: 0.25)
-        : AppColors.surfaceBorder;
-
-    return GestureDetector(
-      onTap: () => Get.toNamed(AppRoutes.tournamentDetailById(tournament.id)),
-      child: El7reefSurface(
-        elevated: isReg,
-        borderColor: cardBorderColor,
-        padding: const EdgeInsets.all(AppDimensions.md),
-        margin: const EdgeInsets.only(bottom: AppDimensions.xs),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── العنوان والحالة ──
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    tournament.name,
-                    style: AppTextStyles.headlineSmall.copyWith(
-                      fontWeight: FontWeight.w800,
+    return Semantics(
+      button: true,
+      label:
+          '${tournament.name}، ${spec.statusLabel}، ${tournament.teamCount} من ${tournament.maxTeams} فريق',
+      child: Material(
+        color: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+          side: BorderSide(color: spec.accent.withValues(alpha: 0.28)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () =>
+              Get.toNamed(AppRoutes.tournamentDetailById(tournament.id)),
+          child: TournamentFieldPattern(
+            color: spec.accent,
+            child: Padding(
+              padding: const EdgeInsets.all(AppDimensions.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TournamentStatusPill(spec: spec),
+                            const SizedBox(height: AppDimensions.sm),
+                            Text(
+                              tournament.name,
+                              style: AppTextStyles.headlineMedium.copyWith(
+                                fontWeight: FontWeight.w900,
+                                height: 1.2,
+                              ),
+                              maxLines: textScale >= 1.5 ? 3 : 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: AppDimensions.md),
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: spec.accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(
+                            AppDimensions.radiusMd,
+                          ),
+                          border: Border.all(
+                            color: spec.accent.withValues(alpha: 0.28),
+                          ),
+                        ),
+                        child: Icon(spec.icon, color: spec.accent, size: 24),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppDimensions.md),
+                  Text(
+                    [
+                      tournamentFormatLabel(tournament.format),
+                      '${tournament.teamSize.value} ضد ${tournament.teamSize.value}',
+                      if (showLocation) tournament.location!.trim(),
+                    ].join('  •  '),
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSecondaryTinted,
+                      fontWeight: FontWeight.w600,
                     ),
-                    maxLines: 1,
+                    maxLines: textScale >= 1.5 ? 3 : 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                _StatusBadge(color: statusColor, label: statusLabel),
-              ],
-            ),
-
-            const SizedBox(height: AppDimensions.sm),
-
-            // ── تفاصيل الدورة (Chips) ──
-            Row(
-              children: [
-                _InfoChip(
-                  icon: Icons.groups_rounded,
-                  label: '${tournament.teamCount}/${tournament.maxTeams} فريق',
-                ),
-                const SizedBox(width: AppDimensions.md),
-                _InfoChip(
-                  icon: Icons.sports_soccer_rounded,
-                  label:
-                      '${tournament.teamSize.value} ضد ${tournament.teamSize.value}',
-                ),
-                if (tournament.location != null) ...[
-                  const SizedBox(width: AppDimensions.md),
-                  Expanded(
-                    child: _InfoChip(
-                      icon: Icons.location_on_outlined,
-                      label: tournament.location!,
+                  const SizedBox(height: AppDimensions.md),
+                  if (tournament.status == TournamentStatus.registration) ...[
+                    Row(
+                      children: [
+                        Text(
+                          '${tournament.teamCount}/${tournament.maxTeams} فريق',
+                          style: AppTextStyles.labelMedium.copyWith(
+                            color: AppColors.textPrimaryTinted,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          tournament.canRegister
+                              ? '${tournament.maxTeams - tournament.teamCount} أماكن متبقية'
+                              : 'اكتمل العدد',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: spec.accent,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+                    const SizedBox(height: AppDimensions.xs),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(
+                        AppDimensions.radiusFull,
+                      ),
+                      child: LinearProgressIndicator(
+                        value: tournament.fillRate.clamp(0.0, 1.0),
+                        backgroundColor: AppColors.surfaceBorderStrong,
+                        valueColor: AlwaysStoppedAnimation<Color>(spec.accent),
+                        minHeight: 7,
+                      ),
+                    ),
+                  ] else
+                    TournamentStageRail(
+                      activeIndex: spec.stageIndex,
+                      accent: spec.accent,
+                      semanticsLabel: spec.stageLabel,
+                    ),
                 ],
-              ],
+              ),
             ),
-
-            const SizedBox(height: AppDimensions.md),
-
-            // ── شريط التقدم لامتلاء البطولة ──
-            Row(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(
-                      AppDimensions.radiusFull,
-                    ),
-                    child: LinearProgressIndicator(
-                      value: tournament.fillRate.clamp(0.0, 1.0),
-                      backgroundColor: AppColors.surfaceBorder,
-                      valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-                      minHeight: 6,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: AppDimensions.md),
-                Text(
-                  '${(tournament.fillRate * 100).toInt()}%',
-                  style: AppTextStyles.labelSmall.copyWith(
-                    color: statusColor,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
-    ).animate(delay: (60 * index).ms).fadeIn(duration: 400.ms).slideY(begin: 0.05);
+    );
   }
-
-  (Color, String) _statusInfo(TournamentStatus s) => switch (s) {
-    TournamentStatus.upcoming => (AppColors.textMuted, '⏳ قريباً'),
-    TournamentStatus.registration => (AppColors.success, '✅ تسجيل مفتوح'),
-    TournamentStatus.groupStage => (AppColors.primary, '🔵 مجموعات'),
-    TournamentStatus.transferWindow => (
-      AppColors.secondary,
-      '🔄 نافذة انتقالات',
-    ),
-    TournamentStatus.knockoutStage => (AppColors.error, '⚡ إقصاء مباشر'),
-    TournamentStatus.completed => (
-      AppColors.secondary,
-      '🏆 منتهية بتثبيت البطل',
-    ),
-    TournamentStatus.cancelled => (AppColors.error, '❌ ملغاة'),
-  };
 }
 
 // ══════════════════════════════════════════
@@ -663,18 +1169,16 @@ class _CreateTournamentSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return El7reefGlassSurface(
+      variant: El7reefGlassVariant.sheet,
+      borderRadius: const BorderRadius.vertical(
+        top: Radius.circular(AppDimensions.radiusXl),
+      ),
       padding: EdgeInsets.only(
         left: AppDimensions.lg,
         right: AppDimensions.lg,
         top: AppDimensions.lg,
         bottom: MediaQuery.of(context).viewInsets.bottom + AppDimensions.lg,
-      ),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppDimensions.radiusXl),
-        ),
       ),
       child: SafeArea(
         child: SingleChildScrollView(
@@ -698,19 +1202,25 @@ class _CreateTournamentSheet extends StatelessWidget {
                 const SizedBox(height: AppDimensions.lg),
                 Row(
                   children: [
-                    const Text('🏆', style: TextStyle(fontSize: 28)),
+                    const Icon(
+                      Icons.emoji_events_rounded,
+                      color: AppColors.secondary,
+                      size: 28,
+                    ),
                     const SizedBox(width: AppDimensions.sm),
-                    Text(
-                      'أنشئ دورة جديدة بمجدها',
-                      style: AppTextStyles.headlineMedium.copyWith(
-                        fontWeight: FontWeight.w800,
+                    Expanded(
+                      child: Text(
+                        'أنشئ دورة جديدة بمجدها',
+                        style: AppTextStyles.headlineMedium.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: AppDimensions.xs),
                 Text(
-                  'أدخل التفاصيل ووزع الفرق والعب البطولة الشعبية.',
+                  'اكتب الاسم فقط وابدأ. الإعداد الشائع جاهز ويمكنك تعديله عند الحاجة.',
                   style: AppTextStyles.bodySmall.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -733,212 +1243,318 @@ class _CreateTournamentSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: AppDimensions.md),
 
-                // الموقع
-                TextFormField(
-                  controller: controller.locationController,
-                  style: AppTextStyles.bodyLarge,
-                  decoration: const InputDecoration(
-                    labelText: 'ملعب البطولة (اختياري)',
-                    hintText: 'مثال: ملعب البلدية الخماسي',
-                    prefixIcon: Icon(
-                      Icons.location_on_outlined,
-                      color: AppColors.primary,
+                AnimatedBuilder(
+                  animation: controller.maxTeamsController,
+                  builder: (context, _) => Obx(
+                    () => _TournamentDefaultsSummary(
+                      formatLabel: _compactFormatLabel(
+                        controller.selectedFormat.value,
+                      ),
+                      teamSize: controller.selectedTeamSize.value.value,
+                      maxTeams:
+                          int.tryParse(controller.maxTeamsController.text) ?? 8,
+                      isPublic:
+                          controller.selectedVisibility.value ==
+                          TournamentVisibility.public,
                     ),
                   ),
                 ),
-                const SizedBox(height: AppDimensions.lg),
+                const SizedBox(height: AppDimensions.sm),
 
-                // حجم الفريق
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.sports_soccer_rounded,
-                      size: 16,
+                Material(
+                  color: Colors.transparent,
+                  child: ExpansionTile(
+                    initiallyExpanded: false,
+                    tilePadding: EdgeInsets.zero,
+                    childrenPadding: EdgeInsets.zero,
+                    leading: const Icon(
+                      Icons.tune_rounded,
                       color: AppColors.primary,
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'حجم الفريق (عدد اللاعبين)',
+                    title: Text(
+                      'خيارات متقدمة',
                       style: AppTextStyles.titleMedium,
                     ),
-                  ],
-                ),
-                const SizedBox(height: AppDimensions.xs),
-                Obx(
-                  () => Wrap(
-                    spacing: AppDimensions.sm,
-                    children: TournamentTeamSize.values.map((size) {
-                      final selected =
-                          controller.selectedTeamSize.value == size;
-                      return ChoiceChip(
-                        label: Text(
-                          '${size.value} ضد ${size.value}',
-                          style: AppTextStyles.labelMedium.copyWith(
-                            color: selected
-                                ? AppColors.textOnPrimary
-                                : AppColors.textSecondary,
-                            fontWeight: selected
-                                ? FontWeight.w800
-                                : FontWeight.w500,
+                    subtitle: Text(
+                      'الملعب، حجم الفريق، النظام، العدد والظهور',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSecondaryTinted,
+                      ),
+                    ),
+                    children: [
+                      // الموقع
+                      TextFormField(
+                        controller: controller.locationController,
+                        style: AppTextStyles.bodyLarge,
+                        decoration: const InputDecoration(
+                          labelText: 'ملعب البطولة (اختياري)',
+                          hintText: 'مثال: ملعب البلدية الخماسي',
+                          prefixIcon: Icon(
+                            Icons.location_on_outlined,
+                            color: AppColors.primary,
                           ),
                         ),
-                        selected: selected,
-                        onSelected: (_) =>
-                            controller.selectedTeamSize.value = size,
-                        selectedColor: AppColors.primary,
-                        backgroundColor: AppColors.background,
-                        side: BorderSide(
-                          color: selected
-                              ? AppColors.primary
-                              : AppColors.surfaceBorder,
-                          width: 1,
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-                const SizedBox(height: AppDimensions.lg),
+                      ),
+                      const SizedBox(height: AppDimensions.lg),
 
-                // نوع الدورة
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.grid_view_rounded,
-                      size: 16,
-                      color: AppColors.primary,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'نوع ونظام البطولة الكروية',
-                      style: AppTextStyles.titleMedium,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppDimensions.xs),
-                Obx(
-                  () => Column(
-                    children: TournamentFormat.values.map((f) {
-                      final selected = controller.selectedFormat.value == f;
-                      return GestureDetector(
-                        onTap: () => controller.selectedFormat.value = f,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          margin: const EdgeInsets.only(
-                            bottom: AppDimensions.sm,
+                      // حجم الفريق
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.sports_soccer_rounded,
+                            size: 16,
+                            color: AppColors.primary,
                           ),
-                          padding: const EdgeInsets.all(AppDimensions.md),
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? AppColors.primarySurface
-                                : AppColors.background,
-                            borderRadius: BorderRadius.circular(
-                              AppDimensions.radiusMd,
-                            ),
-                            border: Border.all(
-                              color: selected
-                                  ? AppColors.primary
-                                  : AppColors.surfaceBorder,
-                              width: selected ? 1.5 : 1,
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'حجم الفريق (عدد اللاعبين)',
+                              style: AppTextStyles.titleMedium,
                             ),
                           ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                selected
-                                    ? Icons.radio_button_checked
-                                    : Icons.radio_button_unchecked,
+                        ],
+                      ),
+                      const SizedBox(height: AppDimensions.xs),
+                      Obx(
+                        () => Wrap(
+                          spacing: AppDimensions.sm,
+                          children: TournamentTeamSize.values.map((size) {
+                            final selected =
+                                controller.selectedTeamSize.value == size;
+                            return ChoiceChip(
+                              label: Text(
+                                '${size.value} ضد ${size.value}',
+                                style: AppTextStyles.labelMedium.copyWith(
+                                  color: selected
+                                      ? AppColors.textOnPrimary
+                                      : AppColors.textSecondary,
+                                  fontWeight: selected
+                                      ? FontWeight.w800
+                                      : FontWeight.w500,
+                                ),
+                              ),
+                              selected: selected,
+                              onSelected: (_) =>
+                                  controller.selectedTeamSize.value = size,
+                              selectedColor: AppColors.primary,
+                              backgroundColor: AppColors.background,
+                              side: BorderSide(
                                 color: selected
                                     ? AppColors.primary
-                                    : AppColors.textMuted,
-                                size: 22,
+                                    : AppColors.surfaceBorder,
+                                width: 1,
                               ),
-                              const SizedBox(width: AppDimensions.md),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _formatLabel(f),
-                                      style: AppTextStyles.titleMedium.copyWith(
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                      const SizedBox(height: AppDimensions.lg),
+
+                      // نوع الدورة
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.grid_view_rounded,
+                            size: 16,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'نوع ونظام البطولة الكروية',
+                              style: AppTextStyles.titleMedium,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppDimensions.xs),
+                      Obx(
+                        () => Semantics(
+                          container: true,
+                          role: SemanticsRole.radioGroup,
+                          child: Column(
+                            children: TournamentFormat.values.map((f) {
+                              final selected =
+                                  controller.selectedFormat.value == f;
+                              return Semantics(
+                                checked: selected,
+                                inMutuallyExclusiveGroup: true,
+                                child: GestureDetector(
+                                  onTap: () =>
+                                      controller.selectedFormat.value = f,
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    margin: const EdgeInsets.only(
+                                      bottom: AppDimensions.sm,
+                                    ),
+                                    padding: const EdgeInsets.all(
+                                      AppDimensions.md,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: selected
+                                          ? AppColors.primarySurface
+                                          : AppColors.background,
+                                      borderRadius: BorderRadius.circular(
+                                        AppDimensions.radiusMd,
+                                      ),
+                                      border: Border.all(
                                         color: selected
                                             ? AppColors.primary
-                                            : AppColors.textPrimary,
-                                        fontWeight: selected
-                                            ? FontWeight.w800
-                                            : FontWeight.w600,
+                                            : AppColors.surfaceBorder,
+                                        width: selected ? 1.5 : 1,
                                       ),
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      _formatDesc(f),
-                                      style: AppTextStyles.bodySmall.copyWith(
-                                        color: AppColors.textSecondary,
-                                      ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          selected
+                                              ? Icons.radio_button_checked
+                                              : Icons.radio_button_unchecked,
+                                          color: selected
+                                              ? AppColors.primary
+                                              : AppColors.textMuted,
+                                          size: 22,
+                                        ),
+                                        const SizedBox(width: AppDimensions.md),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                _formatLabel(f),
+                                                style: AppTextStyles.titleMedium
+                                                    .copyWith(
+                                                      color: selected
+                                                          ? AppColors.primary
+                                                          : AppColors
+                                                                .textPrimary,
+                                                      fontWeight: selected
+                                                          ? FontWeight.w800
+                                                          : FontWeight.w600,
+                                                    ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                _formatDesc(f),
+                                                style: AppTextStyles.bodySmall
+                                                    .copyWith(
+                                                      color: AppColors
+                                                          .textSecondary,
+                                                    ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
+                                  ),
                                 ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppDimensions.md),
+
+                      // عدد الفرق
+                      TextFormField(
+                        controller: controller.maxTeamsController,
+                        validator: controller.validateMaxTeams,
+                        keyboardType: TextInputType.number,
+                        style: AppTextStyles.bodyLarge,
+                        decoration: const InputDecoration(
+                          labelText: 'الحد الأقصى للفرق المشاركة',
+                          hintText: 'مثال: 8 أو 16 فريق',
+                          prefixIcon: Icon(
+                            Icons.groups_outlined,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppDimensions.xl),
+
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.visibility_rounded,
+                            size: 16,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'ظهور البطولة',
+                              style: AppTextStyles.titleMedium,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppDimensions.xs),
+                      Obx(
+                        () => Semantics(
+                          container: true,
+                          role: SemanticsRole.radioGroup,
+                          child: Column(
+                            children: [
+                              _buildVisibilityOption(
+                                visibility: TournamentVisibility.public,
+                                label: 'عامة وتظهر في الاستكشاف',
+                                description:
+                                    'مناسبة للبطولات المفتوحة؛ تظهر للفرق في شاشة استكشف.',
+                              ),
+                              _buildVisibilityOption(
+                                visibility: TournamentVisibility.private,
+                                label: 'خاصة ولا تظهر في الاستكشاف',
+                                description:
+                                    'مناسبة للبطولات التي تديرها بالدعوات أو الروابط المباشرة.',
                               ),
                             ],
                           ),
                         ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-                const SizedBox(height: AppDimensions.md),
-
-                // عدد الفرق
-                TextFormField(
-                  controller: controller.maxTeamsController,
-                  validator: controller.validateMaxTeams,
-                  keyboardType: TextInputType.number,
-                  style: AppTextStyles.bodyLarge,
-                  decoration: const InputDecoration(
-                    labelText: 'الحد الأقصى للفرق المشاركة',
-                    hintText: 'مثال: 8 أو 16 فريق',
-                    prefixIcon: Icon(
-                      Icons.groups_outlined,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppDimensions.xl),
-
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.visibility_rounded,
-                      size: 16,
-                      color: AppColors.primary,
-                    ),
-                    const SizedBox(width: 6),
-                    Text('ظهور البطولة', style: AppTextStyles.titleMedium),
-                  ],
-                ),
-                const SizedBox(height: AppDimensions.xs),
-                Obx(
-                  () => Column(
-                    children: [
-                      _buildVisibilityOption(
-                        visibility: TournamentVisibility.public,
-                        label: 'عامة وتظهر في الاستكشاف',
-                        description:
-                            'مناسبة للبطولات المفتوحة؛ تظهر للفرق في شاشة استكشف.',
                       ),
-                      _buildVisibilityOption(
-                        visibility: TournamentVisibility.private,
-                        label: 'خاصة ولا تظهر في الاستكشاف',
-                        description:
-                            'مناسبة للبطولات التي تديرها بالدعوات أو الروابط المباشرة.',
-                      ),
+                      const SizedBox(height: AppDimensions.xl),
                     ],
                   ),
                 ),
-                const SizedBox(height: AppDimensions.xl),
+                const SizedBox(height: AppDimensions.lg),
+
+                Obx(() {
+                  final message = controller.createTournamentErrorMessage.value;
+                  if (message.isEmpty) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: AppDimensions.md),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: El7reefSurface(
+                        color: AppColors.errorSurfaceSolid,
+                        borderColor: AppColors.error.withValues(alpha: 0.55),
+                        padding: const EdgeInsets.all(AppDimensions.md),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.error_outline_rounded,
+                              color: AppColors.error,
+                            ),
+                            const SizedBox(width: AppDimensions.sm),
+                            Expanded(
+                              child: Text(
+                                message,
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.error,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
 
                 Obx(
                   () => El7reefButton(
-                    text: 'إنشاء الدورة وبدء المغامرة',
+                    text: 'أنشئ البطولة',
                     icon: Icons.check_circle_outline,
                     isLoading: controller.isLoading.value,
                     onPressed: controller.createTournament,
@@ -967,115 +1583,74 @@ class _CreateTournamentSheet extends StatelessWidget {
       'النظام الكلاسيكي الأكثر إثارة؛ مجموعات تمهد للتصفيات النارية.',
   };
 
+  String _compactFormatLabel(TournamentFormat f) => switch (f) {
+    TournamentFormat.groupsOnly => 'مجموعات',
+    TournamentFormat.knockoutOnly => 'إقصائيات',
+    TournamentFormat.groupsThenKnockout => 'مجموعات ثم إقصائيات',
+  };
+
   Widget _buildVisibilityOption({
     required TournamentVisibility visibility,
     required String label,
     required String description,
   }) {
     final selected = controller.selectedVisibility.value == visibility;
-    return GestureDetector(
-      onTap: () => controller.selectedVisibility.value = visibility,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(bottom: AppDimensions.sm),
-        padding: const EdgeInsets.all(AppDimensions.md),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primarySurface : AppColors.background,
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-          border: Border.all(
-            color: selected ? AppColors.primary : AppColors.surfaceBorder,
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              selected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_unchecked,
-              color: selected ? AppColors.primary : AppColors.textMuted,
-              size: 22,
+    return Semantics(
+      checked: selected,
+      inMutuallyExclusiveGroup: true,
+      child: GestureDetector(
+        onTap: () => controller.selectedVisibility.value = visibility,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.only(bottom: AppDimensions.sm),
+          padding: const EdgeInsets.all(AppDimensions.md),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primarySurface : AppColors.background,
+            borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+            border: Border.all(
+              color: selected ? AppColors.primary : AppColors.surfaceBorder,
+              width: selected ? 1.5 : 1,
             ),
-            const SizedBox(width: AppDimensions.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: AppTextStyles.titleMedium.copyWith(
-                      color: selected
-                          ? AppColors.primary
-                          : AppColors.textPrimary,
-                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    description,
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
+          ),
+          child: Row(
+            children: [
+              Icon(
+                selected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
+                color: selected ? AppColors.primary : AppColors.textMuted,
+                size: 22,
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── مكونات مساعدة مطورة ──
-class _StatusBadge extends StatelessWidget {
-  final Color color;
-  final String label;
-  const _StatusBadge({required this.color, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-        border: Border.all(color: color.withValues(alpha: 0.35), width: 1),
-      ),
-      child: Text(
-        label,
-        style: AppTextStyles.labelSmall.copyWith(
-          color: color,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _InfoChip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 15, color: AppColors.primary),
-        const SizedBox(width: 6),
-        Flexible(
-          child: Text(
-            label,
-            style: AppTextStyles.labelMedium.copyWith(
-              color: AppColors.textSecondaryTinted,
-              fontWeight: FontWeight.w600,
-            ),
-            overflow: TextOverflow.ellipsis,
+              const SizedBox(width: AppDimensions.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: AppTextStyles.titleMedium.copyWith(
+                        color: selected
+                            ? AppColors.primary
+                            : AppColors.textPrimary,
+                        fontWeight: selected
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      description,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 }

@@ -1,147 +1,183 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'app_colors.dart';
 
-/// أنماط النصوص — خط Cairo للعربي
-abstract class AppTextStyles {
+/// سلم Cairo موحد لواجهة عربية واضحة وصور قابلة للقراءة.
+///
+/// أصغر نص وظيفي هو 12sp. أرقام النتائج تستخدم tabular figures، بينما يحدد
+/// مكوّن النتيجة نفسه اتجاه LTR حتى لا يتغير ترتيب الفريقين داخل RTL.
+abstract final class AppTextStyles {
+  static TextStyle _cairo({
+    required double size,
+    required FontWeight weight,
+    required Color color,
+    required double height,
+    List<FontFeature>? fontFeatures,
+  }) {
+    return TextStyle(
+      fontFamily: 'Cairo',
+      fontFamilyFallback: const <String>['Noto Sans Arabic'],
+      fontSize: size,
+      fontWeight: weight,
+      fontVariations: <FontVariation>[
+        FontVariation('wght', weight.value.toDouble()),
+      ],
+      color: color,
+      height: height,
+      fontFeatures: fontFeatures,
+    );
+  }
+
   // ── Display ──
-  static TextStyle displayLarge = GoogleFonts.cairo(
-    fontSize: 40,
-    fontWeight: FontWeight.w700,
+  static final TextStyle displayLarge = _cairo(
+    size: 36,
+    weight: FontWeight.w800,
+    color: AppColors.textPrimary,
+    height: 1.15,
+  );
+  static final TextStyle displayMedium = _cairo(
+    size: 30,
+    weight: FontWeight.w800,
     color: AppColors.textPrimary,
     height: 1.2,
   );
-
-  static TextStyle displayMedium = GoogleFonts.cairo(
-    fontSize: 32,
-    fontWeight: FontWeight.w700,
+  static final TextStyle displaySmall = _cairo(
+    size: 26,
+    weight: FontWeight.w700,
     color: AppColors.textPrimary,
-    height: 1.2,
-  );
-
-  static TextStyle displaySmall = GoogleFonts.cairo(
-    fontSize: 28,
-    fontWeight: FontWeight.w600,
-    color: AppColors.textPrimary,
-    height: 1.3,
+    height: 1.25,
   );
 
   // ── Headline ──
-  static TextStyle headlineLarge = GoogleFonts.cairo(
-    fontSize: 24,
-    fontWeight: FontWeight.w700,
+  static final TextStyle headlineLarge = _cairo(
+    size: 24,
+    weight: FontWeight.w700,
     color: AppColors.textPrimary,
     height: 1.3,
   );
-
-  static TextStyle headlineMedium = GoogleFonts.cairo(
-    fontSize: 20,
-    fontWeight: FontWeight.w600,
+  static final TextStyle headlineMedium = _cairo(
+    size: 20,
+    weight: FontWeight.w700,
     color: AppColors.textPrimary,
-    height: 1.3,
+    height: 1.35,
   );
-
-  static TextStyle headlineSmall = GoogleFonts.cairo(
-    fontSize: 18,
-    fontWeight: FontWeight.w600,
+  static final TextStyle headlineSmall = _cairo(
+    size: 18,
+    weight: FontWeight.w700,
     color: AppColors.textPrimary,
     height: 1.4,
   );
 
   // ── Title ──
-  static TextStyle titleLarge = GoogleFonts.cairo(
-    fontSize: 16,
-    fontWeight: FontWeight.w600,
+  static final TextStyle titleLarge = _cairo(
+    size: 18,
+    weight: FontWeight.w700,
     color: AppColors.textPrimary,
     height: 1.4,
   );
-
-  static TextStyle titleMedium = GoogleFonts.cairo(
-    fontSize: 14,
-    fontWeight: FontWeight.w600,
+  static final TextStyle titleMedium = _cairo(
+    size: 16,
+    weight: FontWeight.w600,
     color: AppColors.textPrimary,
     height: 1.4,
   );
-
-  static TextStyle titleSmall = GoogleFonts.cairo(
-    fontSize: 12,
-    fontWeight: FontWeight.w600,
+  static final TextStyle titleSmall = _cairo(
+    size: 14,
+    weight: FontWeight.w600,
     color: AppColors.textSecondary,
-    height: 1.4,
+    height: 1.45,
   );
 
   // ── Body ──
-  static TextStyle bodyLarge = GoogleFonts.cairo(
-    fontSize: 16,
-    fontWeight: FontWeight.w400,
+  static final TextStyle bodyLarge = _cairo(
+    size: 16,
+    weight: FontWeight.w500,
     color: AppColors.textPrimary,
-    height: 1.5,
+    height: 1.55,
   );
-
-  static TextStyle bodyMedium = GoogleFonts.cairo(
-    fontSize: 14,
-    fontWeight: FontWeight.w400,
+  static final TextStyle bodyMedium = _cairo(
+    size: 14,
+    weight: FontWeight.w500,
     color: AppColors.textSecondary,
-    height: 1.5,
+    height: 1.55,
   );
-
-  static TextStyle bodySmall = GoogleFonts.cairo(
-    fontSize: 12,
-    fontWeight: FontWeight.w400,
+  static final TextStyle bodySmall = _cairo(
+    size: 12,
+    weight: FontWeight.w500,
     color: AppColors.textMuted,
-    height: 1.5,
+    height: 1.55,
   );
 
   // ── Label ──
-  static TextStyle labelLarge = GoogleFonts.cairo(
-    fontSize: 14,
-    fontWeight: FontWeight.w500,
+  static final TextStyle labelLarge = _cairo(
+    size: 14,
+    weight: FontWeight.w700,
     color: AppColors.textPrimary,
     height: 1.4,
-    letterSpacing: 0.1,
   );
-
-  static TextStyle labelMedium = GoogleFonts.cairo(
-    fontSize: 12,
-    fontWeight: FontWeight.w500,
+  static final TextStyle labelMedium = _cairo(
+    size: 12,
+    weight: FontWeight.w700,
     color: AppColors.textSecondary,
     height: 1.4,
-    letterSpacing: 0.5,
   );
-
-  static TextStyle labelSmall = GoogleFonts.cairo(
-    fontSize: 10,
-    fontWeight: FontWeight.w500,
+  static final TextStyle labelSmall = _cairo(
+    size: 12,
+    weight: FontWeight.w600,
     color: AppColors.textMuted,
     height: 1.4,
-    letterSpacing: 0.5,
   );
 
-  // ── Special ──
-  static TextStyle ratingLarge = GoogleFonts.cairo(
-    fontSize: 48,
-    fontWeight: FontWeight.w800,
+  // ── Scores & achievements ──
+  static final TextStyle scoreLarge = _cairo(
+    size: 48,
+    weight: FontWeight.w800,
+    color: AppColors.textPrimary,
+    height: 1,
+    fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+  );
+  static final TextStyle scoreMedium = _cairo(
+    size: 30,
+    weight: FontWeight.w800,
+    color: AppColors.textPrimary,
+    height: 1,
+    fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+  );
+  static final TextStyle ratingLarge = scoreLarge.copyWith(
     color: AppColors.primary,
-    height: 1.0,
   );
-
-  static TextStyle ratingMedium = GoogleFonts.cairo(
-    fontSize: 28,
-    fontWeight: FontWeight.w700,
+  static final TextStyle ratingMedium = scoreMedium.copyWith(
     color: AppColors.primary,
-    height: 1.0,
   );
-
-  static TextStyle ratingDelta = GoogleFonts.cairo(
-    fontSize: 20,
-    fontWeight: FontWeight.w700,
-    height: 1.0,
+  static final TextStyle ratingDelta = _cairo(
+    size: 20,
+    weight: FontWeight.w700,
+    color: AppColors.textPrimary,
+    height: 1,
+    fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
   );
-
-  static TextStyle buttonText = GoogleFonts.cairo(
-    fontSize: 16,
-    fontWeight: FontWeight.w600,
+  static final TextStyle buttonText = _cairo(
+    size: 16,
+    weight: FontWeight.w700,
     color: AppColors.textOnPrimary,
     height: 1.4,
+  );
+
+  static TextTheme get textTheme => TextTheme(
+    displayLarge: displayLarge,
+    displayMedium: displayMedium,
+    displaySmall: displaySmall,
+    headlineLarge: headlineLarge,
+    headlineMedium: headlineMedium,
+    headlineSmall: headlineSmall,
+    titleLarge: titleLarge,
+    titleMedium: titleMedium,
+    titleSmall: titleSmall,
+    bodyLarge: bodyLarge,
+    bodyMedium: bodyMedium,
+    bodySmall: bodySmall,
+    labelLarge: labelLarge,
+    labelMedium: labelMedium,
+    labelSmall: labelSmall,
   );
 }

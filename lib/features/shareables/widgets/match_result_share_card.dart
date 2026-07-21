@@ -5,6 +5,9 @@ import 'package:intl/intl.dart' as intl;
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../models/match_result_share_data.dart';
+import '../models/pride_card_format.dart';
+import 'pride_card_shell.dart';
+import 'pride_card_text_scale.dart';
 
 class MatchResultShareCard extends StatelessWidget {
   static const double exportLogicalWidth = 360;
@@ -12,67 +15,51 @@ class MatchResultShareCard extends StatelessWidget {
 
   final MatchResultShareData data;
   final bool exportMode;
+  final PrideCardFormat format;
 
   const MatchResultShareCard({
     super.key,
     required this.data,
     this.exportMode = false,
+    this.format = PrideCardFormat.feed4x5,
   });
 
   @override
   Widget build(BuildContext context) {
-    final content = Directionality(
-      textDirection: TextDirection.rtl,
-      child: Container(
-        width: exportMode ? exportLogicalWidth : null,
-        height: exportMode ? exportLogicalHeight : null,
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          color: AppColors.backgroundDeep,
-          borderRadius: BorderRadius.circular(exportMode ? 20 : 28),
-          border: Border.all(
-            color: AppColors.textPrimaryTinted.withValues(alpha: 0.12),
-          ),
-          boxShadow: exportMode
-              ? null
-              : [
-                  BoxShadow(
-                    color: AppColors.backgroundDeep.withValues(alpha: 0.40),
-                    blurRadius: 24,
-                    offset: const Offset(0, 14),
-                  ),
-                ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(exportMode ? 16 : 22),
-          child: Stack(
-            children: [
-              Positioned.fill(child: _GlowBackground(data: data)),
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: Alignment.topCenter,
-                      radius: 1.1,
-                      colors: [
-                        AppColors.textPrimaryTinted.withValues(alpha: 0.08),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
+    final cardBody = ClipRRect(
+      borderRadius: BorderRadius.circular(exportMode ? 16 : 22),
+      child: Stack(
+        children: [
+          Positioned.fill(child: _GlowBackground(data: data)),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.topCenter,
+                  radius: 1.1,
+                  colors: [
+                    AppColors.textPrimaryTinted.withValues(alpha: 0.08),
+                    Colors.transparent,
+                  ],
                 ),
               ),
-              _CardContent(data: data, exportMode: exportMode),
-            ],
+            ),
           ),
-        ),
+          _CardContent(data: data, exportMode: exportMode, format: format),
+        ],
       ),
     );
-
-    if (exportMode) {
-      return Material(color: Colors.transparent, child: content);
-    }
-    return AspectRatio(aspectRatio: 16 / 9, child: content);
+    return PrideCardShell.framed(
+      exportMode: exportMode,
+      format: format,
+      semanticsLabel: 'بطاقة ملخص نتيجة المباراة',
+      payload: data.sharePayload,
+      exportPadding: EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: format.isStory ? 22 : 12,
+      ),
+      child: cardBody,
+    );
   }
 }
 
@@ -130,25 +117,45 @@ class _Glow extends StatelessWidget {
 class _CardContent extends StatelessWidget {
   final MatchResultShareData data;
   final bool exportMode;
+  final PrideCardFormat format;
 
-  const _CardContent({required this.data, required this.exportMode});
+  const _CardContent({
+    required this.data,
+    required this.exportMode,
+    required this.format,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final titleStyle = exportMode
+    final dense = PrideCardTextScale.usesDenseLayout(context);
+    final compact =
+        format == PrideCardFormat.square1x1 || format.isLandscape || dense;
+    final titleStyle = dense
         ? const TextStyle(
             color: AppColors.textPrimaryTinted,
-            fontSize: 18,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+          )
+        : exportMode
+        ? TextStyle(
+            color: AppColors.textPrimaryTinted,
+            fontSize: compact ? 14 : 18,
             fontWeight: FontWeight.w900,
           )
         : AppTextStyles.titleMedium.copyWith(
             color: AppColors.textPrimaryTinted,
             fontWeight: FontWeight.w900,
           );
-    final subtitleStyle = exportMode
+    final subtitleStyle = dense
         ? TextStyle(
             color: AppColors.textSecondaryTinted.withValues(alpha: 0.82),
-            fontSize: 10,
+            fontSize: 8,
+            fontWeight: FontWeight.w600,
+          )
+        : exportMode
+        ? TextStyle(
+            color: AppColors.textSecondaryTinted.withValues(alpha: 0.82),
+            fontSize: compact ? 8 : 10,
             fontWeight: FontWeight.w600,
           )
         : AppTextStyles.labelSmall.copyWith(
@@ -156,11 +163,15 @@ class _CardContent extends StatelessWidget {
           );
 
     return Padding(
-      padding: EdgeInsets.all(exportMode ? 18 : 18),
+      padding: EdgeInsets.all(compact ? 8 : 18),
       child: Column(
         children: [
-          _TopMeta(data: data, exportMode: exportMode),
-          SizedBox(height: exportMode ? 20 : 16),
+          _TopMeta(
+            data: data,
+            exportMode: exportMode || dense,
+            compact: compact,
+          ),
+          SizedBox(height: compact ? 4 : (exportMode ? 20 : 16)),
           Text(
             data.title,
             style: titleStyle,
@@ -168,18 +179,26 @@ class _CardContent extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: compact ? 2 : 6),
           Text(
             data.subtitle,
             style: subtitleStyle,
             textAlign: TextAlign.center,
-            maxLines: 2,
+            maxLines: compact ? 1 : 2,
             overflow: TextOverflow.ellipsis,
           ),
           const Spacer(),
-          _TeamScoreRow(data: data, exportMode: exportMode),
+          _TeamScoreRow(
+            data: data,
+            exportMode: exportMode || dense,
+            compact: compact,
+          ),
           const Spacer(),
-          _FooterMeta(data: data, exportMode: exportMode),
+          _FooterMeta(
+            data: data,
+            exportMode: exportMode || dense,
+            compact: compact,
+          ),
         ],
       ),
     );
@@ -189,14 +208,19 @@ class _CardContent extends StatelessWidget {
 class _TopMeta extends StatelessWidget {
   final MatchResultShareData data;
   final bool exportMode;
+  final bool compact;
 
-  const _TopMeta({required this.data, required this.exportMode});
+  const _TopMeta({
+    required this.data,
+    required this.exportMode,
+    required this.compact,
+  });
 
   @override
   Widget build(BuildContext context) {
     final chipStyle = TextStyle(
       color: AppColors.textPrimaryTinted,
-      fontSize: exportMode ? 9 : 11,
+      fontSize: compact ? 7 : (exportMode ? 9 : 11),
       fontWeight: FontWeight.w900,
       letterSpacing: 0,
     );
@@ -229,8 +253,13 @@ class _TopMeta extends StatelessWidget {
 class _TeamScoreRow extends StatelessWidget {
   final MatchResultShareData data;
   final bool exportMode;
+  final bool compact;
 
-  const _TeamScoreRow({required this.data, required this.exportMode});
+  const _TeamScoreRow({
+    required this.data,
+    required this.exportMode,
+    required this.compact,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -248,9 +277,10 @@ class _TeamScoreRow extends StatelessWidget {
               accent: data.teamAAccent,
               winnerSide: data.winnerSide == 'A',
               exportMode: exportMode,
+              compact: compact,
             ),
           ),
-          _ScoreBlock(data: data, exportMode: exportMode),
+          _ScoreBlock(data: data, exportMode: exportMode, compact: compact),
           Expanded(
             child: _TeamPanel(
               name: data.teamBName,
@@ -259,6 +289,7 @@ class _TeamScoreRow extends StatelessWidget {
               accent: data.teamBAccent,
               winnerSide: data.winnerSide == 'B',
               exportMode: exportMode,
+              compact: compact,
             ),
           ),
         ],
@@ -274,6 +305,7 @@ class _TeamPanel extends StatelessWidget {
   final Color accent;
   final bool winnerSide;
   final bool exportMode;
+  final bool compact;
 
   const _TeamPanel({
     required this.name,
@@ -282,14 +314,15 @@ class _TeamPanel extends StatelessWidget {
     required this.accent,
     required this.winnerSide,
     required this.exportMode,
+    required this.compact,
   });
 
   @override
   Widget build(BuildContext context) {
-    final logoSize = exportMode ? 54.0 : 58.0;
+    final logoSize = compact ? 34.0 : (exportMode ? 54.0 : 58.0);
     final nameStyle = TextStyle(
       color: AppColors.textPrimaryTinted,
-      fontSize: exportMode ? 14 : 14,
+      fontSize: compact ? 10 : 14,
       fontWeight: FontWeight.w900,
       height: 1.08,
     );
@@ -330,7 +363,7 @@ class _TeamPanel extends StatelessWidget {
                 ),
             ],
           ),
-          SizedBox(height: exportMode ? 10 : 10),
+          SizedBox(height: compact ? 4 : 10),
           Text(
             name,
             style: nameStyle,
@@ -338,7 +371,7 @@ class _TeamPanel extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          SizedBox(height: exportMode ? 8 : 8),
+          SizedBox(height: compact ? 3 : 8),
           if (formation != null && formation!.isNotEmpty)
             _FormationChip(
               label: formation!,
@@ -418,25 +451,38 @@ class _TeamLogo extends StatelessWidget {
 class _ScoreBlock extends StatelessWidget {
   final MatchResultShareData data;
   final bool exportMode;
+  final bool compact;
 
-  const _ScoreBlock({required this.data, required this.exportMode});
+  const _ScoreBlock({
+    required this.data,
+    required this.exportMode,
+    required this.compact,
+  });
 
   @override
   Widget build(BuildContext context) {
     final scoreStyle = TextStyle(
       color: AppColors.textPrimaryTinted,
-      fontSize: exportMode ? 44 : 46,
+      fontSize: compact ? 28 : (exportMode ? 44 : 46),
       fontWeight: FontWeight.w900,
       height: 0.95,
       letterSpacing: 0,
     );
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: exportMode ? 12 : 14),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 3 : (exportMode ? 12 : 14),
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('${data.scoreA} - ${data.scoreB}', style: scoreStyle),
-          SizedBox(height: exportMode ? 6 : 6),
+          SizedBox(
+            width: compact ? 74 : 112,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text('${data.scoreA} - ${data.scoreB}', style: scoreStyle),
+            ),
+          ),
+          SizedBox(height: compact ? 3 : 6),
           Container(
             width: exportMode ? 54 : 54,
             height: exportMode ? 3 : 3,
@@ -456,8 +502,13 @@ class _ScoreBlock extends StatelessWidget {
 class _FooterMeta extends StatelessWidget {
   final MatchResultShareData data;
   final bool exportMode;
+  final bool compact;
 
-  const _FooterMeta({required this.data, required this.exportMode});
+  const _FooterMeta({
+    required this.data,
+    required this.exportMode,
+    required this.compact,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -466,6 +517,7 @@ class _FooterMeta extends StatelessWidget {
         : intl.DateFormat('yyyy/MM/dd').format(data.playedAt!);
     final meta = [
       ?playedAt,
+      if (data.scorers.isNotEmpty) _scorersLabel(data.scorers),
       if (data.mvpName != null && data.mvpName!.isNotEmpty)
         'نجم المباراة: ${data.mvpName}',
     ].join('  •  ');
@@ -476,26 +528,40 @@ class _FooterMeta extends StatelessWidget {
             meta,
             style: TextStyle(
               color: AppColors.textSecondaryTinted.withValues(alpha: 0.72),
-              fontSize: exportMode ? 9 : 11,
+              fontSize: compact ? 7 : (exportMode ? 9 : 11),
               fontWeight: FontWeight.w700,
             ),
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          SizedBox(height: exportMode ? 8 : 8),
+          SizedBox(height: compact ? 3 : 8),
         ],
         Text(
           'EL7REEF  •  العب. اتوثق. اتفاخر.',
           style: TextStyle(
             color: AppColors.primaryLight,
-            fontSize: exportMode ? 10 : 12,
+            fontSize: compact ? 8 : (exportMode ? 10 : 12),
             fontWeight: FontWeight.w900,
             letterSpacing: 0,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
+  }
+
+  String _scorersLabel(List<MatchResultScorerData> scorers) {
+    final visible = scorers
+        .take(3)
+        .map((scorer) {
+          final suffix = scorer.goals > 1 ? ' ×${scorer.goals}' : '';
+          return '${scorer.displayName}$suffix';
+        })
+        .join('، ');
+    final remaining = scorers.length - 3;
+    return 'الهدافون: $visible${remaining > 0 ? ' +$remaining' : ''}';
   }
 }
 

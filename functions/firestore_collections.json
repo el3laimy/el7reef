@@ -1,0 +1,19 @@
+{
+  "players": "players",
+  "guestPlayers": "guestPlayers",
+  "teamMemberships": "teamMemberships",
+  "matches": "matches",
+  "matchEvents": "matchEvents",
+  "matchSides": "matchSides",
+  "matchSidePlayers": "matchSidePlayers",
+  "matchLineupSnapshots": "matchLineupSnapshots",
+  "tournaments": "tournaments",
+  "tournamentParticipants": "tournamentParticipants",
+  "tournamentGroups": "tournamentGroups",
+  "groupStandingSnapshots": "groupStandingSnapshots",
+  "knockoutBrackets": "knockoutBrackets",
+  "knockoutTies": "knockoutTies",
+  "auditEvents": "auditEvents",
+  "fanVotingSessions": "fanVotingSessions",
+  "playerStats": "player_stats"
+}

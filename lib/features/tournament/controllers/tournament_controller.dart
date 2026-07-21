@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/enums/tournament_enums.dart';
+import '../../../core/errors/app_exceptions.dart';
 import '../../../core/utils/app_logger.dart';
+import '../../../app/routes/app_routes.dart';
 import '../../../data/repositories/tournament_repository_impl.dart';
 import '../../../data/repositories/team_repository_impl.dart';
 import '../../../domain/entities/tournament.dart';
@@ -31,6 +33,9 @@ class TournamentController extends GetxController {
   final RxBool isLoadingMyTournaments = false.obs;
   final RxBool isLoadingDiscoverableTournaments = false.obs;
   final RxString errorMessage = ''.obs;
+  final RxString createTournamentErrorMessage = ''.obs;
+  final RxString myTournamentsErrorMessage = ''.obs;
+  final RxString followedTournamentsErrorMessage = ''.obs;
 
   /// Backward-compatible alias for older callers. Prefer discoverableTournaments.
   RxList<Tournament> get liveTournaments => discoverableTournaments;
@@ -83,7 +88,9 @@ class TournamentController extends GetxController {
         loadMyTournaments();
       }
     });
-    loadMyTournaments();
+    if (_authService.currentPlayer.value != null) {
+      loadMyTournaments();
+    }
   }
 
   void resetSessionState() {
@@ -95,6 +102,9 @@ class TournamentController extends GetxController {
     isLoadingMyTournaments.value = false;
     isLoadingDiscoverableTournaments.value = false;
     errorMessage.value = '';
+    createTournamentErrorMessage.value = '';
+    myTournamentsErrorMessage.value = '';
+    followedTournamentsErrorMessage.value = '';
     _clearForm();
   }
 
@@ -102,10 +112,16 @@ class TournamentController extends GetxController {
   Future<void> loadDiscoverableTournaments() async {
     try {
       isLoadingDiscoverableTournaments.value = true;
-      discoverableTournaments.value = await _repo.getDiscoverableTournaments();
+      errorMessage.value = '';
+      discoverableTournaments.assignAll(
+        await _repo.getDiscoverableTournaments(),
+      );
     } catch (e) {
       AppLogger.error('TournamentController.loadDiscoverableTournaments', e);
-      errorMessage.value = 'فشل تحميل البطولات العامة';
+      final reason = e is AppException
+          ? e.message
+          : 'تعذر إتمام العملية حالياً. حاول مرة أخرى.';
+      errorMessage.value = 'تعذر تحميل البطولات المفتوحة. $reason';
     } finally {
       isLoadingDiscoverableTournaments.value = false;
     }
@@ -116,26 +132,60 @@ class TournamentController extends GetxController {
   /// تحميل دوراتي (كمنظم)
   Future<void> loadMyTournaments() async {
     final uid = _authService.currentUserId;
-    if (uid == null) return;
+    if (uid == null || _authService.currentPlayer.value == null) return;
+    if (isLoadingMyTournaments.value) return;
+
+    isLoadingMyTournaments.value = true;
+    myTournamentsErrorMessage.value = '';
+    followedTournamentsErrorMessage.value = '';
+    var organizedLoadFailed = false;
+    var participatingLoadFailed = false;
+
     try {
-      isLoadingMyTournaments.value = true;
       final organized = await _repo.getOrganizerTournaments(uid);
-      final followed = await _repo.getFollowedTournaments(uid);
+      myOrganizedTournaments.assignAll(organized);
+    } catch (e) {
+      organizedLoadFailed = true;
+      AppLogger.error('TournamentController.loadOrganizedTournaments', e);
+    }
+
+    try {
       final teams = await _teamRepo.getPlayerTeams(uid);
       final participating = <String, Tournament>{};
-      for (final team in teams) {
-        final tournaments = await _repo.getPlayerTournaments(team.id);
+      final tournamentsByTeam = await Future.wait(
+        teams.map((team) => _repo.getPlayerTournaments(team.id)),
+      );
+      for (final tournaments in tournamentsByTeam) {
         for (final tournament in tournaments) {
           participating[tournament.id] = tournament;
         }
       }
-      myOrganizedTournaments.value = organized;
-      myParticipatingTournaments.value = participating.values.toList(
-        growable: false,
-      )..sort((left, right) => right.createdAt.compareTo(left.createdAt));
-      followedTournaments.value = followed;
+      final sortedParticipating = participating.values.toList()
+        ..sort((left, right) => right.createdAt.compareTo(left.createdAt));
+      myParticipatingTournaments.assignAll(sortedParticipating);
     } catch (e) {
-      AppLogger.error('TournamentController.loadMyTournaments', e);
+      participatingLoadFailed = true;
+      AppLogger.error('TournamentController.loadParticipatingTournaments', e);
+    }
+
+    if (organizedLoadFailed && participatingLoadFailed) {
+      myTournamentsErrorMessage.value = 'تعذر تحميل بطولاتك حالياً.';
+    } else if (organizedLoadFailed) {
+      myTournamentsErrorMessage.value =
+          'تعذر تحديث البطولات التي تنظمها حالياً.';
+    } else if (participatingLoadFailed) {
+      myTournamentsErrorMessage.value = myOrganizedTournaments.isEmpty
+          ? 'تعذر تحديث بطولات فرقك حالياً.'
+          : 'ظهرت بطولاتك المنظمة، لكن تعذر تحديث بطولات فرقك.';
+    }
+
+    try {
+      followedTournaments.assignAll(await _repo.getFollowedTournaments(uid));
+    } catch (e) {
+      AppLogger.error('TournamentController.loadFollowedTournaments', e);
+      followedTournaments.clear();
+      followedTournamentsErrorMessage.value =
+          'تعذر تحميل البطولات التي تتابعها حالياً.';
     } finally {
       isLoadingMyTournaments.value = false;
     }
@@ -143,52 +193,93 @@ class TournamentController extends GetxController {
 
   /// إنشاء دورة جديدة
   Future<void> createTournament() async {
-    if (!formKey.currentState!.validate()) return;
+    if (isLoading.value || formKey.currentState?.validate() != true) return;
     final uid = _authService.currentUserId;
-    if (uid == null) return;
+    if (uid == null) {
+      createTournamentErrorMessage.value = 'سجّل الدخول أولاً لإنشاء بطولة.';
+      return;
+    }
+
+    isLoading.value = true;
+    createTournamentErrorMessage.value = '';
+    final tournament = Tournament(
+      id: const Uuid().v4(),
+      organizerId: uid,
+      name: nameController.text.trim(),
+      description: descriptionController.text.trim().isEmpty
+          ? null
+          : descriptionController.text.trim(),
+      location: locationController.text.trim().isEmpty
+          ? null
+          : locationController.text.trim(),
+      format: selectedFormat.value,
+      teamSize: selectedTeamSize.value,
+      maxTeams: int.tryParse(maxTeamsController.text) ?? 8,
+      visibility: selectedVisibility.value,
+      discoverable: selectedVisibility.value == TournamentVisibility.public,
+      status: TournamentStatus.registration,
+      isFantasyEnabled: false,
+      createdAt: DateTime.now(),
+    );
 
     try {
-      isLoading.value = true;
-      errorMessage.value = '';
-
-      final tournament = Tournament(
-        id: const Uuid().v4(),
-        organizerId: uid,
-        name: nameController.text.trim(),
-        description: descriptionController.text.trim().isEmpty
-            ? null
-            : descriptionController.text.trim(),
-        location: locationController.text.trim().isEmpty
-            ? null
-            : locationController.text.trim(),
-        format: selectedFormat.value,
-        teamSize: selectedTeamSize.value,
-        maxTeams: int.tryParse(maxTeamsController.text) ?? 8,
-        visibility: selectedVisibility.value,
-        discoverable: selectedVisibility.value == TournamentVisibility.public,
-        status: TournamentStatus.registration,
-        isFantasyEnabled: false,
-        createdAt: DateTime.now(),
-      );
-
       await _repo.createTournament(tournament);
-      myOrganizedTournaments.insert(0, tournament);
-      if (tournament.isDiscoverable) {
-        discoverableTournaments.insert(0, tournament);
-      }
-
-      _clearForm();
-      Get.back();
-      Get.snackbar(
-        'تم ✅',
-        'تم إنشاء الدورة بنجاح!',
-        snackPosition: SnackPosition.BOTTOM,
-      );
     } catch (e) {
-      errorMessage.value = 'فشل إنشاء الدورة: $e';
-    } finally {
+      AppLogger.error('TournamentController.createTournament', e);
+      final reason = e is AppException
+          ? e.message
+          : 'تعذر إتمام العملية حالياً. حاول مرة أخرى.';
+      createTournamentErrorMessage.value = 'فشل إنشاء البطولة. $reason';
       isLoading.value = false;
+      return;
     }
+
+    try {
+      _putTournamentFirst(myOrganizedTournaments, tournament);
+      if (tournament.isDiscoverable) {
+        _putTournamentFirst(discoverableTournaments, tournament);
+      }
+    } catch (e) {
+      AppLogger.error('TournamentController.syncCreatedTournament', e);
+      await loadMyTournaments();
+      if (tournament.isDiscoverable) {
+        await loadDiscoverableTournaments();
+      }
+    }
+
+    _clearForm();
+    var dashboardOpened = true;
+    try {
+      final openedFromCreateIntent =
+          Get.currentRoute == AppRoutes.createTournament;
+      if (Get.isBottomSheetOpen == true) {
+        Get.back();
+      }
+      final dashboardRoute = AppRoutes.organizerDashboardForTournament(
+        tournament.id,
+      );
+      if (openedFromCreateIntent) {
+        Get.offNamed(dashboardRoute);
+      } else {
+        Get.toNamed(dashboardRoute);
+      }
+    } catch (e) {
+      dashboardOpened = false;
+      AppLogger.error('TournamentController.openCreatedTournament', e);
+    }
+    isLoading.value = false;
+    Get.snackbar(
+      dashboardOpened ? 'تم ✅' : 'تم الحفظ ✅',
+      dashboardOpened
+          ? 'تم إنشاء الدورة بنجاح!'
+          : 'تم إنشاء الدورة، ويمكنك فتحها من بطولاتك.',
+      snackPosition: SnackPosition.BOTTOM,
+    );
+  }
+
+  void _putTournamentFirst(RxList<Tournament> target, Tournament tournament) {
+    target.removeWhere((item) => item.id == tournament.id);
+    target.insert(0, tournament);
   }
 
   void _clearForm() {

@@ -3,6 +3,19 @@ import '../../core/enums/claim_payload_scope.dart';
 import '../../core/enums/claim_target_type.dart';
 
 class ClaimPayload {
+  static const Set<String> publicQueryParameterNames = {
+    'v',
+    'code',
+    'type',
+    'targetId',
+    'scope',
+    'requiresApproval',
+    'expiresAt',
+    'status',
+    'teamId',
+    'tournamentId',
+  };
+
   final int version;
   final String code;
   final ClaimTargetType targetType;
@@ -35,8 +48,6 @@ class ClaimPayload {
       'code': code,
       'type': targetType.name,
       'targetId': targetId,
-      if (subjectName != null && subjectName!.isNotEmpty)
-        'subjectName': subjectName!,
       'scope': scope.name,
       'requiresApproval': requiresApproval ? '1' : '0',
       'expiresAt': expiresAt.millisecondsSinceEpoch.toString(),

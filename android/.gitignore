@@ -12,3 +12,6 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Debug-only keystore used by Firebase Auth for local Android builds.
+!app/debug-el7reef-v2.keystore

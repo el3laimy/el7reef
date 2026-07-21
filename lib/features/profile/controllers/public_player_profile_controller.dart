@@ -5,17 +5,21 @@ import '../../../core/utils/app_logger.dart';
 import '../../../domain/entities/participant_ref.dart';
 import '../models/public_player_profile_data.dart';
 import '../services/public_player_profile_resolver.dart';
+import '../services/user_safety_service.dart';
 
 class PublicPlayerProfileController extends GetxController {
   final PublicPlayerProfileResolver _resolver;
   final String kind;
   final String id;
+  final UserSafetyService? _userSafetyService;
 
   PublicPlayerProfileController({
     required this.kind,
     required this.id,
     PublicPlayerProfileResolver? resolver,
-  }) : _resolver = resolver ?? PublicPlayerProfileResolver();
+    UserSafetyService? userSafetyService,
+  }) : _resolver = resolver ?? PublicPlayerProfileResolver(),
+       _userSafetyService = userSafetyService;
 
   final RxBool isLoading = true.obs;
   final RxString errorMessage = ''.obs;
@@ -146,6 +150,75 @@ class PublicPlayerProfileController extends GetxController {
     final route = guestClaimRoute;
     if (route == null) return;
     Get.toNamed(route);
+  }
+
+  bool get canReportProfile {
+    final data = profile.value;
+    return data != null && (_userSafetyService?.canReport(data) ?? false);
+  }
+
+  bool get canBlockPlayer {
+    final data = profile.value;
+    return data != null && (_userSafetyService?.canBlock(data) ?? false);
+  }
+
+  Future<bool> reportProfile({
+    required UserReportReason reason,
+    String details = '',
+  }) async {
+    final data = profile.value;
+    final service = _userSafetyService;
+    if (data == null || service == null || !service.canReport(data)) {
+      return false;
+    }
+    try {
+      final reported = await service.reportProfile(
+        profile: data,
+        reason: reason,
+        details: details,
+      );
+      Get.snackbar(
+        reported ? 'وصل البلاغ' : 'تعذر إرسال البلاغ',
+        reported
+            ? 'سنراجع البروفايل ونتخذ الإجراء المناسب.'
+            : 'حاول مرة أخرى بعد قليل.',
+      );
+      return reported;
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'PublicPlayerProfileController.reportProfile',
+        error,
+        stackTrace,
+      );
+      Get.snackbar('تعذر إرسال البلاغ', 'حاول مرة أخرى بعد قليل.');
+      return false;
+    }
+  }
+
+  Future<bool> blockPlayer() async {
+    final data = profile.value;
+    final service = _userSafetyService;
+    if (data == null || service == null || !service.canBlock(data)) {
+      return false;
+    }
+    try {
+      final blocked = await service.blockPlayer(data);
+      Get.snackbar(
+        blocked ? 'تم الحظر' : 'تعذر الحظر',
+        blocked
+            ? 'لن يظهر هذا اللاعب ضمن تفاعلاتك الاجتماعية.'
+            : 'حاول مرة أخرى بعد قليل.',
+      );
+      return blocked;
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'PublicPlayerProfileController.blockPlayer',
+        error,
+        stackTrace,
+      );
+      Get.snackbar('تعذر الحظر', 'حاول مرة أخرى بعد قليل.');
+      return false;
+    }
   }
 
   String? _queryValue(String key) {

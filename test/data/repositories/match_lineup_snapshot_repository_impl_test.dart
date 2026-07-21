@@ -59,6 +59,7 @@ void main() {
                 availability: TeamMemberAvailability.available,
                 attendanceStatus: MatchAttendanceStatus.late,
                 displayName: 'Guest Forward',
+                shirtNumber: 9,
               ),
             ],
             lockedBy: 'organizer-1',
@@ -85,6 +86,7 @@ void main() {
         expect(byTeam?.formationCode, '2-3-1');
         expect(byTeam?.summaryLabel, '2-3-1');
         expect(byGuest?.starters.single.guestPlayerId, 'guest-player-2');
+        expect(byGuest?.starters.single.shirtNumber, 9);
         expect(byGuest?.summaryLabel, 'أساسي 1 • احتياط 0 • ضيوف 1');
       },
     );

@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 
 import 'package:el7reef/app/routes/app_pages.dart';
 import 'package:el7reef/app/routes/app_routes.dart';
+import 'package:el7reef/core/navigation/pending_deep_link_service.dart';
 import 'package:el7reef/core/enums/fantasy_league_phase.dart';
 import 'package:el7reef/features/fantasy/services/fantasy_lifecycle_service.dart';
 import 'package:el7reef/features/fantasy/services/fantasy_market_service.dart';
@@ -14,6 +15,7 @@ import 'package:el7reef/data/repositories/fantasy_lifecycle_repository_impl.dart
 import 'package:el7reef/data/repositories/fantasy_repository_impl.dart';
 import 'package:el7reef/data/repositories/player_repository_impl.dart';
 import 'package:el7reef/data/repositories/tournament_repository_impl.dart';
+import 'package:el7reef/features/auth/views/onboarding_screen.dart';
 import 'package:el7reef/features/home/views/home_screen.dart';
 
 void main() {
@@ -146,6 +148,38 @@ void main() {
     expect(find.byType(FeatureUnavailableScreen), findsOneWidget);
     expect(find.text('البحث الاجتماعي غير متاح'), findsWidgets);
     expect(find.text('البحث عن أصدقاء'), findsNothing);
+  });
+
+  for (final intent in <({String label, String route})>[
+    (label: 'أنظم بطولة', route: AppRoutes.createTournament),
+    (label: 'أنا كابتن فريق', route: AppRoutes.createTeam),
+    (label: 'أنا لاعب', route: AppRoutes.tournamentExplore),
+  ]) {
+    testWidgets('onboarding intent preserves ${intent.route} after login', (
+      WidgetTester tester,
+    ) async {
+      final pendingDeepLinkService = Get.put(PendingDeepLinkService());
+
+      await tester.pumpWidget(
+        GetMaterialApp(
+          getPages: AppPages.routes,
+          home: const OnboardingScreen(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(intent.label));
+
+      expect(pendingDeepLinkService.take(), intent.route);
+    });
+  }
+
+  test('every onboarding intent has a registered route', () {
+    final registeredRoutes = AppPages.routes.map((page) => page.name).toSet();
+
+    expect(registeredRoutes, contains(AppRoutes.createTournament));
+    expect(registeredRoutes, contains(AppRoutes.createTeam));
+    expect(registeredRoutes, contains(AppRoutes.tournamentExplore));
   });
 
   test('home destinations keep navigation labels in page order', () {

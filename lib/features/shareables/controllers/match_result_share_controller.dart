@@ -3,9 +3,12 @@ import '../../../core/enums/match_status.dart';
 import '../../../domain/entities/match.dart';
 import '../../../features/lineup/controllers/match_result_lineup_controller.dart';
 import '../models/match_result_share_data.dart';
+import '../services/pride_share_payload_builder.dart';
 
 class MatchResultShareController {
   const MatchResultShareController();
+
+  static const _payloadBuilder = PrideSharePayloadBuilder();
 
   MatchResultShareData build({
     required Match match,
@@ -15,6 +18,33 @@ class MatchResultShareController {
     required String teamBFormation,
     String? tournamentName,
     String? mvpName,
+    List<MatchResultScorerData> scorers = const [],
+  }) {
+    return buildFromLabels(
+      match: match,
+      teamAName: teamA.label,
+      teamBName: teamB.label,
+      teamALogoUrl: teamA.logoUrl,
+      teamBLogoUrl: teamB.logoUrl,
+      teamAFormation: teamAFormation,
+      teamBFormation: teamBFormation,
+      tournamentName: tournamentName,
+      mvpName: mvpName,
+      scorers: scorers,
+    );
+  }
+
+  MatchResultShareData buildFromLabels({
+    required Match match,
+    required String teamAName,
+    required String teamBName,
+    String? teamALogoUrl,
+    String? teamBLogoUrl,
+    String teamAFormation = '',
+    String teamBFormation = '',
+    String? tournamentName,
+    String? mvpName,
+    List<MatchResultScorerData> scorers = const [],
   }) {
     final scoreA = match.scoreTeamA;
     final scoreB = match.scoreTeamB;
@@ -26,14 +56,14 @@ class MatchResultShareController {
       matchId: match.id,
       title: 'نتيجة المباراة',
       subtitle: _subtitle(match),
-      teamAName: teamA.label,
-      teamALogoUrl: teamA.logoUrl,
+      teamAName: teamAName,
+      teamALogoUrl: teamALogoUrl,
       teamAFormation: _nullableFormation(teamAFormation),
       teamAAccent: AppColors.primary,
-      teamBName: teamB.label,
-      teamBLogoUrl: teamB.logoUrl,
+      teamBName: teamBName,
+      teamBLogoUrl: teamBLogoUrl,
       teamBFormation: _nullableFormation(teamBFormation),
-      teamBAccent: AppColors.error,
+      teamBAccent: AppColors.accent,
       scoreA: scoreA,
       scoreB: scoreB,
       statusLabel: _statusLabel(match.status),
@@ -42,7 +72,13 @@ class MatchResultShareController {
       // loaded name passed by the caller.
       tournamentName: _normalizeOptional(tournamentName),
       mvpName: mvpName,
+      scorers: List.unmodifiable(
+        scorers.where(
+          (scorer) => scorer.displayName.trim().isNotEmpty && scorer.goals > 0,
+        ),
+      ),
       playedAt: match.completedAt ?? match.startedAt ?? match.scheduledAt,
+      sharePayload: _payloadBuilder.matchResult(match: match),
     );
   }
 

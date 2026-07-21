@@ -30,7 +30,9 @@ void main() {
 
       await firestore.collection(FirebasePaths.players).doc('friend-1').set({
         'name': 'أحمد',
-        'createdAt': now.subtract(const Duration(days: 60)).millisecondsSinceEpoch,
+        'createdAt': now
+            .subtract(const Duration(days: 60))
+            .millisecondsSinceEpoch,
         'lastActiveAt': now.millisecondsSinceEpoch,
       });
 
@@ -42,8 +44,12 @@ void main() {
         'scoreTeamA': 3,
         'scoreTeamB': 1,
         'mvpPlayerId': 'friend-1',
-        'createdAt': now.subtract(const Duration(hours: 3)).millisecondsSinceEpoch,
-        'completedAt': now.subtract(const Duration(hours: 2)).millisecondsSinceEpoch,
+        'createdAt': now
+            .subtract(const Duration(hours: 3))
+            .millisecondsSinceEpoch,
+        'completedAt': now
+            .subtract(const Duration(hours: 2))
+            .millisecondsSinceEpoch,
       });
 
       final currentPlayer = Player(
@@ -68,7 +74,9 @@ void main() {
       await firestore.collection(FirebasePaths.players).doc('org-1').set({
         'name': 'كابتن محمود',
         'role': 'organizer',
-        'createdAt': now.subtract(const Duration(days: 90)).millisecondsSinceEpoch,
+        'createdAt': now
+            .subtract(const Duration(days: 90))
+            .millisecondsSinceEpoch,
         'lastActiveAt': now.millisecondsSinceEpoch,
       });
 
@@ -79,12 +87,25 @@ void main() {
         'teamSize': TournamentTeamSize.fiveVsFive.value,
         'maxTeams': 8,
         'status': TournamentStatus.registration.name,
-        'createdAt': now.subtract(const Duration(days: 1)).millisecondsSinceEpoch,
+        'createdAt': now
+            .subtract(const Duration(days: 1))
+            .millisecondsSinceEpoch,
         'registeredTeamIds': const <String>[],
         'assistants': const <Map<String, dynamic>>[],
         'groupRoundIds': const <String>[],
         'knockoutRoundIds': const <String>[],
       });
+      await firestore
+          .collection('tournamentMemberships')
+          .doc('org-1_tour-1')
+          .set({
+            'tournamentId': 'tour-1',
+            'userId': 'org-1',
+            'role': 'organizer',
+            'createdAt': now
+                .subtract(const Duration(days: 1))
+                .millisecondsSinceEpoch,
+          });
 
       final currentPlayer = Player(
         id: 'me',

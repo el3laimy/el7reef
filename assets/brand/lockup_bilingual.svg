@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 256" role="img" aria-labelledby="title desc">
+  <title id="title">الحريف، EL7REEF</title>
+  <desc id="desc">النسخة الثنائية المساندة من هوية الحريف</desc>
+  <g transform="translate(0 0)">
+    <path
+      fill="#7ED957"
+      d="M44 42h177l-25 30h-21l-72 89c-15 19-16 38-1 50 17 14 49 8 82-13l24-16-10 36c-32 24-73 32-104 17-33-15-46-47-31-77 4-8 9-17 16-25l51-61H70c-13 0-18 8-18 21v15L24 93V75c0-18 8-33 20-33Z"/>
+    <path fill="#F4F7EE" d="M29 128h46l-18 23H12l17-23Zm126 0h68l-18 23h-68l18-23Z"/>
+  </g>
+  <g transform="translate(286 18)">
+    <text
+      x="438"
+      y="105"
+      fill="#F4F7EE"
+      direction="rtl"
+      unicode-bidi="bidi-override"
+      text-anchor="start"
+      font-family="Cairo, Noto Sans Arabic, sans-serif"
+      font-size="100"
+      font-weight="800">الحريف</text>
+    <path fill="#7ED957" d="M48 126h380l-14 12H34l14-12Z"/>
+    <text
+      x="428"
+      y="191"
+      fill="#B7C0B3"
+      text-anchor="end"
+      font-family="Cairo, Noto Sans, sans-serif"
+      font-size="42"
+      font-weight="800"
+      letter-spacing="7">EL7REEF</text>
+  </g>
+</svg>

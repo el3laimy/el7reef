@@ -89,6 +89,45 @@ void main() {
     );
 
     test(
+      'createTournament writes the deterministic organizer membership',
+      () async {
+        final beforeCreate = DateTime.now().millisecondsSinceEpoch;
+        await repository.createTournament(
+          Tournament(
+            id: 'membership-cup',
+            organizerId: 'organizer-1',
+            name: 'Membership Cup',
+            format: TournamentFormat.groupsThenKnockout,
+            teamSize: TournamentTeamSize.fiveVsFive,
+            maxTeams: 8,
+            status: TournamentStatus.registration,
+            createdAt: now,
+          ),
+        );
+
+        final membership = await firestore
+            .collection('tournamentMemberships')
+            .doc('organizer-1_membership-cup')
+            .get();
+        final afterCreate = DateTime.now().millisecondsSinceEpoch;
+        final membershipData = membership.data();
+
+        expect(membershipData, isNotNull);
+        expect(
+          membershipData!.keys,
+          unorderedEquals(['tournamentId', 'userId', 'role', 'createdAt']),
+        );
+        expect(membershipData['tournamentId'], 'membership-cup');
+        expect(membershipData['userId'], 'organizer-1');
+        expect(membershipData['role'], 'organizer');
+        expect(
+          membershipData['createdAt'],
+          inInclusiveRange(beforeCreate, afterCreate),
+        );
+      },
+    );
+
+    test(
       'getOrganizerTournaments only returns tournaments for the requested organizer',
       () async {
         await repository.createTournament(
@@ -183,6 +222,45 @@ void main() {
     );
 
     test(
+      'featured completed tournament stays discoverable and sorts before active catalog',
+      () async {
+        await repository.createTournament(
+          Tournament(
+            id: 'featured-world-cup',
+            organizerId: 'el7reef-official',
+            name: 'كأس العالم 2026',
+            format: TournamentFormat.groupsThenKnockout,
+            teamSize: TournamentTeamSize.elevenVsEleven,
+            maxTeams: 48,
+            isFeatured: true,
+            featuredPriority: 0,
+            status: TournamentStatus.completed,
+            createdAt: now.subtract(const Duration(days: 30)),
+          ),
+        );
+        await repository.createTournament(
+          Tournament(
+            id: 'active-street-cup',
+            organizerId: 'account-a',
+            name: 'Active Street Cup',
+            format: TournamentFormat.groupsOnly,
+            teamSize: TournamentTeamSize.fiveVsFive,
+            maxTeams: 8,
+            status: TournamentStatus.registration,
+            createdAt: now,
+          ),
+        );
+
+        final tournaments = await repository.getDiscoverableTournaments();
+
+        expect(tournaments.map((tournament) => tournament.id), [
+          'featured-world-cup',
+          'active-street-cup',
+        ]);
+      },
+    );
+
+    test(
       'getLiveTournaments keeps legacy callers on discoverable query',
       () async {
         await repository.createTournament(
@@ -207,7 +285,7 @@ void main() {
     );
 
     test(
-      'getDiscoverableTournaments keeps legacy documents discoverable',
+      'getDiscoverableTournaments ignores legacy documents missing explicit visibility',
       () async {
         await firestore.collection('tournaments').doc('legacy-live-cup').set({
           'organizerId': 'organizer-1',
@@ -221,11 +299,7 @@ void main() {
 
         final tournaments = await repository.getDiscoverableTournaments();
 
-        expect(tournaments.map((tournament) => tournament.id), [
-          'legacy-live-cup',
-        ]);
-        expect(tournaments.single.visibility, TournamentVisibility.public);
-        expect(tournaments.single.discoverable, isTrue);
+        expect(tournaments, isEmpty);
       },
     );
 

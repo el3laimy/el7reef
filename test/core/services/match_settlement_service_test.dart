@@ -7,6 +7,7 @@ import 'package:el7reef/core/enums/match_check_in_status.dart';
 import 'package:el7reef/core/enums/team_member_availability.dart';
 import 'package:el7reef/core/enums/team_membership_role.dart';
 import 'package:el7reef/core/enums/tournament_enums.dart';
+import 'package:el7reef/core/enums/tournament_ops_enums.dart';
 import 'package:el7reef/core/services/tournament_fixture_service.dart';
 import 'package:el7reef/core/services/match_settlement_service.dart';
 import 'package:el7reef/core/services/tournament_lifecycle_service.dart';
@@ -27,7 +28,9 @@ import 'package:el7reef/domain/entities/match.dart';
 import 'package:el7reef/domain/entities/match_check_in.dart';
 import 'package:el7reef/domain/entities/match_lineup_entry.dart';
 import 'package:el7reef/domain/entities/match_lineup_snapshot.dart';
+import 'package:el7reef/domain/entities/penalty_shootout_result.dart';
 import 'package:el7reef/domain/entities/match_side_player.dart';
+import 'package:el7reef/domain/entities/participant_ref.dart';
 import 'package:el7reef/domain/entities/player.dart';
 import 'package:el7reef/domain/entities/team.dart';
 import 'package:el7reef/domain/entities/tournament.dart';
@@ -58,6 +61,7 @@ void main() {
       settlementService = MatchSettlementService(
         firestore: firestore,
         tournamentLifecycleService: lifecycleService,
+        allowLocalFallback: true,
       );
       standingsRepository = GroupStandingSnapshotRepositoryImpl(
         firestore: firestore,
@@ -102,6 +106,22 @@ void main() {
         actorId: 'organizer-1',
         now: now.add(const Duration(minutes: 10)),
       );
+    });
+
+    test('score submission rejects values outside 0 to 99', () async {
+      for (final score in <(int, int)>[(-1, 0), (100, 0), (0, -1), (0, 100)]) {
+        await expectLater(
+          settlementService.submitScore(
+            matchId: 'unused-match',
+            actorId: 'organizer-1',
+            scoreA: score.$1,
+            scoreB: score.$2,
+          ),
+          throwsA(isA<StateError>()),
+        );
+      }
+      final matches = await firestore.collection(FirebasePaths.matches).get();
+      expect(matches.docs, isEmpty);
     });
 
     test(
@@ -218,6 +238,79 @@ void main() {
     );
 
     test(
+      'tied knockout requires decisive penalties and advances without adding goals',
+      () async {
+        final groupStage = await lifecycleService.startGroupStage(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 15)),
+        );
+        for (final fixture in groupStage.fixtures) {
+          final score = _groupScoreFor(fixture.teamAId!, fixture.teamBId!);
+          await matchRepository.updateMatch(
+            fixture.copyWith(
+              scoreTeamA: score.$1,
+              scoreTeamB: score.$2,
+              status: MatchStatus.settled,
+            ),
+          );
+        }
+        await lifecycleService.refreshGroupStandings(
+          tournamentId: 'tournament-1',
+          now: now.add(const Duration(minutes: 20)),
+        );
+        final knockout = await lifecycleService.startKnockout(
+          tournamentId: 'tournament-1',
+          actorId: 'organizer-1',
+          now: now.add(const Duration(minutes: 25)),
+        );
+        final finalMatch = knockout.matches.single;
+        await matchRepository.updateMatch(
+          finalMatch.copyWith(status: MatchStatus.live),
+        );
+
+        await expectLater(
+          settlementService.submitScore(
+            matchId: finalMatch.id,
+            actorId: 'organizer-1',
+            scoreA: 1,
+            scoreB: 1,
+          ),
+          throwsA(isA<StateError>()),
+        );
+        expect(
+          (await matchRepository.getMatch(finalMatch.id))?.status,
+          MatchStatus.live,
+        );
+
+        await settlementService.submitScore(
+          matchId: finalMatch.id,
+          actorId: 'organizer-1',
+          scoreA: 1,
+          scoreB: 1,
+          penaltyShootout: const PenaltyShootoutResult(
+            scoreTeamA: 4,
+            scoreTeamB: 5,
+          ),
+        );
+        final submitted = await matchRepository.getMatch(finalMatch.id);
+        expect(submitted?.scoreTeamA, 1);
+        expect(submitted?.scoreTeamB, 1);
+        expect(submitted?.penaltyScoreTeamA, 4);
+        expect(submitted?.penaltyScoreTeamB, 5);
+        expect(submitted?.knockoutDecision, KnockoutDecision.teamB);
+
+        await settlementService.approveScore(
+          matchId: finalMatch.id,
+          actorId: 'organizer-1',
+        );
+        final tie = await tieRepository.getTie(knockout.ties.single.id);
+        expect(tie?.winnerParticipantId, finalMatch.teamBParticipantId);
+        expect(tie?.resolutionType, KnockoutTieResolution.penalties);
+      },
+    );
+
+    test(
       'pilot smoke flow completes tournament through approval-driven progression',
       () async {
         final groupStage = await lifecycleService.startGroupStage(
@@ -315,11 +408,6 @@ void main() {
     test(
       'submit and approve score use official roster when legacy match arrays are empty',
       () async {
-        await _seedRegisteredPlayersForFixture(
-          playerRepository: playerRepository,
-          now: now,
-          fixtureTeamIds: <String>['team-1', 'team-2'],
-        );
         await lifecycleService.startGroupStage(
           tournamentId: 'tournament-1',
           actorId: 'organizer-1',
@@ -331,6 +419,13 @@ void main() {
           now: now.add(const Duration(minutes: 16)),
         );
         final fixture = publishedFixtures.first;
+        final homeTeamId = fixture.teamAId!;
+        final awayTeamId = fixture.teamBId!;
+        await _seedRegisteredPlayersForFixture(
+          playerRepository: playerRepository,
+          now: now,
+          fixtureTeamIds: <String>[homeTeamId, awayTeamId],
+        );
 
         await _seedRegisteredFixtureReadyState(
           firestore: firestore,
@@ -354,7 +449,7 @@ void main() {
           actorId: 'organizer-1',
           scoreA: 2,
           scoreB: 1,
-          mvpPlayerId: 'team-1-player-1',
+          mvpPlayerId: '$homeTeamId-player-1',
         );
 
         final fanVotingSession = await firestore
@@ -364,10 +459,10 @@ void main() {
         expect(
           fanVotingSession.data()?['eligiblePlayerIds'],
           containsAll(<String>[
-            'team-1-player-1',
-            'team-1-player-2',
-            'team-2-player-1',
-            'team-2-player-2',
+            '$homeTeamId-player-1',
+            '$homeTeamId-player-2',
+            '$awayTeamId-player-1',
+            '$awayTeamId-player-2',
           ]),
         );
 
@@ -376,8 +471,12 @@ void main() {
           actorId: 'organizer-1',
         );
 
-        final homeStarter = await playerRepository.getPlayer('team-1-player-1');
-        final awayStarter = await playerRepository.getPlayer('team-2-player-1');
+        final homeStarter = await playerRepository.getPlayer(
+          '$homeTeamId-player-1',
+        );
+        final awayStarter = await playerRepository.getPlayer(
+          '$awayTeamId-player-1',
+        );
         expect(homeStarter?.totalMatches, 1);
         expect(awayStarter?.totalMatches, 1);
       },
@@ -481,6 +580,84 @@ void main() {
       expect(scoredMatch?.mvpPlayerId, 'temporary-mvp');
       expect(scoredMatch?.status, MatchStatus.completed);
     });
+
+    test(
+      'submitScore validates an MVP draft even without goals or legacy MVP id',
+      () async {
+        await _seedFriendlyMatch(
+          matchRepository: matchRepository,
+          matchId: 'invalid-mvp-draft-match',
+          now: now,
+          teamAPlayerIds: const ['registered-player'],
+        );
+        await playerRepository.createPlayer(
+          _player(id: 'registered-player', name: 'Registered', now: now),
+        );
+
+        await expectLater(
+          settlementService.submitScore(
+            matchId: 'invalid-mvp-draft-match',
+            actorId: 'organizer-1',
+            scoreA: 1,
+            scoreB: 0,
+            mvpDraft: const MatchSettlementMvpDraft(
+              sideKey: 'A',
+              actor: ParticipantRef(
+                kind: ParticipantRefKind.guestPlayer,
+                id: 'guest-outside-roster',
+                displayName: 'ضيف خارج القائمة',
+              ),
+            ),
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              contains('MVP'),
+            ),
+          ),
+        );
+
+        final unchangedMatch = await matchRepository.getMatch(
+          'invalid-mvp-draft-match',
+        );
+        final events = await firestore
+            .collection(FirebasePaths.matchEvents)
+            .where('matchId', isEqualTo: 'invalid-mvp-draft-match')
+            .get();
+        expect(unchangedMatch?.status, MatchStatus.live);
+        expect(events.docs, isEmpty);
+      },
+    );
+
+    test(
+      'local fallback voids the canonical MVP event when resubmitted without MVP',
+      () async {
+        const matchId = 'clear-mvp-match';
+        await _seedFriendlyMatch(
+          matchRepository: matchRepository,
+          matchId: matchId,
+          now: now,
+        );
+        final canonicalMvpRef = firestore
+            .collection(FirebasePaths.matchEvents)
+            .doc('mvp-$matchId');
+        await canonicalMvpRef.set({
+          'matchId': matchId,
+          'eventType': 'mvp',
+          'status': 'active',
+        });
+
+        await settlementService.submitScore(
+          matchId: matchId,
+          actorId: 'organizer-1',
+          scoreA: 1,
+          scoreB: 0,
+        );
+
+        expect((await canonicalMvpRef.get()).data()?['status'], 'voided');
+      },
+    );
 
     test(
       'submitScore rejects MVP id outside the full participant roster',

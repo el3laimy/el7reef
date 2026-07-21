@@ -161,12 +161,12 @@ class PendingPrideEventsService {
     if (value is! Map) {
       return null;
     }
-    final ref = ParticipantRefModel.fromJson(
-      Map<String, dynamic>.from(value),
-    ).toEntity();
-    if (ref.id.trim().isEmpty || ref.displayName.trim().isEmpty) {
+    try {
+      return ParticipantRefModel.fromJson(
+        Map<String, dynamic>.from(value),
+      ).toEntity();
+    } on FormatException {
       return null;
     }
-    return ref;
   }
 }
