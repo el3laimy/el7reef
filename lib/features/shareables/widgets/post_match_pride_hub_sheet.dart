@@ -65,7 +65,7 @@ class PostMatchPrideHubSheet extends StatelessWidget {
                 const SizedBox(height: AppDimensions.md),
                 const El7reefBadge(
                   label: 'لحظة الفخر جاهزة',
-                  color: AppColors.secondary,
+                  color: AppColors.socialAccent,
                   icon: Icons.emoji_events_rounded,
                 ),
                 const SizedBox(height: AppDimensions.md),
@@ -89,7 +89,7 @@ class PostMatchPrideHubSheet extends StatelessWidget {
                   icon: Icons.sports_score_rounded,
                   title: 'شارك كارت النتيجة',
                   subtitle: 'المشاركة تفتح الآن من غير تنقل إضافي.',
-                  color: AppColors.primary,
+                  color: AppColors.actionPrimary,
                   onPressed: onOpenResult,
                 ),
                 if (hasMvp) ...[
@@ -100,7 +100,7 @@ class PostMatchPrideHubSheet extends StatelessWidget {
                     subtitle: mvpName == null
                         ? 'شارك لحظة MVP من نفس المكان.'
                         : 'نجم المباراة: $mvpName',
-                    color: AppColors.secondary,
+                    color: AppColors.achievement,
                     onPressed: onOpenMvp,
                   ),
                 ],
@@ -110,7 +110,7 @@ class PostMatchPrideHubSheet extends StatelessWidget {
                     icon: Icons.leaderboard_rounded,
                     title: 'هدافو البطولة',
                     subtitle: 'افتح ترتيب الهدافين وشارك الكارت الحالي.',
-                    color: AppColors.accent,
+                    color: AppColors.socialAccent,
                     onPressed: onOpenTopScorers,
                   ),
                 ],
@@ -137,7 +137,7 @@ class _ScoreLine extends StatelessWidget {
   Widget build(BuildContext context) {
     return El7reefSurface(
       elevated: true,
-      borderColor: AppColors.primary.withValues(alpha: 0.3),
+      borderColor: AppColors.surfaceBorderStrong,
       child: Text(
         scoreLine,
         style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.w900),

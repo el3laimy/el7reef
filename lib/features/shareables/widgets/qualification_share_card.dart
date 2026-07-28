@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_media_colors.dart';
 import '../models/pride_card_format.dart';
 import '../models/qualification_share_data.dart';
 import 'pride_card_shell.dart';
@@ -27,18 +27,18 @@ class QualificationShareCard extends StatelessWidget {
     final dense = PrideCardTextScale.usesDenseLayout(context);
     final compact =
         format.isLandscape || format == PrideCardFormat.square1x1 || dense;
-    const accent = AppColors.secondary;
+    const accent = AppMediaColors.achievement;
     final body = Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
-          colors: [AppColors.secondaryDark, AppColors.backgroundDeep],
+          colors: [AppMediaColors.achievementDark, AppMediaColors.canvasDeep],
         ),
         borderRadius: BorderRadius.circular(exportMode ? 16 : 22),
         border: Border.all(
-          color: AppColors.secondaryLight.withValues(alpha: 0.72),
+          color: AppMediaColors.achievementLight.withValues(alpha: 0.72),
         ),
       ),
       child: Stack(
@@ -142,7 +142,7 @@ class _Header extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: AppColors.secondaryLight,
+              color: AppMediaColors.achievementLight,
               fontSize: dense ? 7 : (compact ? 10 : 13),
               fontWeight: FontWeight.w900,
               letterSpacing: 0.7,
@@ -156,16 +156,16 @@ class _Header extends StatelessWidget {
             vertical: dense ? 2 : 5,
           ),
           decoration: BoxDecoration(
-            color: AppColors.secondary.withValues(alpha: 0.16),
+            color: AppMediaColors.achievement.withValues(alpha: 0.16),
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-              color: AppColors.secondaryLight.withValues(alpha: 0.42),
+              color: AppMediaColors.achievementLight.withValues(alpha: 0.42),
             ),
           ),
           child: Text(
             'ختم التأهل',
             style: TextStyle(
-              color: AppColors.secondaryLight,
+              color: AppMediaColors.achievementLight,
               fontSize: dense ? 6.5 : (compact ? 9 : 10),
               fontWeight: FontWeight.w900,
             ),
@@ -195,7 +195,7 @@ class _Identity extends StatelessWidget {
       children: [
         Icon(
           Icons.verified_rounded,
-          color: AppColors.secondaryLight,
+          color: AppMediaColors.achievementLight,
           size: dense ? 22 : (compact ? 34 : 48),
         ),
         SizedBox(height: dense ? 2 : (compact ? 5 : 10)),
@@ -205,7 +205,7 @@ class _Identity extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: AppColors.secondaryLight,
+            color: AppMediaColors.achievementLight,
             fontSize: dense ? 12 : (compact ? 19 : 26),
             fontWeight: FontWeight.w900,
             height: 1,
@@ -217,7 +217,7 @@ class _Identity extends StatelessWidget {
             imageUrl: data.logoUrl,
             initials: data.initials,
             size: dense ? 38 : (compact ? 54 : 76),
-            accent: AppColors.secondary,
+            accent: AppMediaColors.achievement,
             fallbackIcon: Icons.shield_rounded,
           ),
         ),
@@ -228,7 +228,7 @@ class _Identity extends StatelessWidget {
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: AppColors.textPrimaryTinted,
+            color: AppMediaColors.textPrimary,
             fontSize: dense ? 14 : (compact ? 21 : 28),
             fontWeight: FontWeight.w900,
             height: 1.1,
@@ -240,7 +240,7 @@ class _Identity extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: AppColors.textSecondaryTinted,
+            color: AppMediaColors.textSecondary,
             fontSize: dense ? 6.5 : (compact ? 9 : 10),
             fontWeight: FontWeight.w700,
           ),
@@ -276,7 +276,7 @@ class _QualificationFacts extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: AppColors.textSecondaryTinted,
+            color: AppMediaColors.textSecondary,
             fontSize: dense ? 6.5 : (compact ? 9 : 11),
             fontWeight: FontWeight.w700,
           ),
@@ -338,10 +338,10 @@ class _Fact extends StatelessWidget {
         vertical: dense ? 3 : (compact ? 6 : 9),
       ),
       decoration: BoxDecoration(
-        color: AppColors.textPrimaryTinted.withValues(alpha: 0.08),
+        color: AppMediaColors.textPrimary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppColors.secondaryLight.withValues(alpha: 0.22),
+          color: AppMediaColors.achievementLight.withValues(alpha: 0.22),
         ),
       ),
       child: Column(
@@ -351,7 +351,7 @@ class _Fact extends StatelessWidget {
             textDirection: TextDirection.ltr,
             maxLines: 1,
             style: TextStyle(
-              color: AppColors.secondaryLight,
+              color: AppMediaColors.achievementLight,
               fontSize: dense ? 9 : (compact ? 14 : 18),
               fontWeight: FontWeight.w900,
               fontFeatures: const [FontFeature.tabularFigures()],
@@ -362,7 +362,7 @@ class _Fact extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: AppColors.textSecondaryTinted,
+              color: AppMediaColors.textSecondary,
               fontSize: dense ? 5.5 : (compact ? 8 : 9),
               fontWeight: FontWeight.w700,
             ),
@@ -379,7 +379,7 @@ class _QualificationPathPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.secondaryLight.withValues(alpha: 0.09)
+      ..color = AppMediaColors.achievementLight.withValues(alpha: 0.09)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
     final path = Path()

@@ -26,8 +26,7 @@ class TeamRosterSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final members = controller.membersByStatus(status);
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       radius: AppDimensions.radiusXl,
       padding: const EdgeInsets.all(AppDimensions.lg),
       child: Column(

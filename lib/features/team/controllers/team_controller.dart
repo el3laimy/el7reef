@@ -22,6 +22,7 @@ class TeamController extends GetxController {
   // ── Form ──
   final teamNameController = TextEditingController();
   final formKey = GlobalKey<FormState>();
+  final RxnString selectedLogoUrl = RxnString();
 
   @override
   void onInit() {
@@ -41,6 +42,7 @@ class TeamController extends GetxController {
     isLoading.value = false;
     errorMessage.value = '';
     teamNameController.clear();
+    selectedLogoUrl.value = null;
   }
 
   /// تحميل فرقي
@@ -71,6 +73,7 @@ class TeamController extends GetxController {
       final team = Team(
         id: const Uuid().v4(),
         name: teamNameController.text.trim(),
+        logoUrl: selectedLogoUrl.value,
         ownerId: userId,
         playerIds: [userId],
         createdAt: DateTime.now(),
@@ -79,6 +82,7 @@ class TeamController extends GetxController {
       await _teamRepo.createTeam(team);
       myTeams.add(team);
       teamNameController.clear();
+      selectedLogoUrl.value = null;
       Get.back();
       Get.snackbar(
         'تم ✅',
@@ -96,6 +100,10 @@ class TeamController extends GetxController {
     if (value == null || value.trim().isEmpty) return 'اسم الفريق مطلوب';
     if (value.trim().length < 3) return 'الاسم لازم يكون 3 حروف على الأقل';
     return null;
+  }
+
+  void selectLogo(String? logoUrl) {
+    selectedLogoUrl.value = logoUrl;
   }
 
   @override

@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:el7reef/core/enums/tournament_enums.dart';
 import 'package:el7reef/core/enums/tournament_ops_enums.dart';
-import 'package:el7reef/core/widgets/el7reef_glass_surface.dart';
+import 'package:el7reef/core/widgets/el7reef_solid_surface.dart';
 import 'package:el7reef/domain/entities/guest_team.dart';
 import 'package:el7reef/domain/entities/participant_ref.dart';
 import 'package:el7reef/domain/entities/tournament.dart';
@@ -116,7 +116,8 @@ void main() {
     expect(find.text('فوز'), findsNothing);
     expect(find.text('مباريات'), findsNothing);
     expect(find.text('0'), findsNothing);
-    expect(find.byType(El7reefGlassSurface), findsOneWidget);
+    expect(find.byType(El7reefSolidSurface), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsNothing);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -133,7 +134,8 @@ void main() {
     );
 
     expect(find.text('ضيف موهوب'), findsOneWidget);
-    expect(find.byType(El7reefGlassSurface), findsOneWidget);
+    expect(find.byType(El7reefSolidSurface), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsNothing);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -150,7 +152,8 @@ void main() {
     );
 
     expect(find.text('أبطال الشارع'), findsWidgets);
-    expect(find.byType(El7reefGlassSurface), findsOneWidget);
+    expect(find.byType(El7reefSolidSurface), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsNothing);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -160,7 +163,7 @@ void main() {
       ),
     );
 
-    expect(find.byType(El7reefGlassSurface), findsNothing);
+    expect(find.byType(El7reefSolidSurface), findsNothing);
     expect(find.byType(BackdropFilter), findsNothing);
   });
 

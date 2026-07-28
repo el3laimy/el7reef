@@ -522,6 +522,66 @@ void main() {
     expect(find.text('مختار: Mahmoud Ali'), findsNothing);
   });
 
+  testWidgets('dragging a bench player removes the bench card before saving', (
+    WidgetTester tester,
+  ) async {
+    tester.view.devicePixelRatio = 2;
+    tester.view.physicalSize = const Size(720, 2800);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        authSession: authSession,
+        teamRepository: teamRepository,
+        teamRosterService: teamRosterService,
+        teamFormationService: teamFormationService,
+        playerRepository: playerRepository,
+        guestPlayerRepository: guestPlayerRepository,
+        shareLinkService: shareLinkService,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('خطة الفريق'));
+    await tester.pumpAndSettle();
+
+    final controller = Get.find<TeamRosterController>();
+    final player = controller.visualBench.firstWhere(
+      (candidate) => candidate.name == 'Mahmoud Ali',
+    );
+    final targetSlot = controller.visualSlots.first;
+    final benchCard = find.byKey(ValueKey('bench-player-${player.key}'));
+    final pitchTarget = find.byKey(ValueKey('lineup-slot-${targetSlot.id}'));
+    expect(benchCard, findsOneWidget);
+    expect(pitchTarget, findsOneWidget);
+
+    final gesture = await tester.startGesture(tester.getCenter(benchCard));
+    await tester.pump();
+    await gesture.moveTo(tester.getCenter(pitchTarget));
+    await tester.pump(const Duration(milliseconds: 200));
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    final pitchKeys = controller.visualSlots
+        .map((slot) => slot.occupantKey)
+        .whereType<String>()
+        .toSet();
+    final benchKeys = controller.visualBench
+        .map((candidate) => candidate.key)
+        .toSet();
+    final activeKeys = controller.allVisualPlayers
+        .map((candidate) => candidate.key)
+        .toSet();
+
+    expect(pitchKeys, contains(player.key));
+    expect(benchKeys, isNot(contains(player.key)));
+    expect(pitchKeys.intersection(benchKeys), isEmpty);
+    expect(pitchKeys.length + benchKeys.length, activeKeys.length);
+    expect(find.byKey(ValueKey('bench-player-${player.key}')), findsNothing);
+    expect(controller.isLineupDirty.value, isTrue);
+  });
+
   testWidgets('lineup tap-select mode swaps occupied slots without dragging', (
     WidgetTester tester,
   ) async {

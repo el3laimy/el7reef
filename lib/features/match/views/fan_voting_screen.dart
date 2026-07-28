@@ -125,7 +125,8 @@ class FanVotingScreen extends StatelessWidget {
 
   Widget _buildTimerHeader(FanVotingController controller) {
     return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+      role: El7reefGlassRole.floatingToolbar,
+      tone: El7reefGlassTone.competitive,
       margin: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
       padding: const EdgeInsets.all(AppDimensions.lg),
       radius: AppDimensions.radiusLg,
@@ -152,8 +153,7 @@ class FanVotingScreen extends StatelessWidget {
   }
 
   Widget _buildPlayerCard(Player player, FanVotingController controller) {
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       padding: const EdgeInsets.all(AppDimensions.md),
       radius: AppDimensions.radiusMd,
       child: Column(
@@ -222,8 +222,7 @@ class FanVotingScreen extends StatelessWidget {
     required String message,
   }) {
     return Center(
-      child: El7reefGlassSurface(
-        variant: El7reefGlassVariant.base,
+      child: El7reefSolidSurface(
         margin: const EdgeInsets.all(AppDimensions.pagePadding),
         padding: const EdgeInsets.all(AppDimensions.xl),
         radius: AppDimensions.radiusLg,

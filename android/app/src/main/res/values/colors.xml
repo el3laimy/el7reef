@@ -3,4 +3,8 @@
     <color name="brand_asphalt">#10140F</color>
     <color name="brand_pitch">#7ED957</color>
     <color name="brand_chalk">#F4F7EE</color>
+    <color name="app_window_light">#EEF2F6</color>
+    <color name="splash_background_light">#F6F8FB</color>
+    <color name="brand_pitch_daylight">#167247</color>
+    <color name="splash_mark_ink">#17202C</color>
 </resources>

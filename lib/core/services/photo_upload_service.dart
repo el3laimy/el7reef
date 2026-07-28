@@ -110,8 +110,13 @@ class PhotoUploadService {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      sheetAnimationStyle: const AnimationStyle(
+        duration: Duration(milliseconds: AppDimensions.animSlow),
+        reverseDuration: Duration(milliseconds: AppDimensions.animNormal),
+      ),
       builder: (ctx) => El7reefGlassSurface(
-        variant: El7reefGlassVariant.sheet,
+        role: El7reefGlassRole.compactSheet,
+        tone: El7reefGlassTone.action,
         borderRadius: const BorderRadius.vertical(
           top: Radius.circular(AppDimensions.radiusXl),
         ),

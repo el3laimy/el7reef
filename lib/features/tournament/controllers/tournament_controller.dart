@@ -75,6 +75,7 @@ class TournamentController extends GetxController {
       TournamentTeamSize.fiveVsFive.obs;
   final Rx<TournamentVisibility> selectedVisibility =
       TournamentVisibility.public.obs;
+  final RxnString selectedLogoUrl = RxnString();
   final RxBool isFantasyEnabled = false.obs;
   Worker? _authWorker;
 
@@ -206,6 +207,7 @@ class TournamentController extends GetxController {
       id: const Uuid().v4(),
       organizerId: uid,
       name: nameController.text.trim(),
+      logoUrl: selectedLogoUrl.value,
       description: descriptionController.text.trim().isEmpty
           ? null
           : descriptionController.text.trim(),
@@ -290,7 +292,12 @@ class TournamentController extends GetxController {
     selectedFormat.value = TournamentFormat.groupsThenKnockout;
     selectedTeamSize.value = TournamentTeamSize.fiveVsFive;
     selectedVisibility.value = TournamentVisibility.public;
+    selectedLogoUrl.value = null;
     isFantasyEnabled.value = false;
+  }
+
+  void selectLogo(String? logoUrl) {
+    selectedLogoUrl.value = logoUrl;
   }
 
   // ── Validators ──

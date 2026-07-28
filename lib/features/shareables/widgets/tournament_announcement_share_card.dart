@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_media_colors.dart';
+import '../../../core/identity/identity_visual.dart';
 import '../models/pride_card_format.dart';
 import '../models/tournament_announcement_share_data.dart';
 import 'pride_card_shell.dart';
@@ -27,14 +28,16 @@ class TournamentAnnouncementShareCard extends StatelessWidget {
     final compact =
         format.isLandscape || format == PrideCardFormat.square1x1 || dense;
     final isInvite = data is TournamentInviteShareData;
-    final accent = isInvite ? AppColors.primary : AppColors.accentLight;
+    final accent = isInvite
+        ? AppMediaColors.actionPrimary
+        : AppMediaColors.infoLight;
     final body = Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
-          colors: [accent.withValues(alpha: 0.3), AppColors.backgroundDeep],
+          colors: [accent.withValues(alpha: 0.3), AppMediaColors.canvasDeep],
         ),
         borderRadius: BorderRadius.circular(exportMode ? 16 : 22),
         border: Border.all(color: accent.withValues(alpha: 0.58)),
@@ -221,10 +224,24 @@ class _InviteHeadline extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Icon(
-          Icons.how_to_reg_rounded,
-          color: accent,
-          size: dense ? 24 : (compact ? 34 : 52),
+        Center(
+          child: data.tournamentLogoUrl == null
+              ? Icon(
+                  Icons.how_to_reg_rounded,
+                  color: accent,
+                  size: dense ? 24 : (compact ? 34 : 52),
+                )
+              : IdentityVisual(
+                  source: data.tournamentLogoUrl,
+                  size: dense ? 28 : (compact ? 40 : 56),
+                  semanticLabel: 'رمز بطولة ${data.tournamentName}',
+                  appearance: IdentityVisualAppearance.onDarkMedia,
+                  fallbackBuilder: (_) => Icon(
+                    Icons.how_to_reg_rounded,
+                    color: accent,
+                    size: dense ? 24 : (compact ? 34 : 52),
+                  ),
+                ),
         ),
         SizedBox(height: dense ? 2 : (compact ? 5 : 10)),
         Text(
@@ -246,7 +263,7 @@ class _InviteHeadline extends StatelessWidget {
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: AppColors.textPrimaryTinted,
+            color: AppMediaColors.textPrimary,
             fontSize: dense ? 15 : (compact ? 23 : 31),
             fontWeight: FontWeight.w900,
             height: 1.12,
@@ -368,16 +385,32 @@ class _Matchup extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          data.tournamentName,
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: AppColors.textSecondaryTinted,
-            fontSize: dense ? 7 : (compact ? 10 : 12),
-            fontWeight: FontWeight.w700,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (data.tournamentLogoUrl != null) ...[
+              IdentityVisual(
+                source: data.tournamentLogoUrl,
+                size: dense ? 14 : 20,
+                semanticLabel: 'رمز بطولة ${data.tournamentName}',
+                appearance: IdentityVisualAppearance.onDarkMedia,
+              ),
+              const SizedBox(width: 5),
+            ],
+            Flexible(
+              child: Text(
+                data.tournamentName,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: AppMediaColors.textSecondary,
+                  fontSize: dense ? 7 : (compact ? 10 : 12),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
         ),
         SizedBox(height: dense ? 3 : (compact ? 6 : 14)),
         Row(
@@ -445,7 +478,7 @@ class _TeamName extends StatelessWidget {
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
-        color: AppColors.textPrimaryTinted,
+        color: AppMediaColors.textPrimary,
         fontSize: dense ? 12 : (compact ? 18 : 24),
         fontWeight: FontWeight.w900,
         height: 1.12,
@@ -475,7 +508,7 @@ class _FixtureSchedule extends StatelessWidget {
         vertical: dense ? 4 : 8,
       ),
       decoration: BoxDecoration(
-        color: AppColors.surfaceRaised.withValues(alpha: 0.76),
+        color: AppMediaColors.raised.withValues(alpha: 0.76),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: accent.withValues(alpha: 0.28)),
       ),
@@ -498,7 +531,7 @@ class _FixtureSchedule extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: AppColors.textPrimaryTinted,
+              color: AppMediaColors.textPrimary,
               fontSize: dense ? 8 : (compact ? 12 : 14),
               fontWeight: FontWeight.w900,
               fontFeatures: const [FontFeature.tabularFigures()],
@@ -510,7 +543,7 @@ class _FixtureSchedule extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: AppColors.textSecondaryTinted,
+                color: AppMediaColors.textSecondary,
                 fontSize: dense ? 6 : (compact ? 8 : 9),
                 fontWeight: FontWeight.w600,
               ),
@@ -584,7 +617,7 @@ class _InfoChip extends StatelessWidget {
         vertical: dense ? 3 : 6,
       ),
       decoration: BoxDecoration(
-        color: AppColors.surfaceRaised.withValues(alpha: 0.72),
+        color: AppMediaColors.raised.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: accent.withValues(alpha: 0.25)),
       ),
@@ -599,7 +632,7 @@ class _InfoChip extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: AppColors.textPrimaryTinted,
+                color: AppMediaColors.textPrimary,
                 fontSize: dense ? 6 : (compact ? 8 : 9),
                 fontWeight: FontWeight.w700,
               ),

@@ -167,7 +167,7 @@ class _GuestTeamRosterHeader extends StatelessWidget {
                     : 'القائد: ${captain.displayName}',
                 backgroundColor: captain == null
                     ? AppColors.surface
-                    : AppColors.secondary.withValues(alpha: 0.18),
+                    : AppColors.tacticalSurface,
               ),
             ],
           ),
@@ -258,7 +258,7 @@ class _GuestPlayerCard extends StatelessWidget {
               if (isCaptain)
                 TournamentStatusChip(
                   label: 'قائد',
-                  backgroundColor: AppColors.secondary.withValues(alpha: 0.18),
+                  backgroundColor: AppColors.tacticalSurface,
                 ),
             ],
           ),

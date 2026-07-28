@@ -400,10 +400,7 @@ class _CreateGuestTeamButton extends StatelessWidget {
   final String? tournamentId;
   final ValueChanged<TournamentParticipantCandidate>? onCreated;
 
-  const _CreateGuestTeamButton({
-    required this.tournamentId,
-    this.onCreated,
-  });
+  const _CreateGuestTeamButton({required this.tournamentId, this.onCreated});
 
   @override
   Widget build(BuildContext context) {
@@ -434,10 +431,8 @@ class _CreateGuestTeamButton extends StatelessWidget {
         label: const Text('إنشاء فريق ضيف جديد'),
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(0, 44),
-          foregroundColor: AppColors.secondary,
-          side: BorderSide(
-            color: AppColors.secondary.withValues(alpha: 0.4),
-          ),
+          foregroundColor: AppColors.info,
+          side: BorderSide(color: AppColors.info.withValues(alpha: 0.4)),
         ),
       ),
     );

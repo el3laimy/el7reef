@@ -62,7 +62,7 @@ class ChampionCelebrationSheet extends StatelessWidget {
                 Text(
                   'البطل اتوّج',
                   style: AppTextStyles.headlineSmall.copyWith(
-                    color: AppColors.secondaryLight,
+                    color: AppColors.achievementLight,
                     fontWeight: FontWeight.w900,
                   ),
                   textAlign: TextAlign.center,

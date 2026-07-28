@@ -170,14 +170,14 @@ class ProfileScreen extends GetView<ProfileController> {
                     ),
                     child: const Icon(
                       Icons.camera_alt,
-                      color: AppColors.textPrimary,
+                      color: AppColors.textOnPrimary,
                       size: 16,
                     ),
                   ),
                 ),
               ],
             ),
-          ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
+          ).animate().scale(duration: 250.ms, curve: Curves.easeOutQuart),
 
           const SizedBox(height: AppDimensions.sm),
 
@@ -239,8 +239,7 @@ class ProfileScreen extends GetView<ProfileController> {
           const SizedBox(height: AppDimensions.md),
 
           // ── Rating الكبير ──
-          El7reefGlassSurface(
-            variant: El7reefGlassVariant.base,
+          El7reefSolidSurface(
             padding: const EdgeInsets.symmetric(
               horizontal: AppDimensions.xl,
               vertical: AppDimensions.md,
@@ -302,7 +301,7 @@ class ProfileScreen extends GetView<ProfileController> {
         _actionButton(
           icon: Icons.people_outline,
           label: 'أصدقاء',
-          color: AppColors.secondary,
+          color: AppColors.socialAccent,
           badge: player.friendIds.length,
           onTap: () => Get.toNamed(AppRoutes.friends),
         ),
@@ -335,8 +334,7 @@ class ProfileScreen extends GetView<ProfileController> {
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
-        child: El7reefGlassSurface(
-          variant: El7reefGlassVariant.base,
+        child: El7reefSolidSurface(
           padding: const EdgeInsets.symmetric(vertical: 12),
           radius: AppDimensions.radiusMd,
           child: Column(
@@ -358,7 +356,7 @@ class ProfileScreen extends GetView<ProfileController> {
                         child: Text(
                           '$badge',
                           style: const TextStyle(
-                            color: AppColors.textPrimary,
+                            color: AppColors.textOnPrimary,
                             fontSize: 10,
                           ),
                         ),
@@ -429,8 +427,7 @@ class ProfileScreen extends GetView<ProfileController> {
 
   /// ── Stats Grid ──
   Widget _buildStatsGrid(Player player) {
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       padding: const EdgeInsets.all(AppDimensions.md),
       radius: AppDimensions.radiusLg,
       child: Column(
@@ -456,7 +453,7 @@ class ProfileScreen extends GetView<ProfileController> {
                 'التعادل',
                 '${player.draws}',
                 Icons.handshake,
-                AppColors.secondary,
+                AppColors.info,
               ),
               _statItem(
                 'الخسارة',
@@ -473,7 +470,7 @@ class ProfileScreen extends GetView<ProfileController> {
                 'MVP',
                 '${player.mvpCount}',
                 Icons.star,
-                AppColors.secondary,
+                AppColors.achievement,
               ),
               _statItem(
                 'نسبة الفوز',
@@ -490,7 +487,7 @@ class ProfileScreen extends GetView<ProfileController> {
                     : 'جديد',
                 Icons.verified,
                 player.trustLevel.name == 'veteran'
-                    ? AppColors.secondary
+                    ? AppColors.info
                     : AppColors.textMuted,
               ),
               const Expanded(child: SizedBox()),
@@ -516,8 +513,7 @@ class ProfileScreen extends GetView<ProfileController> {
 
   /// ── اختيار المركز ──
   Widget _buildPositionSection() {
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       padding: const EdgeInsets.all(AppDimensions.md),
       radius: AppDimensions.radiusLg,
       child: Column(
@@ -531,35 +527,21 @@ class ProfileScreen extends GetView<ProfileController> {
               runSpacing: AppDimensions.sm,
               children: controller.positions.map((pos) {
                 final isSelected = controller.selectedPosition.value == pos;
-                return GestureDetector(
+                return El7reefLens(
+                  tone: El7reefGlassTone.action,
+                  selected: isSelected,
                   onTap: () => controller.updatePosition(pos),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimensions.md,
-                      vertical: AppDimensions.sm,
-                    ),
-                    decoration: BoxDecoration(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppDimensions.md,
+                    vertical: AppDimensions.sm,
+                  ),
+                  radius: AppDimensions.radiusFull,
+                  child: Text(
+                    controller.positionLabels[pos] ?? pos,
+                    style: AppTextStyles.labelLarge.copyWith(
                       color: isSelected
-                          ? AppColors.primarySurface
-                          : AppColors.surface,
-                      borderRadius: BorderRadius.circular(
-                        AppDimensions.radiusFull,
-                      ),
-                      border: Border.all(
-                        color: isSelected
-                            ? AppColors.primary
-                            : AppColors.surfaceBorder,
-                        width: isSelected ? 2 : 1,
-                      ),
-                    ),
-                    child: Text(
-                      controller.positionLabels[pos] ?? pos,
-                      style: AppTextStyles.labelLarge.copyWith(
-                        color: isSelected
-                            ? AppColors.primary
-                            : AppColors.textSecondary,
-                      ),
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
                     ),
                   ),
                 );
@@ -573,8 +555,7 @@ class ProfileScreen extends GetView<ProfileController> {
 
   /// ── معلومات إضافية ──
   Widget _buildInfoSection(Player player) {
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       padding: const EdgeInsets.all(AppDimensions.md),
       radius: AppDimensions.radiusLg,
       child: Column(
@@ -634,8 +615,7 @@ class ProfileScreen extends GetView<ProfileController> {
   }
 
   Widget _buildAccountActions(BuildContext context) {
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       padding: const EdgeInsets.all(AppDimensions.md),
       radius: AppDimensions.radiusLg,
       child: Column(

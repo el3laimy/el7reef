@@ -18,8 +18,7 @@ class TeamRosterFormationWorkspace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       radius: AppDimensions.radiusXl,
       padding: const EdgeInsets.all(AppDimensions.lg),
       child: Column(

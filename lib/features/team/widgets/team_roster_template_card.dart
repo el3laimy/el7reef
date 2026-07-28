@@ -101,12 +101,18 @@ class TeamRosterTemplateCard extends StatelessWidget {
             spacing: AppDimensions.xs,
             runSpacing: AppDimensions.xs,
             children: [
-                    TeamRosterTag(label: 'أساسي ${template.starterCount}', color: AppColors.primary),
-                    TeamRosterTag(label: 'احتياط ${template.benchCount}', color: AppColors.secondary),
-                    TeamRosterTag(
-                      label: 'غير نشط ${template.inactiveCount}',
-                      color: AppColors.textMuted,
-                    ),
+              TeamRosterTag(
+                label: 'أساسي ${template.starterCount}',
+                color: AppColors.primary,
+              ),
+              TeamRosterTag(
+                label: 'احتياط ${template.benchCount}',
+                color: AppColors.info,
+              ),
+              TeamRosterTag(
+                label: 'غير نشط ${template.inactiveCount}',
+                color: AppColors.textMuted,
+              ),
             ],
           ),
         ],

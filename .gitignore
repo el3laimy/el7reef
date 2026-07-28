@@ -51,6 +51,11 @@ package-lock.json
 # Local audit/tool output
 /.impeccable/critique/
 
+# Firebase local cache
+.firebase/
+.agents/skills/ExportBlock*
+ScreenShots/
+
 # Secure Keys & Configurations Exclusions
 key.properties
 **/*.keystore

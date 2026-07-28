@@ -17,8 +17,7 @@ class MatchdaySubstitutionSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final snapshot = controller.activeSnapshot.value;
 
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       padding: const EdgeInsets.all(AppDimensions.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

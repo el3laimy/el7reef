@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../app/routes/app_routes.dart';
-import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
+import '../../../app/theme/app_media_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 
 /// شاشة QR Scanner — Task 6.2.6
 class QrScannerScreen extends StatefulWidget {
@@ -89,40 +90,58 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundDeep,
+      extendBodyBehindAppBar: true,
+      backgroundColor: AppMediaColors.canvasDeep,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
+        foregroundColor: AppMediaColors.textPrimary,
+        surfaceTintColor: Colors.transparent,
         title: const Text('مسح الباركود'),
         actions: [
-          IconButton(
-            icon: ValueListenableBuilder(
-              valueListenable: _controller,
-              builder: (ctx1, state, child1) {
-                return Icon(
-                  state.torchState == TorchState.on
-                      ? Icons.flash_on
-                      : Icons.flash_off,
-                  color: state.torchState == TorchState.on
-                      ? AppColors.secondary
-                      : AppColors.textPrimaryTinted,
-                );
-              },
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: AppDimensions.sm),
+            child: El7reefGlassSurface(
+              role: El7reefGlassRole.mediaOverlay,
+              padding: EdgeInsets.zero,
+              radius: 20,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'تشغيل الإضاءة',
+                    icon: ValueListenableBuilder(
+                      valueListenable: _controller,
+                      builder: (ctx1, state, child1) {
+                        return Icon(
+                          state.torchState == TorchState.on
+                              ? Icons.flash_on
+                              : Icons.flash_off,
+                          color: state.torchState == TorchState.on
+                              ? AppMediaColors.actionPrimary
+                              : AppMediaColors.textPrimary,
+                        );
+                      },
+                    ),
+                    onPressed: _controller.toggleTorch,
+                  ),
+                  IconButton(
+                    tooltip: 'تبديل الكاميرا',
+                    icon: ValueListenableBuilder(
+                      valueListenable: _controller,
+                      builder: (ctx2, state, child2) {
+                        return Icon(
+                          state.cameraDirection == CameraFacing.front
+                              ? Icons.camera_front
+                              : Icons.camera_rear,
+                          color: AppMediaColors.textPrimary,
+                        );
+                      },
+                    ),
+                    onPressed: _controller.switchCamera,
+                  ),
+                ],
+              ),
             ),
-            onPressed: _controller.toggleTorch,
-          ),
-          IconButton(
-            icon: ValueListenableBuilder(
-              valueListenable: _controller,
-              builder: (ctx2, state, child2) {
-                return Icon(
-                  state.cameraDirection == CameraFacing.front
-                      ? Icons.camera_front
-                      : Icons.camera_rear,
-                  color: AppColors.textPrimaryTinted,
-                );
-              },
-            ),
-            onPressed: _controller.switchCamera,
           ),
         ],
       ),
@@ -142,7 +161,10 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               width: 250,
               height: 250,
               decoration: BoxDecoration(
-                border: Border.all(color: AppColors.primary, width: 3),
+                border: Border.all(
+                  color: AppMediaColors.actionPrimary,
+                  width: 3,
+                ),
                 borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
               ),
               child: Stack(
@@ -161,24 +183,35 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             bottom: 80,
             left: 0,
             right: 0,
-            child: Column(
-              children: [
-                Text(
-                  'وجّه الكاميرا على الباركود',
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
-                  textAlign: TextAlign.center,
+            child: Center(
+              child: El7reefGlassSurface(
+                role: El7reefGlassRole.mediaOverlay,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppDimensions.lg,
+                  vertical: AppDimensions.sm,
                 ),
-                const SizedBox(height: AppDimensions.xs),
-                Text(
-                  'باركود اللاعب · الفريق · الدورة',
-                  style: AppTextStyles.labelSmall.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                  textAlign: TextAlign.center,
+                radius: AppDimensions.radiusLg,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'وجّه الكاميرا على الباركود',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppMediaColors.textPrimary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: AppDimensions.xs),
+                    Text(
+                      'باركود اللاعب · الفريق · الدورة',
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppMediaColors.textSecondary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ],
@@ -202,20 +235,22 @@ class _ScannerErrorState extends StatelessWidget {
           children: [
             const Icon(
               Icons.no_photography_outlined,
-              color: AppColors.textSecondary,
+              color: AppMediaColors.textSecondary,
               size: 48,
             ),
             const SizedBox(height: AppDimensions.md),
             Text(
               'تعذر تشغيل الكاميرا',
-              style: AppTextStyles.titleLarge,
+              style: AppTextStyles.titleLarge.copyWith(
+                color: AppMediaColors.textPrimary,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppDimensions.xs),
             Text(
               'اسمح للحريف باستخدام الكاميرا لمسح QR، ثم حاول مرة أخرى.',
               style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textSecondary,
+                color: AppMediaColors.textSecondary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -224,7 +259,11 @@ class _ScannerErrorState extends StatelessWidget {
               onPressed: onRetry,
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('إعادة المحاولة'),
-              style: FilledButton.styleFrom(minimumSize: const Size(160, 48)),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppMediaColors.actionPrimary,
+                foregroundColor: AppMediaColors.inkOnAccent,
+                minimumSize: const Size(160, 48),
+              ),
             ),
           ],
         ),
@@ -252,16 +291,28 @@ class _Corner extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border(
             top: top
-                ? const BorderSide(color: AppColors.primary, width: 3)
+                ? const BorderSide(
+                    color: AppMediaColors.actionPrimary,
+                    width: 3,
+                  )
                 : BorderSide.none,
             bottom: !top
-                ? const BorderSide(color: AppColors.primary, width: 3)
+                ? const BorderSide(
+                    color: AppMediaColors.actionPrimary,
+                    width: 3,
+                  )
                 : BorderSide.none,
             left: left
-                ? const BorderSide(color: AppColors.primary, width: 3)
+                ? const BorderSide(
+                    color: AppMediaColors.actionPrimary,
+                    width: 3,
+                  )
                 : BorderSide.none,
             right: !left
-                ? const BorderSide(color: AppColors.primary, width: 3)
+                ? const BorderSide(
+                    color: AppMediaColors.actionPrimary,
+                    width: 3,
+                  )
                 : BorderSide.none,
           ),
           borderRadius: BorderRadius.only(

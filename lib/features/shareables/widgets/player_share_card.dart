@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_media_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../models/player_share_data.dart';
 import '../models/pride_card_format.dart';
@@ -32,10 +32,12 @@ class PlayerShareCard extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [AppColors.surfaceRaised, AppColors.backgroundDeep],
+          colors: [AppMediaColors.raised, AppMediaColors.canvasDeep],
         ),
         borderRadius: BorderRadius.circular(exportMode ? 16 : 22),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.48)),
+        border: Border.all(
+          color: AppMediaColors.actionPrimary.withValues(alpha: 0.48),
+        ),
       ),
       child: Padding(
         padding: EdgeInsets.all(dense ? 8 : (compact ? 12 : 24)),
@@ -50,7 +52,7 @@ class PlayerShareCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: AppColors.primaryLight,
+                      color: AppMediaColors.actionLight,
                       fontWeight: FontWeight.w900,
                       fontSize: dense ? 8 : 13,
                     ),
@@ -68,7 +70,9 @@ class PlayerShareCard extends StatelessWidget {
                 imageUrl: data.photoUrl,
                 initials: data.initials,
                 size: dense ? 42 : (compact ? 64 : 112),
-                accent: data.isGuest ? AppColors.secondary : AppColors.primary,
+                accent: data.isGuest
+                    ? AppMediaColors.achievement
+                    : AppMediaColors.actionPrimary,
               ),
             ),
             SizedBox(height: dense ? 3 : (compact ? 8 : 18)),
@@ -81,7 +85,7 @@ class PlayerShareCard extends StatelessWidget {
                           ? TextStyle(fontSize: compact ? 22 : 30)
                           : AppTextStyles.displaySmall)
                       .copyWith(
-                        color: AppColors.textPrimaryTinted,
+                        color: AppMediaColors.textPrimary,
                         fontWeight: FontWeight.w900,
                         height: 1.12,
                       ),
@@ -117,7 +121,7 @@ class PlayerShareCard extends StatelessWidget {
             Text(
               'إحصائيات من أحداث المباريات المعتمدة',
               style: TextStyle(
-                color: AppColors.textSecondaryTinted.withValues(alpha: 0.68),
+                color: AppMediaColors.textSecondary.withValues(alpha: 0.68),
                 fontSize: dense ? 7 : (exportMode ? 10 : 11),
                 fontWeight: FontWeight.w700,
               ),
@@ -148,7 +152,9 @@ class _IdentityTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isGuest ? AppColors.secondary : AppColors.primary;
+    final color = isGuest
+        ? AppMediaColors.achievement
+        : AppMediaColors.actionPrimary;
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: dense ? 6 : 10,
@@ -196,24 +202,24 @@ class _Stat extends StatelessWidget {
         horizontal: dense ? 4 : 8,
       ),
       decoration: BoxDecoration(
-        color: AppColors.textPrimaryTinted.withValues(alpha: 0.08),
+        color: AppMediaColors.textPrimary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: AppColors.textPrimaryTinted.withValues(alpha: 0.1),
+          color: AppMediaColors.textPrimary.withValues(alpha: 0.1),
         ),
       ),
       child: Column(
         children: [
           Icon(
             icon,
-            color: AppColors.primaryLight,
+            color: AppMediaColors.actionLight,
             size: dense ? 14 : (compact ? 18 : 22),
           ),
           SizedBox(height: dense ? 1 : (compact ? 2 : 6)),
           Text(
             '$value',
             style: TextStyle(
-              color: AppColors.textPrimaryTinted,
+              color: AppMediaColors.textPrimary,
               fontSize: dense ? 11 : (compact ? 18 : 21),
               fontWeight: FontWeight.w900,
               height: 1,
@@ -222,7 +228,7 @@ class _Stat extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: AppColors.textSecondaryTinted,
+              color: AppMediaColors.textSecondary,
               fontSize: dense ? 7 : 11,
               fontWeight: FontWeight.w700,
               height: 1,

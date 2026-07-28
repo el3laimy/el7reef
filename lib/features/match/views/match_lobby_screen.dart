@@ -148,8 +148,7 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppDimensions.pagePadding,
                         ),
-                        child: El7reefGlassSurface(
-                          variant: El7reefGlassVariant.base,
+                        child: El7reefSolidSurface(
                           padding: const EdgeInsets.all(AppDimensions.lg),
                           child: Column(
                             children: [
@@ -351,7 +350,7 @@ class MatchLobbyScreen extends GetView<MatchLobbyController> {
                                         ? AppColors.success
                                         : AppColors.surfaceBorder,
                                     foregroundColor: readiness.canStart
-                                        ? Colors.white
+                                        ? AppColors.textOnTactical
                                         : AppColors.textMuted,
                                     padding: const EdgeInsets.symmetric(
                                       vertical: AppDimensions.md,

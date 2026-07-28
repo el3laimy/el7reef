@@ -2,11 +2,14 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_media_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/lineup/lineup_types.dart';
 import 'lineup_player_display.dart';
 
 enum SquadPlayerCardSize { field, compact, dense, bench }
+
+enum SquadPlayerCardCanvas { operational, pitch }
 
 class SquadPlayerCard extends StatelessWidget {
   final LineupPlayer? player;
@@ -14,6 +17,7 @@ class SquadPlayerCard extends StatelessWidget {
   final SquadPlayerCardSize size;
   final bool isSelected;
   final bool isUnavailable;
+  final SquadPlayerCardCanvas canvas;
 
   const SquadPlayerCard({
     super.key,
@@ -22,6 +26,7 @@ class SquadPlayerCard extends StatelessWidget {
     this.size = SquadPlayerCardSize.field,
     this.isSelected = false,
     this.isUnavailable = false,
+    this.canvas = SquadPlayerCardCanvas.operational,
   });
 
   bool get isEmpty => player == null;
@@ -30,8 +35,10 @@ class SquadPlayerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final metrics = _SquadCardMetrics.forSize(size);
     final roleColor = lineupRoleColor(role);
+    final palette = _SquadCardPalette.forCanvas(canvas);
+    final selectionColor = palette.selection;
     final borderColor = isSelected
-        ? AppColors.primaryLight
+        ? selectionColor
         : roleColor.withValues(alpha: isEmpty ? 0.5 : 0.72);
 
     return AnimatedOpacity(
@@ -46,8 +53,8 @@ class SquadPlayerCard extends StatelessWidget {
           height: metrics.height,
           decoration: BoxDecoration(
             color: isEmpty
-                ? AppColors.backgroundDeep.withValues(alpha: 0.76)
-                : AppColors.surfaceSunken.withValues(alpha: 0.96),
+                ? palette.emptySurface.withValues(alpha: 0.76)
+                : palette.filledSurface.withValues(alpha: 0.96),
             borderRadius: BorderRadius.circular(metrics.radius),
             border: Border.all(color: borderColor, width: isSelected ? 2 : 1),
             boxShadow: [
@@ -58,7 +65,7 @@ class SquadPlayerCard extends StatelessWidget {
               ),
               if (isSelected)
                 BoxShadow(
-                  color: AppColors.primaryLight.withValues(alpha: 0.28),
+                  color: selectionColor.withValues(alpha: 0.28),
                   blurRadius: 16,
                   spreadRadius: 1,
                 ),
@@ -72,6 +79,7 @@ class SquadPlayerCard extends StatelessWidget {
                   role: role,
                   roleColor: roleColor,
                   metrics: metrics,
+                  palette: palette,
                 ),
         ),
       ),
@@ -84,12 +92,14 @@ class _FilledSquadCard extends StatelessWidget {
   final SlotRole role;
   final Color roleColor;
   final _SquadCardMetrics metrics;
+  final _SquadCardPalette palette;
 
   const _FilledSquadCard({
     required this.player,
     required this.role,
     required this.roleColor,
     required this.metrics,
+    required this.palette,
   });
 
   @override
@@ -100,7 +110,6 @@ class _FilledSquadCard extends StatelessWidget {
         : player.isGuest
         ? 'ضيف'
         : null;
-
     return Stack(
       children: [
         Positioned.fill(
@@ -110,9 +119,9 @@ class _FilledSquadCard extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  AppColors.primaryDark.withValues(alpha: 0.3),
-                  AppColors.surfaceRaised.withValues(alpha: 0.92),
-                  AppColors.backgroundDeep,
+                  palette.actionStrong.withValues(alpha: 0.3),
+                  palette.raisedSurface.withValues(alpha: 0.92),
+                  palette.deepSurface,
                 ],
                 stops: const [0, 0.54, 1],
               ),
@@ -125,7 +134,7 @@ class _FilledSquadCard extends StatelessWidget {
             start: metrics.edgePadding,
             child: _CardNumber(
               value: player.number!.toString(),
-              color: AppColors.textPrimaryTinted,
+              color: palette.text,
               fontSize: metrics.numberSize,
             ),
           ),
@@ -133,7 +142,7 @@ class _FilledSquadCard extends StatelessWidget {
           PositionedDirectional(
             top: metrics.edgePadding,
             end: metrics.edgePadding,
-            child: _CaptainBadge(size: metrics.captainSize),
+            child: _CaptainBadge(size: metrics.captainSize, palette: palette),
           ),
         Positioned(
           top: metrics.photoTop,
@@ -146,6 +155,7 @@ class _FilledSquadCard extends StatelessWidget {
                 ? _PlayerInitials(
                     player: player,
                     fontSize: metrics.initialsSize,
+                    palette: palette,
                   )
                 : CachedNetworkImage(
                     imageUrl: photoUrl,
@@ -155,10 +165,12 @@ class _FilledSquadCard extends StatelessWidget {
                     placeholder: (context, url) => _PlayerInitials(
                       player: player,
                       fontSize: metrics.initialsSize,
+                      palette: palette,
                     ),
                     errorWidget: (context, url, error) => _PlayerInitials(
                       player: player,
                       fontSize: metrics.initialsSize,
+                      palette: palette,
                     ),
                   ),
           ),
@@ -173,7 +185,7 @@ class _FilledSquadCard extends StatelessWidget {
                 vertical: 2,
               ),
               decoration: BoxDecoration(
-                color: AppColors.backgroundDeep.withValues(alpha: 0.88),
+                color: palette.deepSurface.withValues(alpha: 0.88),
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(color: roleColor.withValues(alpha: 0.8)),
               ),
@@ -201,7 +213,7 @@ class _FilledSquadCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: AppTextStyles.labelSmall.copyWith(
-              color: AppColors.textPrimaryTinted,
+              color: palette.text,
               fontSize: metrics.nameSize,
               fontWeight: FontWeight.w900,
               height: 1.1,
@@ -222,16 +234,18 @@ class _FilledSquadCard extends StatelessWidget {
                   vertical: 2,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.backgroundDeep.withValues(alpha: 0.94),
+                  color: palette.deepSurface.withValues(alpha: 0.94),
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(
-                    color: AppColors.secondary.withValues(alpha: 0.78),
+                    color: palette.info.withValues(
+                      alpha: palette.identityBorderAlpha,
+                    ),
                   ),
                 ),
                 child: Text(
                   identityLabel,
                   style: AppTextStyles.labelSmall.copyWith(
-                    color: AppColors.secondaryLight,
+                    color: palette.infoLight,
                     fontSize: metrics.identitySize,
                     fontWeight: FontWeight.w900,
                     height: 1,
@@ -296,8 +310,13 @@ class _EmptySquadSlot extends StatelessWidget {
 class _PlayerInitials extends StatelessWidget {
   final LineupPlayer player;
   final double fontSize;
+  final _SquadCardPalette palette;
 
-  const _PlayerInitials({required this.player, required this.fontSize});
+  const _PlayerInitials({
+    required this.player,
+    required this.fontSize,
+    required this.palette,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -307,8 +326,8 @@ class _PlayerInitials extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            AppColors.primaryDark.withValues(alpha: 0.42),
-            AppColors.backgroundDeep,
+            palette.actionStrong.withValues(alpha: 0.42),
+            palette.deepSurface,
           ],
         ),
       ),
@@ -316,7 +335,7 @@ class _PlayerInitials extends StatelessWidget {
         child: Text(
           lineupInitialsForPlayer(player),
           style: AppTextStyles.titleMedium.copyWith(
-            color: AppColors.textPrimaryTinted,
+            color: palette.text,
             fontSize: fontSize,
             fontWeight: FontWeight.w900,
             letterSpacing: 0,
@@ -357,29 +376,100 @@ class _CardNumber extends StatelessWidget {
 
 class _CaptainBadge extends StatelessWidget {
   final double size;
+  final _SquadCardPalette palette;
 
-  const _CaptainBadge({required this.size});
+  const _CaptainBadge({required this.size, required this.palette});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: size,
       height: size,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: AppColors.secondary,
+        color: palette.captainBackground,
       ),
       alignment: Alignment.center,
       child: Text(
         'C',
         style: AppTextStyles.labelSmall.copyWith(
-          color: AppColors.textOnPrimary,
+          color: palette.captainForeground,
           fontSize: size * 0.47,
           fontWeight: FontWeight.w900,
           height: 1,
         ),
       ),
     );
+  }
+}
+
+@immutable
+class _SquadCardPalette {
+  const _SquadCardPalette({
+    required this.selection,
+    required this.emptySurface,
+    required this.filledSurface,
+    required this.actionStrong,
+    required this.raisedSurface,
+    required this.deepSurface,
+    required this.text,
+    required this.info,
+    required this.infoLight,
+    required this.identityBorderAlpha,
+    required this.captainBackground,
+    required this.captainForeground,
+  });
+
+  final Color selection;
+  final Color emptySurface;
+  final Color filledSurface;
+  final Color actionStrong;
+  final Color raisedSurface;
+  final Color deepSurface;
+  final Color text;
+  final Color info;
+  final Color infoLight;
+  final double identityBorderAlpha;
+  final Color captainBackground;
+  final Color captainForeground;
+
+  static const operational = _SquadCardPalette(
+    selection: AppColors.primaryLight,
+    emptySurface: AppColors.backgroundDeep,
+    filledSurface: AppColors.surfaceSunken,
+    actionStrong: AppColors.primaryDark,
+    raisedSurface: AppColors.surfaceRaised,
+    deepSurface: AppColors.backgroundDeep,
+    text: AppColors.textPrimaryTinted,
+    info: AppColors.info,
+    infoLight: AppColors.infoLight,
+    identityBorderAlpha: 0.72,
+    captainBackground: AppColors.actionPrimary,
+    captainForeground: AppColors.textOnPrimary,
+  );
+
+  // The pitch palette is intentionally stable so light-theme refinements do
+  // not alter lineup screenshots or exported lineup cards.
+  static const pitch = _SquadCardPalette(
+    selection: AppMediaColors.pitchActionLight,
+    emptySurface: AppMediaColors.pitchCanvasDeep,
+    filledSurface: AppMediaColors.pitchSunken,
+    actionStrong: AppMediaColors.pitchActionStrong,
+    raisedSurface: AppMediaColors.pitchRaised,
+    deepSurface: AppMediaColors.pitchCanvasDeep,
+    text: AppMediaColors.pitchTextPrimary,
+    info: AppMediaColors.pitchAchievement,
+    infoLight: AppMediaColors.pitchAchievementLight,
+    identityBorderAlpha: 0.78,
+    captainBackground: AppMediaColors.pitchAchievement,
+    captainForeground: AppMediaColors.pitchInkOnAccent,
+  );
+
+  static _SquadCardPalette forCanvas(SquadPlayerCardCanvas canvas) {
+    return switch (canvas) {
+      SquadPlayerCardCanvas.operational => operational,
+      SquadPlayerCardCanvas.pitch => pitch,
+    };
   }
 }
 

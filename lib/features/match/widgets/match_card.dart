@@ -37,8 +37,7 @@ class MatchCard extends StatelessWidget {
     final canOpenMatchday = isOrganizer || isParticipant;
     final hasResult = match.scoreTeamA != null && match.scoreTeamB != null;
 
-    return El7reefGlassSurface(
-          variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
           padding: const EdgeInsets.all(AppDimensions.md),
           radius: AppDimensions.radiusLg,
           margin: const EdgeInsets.only(bottom: AppDimensions.sm),
@@ -57,15 +56,18 @@ class MatchCard extends StatelessWidget {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        gradient: AppColors.goldGradient,
+                        color: AppColors.achievementSurface,
                         borderRadius: BorderRadius.circular(
                           AppDimensions.radiusFull,
+                        ),
+                        border: Border.all(
+                          color: AppColors.achievement.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Text(
                         '⭐ ذهبي',
                         style: AppTextStyles.labelSmall.copyWith(
-                          color: AppColors.textPrimary,
+                          color: AppColors.achievement,
                         ),
                       ),
                     ),
@@ -174,8 +176,8 @@ class MatchCard extends StatelessWidget {
                     icon: const Icon(Icons.star_border_purple500, size: 18),
                     label: const Text('تصويت رجل المباراة (الجماهير)'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.secondary,
-                      side: const BorderSide(color: AppColors.secondary),
+                      foregroundColor: AppColors.competitive,
+                      side: const BorderSide(color: AppColors.competitive),
                     ),
                   ),
                 ),
@@ -213,7 +215,7 @@ class MatchCard extends StatelessWidget {
                             controller.activateGoldenRating(match.id),
                         icon: const Icon(
                           Icons.star_outline,
-                          color: AppColors.secondary,
+                          color: AppColors.competitive,
                         ),
                         tooltip: 'تقييم ذهبي',
                       ),
@@ -253,7 +255,7 @@ class MatchCard extends StatelessWidget {
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.success,
-                      foregroundColor: AppColors.textPrimary,
+                      foregroundColor: AppColors.textOnTactical,
                     ),
                   ),
                 ),

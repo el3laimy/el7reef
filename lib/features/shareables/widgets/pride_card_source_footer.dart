@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_media_colors.dart';
 import '../../../core/services/pride_share_attribution.dart';
 import '../../../core/widgets/el7reef_brand_mark.dart';
 import '../../../domain/entities/share_payload.dart';
@@ -45,7 +45,10 @@ class PrideCardSourceFooter extends StatelessWidget {
             semanticsLabel: qrSemanticsLabel,
           )
         else
-          El7reefBrandMark(size: markSize),
+          El7reefBrandMark(
+            size: markSize,
+            appearance: El7reefBrandMarkAppearance.onDark,
+          ),
         SizedBox(width: dense ? 5 : 8),
         Expanded(
           child: Column(
@@ -67,7 +70,7 @@ class PrideCardSourceFooter extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: AppColors.textSecondaryTinted,
+                  color: AppMediaColors.textSecondary,
                   fontSize: dense ? 6 : (compact ? 8 : 9),
                   fontWeight: FontWeight.w600,
                   height: 1.25,
@@ -98,14 +101,18 @@ class _AttributedQr extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppMediaColors.qrBackground,
         borderRadius: BorderRadius.circular(8),
       ),
       child: QrImageView(
         data: url,
         size: size,
         padding: EdgeInsets.zero,
-        backgroundColor: Colors.white,
+        backgroundColor: AppMediaColors.qrBackground,
+        eyeStyle: const QrEyeStyle(color: AppMediaColors.qrForeground),
+        dataModuleStyle: const QrDataModuleStyle(
+          color: AppMediaColors.qrForeground,
+        ),
         semanticsLabel: semanticsLabel,
       ),
     );

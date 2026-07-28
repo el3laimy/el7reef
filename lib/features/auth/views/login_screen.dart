@@ -35,7 +35,8 @@ class LoginScreen extends GetView<AuthController> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       El7reefGlassSurface(
-                        variant: El7reefGlassVariant.raised,
+                        role: El7reefGlassRole.hero,
+                        tone: El7reefGlassTone.action,
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppDimensions.lg,
                           vertical: AppDimensions.xl,
@@ -49,11 +50,11 @@ class LoginScreen extends GetView<AuthController> {
                                     borderRadius: BorderRadius.circular(28),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: AppColors.primary.withValues(
-                                          alpha: 0.28,
+                                        color: AppColors.black.withValues(
+                                          alpha: 0.12,
                                         ),
-                                        blurRadius: 34,
-                                        spreadRadius: 3,
+                                        blurRadius: 24,
+                                        offset: const Offset(0, 12),
                                       ),
                                     ],
                                   ),
@@ -63,7 +64,7 @@ class LoginScreen extends GetView<AuthController> {
                                 .scale(
                                   begin: const Offset(0.92, 0.92),
                                   end: const Offset(1.0, 1.0),
-                                  duration: 450.ms,
+                                  duration: 250.ms,
                                   curve: Curves.easeOutCubic,
                                 )
                                 .fadeIn(duration: 260.ms),
@@ -73,16 +74,7 @@ class LoginScreen extends GetView<AuthController> {
                             Text(
                                   AppConstants.appName,
                                   style: AppTextStyles.displayLarge.copyWith(
-                                    foreground: Paint()
-                                      ..shader =
-                                          const LinearGradient(
-                                            colors: [
-                                              AppColors.primary,
-                                              AppColors.primaryLight,
-                                            ],
-                                          ).createShader(
-                                            const Rect.fromLTWH(0, 0, 200, 70),
-                                          ),
+                                    color: AppColors.textPrimary,
                                   ),
                                 )
                                 .animate()
@@ -188,8 +180,7 @@ class _AuthErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.error,
+    return El7reefSolidSurface(
       margin: const EdgeInsets.only(bottom: AppDimensions.md),
       padding: const EdgeInsets.symmetric(
         horizontal: AppDimensions.md,

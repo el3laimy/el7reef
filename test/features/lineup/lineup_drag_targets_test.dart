@@ -2,6 +2,7 @@ import 'package:el7reef/core/lineup/formation_engine.dart';
 import 'package:el7reef/core/lineup/formation_library.dart';
 import 'package:el7reef/core/lineup/lineup_types.dart';
 import 'package:el7reef/core/lineup/lineup_utils.dart';
+import 'package:el7reef/core/widgets/el7reef_glass_surface.dart';
 import 'package:el7reef/features/lineup/widgets/bench_bar.dart';
 import 'package:el7reef/features/lineup/widgets/formation_control_bar.dart';
 import 'package:el7reef/features/lineup/widgets/lineup_player_node.dart';
@@ -52,6 +53,7 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byType(DragTarget<LineupDragPayload>), findsOneWidget);
+    expect(find.byType(El7reefGlassSurface), findsNothing);
   });
 
   testWidgets('ProfessionalPitchCard marks tap-select move targets clearly', (
@@ -345,6 +347,7 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byType(DragTarget<LineupDragPayload>), findsOneWidget);
+    expect(find.byType(El7reefGlassSurface), findsNothing);
   });
 
   testWidgets('BenchBar highlights selected bench player', (tester) async {
@@ -432,6 +435,11 @@ void main() {
     expect(find.byKey(const ValueKey('squad-tactics-save')), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'حفظ'), findsOneWidget);
     expect(find.byType(SingleChildScrollView), findsNothing);
+    expect(find.byType(El7reefGlassSurface), findsOneWidget);
+    expect(
+      tester.widget<El7reefGlassSurface>(find.byType(El7reefGlassSurface)).role,
+      El7reefGlassRole.floatingToolbar,
+    );
 
     final saveRect = tester.getRect(
       find.byKey(const ValueKey('squad-tactics-save')),
@@ -608,6 +616,7 @@ void main() {
     expect(find.text('6/7 على الملعب'), findsOneWidget);
     expect(find.text('مختار: أمام عاشور'), findsOneWidget);
     expect(find.text('اضغط خانة للنقل أو التبديل'), findsOneWidget);
+    expect(find.byType(El7reefGlassSurface), findsNothing);
   });
 }
 

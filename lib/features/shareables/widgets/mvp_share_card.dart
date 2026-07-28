@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_media_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../models/mvp_share_data.dart';
 import '../models/pride_card_format.dart';
@@ -57,18 +57,18 @@ class _MvpBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [AppColors.surfaceRaised, AppColors.backgroundDeep],
+              colors: [AppMediaColors.raised, AppMediaColors.canvasDeep],
             ),
           ),
           child: SizedBox.expand(),
         ),
         Align(
           alignment: Alignment.topRight,
-          child: _Glow(color: AppColors.secondary),
+          child: _Glow(color: AppMediaColors.achievement),
         ),
         Align(
           alignment: Alignment.bottomLeft,
-          child: _Glow(color: AppColors.primary),
+          child: _Glow(color: AppMediaColors.actionPrimary),
         ),
         Positioned.fill(child: CustomPaint(painter: _StarPitchPainter())),
       ],
@@ -101,34 +101,34 @@ class _MvpContent extends StatelessWidget {
     final compact = !format.isStory;
     final titleStyle = compact
         ? const TextStyle(
-            color: AppColors.textPrimary,
+            color: AppMediaColors.textPrimary,
             fontSize: 20,
             fontWeight: FontWeight.w900,
           )
         : exportMode
         ? const TextStyle(
-            color: AppColors.textPrimary,
+            color: AppMediaColors.textPrimary,
             fontSize: 22,
             fontWeight: FontWeight.w900,
           )
         : AppTextStyles.headlineMedium.copyWith(
-            color: AppColors.textPrimary,
+            color: AppMediaColors.textPrimary,
             fontWeight: FontWeight.w900,
           );
     final nameStyle = compact
         ? const TextStyle(
-            color: AppColors.textPrimary,
+            color: AppMediaColors.textPrimary,
             fontSize: 25,
             fontWeight: FontWeight.w900,
           )
         : exportMode
         ? const TextStyle(
-            color: AppColors.textPrimary,
+            color: AppMediaColors.textPrimary,
             fontSize: 30,
             fontWeight: FontWeight.w900,
           )
         : AppTextStyles.displayMedium.copyWith(
-            color: AppColors.textPrimary,
+            color: AppMediaColors.textPrimary,
             fontWeight: FontWeight.w900,
           );
 
@@ -164,7 +164,7 @@ class _MvpContent extends StatelessWidget {
                             )
                           : AppTextStyles.labelLarge)
                       .copyWith(
-                        color: AppColors.textSecondaryTinted.withValues(
+                        color: AppMediaColors.textSecondary.withValues(
                           alpha: 0.72,
                         ),
                       ),
@@ -208,7 +208,7 @@ class _MvpContent extends StatelessWidget {
                         ? const TextStyle(fontSize: 10)
                         : AppTextStyles.labelSmall)
                     .copyWith(
-                      color: AppColors.textSecondaryTinted.withValues(
+                      color: AppMediaColors.textSecondary.withValues(
                         alpha: 0.62,
                       ),
                     ),
@@ -283,7 +283,7 @@ class _ShortMvpContent extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: AppColors.textPrimary,
+                          color: AppMediaColors.textPrimary,
                           fontSize: dense ? 12 : 18,
                           fontWeight: FontWeight.w900,
                         ),
@@ -295,7 +295,7 @@ class _ShortMvpContent extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: AppColors.textSecondaryTinted,
+                            color: AppMediaColors.textSecondary,
                             fontSize: dense ? 8 : 11,
                             fontWeight: FontWeight.w700,
                           ),
@@ -306,7 +306,7 @@ class _ShortMvpContent extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: AppColors.textPrimary,
+                          color: AppMediaColors.textPrimary,
                           fontSize: dense ? 15 : 22,
                           height: 1.15,
                           fontWeight: FontWeight.w900,
@@ -337,7 +337,7 @@ class _ShortMvpContent extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: AppColors.textSecondaryTinted,
+                            color: AppMediaColors.textSecondary,
                             fontSize: dense ? 8 : 11,
                             fontWeight: FontWeight.w700,
                           ),
@@ -388,9 +388,9 @@ class _MvpMedal extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: AppColors.secondary.withValues(alpha: 0.18),
+          color: AppMediaColors.achievement.withValues(alpha: 0.18),
           border: Border.all(
-            color: AppColors.secondary.withValues(alpha: 0.70),
+            color: AppMediaColors.achievement.withValues(alpha: 0.70),
             width: 2,
           ),
         ),
@@ -402,14 +402,16 @@ class _MvpMedal extends StatelessWidget {
               imageUrl: data.photoUrl,
               initials: data.initials,
               size: avatarSize,
-              accent: data.isGuest ? AppColors.secondary : AppColors.primary,
+              accent: data.isGuest
+                  ? AppMediaColors.achievement
+                  : AppMediaColors.actionPrimary,
             ),
             PositionedDirectional(
               bottom: -6,
               end: -6,
               child: Icon(
                 Icons.workspace_premium_rounded,
-                color: AppColors.secondary,
+                color: AppMediaColors.achievement,
                 size: dense
                     ? 18
                     : compact
@@ -443,16 +445,16 @@ class _WideChip extends StatelessWidget {
         vertical: dense ? 4 : 9,
       ),
       decoration: BoxDecoration(
-        color: AppColors.textPrimaryTinted.withValues(alpha: 0.10),
+        color: AppMediaColors.textPrimary.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: AppColors.textPrimaryTinted.withValues(alpha: 0.12),
+          color: AppMediaColors.textPrimary.withValues(alpha: 0.12),
         ),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: AppColors.textPrimary,
+          color: AppMediaColors.textPrimary,
           fontSize: dense ? 8 : (exportMode ? 12 : 13),
           fontWeight: FontWeight.w800,
         ),
@@ -478,13 +480,13 @@ class _GuestBadge extends StatelessWidget {
         vertical: dense ? 2 : 3,
       ),
       decoration: BoxDecoration(
-        color: AppColors.secondary.withValues(alpha: 0.18),
+        color: AppMediaColors.achievement.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         'ضيف',
         style: TextStyle(
-          color: AppColors.secondary,
+          color: AppMediaColors.achievement,
           fontSize: dense ? 7 : (exportMode ? 10 : 11),
           fontWeight: FontWeight.w900,
         ),
@@ -509,7 +511,7 @@ class _BrandMark extends StatelessWidget {
     return Text(
       label,
       style: TextStyle(
-        color: AppColors.textPrimary,
+        color: AppMediaColors.textPrimary,
         fontSize: dense ? 8 : (exportMode ? 13 : 12),
         fontWeight: FontWeight.w900,
       ),
@@ -538,13 +540,13 @@ class _MetaChip extends StatelessWidget {
         vertical: dense ? 3 : 5,
       ),
       decoration: BoxDecoration(
-        color: AppColors.textPrimaryTinted.withValues(alpha: 0.10),
+        color: AppMediaColors.textPrimary.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: AppColors.textPrimary,
+          color: AppMediaColors.textPrimary,
           fontSize: dense ? 7 : (exportMode ? 9 : 10),
           fontWeight: FontWeight.w900,
         ),
@@ -578,7 +580,7 @@ class _StarPitchPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.textPrimaryTinted.withValues(alpha: 0.05)
+      ..color = AppMediaColors.textPrimary.withValues(alpha: 0.05)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
 

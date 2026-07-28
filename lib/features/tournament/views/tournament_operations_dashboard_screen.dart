@@ -7,6 +7,7 @@ import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/enums/tournament_enums.dart';
 import '../../../core/widgets/el7reef_badge.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../core/widgets/el7reef_surface.dart';
 import '../../../core/widgets/section_state_card.dart';
 import '../controllers/tournament_operations_controller.dart';
@@ -439,64 +440,61 @@ class _DashboardHero extends StatelessWidget {
       accent: baseSpec.accent,
       stageIndex: baseSpec.stageIndex,
     );
-    return El7reefSurface(
-      elevated: true,
+    return El7reefGlassSurface(
+      role: El7reefGlassRole.hero,
+      tone: El7reefGlassTone.competitive,
       padding: EdgeInsets.zero,
-      borderColor: spec.accent.withValues(alpha: 0.28),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+        borderRadius: BorderRadius.circular(30),
         child: TournamentFieldPattern(
           color: spec.accent,
-          child: ColoredBox(
-            color: AppColors.surfaceRaised.withValues(alpha: 0.92),
-            child: Padding(
-              padding: const EdgeInsets.all(AppDimensions.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: AppDimensions.sm,
-                    runSpacing: AppDimensions.sm,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      TournamentStatusPill(spec: spec),
-                      _DashboardLockPill(isFinalized: isFinalized),
-                    ],
+          child: Padding(
+            padding: const EdgeInsets.all(AppDimensions.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: AppDimensions.sm,
+                  runSpacing: AppDimensions.sm,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    TournamentStatusPill(spec: spec),
+                    _DashboardLockPill(isFinalized: isFinalized),
+                  ],
+                ),
+                const SizedBox(height: AppDimensions.lg),
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.headlineLarge.copyWith(
+                    fontWeight: FontWeight.w900,
+                    height: 1.15,
                   ),
-                  const SizedBox(height: AppDimensions.lg),
-                  Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.headlineLarge.copyWith(
-                      fontWeight: FontWeight.w900,
-                      height: 1.15,
-                    ),
-                  ),
-                  const SizedBox(height: AppDimensions.sm),
-                  Row(
-                    children: [
-                      Icon(Icons.groups_rounded, color: spec.accent, size: 18),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          '$activeParticipantsCount فريق نشط جاهز',
-                          style: AppTextStyles.labelMedium.copyWith(
-                            color: AppColors.textPrimaryTinted,
-                            fontWeight: FontWeight.w800,
-                          ),
+                ),
+                const SizedBox(height: AppDimensions.sm),
+                Row(
+                  children: [
+                    Icon(Icons.groups_rounded, color: spec.accent, size: 18),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '$activeParticipantsCount فريق نشط جاهز',
+                        style: AppTextStyles.labelMedium.copyWith(
+                          color: AppColors.textPrimaryTinted,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: AppDimensions.lg),
-                  TournamentStageRail(
-                    activeIndex: spec.stageIndex,
-                    accent: spec.accent,
-                    semanticsLabel: spec.stageLabel,
-                  ),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppDimensions.lg),
+                TournamentStageRail(
+                  activeIndex: spec.stageIndex,
+                  accent: spec.accent,
+                  semanticsLabel: spec.stageLabel,
+                ),
+              ],
             ),
           ),
         ),

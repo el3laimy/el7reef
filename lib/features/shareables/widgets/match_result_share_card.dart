@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart' as intl;
 
-import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_media_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/identity/identity_visual.dart';
 import '../models/match_result_share_data.dart';
 import '../models/pride_card_format.dart';
 import 'pride_card_shell.dart';
@@ -38,7 +38,7 @@ class MatchResultShareCard extends StatelessWidget {
                   center: Alignment.topCenter,
                   radius: 1.1,
                   colors: [
-                    AppColors.textPrimaryTinted.withValues(alpha: 0.08),
+                    AppMediaColors.textPrimary.withValues(alpha: 0.08),
                     Colors.transparent,
                   ],
                 ),
@@ -77,7 +77,7 @@ class _GlowBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [AppColors.surfaceSunken, AppColors.backgroundDeep],
+              colors: [AppMediaColors.sunken, AppMediaColors.canvasDeep],
             ),
           ),
           child: SizedBox.expand(),
@@ -132,34 +132,34 @@ class _CardContent extends StatelessWidget {
         format == PrideCardFormat.square1x1 || format.isLandscape || dense;
     final titleStyle = dense
         ? const TextStyle(
-            color: AppColors.textPrimaryTinted,
+            color: AppMediaColors.textPrimary,
             fontSize: 14,
             fontWeight: FontWeight.w900,
           )
         : exportMode
         ? TextStyle(
-            color: AppColors.textPrimaryTinted,
+            color: AppMediaColors.textPrimary,
             fontSize: compact ? 14 : 18,
             fontWeight: FontWeight.w900,
           )
         : AppTextStyles.titleMedium.copyWith(
-            color: AppColors.textPrimaryTinted,
+            color: AppMediaColors.textPrimary,
             fontWeight: FontWeight.w900,
           );
     final subtitleStyle = dense
         ? TextStyle(
-            color: AppColors.textSecondaryTinted.withValues(alpha: 0.82),
+            color: AppMediaColors.textSecondary.withValues(alpha: 0.82),
             fontSize: 8,
             fontWeight: FontWeight.w600,
           )
         : exportMode
         ? TextStyle(
-            color: AppColors.textSecondaryTinted.withValues(alpha: 0.82),
+            color: AppMediaColors.textSecondary.withValues(alpha: 0.82),
             fontSize: compact ? 8 : 10,
             fontWeight: FontWeight.w600,
           )
         : AppTextStyles.labelSmall.copyWith(
-            color: AppColors.textSecondaryTinted.withValues(alpha: 0.82),
+            color: AppMediaColors.textSecondary.withValues(alpha: 0.82),
           );
 
     return Padding(
@@ -219,7 +219,7 @@ class _TopMeta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chipStyle = TextStyle(
-      color: AppColors.textPrimaryTinted,
+      color: AppMediaColors.textPrimary,
       fontSize: compact ? 7 : (exportMode ? 9 : 11),
       fontWeight: FontWeight.w900,
       letterSpacing: 0,
@@ -228,7 +228,7 @@ class _TopMeta extends StatelessWidget {
       children: [
         _MetaChip(
           label: data.statusLabel,
-          accent: AppColors.success,
+          accent: AppMediaColors.tactical,
           exportMode: exportMode,
           style: chipStyle,
         ),
@@ -238,7 +238,7 @@ class _TopMeta extends StatelessWidget {
             child: Text(
               data.tournamentName!,
               style: chipStyle.copyWith(
-                color: AppColors.textPrimaryTinted.withValues(alpha: 0.78),
+                color: AppMediaColors.textPrimary.withValues(alpha: 0.78),
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -321,7 +321,7 @@ class _TeamPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final logoSize = compact ? 34.0 : (exportMode ? 54.0 : 58.0);
     final nameStyle = TextStyle(
-      color: AppColors.textPrimaryTinted,
+      color: AppMediaColors.textPrimary,
       fontSize: compact ? 10 : 14,
       fontWeight: FontWeight.w900,
       height: 1.08,
@@ -358,7 +358,7 @@ class _TeamPanel extends StatelessWidget {
                   child: Icon(
                     Icons.emoji_events_rounded,
                     size: exportMode ? 18 : 18,
-                    color: AppColors.secondaryLight,
+                    color: AppMediaColors.achievementLight,
                   ),
                 ),
             ],
@@ -401,7 +401,6 @@ class _TeamLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final url = logoUrl?.trim();
     final fallback = Container(
       width: size,
       height: size,
@@ -417,7 +416,7 @@ class _TeamLogo extends StatelessWidget {
         child: Text(
           _initials(name),
           style: TextStyle(
-            color: AppColors.textPrimaryTinted,
+            color: AppMediaColors.textPrimary,
             fontSize: exportMode ? 18 : 20,
             fontWeight: FontWeight.w900,
           ),
@@ -425,18 +424,15 @@ class _TeamLogo extends StatelessWidget {
       ),
     );
 
-    if (url == null || url.isEmpty) {
-      return fallback;
-    }
-    return ClipOval(
-      child: CachedNetworkImage(
-        imageUrl: url,
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        placeholder: (context, url) => fallback,
-        errorWidget: (context, url, error) => fallback,
-      ),
+    return IdentityVisual(
+      source: logoUrl,
+      size: size,
+      fit: BoxFit.cover,
+      borderRadius: BorderRadius.circular(size / 2),
+      semanticLabel: 'شعار $name',
+      appearance: IdentityVisualAppearance.onDarkMedia,
+      fallbackBuilder: (_) => fallback,
+      placeholderBuilder: (_) => fallback,
     );
   }
 
@@ -462,7 +458,7 @@ class _ScoreBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scoreStyle = TextStyle(
-      color: AppColors.textPrimaryTinted,
+      color: AppMediaColors.textPrimary,
       fontSize: compact ? 28 : (exportMode ? 44 : 46),
       fontWeight: FontWeight.w900,
       height: 0.95,
@@ -527,7 +523,7 @@ class _FooterMeta extends StatelessWidget {
           Text(
             meta,
             style: TextStyle(
-              color: AppColors.textSecondaryTinted.withValues(alpha: 0.72),
+              color: AppMediaColors.textSecondary.withValues(alpha: 0.72),
               fontSize: compact ? 7 : (exportMode ? 9 : 11),
               fontWeight: FontWeight.w700,
             ),
@@ -540,7 +536,7 @@ class _FooterMeta extends StatelessWidget {
         Text(
           'EL7REEF  •  العب. اتوثق. اتفاخر.',
           style: TextStyle(
-            color: AppColors.primaryLight,
+            color: AppMediaColors.actionLight,
             fontSize: compact ? 8 : (exportMode ? 10 : 12),
             fontWeight: FontWeight.w900,
             letterSpacing: 0,
@@ -614,14 +610,14 @@ class _FormationChip extends StatelessWidget {
         vertical: exportMode ? 5 : 5,
       ),
       decoration: BoxDecoration(
-        color: AppColors.backgroundDeep.withValues(alpha: 0.42),
+        color: AppMediaColors.canvasDeep.withValues(alpha: 0.42),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: accent.withValues(alpha: 0.46)),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: AppColors.textPrimaryTinted.withValues(alpha: 0.9),
+          color: AppMediaColors.textPrimary.withValues(alpha: 0.9),
           fontSize: exportMode ? 9 : 10,
           fontWeight: FontWeight.w900,
         ),
@@ -634,7 +630,7 @@ class _PitchLinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.textPrimaryTinted.withValues(alpha: 0.045)
+      ..color = AppMediaColors.textPrimary.withValues(alpha: 0.045)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.4;
     canvas.drawCircle(

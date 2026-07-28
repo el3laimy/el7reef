@@ -22,15 +22,16 @@ class TournamentGuestTeamCreateController extends GetxController {
     required TournamentRepository tournamentRepository,
     required GuestTeamRepository guestTeamRepository,
     required TournamentRegistrationService registrationService,
-  })  : _authSession = authSession,
-        _tournamentRepository = tournamentRepository,
-        _guestTeamRepository = guestTeamRepository,
-        _registrationService = registrationService;
+  }) : _authSession = authSession,
+       _tournamentRepository = tournamentRepository,
+       _guestTeamRepository = guestTeamRepository,
+       _registrationService = registrationService;
 
   final formKey = GlobalKey<FormState>();
   final teamNameController = TextEditingController();
   final contactNameController = TextEditingController();
   final contactPhoneController = TextEditingController();
+  final RxnString selectedLogoUrl = RxnString();
 
   final tournament = Rxn<Tournament>();
   final selectedMode = TournamentRegistrationMode.quick.obs;
@@ -78,6 +79,10 @@ class TournamentGuestTeamCreateController extends GetxController {
     }
   }
 
+  void selectLogo(String? logoUrl) {
+    selectedLogoUrl.value = logoUrl;
+  }
+
   Future<void> submit() async {
     final userId = currentUserId;
     final loadedTournament = tournament.value;
@@ -105,6 +110,7 @@ class TournamentGuestTeamCreateController extends GetxController {
         id: const Uuid().v4(),
         name: teamNameController.text.trim(),
         normalizedName: teamNameController.text.trim().toLowerCase(),
+        logoUrl: selectedLogoUrl.value,
         creatorId: userId,
         contactName: _nullableTrim(contactNameController.text),
         contactPhone: _nullableTrim(contactPhoneController.text),
@@ -132,10 +138,12 @@ class TournamentGuestTeamCreateController extends GetxController {
       }
 
       Get.snackbar('تم', 'تم إنشاء الفريق الضيف وتسجيله في البطولة.');
-      Get.back(result: <String, dynamic>{
-        'guestTeamId': guestTeam.id,
-        'guestTeamName': guestTeam.name,
-      });
+      Get.back(
+        result: <String, dynamic>{
+          'guestTeamId': guestTeam.id,
+          'guestTeamName': guestTeam.name,
+        },
+      );
     } catch (error) {
       errorMessage.value = _normalizeError(error);
     } finally {

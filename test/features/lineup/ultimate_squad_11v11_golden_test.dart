@@ -47,7 +47,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: AppTheme.darkTheme,
+        theme: AppTheme.lightTheme,
         home: Scaffold(
           backgroundColor: const Color(0xFF070A08),
           body: Center(

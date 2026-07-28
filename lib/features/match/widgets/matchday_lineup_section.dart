@@ -35,8 +35,7 @@ class _MatchdayLineupSectionState extends State<MatchdayLineupSection> {
         .where((value) => value == MatchdayLineupSlot.starter.name)
         .length;
 
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       padding: const EdgeInsets.all(AppDimensions.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

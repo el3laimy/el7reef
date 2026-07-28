@@ -9,6 +9,7 @@ class TournamentModel {
   final String id;
   final String organizerId;
   final String name;
+  final String? logoUrl;
   final String? description;
   final String? location;
   final String format;
@@ -44,6 +45,7 @@ class TournamentModel {
     required this.id,
     required this.organizerId,
     required this.name,
+    this.logoUrl,
     this.description,
     this.location,
     required this.format,
@@ -82,6 +84,7 @@ class TournamentModel {
       id: docId,
       organizerId: json['organizerId'] as String? ?? '',
       name: json['name'] as String? ?? '',
+      logoUrl: json['logoUrl'] as String?,
       description: json['description'] as String?,
       location: json['location'] as String?,
       format: json['format'] as String? ?? 'groupsOnly',
@@ -182,6 +185,9 @@ class TournamentModel {
     if (groupRoundIds.isNotEmpty) {
       data['groupRoundIds'] = groupRoundIds;
     }
+    if (logoUrl != null && logoUrl!.isNotEmpty) {
+      data['logoUrl'] = logoUrl;
+    }
     if (knockoutRoundIds.isNotEmpty) {
       data['knockoutRoundIds'] = knockoutRoundIds;
     }
@@ -193,6 +199,7 @@ class TournamentModel {
     id: id,
     organizerId: organizerId,
     name: name,
+    logoUrl: logoUrl,
     description: description,
     location: location,
     format: _parseFormat(format),
@@ -237,6 +244,7 @@ class TournamentModel {
     id: t.id,
     organizerId: t.organizerId,
     name: t.name,
+    logoUrl: t.logoUrl,
     description: t.description,
     location: t.location,
     format: t.format.name,

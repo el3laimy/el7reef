@@ -1,9 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
-import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_media_colors.dart';
+import '../../../core/identity/identity_visual.dart';
 import '../../../core/lineup/pitch_layout.dart';
 import '../models/lineup_share_data.dart';
 import '../models/pride_card_format.dart';
@@ -11,8 +11,8 @@ import 'pride_card_shell.dart';
 import 'pride_card_text_scale.dart';
 
 // ── Design tokens ──
-const _gold = AppColors.primary;
-const _goldLight = AppColors.primaryLight;
+const _lineupAccent = AppMediaColors.actionPrimary;
+const _lineupAccentLight = AppMediaColors.actionLight;
 const _cardBg = Color(0xFF0A0E0A);
 const _cardBgRaised = Color(0xFF141A14);
 const _pitchGreen = Color(0xFF1B5E20);
@@ -38,7 +38,7 @@ class LineupShareCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: _cardBg,
         borderRadius: BorderRadius.circular(exportMode ? 16 : 22),
-        border: Border.all(color: _gold.withValues(alpha: 0.25)),
+        border: Border.all(color: _lineupAccent.withValues(alpha: 0.25)),
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -119,7 +119,7 @@ class _HeaderSection extends StatelessWidget {
                 Text(
                   data.statusLabel ?? 'التشكيلة الرسمية',
                   style: TextStyle(
-                    color: _gold,
+                    color: _lineupAccent,
                     fontSize: dense ? 11 : (exportMode ? 20 : 22),
                     fontWeight: FontWeight.w900,
                     height: 1.1,
@@ -131,7 +131,7 @@ class _HeaderSection extends StatelessWidget {
                 Text(
                   data.matchLabel ?? data.lineupTypeLabel,
                   style: TextStyle(
-                    color: _goldLight.withValues(alpha: 0.6),
+                    color: _lineupAccentLight.withValues(alpha: 0.6),
                     fontSize: dense ? 7 : (exportMode ? 12 : 13),
                     fontWeight: FontWeight.w700,
                   ),
@@ -142,7 +142,7 @@ class _HeaderSection extends StatelessWidget {
                 Text(
                   data.formationLabel ?? data.formationCode,
                   style: TextStyle(
-                    color: AppColors.textPrimary,
+                    color: AppMediaColors.textPrimary,
                     fontSize: dense ? 16 : (exportMode ? 28 : 32),
                     fontWeight: FontWeight.w900,
                     letterSpacing: dense ? 1 : 2,
@@ -174,9 +174,6 @@ class _TeamBranding extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final logoSize = dense ? 34.0 : (exportMode ? 48.0 : 54.0);
-    final url = data.logoUrl?.trim();
-    final hasLogo = url != null && url.isNotEmpty;
-
     return Column(
       children: [
         Container(
@@ -192,29 +189,29 @@ class _TeamBranding extends StatelessWidget {
                 data.accentColor.withValues(alpha: 0.5),
               ],
             ),
-            border: Border.all(color: _gold.withValues(alpha: 0.5), width: 2),
+            border: Border.all(
+              color: _lineupAccent.withValues(alpha: 0.5),
+              width: 2,
+            ),
           ),
           clipBehavior: Clip.antiAlias,
-          child: hasLogo
-              ? CachedNetworkImage(
-                  imageUrl: url,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => _LogoFallback(
-                    initials: data.initials,
-                    exportMode: exportMode,
-                    dense: dense,
-                  ),
-                  errorWidget: (context, url, error) => _LogoFallback(
-                    initials: data.initials,
-                    exportMode: exportMode,
-                    dense: dense,
-                  ),
-                )
-              : _LogoFallback(
-                  initials: data.initials,
-                  exportMode: exportMode,
-                  dense: dense,
-                ),
+          child: IdentityVisual(
+            source: data.logoUrl,
+            size: logoSize,
+            fit: BoxFit.cover,
+            semanticLabel: 'شعار ${data.teamName}',
+            appearance: IdentityVisualAppearance.onDarkMedia,
+            fallbackBuilder: (_) => _LogoFallback(
+              initials: data.initials,
+              exportMode: exportMode,
+              dense: dense,
+            ),
+            placeholderBuilder: (_) => _LogoFallback(
+              initials: data.initials,
+              exportMode: exportMode,
+              dense: dense,
+            ),
+          ),
         ),
         SizedBox(height: dense ? 2 : 4),
         // Team name
@@ -226,7 +223,7 @@ class _TeamBranding extends StatelessWidget {
             maxLines: dense ? 1 : 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: AppColors.textPrimary,
+              color: AppMediaColors.textPrimary,
               fontSize: dense ? 6.5 : (exportMode ? 10 : 11),
               fontWeight: FontWeight.w900,
               height: 1.2,
@@ -255,7 +252,7 @@ class _LogoFallback extends StatelessWidget {
       child: Text(
         initials,
         style: TextStyle(
-          color: AppColors.textPrimary,
+          color: AppMediaColors.textPrimary,
           fontSize: dense ? 9 : (exportMode ? 16 : 18),
           fontWeight: FontWeight.w900,
         ),
@@ -297,7 +294,7 @@ class _PitchSection extends StatelessWidget {
           border: Border.all(color: _pitchLine.withValues(alpha: 0.3)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.4),
+              color: AppMediaColors.canvasDeep.withValues(alpha: 0.4),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -465,7 +462,7 @@ class _PlayerNode extends StatelessWidget {
                           ? '${player.shirtNumber}'
                           : player.initials,
                       style: TextStyle(
-                        color: AppColors.textPrimary,
+                        color: AppMediaColors.textPrimary,
                         fontSize: denseSquad
                             ? (dense ? 6 : 9)
                             : dense
@@ -490,11 +487,11 @@ class _PlayerNode extends StatelessWidget {
               vertical: denseSquad ? 1 : (dense ? 1 : 3),
             ),
             decoration: BoxDecoration(
-              color: AppColors.textPrimaryTinted,
+              color: AppMediaColors.textPrimary,
               borderRadius: BorderRadius.circular(4),
               boxShadow: [
                 BoxShadow(
-                  color: _gold.withValues(alpha: 0.3),
+                  color: _lineupAccent.withValues(alpha: 0.3),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
@@ -569,7 +566,7 @@ class _FooterSection extends StatelessWidget {
             Text(
               'البدلاء',
               style: TextStyle(
-                color: AppColors.textSecondaryTinted,
+                color: AppMediaColors.textSecondary,
                 fontSize: dense ? 7 : (exportMode ? 10 : 11),
                 fontWeight: FontWeight.w800,
               ),
@@ -603,7 +600,7 @@ class _FooterSection extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: AppColors.textSecondaryTinted,
+                    color: AppMediaColors.textSecondary,
                     fontSize: dense ? 6.5 : (exportMode ? 10 : 11),
                     fontWeight: FontWeight.w700,
                   ),
@@ -617,7 +614,7 @@ class _FooterSection extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: AppColors.textSecondaryTinted,
+                      color: AppMediaColors.textSecondary,
                       fontSize: dense ? 6.5 : (exportMode ? 10 : 11),
                       fontWeight: FontWeight.w700,
                     ),
@@ -628,7 +625,7 @@ class _FooterSection extends StatelessWidget {
               Text(
                 'EL7REEF',
                 style: TextStyle(
-                  color: _gold,
+                  color: _lineupAccent,
                   fontSize: dense ? 6.5 : (exportMode ? 11 : 12),
                   fontWeight: FontWeight.w900,
                 ),
@@ -665,14 +662,14 @@ class _BenchChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: _cardBgRaised,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.surfaceBorder),
+        border: Border.all(color: AppMediaColors.border),
       ),
       child: Text(
         '$number${player.displayName}',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          color: AppColors.textPrimaryTinted,
+          color: AppMediaColors.textPrimary,
           fontSize: dense ? 6.5 : (exportMode ? 10 : 11),
           fontWeight: FontWeight.w700,
         ),
@@ -697,7 +694,7 @@ class _BenchMoreChip extends StatelessWidget {
     return Text(
       '+$count',
       style: TextStyle(
-        color: _gold,
+        color: _lineupAccent,
         fontSize: dense ? 6.5 : (exportMode ? 10 : 11),
         fontWeight: FontWeight.w900,
       ),
@@ -731,8 +728,8 @@ class _CardBgPainter extends CustomPainter {
         center: const Alignment(-0.7, -1.1),
         radius: 0.55,
         colors: [
-          Colors.white.withValues(alpha: 0.30),
-          _goldLight.withValues(alpha: 0.18),
+          AppMediaColors.textPrimary.withValues(alpha: 0.30),
+          _lineupAccentLight.withValues(alpha: 0.18),
           Colors.transparent,
         ],
         stops: const [0, 0.3, 1],
@@ -745,8 +742,8 @@ class _CardBgPainter extends CustomPainter {
         center: const Alignment(0.7, -1.1),
         radius: 0.55,
         colors: [
-          Colors.white.withValues(alpha: 0.30),
-          _goldLight.withValues(alpha: 0.18),
+          AppMediaColors.textPrimary.withValues(alpha: 0.30),
+          _lineupAccentLight.withValues(alpha: 0.18),
           Colors.transparent,
         ],
         stops: const [0, 0.3, 1],
@@ -758,13 +755,16 @@ class _CardBgPainter extends CustomPainter {
       ..shader = RadialGradient(
         center: const Alignment(0, -1.0),
         radius: 0.45,
-        colors: [_goldLight.withValues(alpha: 0.14), Colors.transparent],
+        colors: [
+          _lineupAccentLight.withValues(alpha: 0.14),
+          Colors.transparent,
+        ],
       ).createShader(Offset.zero & size);
     canvas.drawRect(Rect.fromLTWH(0, 0, w, h * 0.3), centerGlow);
 
     // Light beam streaks
     final beamPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.04)
+      ..color = AppMediaColors.textPrimary.withValues(alpha: 0.04)
       ..strokeWidth = 1.5;
     // Left beams
     for (var i = 0; i < 5; i++) {
@@ -785,7 +785,7 @@ class _CardBgPainter extends CustomPainter {
 
     // Subtle texture lines
     final texturePaint = Paint()
-      ..color = _gold.withValues(alpha: 0.02)
+      ..color = _lineupAccent.withValues(alpha: 0.02)
       ..strokeWidth = 0.5;
     for (var y = 0.0; y < h; y += 24) {
       canvas.drawLine(Offset(0, y), Offset(w, y + 36), texturePaint);
@@ -814,7 +814,7 @@ class _PitchPainter extends CustomPainter {
 
     // Grass stripes
     final stripePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.03)
+      ..color = AppMediaColors.textPrimary.withValues(alpha: 0.03)
       ..style = PaintingStyle.fill;
     const stripeCount = 14;
     final stripeH = h / stripeCount;
@@ -826,7 +826,10 @@ class _PitchPainter extends CustomPainter {
     final vPaint = Paint()
       ..shader = RadialGradient(
         radius: 0.85,
-        colors: [Colors.transparent, Colors.black.withValues(alpha: 0.3)],
+        colors: [
+          Colors.transparent,
+          AppMediaColors.canvasDeep.withValues(alpha: 0.3),
+        ],
       ).createShader(Offset.zero & size);
     canvas.drawRect(Offset.zero & size, vPaint);
 
@@ -960,7 +963,7 @@ class _JerseyPainter extends CustomPainter {
 
     // Jersey outline
     final outline = Paint()
-      ..color = Colors.white.withValues(alpha: 0.25)
+      ..color = AppMediaColors.textPrimary.withValues(alpha: 0.25)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.8;
     canvas.drawPath(path, outline);
@@ -972,7 +975,7 @@ class _JerseyPainter extends CustomPainter {
     canvas.drawPath(
       collarPath,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.4)
+        ..color = AppMediaColors.textPrimary.withValues(alpha: 0.4)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5,
     );

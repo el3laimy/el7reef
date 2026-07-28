@@ -178,9 +178,9 @@ class StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (Color color, String label) = switch (status) {
-      MatchStatus.open => (AppColors.success, '🟢 مفتوحة'),
-      MatchStatus.live => (AppColors.primary, '🔵 جارية'),
-      MatchStatus.completed => (AppColors.secondary, '✅ منتهية'),
+      MatchStatus.open => (AppColors.actionPrimary, 'مفتوحة'),
+      MatchStatus.live => (AppColors.tactical, 'مباشر'),
+      MatchStatus.completed => (AppColors.success, 'معتمدة'),
       MatchStatus.cancelled => (AppColors.error, '❌ ملغاة'),
       _ => (AppColors.textMuted, '⏸ أخرى'),
     };

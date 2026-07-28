@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
+import '../../../app/theme/app_media_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/lineup/lineup_types.dart';
 import '../../shareables/controllers/lineup_share_controller.dart';
@@ -287,7 +288,7 @@ class MatchSideLineupEditorScreen
       lineupOwnerType: LineupShareOwnerType.temporarySide,
       lineupTypeLabel: 'فريق مؤقت',
       matchLabel: 'مباراة ودية',
-      accentColor: AppColors.success,
+      accentColor: AppMediaColors.tactical,
     );
 
     final format = await showPrideCardFormatPicker(context);

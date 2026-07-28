@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_colors.dart';
-import '../../../core/widgets/el7reef_glass_surface.dart';
+import '../../../app/theme/app_media_colors.dart';
+import '../../../core/widgets/el7reef_solid_surface.dart';
 import '../../../domain/entities/share_payload.dart';
 import '../models/pride_card_format.dart';
 import 'pride_card_text_scale.dart';
 
 /// The single safe-area and material boundary used by every Pride export.
 ///
-/// Exported media is always solid. Functional glass is limited to the live
-/// preview and is independently gated by [El7reefGlassSurface].
+/// Exported media and its preview are always solid. Functional glass belongs
+/// to the composer controls outside this capture boundary.
 class PrideCardShell extends StatelessWidget {
   final bool exportMode;
   final PrideCardFormat format;
@@ -19,7 +20,6 @@ class PrideCardShell extends StatelessWidget {
   final EdgeInsetsGeometry exportPadding;
   final EdgeInsetsGeometry previewPadding;
   final BoxDecoration? exportDecoration;
-  final El7reefGlassVariant previewVariant;
   final double previewRadius;
 
   const PrideCardShell({
@@ -32,7 +32,6 @@ class PrideCardShell extends StatelessWidget {
     this.exportPadding = EdgeInsets.zero,
     this.previewPadding = const EdgeInsets.all(12),
     this.exportDecoration,
-    this.previewVariant = El7reefGlassVariant.pride,
     this.previewRadius = 28,
   });
 
@@ -55,10 +54,10 @@ class PrideCardShell extends StatelessWidget {
       exportPadding: exportPadding,
       previewPadding: previewPadding,
       exportDecoration: BoxDecoration(
-        color: AppColors.backgroundDeep,
+        color: AppMediaColors.canvasDeep,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AppColors.textPrimaryTinted.withValues(alpha: 0.12),
+          color: AppMediaColors.textPrimary.withValues(alpha: 0.12),
         ),
       ),
       child: child,
@@ -77,10 +76,11 @@ class PrideCardShell extends StatelessWidget {
               decoration: exportDecoration,
               child: Material(color: Colors.transparent, child: child),
             )
-          : El7reefGlassSurface(
-              variant: previewVariant,
+          : El7reefSolidSurface(
               padding: previewPadding,
               radius: previewRadius,
+              color: AppColors.surfaceRaised,
+              borderColor: AppColors.surfaceBorder,
               child: child,
             ),
     );

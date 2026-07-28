@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:el7reef/app/theme/app_colors.dart';
-import 'package:el7reef/core/widgets/el7reef_glass_surface.dart';
+import 'package:el7reef/app/theme/app_media_colors.dart';
+import 'package:el7reef/core/identity/identity_preset_mark.dart';
+import 'package:el7reef/core/widgets/el7reef_solid_surface.dart';
 import 'package:el7reef/features/shareables/models/match_result_share_data.dart';
 import 'package:el7reef/features/shareables/widgets/match_result_share_card.dart';
 
 void main() {
-  testWidgets('renders result card text and uses pride glass in preview', (
+  testWidgets('renders result card text on a solid preview surface', (
     tester,
   ) async {
     final data = _data();
@@ -27,7 +28,9 @@ void main() {
     expect(find.text('3 - 2'), findsOneWidget);
     expect(find.textContaining('Ali MVP'), findsOneWidget);
     expect(find.textContaining('الهدافون: أحمد ×2، باسم'), findsOneWidget);
-    expect(find.byType(El7reefGlassSurface), findsOneWidget);
+    expect(find.byType(IdentityPresetMark), findsNWidgets(2));
+    expect(find.byType(El7reefSolidSurface), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsNothing);
   });
 
   testWidgets('export mode keeps the result image free of live glass blur', (
@@ -46,7 +49,7 @@ void main() {
     );
 
     expect(find.text('3 - 2'), findsOneWidget);
-    expect(find.byType(El7reefGlassSurface), findsNothing);
+    expect(find.byType(El7reefSolidSurface), findsNothing);
     expect(find.byType(BackdropFilter), findsNothing);
   });
 }
@@ -57,9 +60,11 @@ MatchResultShareData _data() {
     title: 'نتيجة المباراة',
     subtitle: 'ملعب الحريف',
     teamAName: 'الحريف',
-    teamAAccent: AppColors.primary,
+    teamALogoUrl: 'preset://v1/team_badge/falcon_wing',
+    teamAAccent: AppMediaColors.actionPrimary,
     teamBName: 'الخصم',
-    teamBAccent: AppColors.error,
+    teamBLogoUrl: 'preset://v1/team_pennant/diagonal_dash',
+    teamBAccent: AppMediaColors.error,
     scoreA: 3,
     scoreB: 2,
     statusLabel: 'نهاية المباراة',

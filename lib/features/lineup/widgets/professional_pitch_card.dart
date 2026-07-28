@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_media_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../core/lineup/lineup_types.dart';
 import '../../../core/lineup/pitch_layout.dart';
@@ -87,12 +87,12 @@ class _ProfessionalPitchCardState extends State<ProfessionalPitchCard> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
             border: Border.all(
-              color: AppColors.primaryLight.withValues(alpha: 0.38),
+              color: AppMediaColors.pitchActionLight.withValues(alpha: 0.38),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.backgroundDeep.withValues(alpha: 0.5),
+                color: AppMediaColors.pitchCanvasDeep.withValues(alpha: 0.5),
                 blurRadius: 20,
                 offset: const Offset(0, 12),
               ),
@@ -124,7 +124,7 @@ class _ProfessionalPitchCardState extends State<ProfessionalPitchCard> {
                                 center: const Alignment(0, -0.08),
                                 radius: 0.92,
                                 colors: [
-                                  AppColors.primaryLight.withValues(
+                                  AppMediaColors.pitchActionLight.withValues(
                                     alpha: 0.06,
                                   ),
                                   Colors.transparent,
@@ -227,7 +227,7 @@ class _ProfessionalPitchCardState extends State<ProfessionalPitchCard> {
                                 fontFamily: 'Cairo',
                                 fontSize: (width * 0.038).clamp(11.0, 14.0),
                                 fontWeight: FontWeight.w700,
-                                color: AppColors.textSecondaryTinted,
+                                color: AppMediaColors.pitchTextSecondary,
                               ),
                             ),
                           ),
@@ -569,7 +569,7 @@ class _ProfessionalPitchCardState extends State<ProfessionalPitchCard> {
                           height: 22,
                           decoration: const BoxDecoration(
                             shape: BoxShape.circle,
-                            gradient: AppColors.goldGradient,
+                            gradient: AppMediaColors.pitchAchievementGradient,
                           ),
                           child: const Icon(
                             Icons.sports_soccer_rounded,
@@ -617,7 +617,7 @@ class _ProfessionalPitchCardState extends State<ProfessionalPitchCard> {
       child: Center(
         child: ShaderMask(
           shaderCallback: (bounds) =>
-              AppColors.goldGradient.createShader(bounds),
+              AppMediaColors.pitchAchievementGradient.createShader(bounds),
           child: const Icon(
             Icons.shield_rounded,
             color: Colors.white,
@@ -691,7 +691,7 @@ class _PitchBadge extends StatelessWidget {
         color: const Color(0xCC0D130F),
         borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
         border: Border.all(
-          color: AppColors.primaryLight.withValues(alpha: 0.38),
+          color: AppMediaColors.pitchActionLight.withValues(alpha: 0.38),
           width: 0.8,
         ),
         boxShadow: const [
@@ -701,7 +701,7 @@ class _PitchBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: AppColors.primaryLight),
+          Icon(icon, size: 13, color: AppMediaColors.pitchActionLight),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
@@ -735,7 +735,7 @@ class _DropActionBadge extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 112),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: AppColors.backgroundDeep.withValues(alpha: 0.92),
+          color: AppMediaColors.pitchCanvasDeep.withValues(alpha: 0.92),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: color.withValues(alpha: 0.9)),
           boxShadow: [
@@ -892,7 +892,7 @@ class TacticalNetworkPainter extends CustomPainter {
 
     final linkColor = presentationMode
         ? const Color(0xFF4A90D9)
-        : AppColors.primaryLight;
+        : AppMediaColors.pitchActionLight;
     final linePaint = Paint()
       ..color = linkColor.withValues(alpha: presentationMode ? 0.35 : 0.24)
       ..strokeWidth = presentationMode ? 1.5 : 1.15

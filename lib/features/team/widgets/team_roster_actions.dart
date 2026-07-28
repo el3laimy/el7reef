@@ -18,8 +18,7 @@ class TeamRosterActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!controller.canManageRoster) {
-      return El7reefGlassSurface(
-        variant: El7reefGlassVariant.base,
+      return El7reefSolidSurface(
         padding: const EdgeInsets.all(AppDimensions.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

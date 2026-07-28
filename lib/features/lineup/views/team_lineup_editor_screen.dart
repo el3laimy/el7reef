@@ -3,7 +3,10 @@ import 'package:get/get.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
+import '../../../app/theme/app_media_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/identity/identity_preset_catalog.dart';
+import '../../../core/identity/identity_visual.dart';
 import '../../../core/lineup/lineup_types.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../shareables/controllers/lineup_share_controller.dart';
@@ -295,7 +298,7 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
       lineupOwnerType: LineupShareOwnerType.officialTeam,
       lineupTypeLabel: 'فريق رسمي',
       matchLabel: _matchLabel(),
-      accentColor: AppColors.primary,
+      accentColor: AppMediaColors.actionPrimary,
     );
 
     final format = await showPrideCardFormatPicker(context);
@@ -355,6 +358,7 @@ class TeamLineupEditorScreen extends GetView<TeamLineupEditorController> {
   ) async {
     final url = shareData.logoUrl?.trim();
     if (url == null || url.isEmpty) return;
+    if (IdentityPresetCatalog.containsReference(url)) return;
     try {
       await precacheImage(
         NetworkImage(url),
@@ -471,20 +475,26 @@ class _TeamLineupHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: AppColors.primary.withValues(alpha: 0.18),
-            backgroundImage: (controller.teamLogoUrl ?? '').isEmpty
-                ? null
-                : NetworkImage(controller.teamLogoUrl!),
-            child: (controller.teamLogoUrl ?? '').isEmpty
-                ? Text(
+          ClipOval(
+            child: IdentityVisual(
+              source: controller.teamLogoUrl,
+              size: 56,
+              semanticLabel: 'شعار ${controller.teamName}',
+              fallbackBuilder: (_) => DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
                     controller.teamName.characters.first,
                     style: AppTextStyles.headlineSmall.copyWith(
                       color: AppColors.primaryLight,
                     ),
-                  )
-                : null,
+                  ),
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: AppDimensions.md),
           Expanded(

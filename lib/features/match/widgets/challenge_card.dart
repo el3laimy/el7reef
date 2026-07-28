@@ -26,8 +26,7 @@ class ChallengeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       padding: const EdgeInsets.all(AppDimensions.md),
       radius: AppDimensions.radiusMd,
       child: Column(

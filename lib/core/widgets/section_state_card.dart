@@ -12,7 +12,7 @@ class SectionStateCard extends StatelessWidget {
   final String message;
   final IconData icon;
   final Color color;
-  final El7reefGlassVariant variant;
+  final El7reefGlassTone tone;
   final String? actionLabel;
   final FutureOr<void> Function()? onAction;
 
@@ -22,7 +22,7 @@ class SectionStateCard extends StatelessWidget {
     required this.message,
     this.icon = Icons.info_outline_rounded,
     this.color = AppColors.primary,
-    this.variant = El7reefGlassVariant.base,
+    this.tone = El7reefGlassTone.neutral,
     this.actionLabel,
     this.onAction,
   });
@@ -33,7 +33,7 @@ class SectionStateCard extends StatelessWidget {
     required this.message,
     this.icon = Icons.lock_outline_rounded,
     this.color = AppColors.error,
-    this.variant = El7reefGlassVariant.error,
+    this.tone = El7reefGlassTone.error,
     this.actionLabel = 'حاول تاني',
     this.onAction,
   });
@@ -41,8 +41,8 @@ class SectionStateCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final compact = MediaQuery.textScalerOf(context).scale(1) >= 1.5;
-    return El7reefGlassSurface(
-      variant: variant,
+    return El7reefSolidSurface(
+      tone: tone,
       radius: AppDimensions.radiusMd,
       padding: const EdgeInsets.all(AppDimensions.md),
       child: compact

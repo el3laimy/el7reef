@@ -12,6 +12,7 @@ import '../../../core/constants/feature_flags.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../core/widgets/el7reef_badge.dart';
 import '../../../core/widgets/el7reef_button.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../core/widgets/el7reef_surface.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/entities/participant_ref.dart';
@@ -146,9 +147,14 @@ class ScoreSubmitScreen extends StatelessWidget {
     const labels = ['النتيجة', 'الهدافون', 'MVP', 'المراجعة'];
     return Semantics(
       label: 'الخطوة ${currentStep + 1} من 4: ${labels[currentStep]}',
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
+      child: El7reefGlassSurface(
+        role: El7reefGlassRole.floatingToolbar,
+        tone: El7reefGlassTone.action,
+        margin: const EdgeInsets.symmetric(
           horizontal: AppDimensions.pagePadding,
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppDimensions.md,
           vertical: AppDimensions.sm,
         ),
         child: Row(
@@ -195,10 +201,11 @@ class ScoreSubmitScreen extends StatelessWidget {
     BuildContext context,
     ScoreSubmitController controller,
   ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimensions.pagePadding,
-      ),
+    return El7reefGlassSurface(
+      role: El7reefGlassRole.floatingToolbar,
+      tone: El7reefGlassTone.action,
+      margin: const EdgeInsets.symmetric(horizontal: AppDimensions.pagePadding),
+      padding: const EdgeInsets.all(AppDimensions.sm),
       child: Row(
         children: [
           if (!controller.isOnFirstStep) ...[
@@ -639,10 +646,10 @@ class ScoreSubmitScreen extends StatelessWidget {
         horizontal: AppDimensions.pagePadding,
       ),
       child: El7reefSurface(
-        borderColor: AppColors.secondary.withValues(alpha: 0.36),
+        borderColor: AppColors.warning.withValues(alpha: 0.36),
         child: Row(
           children: [
-            const Icon(Icons.sync_problem_rounded, color: AppColors.secondary),
+            const Icon(Icons.sync_problem_rounded, color: AppColors.warning),
             const SizedBox(width: AppDimensions.sm),
             Expanded(
               child: Text(
@@ -945,22 +952,22 @@ class ScoreSubmitScreen extends StatelessWidget {
           avatar: Icon(
             isSelected ? Icons.star_rounded : Icons.person_rounded,
             size: 18,
-            color: isSelected ? AppColors.secondary : AppColors.textMuted,
+            color: isSelected ? AppColors.actionPrimary : AppColors.textMuted,
           ),
           label: Text(_mvpChoiceLabel(participant)),
           selected: isSelected,
           onSelected: (_) =>
               controller.selectMvp(isSelected ? '' : participantKey),
-          selectedColor: AppColors.secondary.withValues(alpha: 0.18),
+          selectedColor: AppColors.actionSurface,
           backgroundColor: AppColors.surfaceSunken,
           side: BorderSide(
             color: isSelected
-                ? AppColors.secondary.withValues(alpha: 0.55)
+                ? AppColors.actionPrimary.withValues(alpha: 0.55)
                 : AppColors.surfaceBorderStrong,
           ),
           labelStyle: AppTextStyles.labelMedium.copyWith(
             color: isSelected
-                ? AppColors.secondary
+                ? AppColors.actionPrimary
                 : AppColors.textPrimaryTinted,
             fontWeight: FontWeight.w800,
           ),

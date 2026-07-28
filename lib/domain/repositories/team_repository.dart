@@ -6,6 +6,7 @@ abstract class TeamRepository {
   Future<List<Team>> getTeamsByIds(List<String> teamIds);
   Future<void> createTeam(Team team);
   Future<void> updateTeam(Team team);
+  Future<void> updateTeamLogo(String teamId, String? logoUrl);
   Future<List<Team>> getPlayerTeams(String playerId);
   Future<void> addPlayerToTeam(String teamId, String playerId);
   Future<void> removePlayerFromTeam(String teamId, String playerId);

@@ -222,6 +222,25 @@ class TeamRosterController extends GetxController {
     }
   }
 
+  Future<void> updateTeamLogo(String? logoUrl) async {
+    final currentTeam = team.value;
+    if (!canManageRoster || currentTeam == null) {
+      Get.snackbar('غير مسموح', 'تغيير شعار الفريق متاح لقادة الفريق فقط.');
+      return;
+    }
+
+    try {
+      isSubmitting.value = true;
+      await _teamRepository.updateTeamLogo(currentTeam.id, logoUrl);
+      team.value = currentTeam.copyWith(logoUrl: logoUrl);
+      Get.snackbar('تم', 'تم تحديث شعار الفريق.');
+    } catch (error) {
+      Get.snackbar('تعذر الحفظ', _readableError(error));
+    } finally {
+      isSubmitting.value = false;
+    }
+  }
+
   Future<void> addRegisteredPlayer(
     Player player, {
     TeamMembershipStatus status = TeamMembershipStatus.bench,

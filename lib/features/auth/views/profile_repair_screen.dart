@@ -49,8 +49,7 @@ class ProfileRepairScreen extends StatelessWidget {
               return Column(
                 children: [
                   const Spacer(),
-                  El7reefGlassSurface(
-                    variant: El7reefGlassVariant.raised,
+                  El7reefSolidSurface(
                     padding: const EdgeInsets.all(AppDimensions.xl),
                     child: Column(
                       children: [

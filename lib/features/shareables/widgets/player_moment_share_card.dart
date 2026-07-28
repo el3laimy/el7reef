@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_media_colors.dart';
 import '../models/player_moment_share_data.dart';
 import '../models/pride_card_format.dart';
 import 'pride_card_shell.dart';
@@ -30,9 +30,10 @@ class PlayerMomentShareCard extends StatelessWidget {
         format.isLandscape || (format == PrideCardFormat.square1x1 && dense);
     final hasClaimLink = data.sharePayload.claimUrl != null;
     final accent = switch (data) {
-      GoalScorerShareData goal when goal.isHatTrick => AppColors.secondary,
-      GoalScorerShareData() => AppColors.primary,
-      PlayerMilestoneShareData() => AppColors.secondary,
+      GoalScorerShareData goal when goal.isHatTrick =>
+        AppMediaColors.achievement,
+      GoalScorerShareData() => AppMediaColors.actionPrimary,
+      PlayerMilestoneShareData() => AppMediaColors.achievement,
     };
     final body = Container(
       clipBehavior: Clip.antiAlias,
@@ -40,7 +41,7 @@ class PlayerMomentShareCard extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
-          colors: [accent.withValues(alpha: 0.3), AppColors.backgroundDeep],
+          colors: [accent.withValues(alpha: 0.3), AppMediaColors.canvasDeep],
         ),
         borderRadius: BorderRadius.circular(exportMode ? 16 : 22),
         border: Border.all(color: accent.withValues(alpha: 0.62)),
@@ -242,7 +243,7 @@ class _PlayerIdentity extends StatelessWidget {
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: AppColors.textPrimaryTinted,
+            color: AppMediaColors.textPrimary,
             fontSize: dense ? 14 : (compact ? 21 : 28),
             fontWeight: FontWeight.w900,
             height: 1.1,
@@ -279,7 +280,7 @@ class _PlayerIdentity extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: AppColors.textSecondaryTinted,
+              color: AppMediaColors.textSecondary,
               fontSize: dense ? 6 : (compact ? 8 : 10),
               fontWeight: FontWeight.w600,
             ),
@@ -364,7 +365,7 @@ class _GoalFact extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: AppColors.textPrimaryTinted,
+            color: AppMediaColors.textPrimary,
             fontSize: dense ? 8 : (compact ? 12 : 15),
             fontWeight: FontWeight.w900,
           ),
@@ -415,7 +416,7 @@ class _VerifiedScoreLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = TextStyle(
-      color: AppColors.textSecondaryTinted,
+      color: AppMediaColors.textSecondary,
       fontSize: dense ? 6.5 : (compact ? 9 : 11),
       fontWeight: FontWeight.w800,
     );
@@ -425,7 +426,7 @@ class _VerifiedScoreLine extends StatelessWidget {
       textAlign: TextAlign.center,
       maxLines: 1,
       style: style.copyWith(
-        color: AppColors.textPrimaryTinted,
+        color: AppMediaColors.textPrimary,
         fontFeatures: const [FontFeature.tabularFigures()],
       ),
     );
@@ -502,7 +503,7 @@ class _MilestoneFact extends StatelessWidget {
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: AppColors.textPrimaryTinted,
+            color: AppMediaColors.textPrimary,
             fontSize: dense ? 8 : (compact ? 12 : 15),
             fontWeight: FontWeight.w900,
           ),
@@ -516,7 +517,7 @@ class _MilestoneFact extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: AppColors.textSecondaryTinted,
+              color: AppMediaColors.textSecondary,
               fontSize: dense ? 6 : (compact ? 8 : 9),
               fontWeight: FontWeight.w700,
               fontFeatures: const [FontFeature.tabularFigures()],

@@ -4,6 +4,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/lineup/formation_library.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 
 class FormationControlBar extends StatelessWidget {
   final int playerCount;
@@ -39,13 +40,10 @@ class FormationControlBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return El7reefGlassSurface(
+      role: El7reefGlassRole.floatingToolbar,
+      tone: El7reefGlassTone.action,
       padding: const EdgeInsets.all(AppDimensions.sm),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-        border: Border.all(color: AppColors.surfaceBorder),
-      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -242,16 +240,16 @@ class _DirtyActionsRow extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppDimensions.xs),
       decoration: BoxDecoration(
-        color: AppColors.secondary.withValues(alpha: 0.08),
+        color: AppColors.warning.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-        border: Border.all(color: AppColors.secondary.withValues(alpha: 0.38)),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.38)),
       ),
       child: Row(
         children: [
           const Icon(
             Icons.edit_note_rounded,
             size: 19,
-            color: AppColors.secondaryLight,
+            color: AppColors.warning,
           ),
           const SizedBox(width: AppDimensions.xs),
           Expanded(
@@ -260,7 +258,7 @@ class _DirtyActionsRow extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: AppTextStyles.labelSmall.copyWith(
-                color: AppColors.secondaryLight,
+                color: AppColors.warning,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0,
               ),

@@ -32,8 +32,7 @@ class _MatchdayAttendanceSectionState extends State<MatchdayAttendanceSection> {
     final locked = controller.isLineupLocked;
     final hasCheckIn = controller.activeCheckIn.value != null;
 
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       padding: const EdgeInsets.all(AppDimensions.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

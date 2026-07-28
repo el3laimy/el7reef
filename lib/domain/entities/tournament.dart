@@ -8,6 +8,7 @@ class Tournament {
   final String id;
   final String organizerId;
   final String name;
+  final String? logoUrl;
   final String? description;
   final String? location;
   final TournamentFormat format;
@@ -43,6 +44,7 @@ class Tournament {
     required this.id,
     required this.organizerId,
     required this.name,
+    this.logoUrl,
     this.description,
     this.location,
     required this.format,
@@ -97,6 +99,7 @@ class Tournament {
     String? id,
     String? organizerId,
     String? name,
+    String? logoUrl,
     String? description,
     String? location,
     TournamentFormat? format,
@@ -132,6 +135,7 @@ class Tournament {
       id: id ?? this.id,
       organizerId: organizerId ?? this.organizerId,
       name: name ?? this.name,
+      logoUrl: logoUrl ?? this.logoUrl,
       description: description ?? this.description,
       location: location ?? this.location,
       format: format ?? this.format,

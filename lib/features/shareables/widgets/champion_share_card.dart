@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_media_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../models/champion_share_data.dart';
 import '../models/pride_card_format.dart';
@@ -34,11 +34,11 @@ class ChampionShareCard extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [AppColors.secondaryDark, AppColors.backgroundDeep],
+          colors: [AppMediaColors.achievementDark, AppMediaColors.canvasDeep],
         ),
         borderRadius: BorderRadius.circular(exportMode ? 16 : 22),
         border: Border.all(
-          color: AppColors.secondaryLight.withValues(alpha: 0.7),
+          color: AppMediaColors.achievementLight.withValues(alpha: 0.7),
         ),
       ),
       child: Stack(
@@ -57,7 +57,7 @@ class ChampionShareCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: AppColors.textPrimaryTinted,
+                          color: AppMediaColors.textPrimary,
                           fontWeight: FontWeight.w900,
                           fontSize: dense ? 8 : 13,
                         ),
@@ -72,7 +72,7 @@ class ChampionShareCard extends StatelessWidget {
                 const Spacer(),
                 Icon(
                   Icons.emoji_events_rounded,
-                  color: AppColors.secondaryLight,
+                  color: AppMediaColors.achievementLight,
                   size: dense ? 28 : (compact ? 36 : 58),
                 ),
                 SizedBox(height: dense ? 2 : (compact ? 4 : 8)),
@@ -85,7 +85,7 @@ class ChampionShareCard extends StatelessWidget {
                               ? TextStyle(fontSize: compact ? 20 : 24)
                               : AppTextStyles.headlineMedium)
                           .copyWith(
-                            color: AppColors.textPrimaryTinted,
+                            color: AppMediaColors.textPrimary,
                             fontWeight: FontWeight.w900,
                           ),
                   textAlign: TextAlign.center,
@@ -96,7 +96,7 @@ class ChampionShareCard extends StatelessWidget {
                     imageUrl: data.logoUrl,
                     initials: data.initials,
                     size: dense ? 44 : (compact ? 56 : 78),
-                    accent: AppColors.secondary,
+                    accent: AppMediaColors.achievement,
                     fallbackIcon: Icons.shield_rounded,
                   ),
                 ),
@@ -104,7 +104,7 @@ class ChampionShareCard extends StatelessWidget {
                 Text(
                   data.championName,
                   style: TextStyle(
-                    color: AppColors.textPrimaryTinted,
+                    color: AppMediaColors.textPrimary,
                     fontSize: dense
                         ? 14
                         : compact
@@ -125,7 +125,7 @@ class ChampionShareCard extends StatelessWidget {
                 Text(
                   data.tournamentName,
                   style: TextStyle(
-                    color: AppColors.textPrimaryTinted.withValues(alpha: 0.82),
+                    color: AppMediaColors.textPrimary.withValues(alpha: 0.82),
                     fontSize: dense ? 8 : (exportMode ? 13 : 14),
                     fontWeight: FontWeight.w700,
                   ),
@@ -137,7 +137,7 @@ class ChampionShareCard extends StatelessWidget {
                 Text(
                   'تتويج مستحق · الحريف',
                   style: TextStyle(
-                    color: AppColors.textPrimaryTinted.withValues(alpha: 0.74),
+                    color: AppMediaColors.textPrimary.withValues(alpha: 0.74),
                     fontSize: dense ? 7 : (exportMode ? 10 : 11),
                     fontWeight: FontWeight.w700,
                   ),
@@ -176,16 +176,16 @@ class _Pill extends StatelessWidget {
         vertical: dense ? 3 : 5,
       ),
       decoration: BoxDecoration(
-        color: AppColors.textPrimaryTinted.withValues(alpha: 0.14),
+        color: AppMediaColors.textPrimary.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: AppColors.textPrimaryTinted.withValues(alpha: 0.2),
+          color: AppMediaColors.textPrimary.withValues(alpha: 0.2),
         ),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: AppColors.textPrimaryTinted,
+          color: AppMediaColors.textPrimary,
           fontSize: dense ? 7 : 10,
           fontWeight: FontWeight.w800,
         ),
@@ -200,7 +200,7 @@ class _ChampionRaysPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.secondaryLight.withValues(alpha: 0.11)
+      ..color = AppMediaColors.achievementLight.withValues(alpha: 0.11)
       ..strokeWidth = 2;
     final center = Offset(size.width / 2, size.height * 0.35);
     for (var index = 0; index < 12; index += 1) {

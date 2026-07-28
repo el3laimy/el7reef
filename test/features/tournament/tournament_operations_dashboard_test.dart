@@ -503,8 +503,6 @@ void main() {
     );
     expect(find.text('الطريق إلى الكأس'), findsOneWidget);
     expect(find.text('النهائي'), findsWidgets);
-    await tester.tap(find.text('الجولات'));
-    await tester.pumpAndSettle();
     await tester.drag(find.byType(ListView).first, const Offset(0, -520));
     await tester.pumpAndSettle();
     expect(find.text('إدارة المباراة'), findsWidgets);
@@ -1353,9 +1351,8 @@ Widget _buildOpsApp(String initialRoute, {double textScale = 1}) {
     locale: const Locale('ar', 'EG'),
     fallbackLocale: const Locale('ar', 'EG'),
     textDirection: TextDirection.rtl,
-    theme: AppTheme.darkTheme,
-    darkTheme: AppTheme.darkTheme,
-    themeMode: ThemeMode.dark,
+    theme: AppTheme.lightTheme,
+    themeMode: ThemeMode.light,
     builder: (context, child) => MediaQuery(
       data: MediaQuery.of(
         context,

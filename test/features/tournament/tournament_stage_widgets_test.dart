@@ -285,11 +285,12 @@ void main() {
   testWidgets(
     'mobile bracket opens the first pending round and keeps one page scroll',
     (tester) async {
+      final semanticsHandle = tester.ensureSemantics();
       final bracket = _bracketScenario();
 
       await _pumpAtSize(
         tester,
-        size: const Size(360, 900),
+        size: const Size(360, 720),
         child: SingleChildScrollView(
           child: KnockoutBracketView(
             ties: bracket.ties,
@@ -297,6 +298,11 @@ void main() {
             participantLabel: (participantId) =>
                 bracket.participantLabels[participantId] ?? 'لم يتحدد',
             hideUnpublishedParticipants: true,
+            headerData: KnockoutBracketHeaderData(
+              teamCount: 4,
+              byeCount: 1,
+              onShare: () {},
+            ),
           ),
         ),
       );
@@ -315,9 +321,27 @@ void main() {
         find.byKey(const ValueKey('bracket-round-chip-1')),
         findsOneWidget,
       );
-      expect(find.text('المحطة الأخيرة: الفائز يرفع الكأس'), findsOneWidget);
-      expect(find.text('المسار الحاسم نحو الكأس'), findsWidgets);
+      expect(find.text('الفائز يرفع الكأس'), findsOneWidget);
+      expect(find.text('المواجهة الجاهزة الآن'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('bracket-featured-match-final')),
+        findsOneWidget,
+      );
       expect(find.byType(KnockoutMatchNode), findsOneWidget);
+      final featuredRect = tester.getRect(
+        find.byKey(const ValueKey('bracket-featured-match-final')),
+      );
+      expect(
+        featuredRect.bottom,
+        lessThanOrEqualTo(620),
+        reason:
+            'The featured match must remain visible below the real app bar.',
+      );
+      expect(find.bySemanticsLabel('شارك طريق النهائي'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('افتح خريطة الشجرة الكاملة'),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
 
       await tester.tap(find.byKey(const ValueKey('bracket-round-chip-0')));
@@ -325,19 +349,23 @@ void main() {
 
       expect(find.text('تأهل مباشر'), findsWidgets);
       expect(find.text('بركلات الترجيح'), findsOne);
-      expect(find.text('كل فرعين يلتقيان في النهائي'), findsOneWidget);
+      expect(find.text('المتأهلون وصلوا إلى النهائي'), findsOneWidget);
       expect(
-        find.byKey(const ValueKey('knockout-path-branch-نصف النهائي-0')),
+        find.byKey(const ValueKey('bracket-featured-match-semi-b')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('bracket-round-match-list')),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);
 
-      await tester.tap(find.byKey(const ValueKey('bracket-next-round')));
+      await tester.tap(find.byKey(const ValueKey('bracket-round-chip-1')));
       await tester.pumpAndSettle();
 
-      expect(find.text('المحطة الأخيرة: الفائز يرفع الكأس'), findsOneWidget);
+      expect(find.text('الفائز يرفع الكأس'), findsOneWidget);
 
-      await tester.tap(find.text('الشجرة كاملة'));
+      await tester.tap(find.byKey(const ValueKey('bracket-open-full-tree')));
       await tester.pumpAndSettle();
 
       expect(find.byType(KnockoutFullTree), findsOne);
@@ -357,8 +385,20 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('الحالي'), findsOneWidget);
-      expect(find.text('كامل'), findsOneWidget);
+      expect(find.text('نظرة'), findsOneWidget);
       expect(find.text('الكأس'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('bracket-back-to-rounds')),
+        findsOneWidget,
+      );
+      final currentRect = tester.getRect(
+        find.byKey(const ValueKey('knockout-tie-final')),
+      );
+      final toolbarRect = tester.getRect(
+        find.byKey(const ValueKey('bracket-map-toolbar')),
+      );
+      expect(currentRect.width, greaterThan(100));
+      expect(toolbarRect.overlaps(currentRect), isFalse);
       await tester.tap(find.byKey(const ValueKey('bracket-focus-trophy')));
       await tester.pumpAndSettle();
 
@@ -376,6 +416,7 @@ void main() {
       expect(find.text('الطرف الأول لم يُنشر'), findsOne);
       expect(find.text('الطرف الثاني لم يُنشر'), findsOne);
       expect(tester.takeException(), isNull);
+      semanticsHandle.dispose();
     },
   );
 
@@ -406,7 +447,7 @@ void main() {
       );
       expect(selectorRect.overlaps(selectedRoundRect), isTrue);
 
-      await tester.tap(find.text('الشجرة كاملة'));
+      await tester.tap(find.byKey(const ValueKey('bracket-open-full-tree')));
       await tester.pumpAndSettle();
 
       final initialTreeRect = tester.getRect(
@@ -450,6 +491,14 @@ void main() {
           participantLabel: (participantId) =>
               bracket.participantLabels[participantId] ?? 'لم يتحدد',
           hideUnpublishedParticipants: true,
+          onOpenMatch: (_) {},
+          canReviewMatch: (_) => true,
+          onReviewMatch: (_) {},
+          headerData: KnockoutBracketHeaderData(
+            teamCount: 4,
+            byeCount: 1,
+            onShare: () {},
+          ),
         ),
       ),
     );
@@ -457,7 +506,7 @@ void main() {
     expect(find.byType(KnockoutRoundPager), findsOne);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('الشجرة كاملة'));
+    await tester.tap(find.byKey(const ValueKey('bracket-open-full-tree')));
     await tester.pumpAndSettle();
 
     expect(find.byType(InteractiveViewer), findsOne);
@@ -496,7 +545,7 @@ void main() {
       expect(find.text('خُتم طريق البطولة'), findsOneWidget);
       expect(find.text('نجوم الحارة'), findsWidgets);
 
-      await tester.tap(find.text('الشجرة كاملة'));
+      await tester.tap(find.byKey(const ValueKey('bracket-open-full-tree')));
       await tester.pumpAndSettle();
 
       expect(find.text('مسار البطل'), findsOneWidget);
@@ -529,7 +578,7 @@ void main() {
         Directionality.of(tester.element(find.byType(KnockoutBracketView))),
         TextDirection.rtl,
       );
-      await tester.tap(find.byKey(const ValueKey('bracket-previous-round')));
+      await tester.tap(find.byKey(const ValueKey('bracket-round-chip-0')));
       await tester.pumpAndSettle();
 
       expect(
@@ -544,7 +593,7 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(find.text('الشجرة كاملة'));
+      await tester.tap(find.byKey(const ValueKey('bracket-open-full-tree')));
       await tester.pumpAndSettle();
 
       expect(find.byType(InteractiveViewer), findsOneWidget);

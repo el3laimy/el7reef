@@ -25,7 +25,6 @@ import '../../../domain/entities/match_side.dart';
 import '../../../domain/entities/match_side_player.dart';
 import '../../../domain/entities/participant_ref.dart';
 import '../../../domain/entities/player.dart';
-import '../../../domain/entities/team.dart';
 import '../../../domain/entities/tournament_assistant_permission.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/friendly_match_side_view.dart';

@@ -44,5 +44,32 @@ void main() {
 
       expect(teams.map((team) => team.id).toList(), ['team-2', 'team-1']);
     });
+
+    test(
+      'updates and clears a team identity without rewriting the team',
+      () async {
+        await repository.createTeam(
+          Team(
+            id: 'team-identity',
+            name: 'Street Falcons',
+            ownerId: 'owner-1',
+            playerIds: const ['owner-1'],
+            createdAt: now,
+          ),
+        );
+
+        await repository.updateTeamLogo(
+          'team-identity',
+          'preset://v1/team_badge/falcon_wing',
+        );
+        expect(
+          (await repository.getTeam('team-identity'))?.logoUrl,
+          'preset://v1/team_badge/falcon_wing',
+        );
+
+        await repository.updateTeamLogo('team-identity', null);
+        expect((await repository.getTeam('team-identity'))?.logoUrl, isNull);
+      },
+    );
   });
 }

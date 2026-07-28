@@ -1,117 +1,152 @@
 import 'package:flutter/material.dart';
 
-/// لوحة «ختم الحارة» — هوية EL7REEF لأندرويد.
+/// لوحة «نهار البطولة» التشغيلية لأندرويد.
 ///
-/// تعتمد الألوان المحايدة على صبغة الملعب بدل الأسود/الأبيض الخالصين. الأخضر
-/// مخصص للفعل والحالة النشطة، والذهبي لإنجاز مكتسب فقط.
-abstract class AppColors {
-  // ── Electric pitch: الفعل والتوثيق ──
-  static const Color primary = Color(0xFF7ED957);
-  static const Color primaryDark = Color(0xFF1F7A3E);
-  static const Color primaryGlow = Color(0x407ED957); // 25% opacity
-  static const Color primarySurface = Color(0x267ED957); // 15% opacity for tags
-  static const Color primaryLight = Color(0xFF4ADE80);
+/// الأسطح فاتحة ومحايدة، والكوبالت للفعل، والمرجاني للطاقة الاجتماعية،
+/// والأخضر للحالة المؤكدة فقط. ألوان الوسائط الداكنة معزولة في
+/// `AppMediaColors` حتى لا تتأثر ملفات Pride والملعب بثيم التطبيق.
+abstract final class AppColors {
+  // ── Cobalt action ──
+  static const Color actionPrimary = Color(0xFF315CC6);
+  static const Color actionStrong = Color(0xFF2549A3);
+  static const Color actionLight = Color(0xFF5F83DF);
+  static const Color actionContainer = Color(0xFFDFE7FA);
+  static const Color actionGlow = Color(0x12315CC6);
+  static const Color actionSurface = Color(0xFFE8EEFC);
 
-  // ── Asphalt & chalk: أسطح صلبة عالية التباين ──
-  static const Color black = Color(0xFF090C09);
-  static const Color background = Color(0xFF10140F);
-  static const Color backgroundDeep = Color(0xFF0B100C);
-  static const Color backgroundLight = Color(0xFF181D17);
-  static const Color surface = Color(0xFF1A2019);
-  static const Color surfaceRaised = Color(0xFF222A20);
-  static const Color surfaceSunken = Color(0xFF131812);
-  static const Color surfaceLight = surfaceRaised;
-  static const Color surfaceBorder = Color(0xFF30392E);
-  static const Color surfaceBorderStrong = Color(0xFF465143);
+  // أسماء توافقية للشاشات القديمة.
+  static const Color primary = actionPrimary;
+  static const Color primaryDark = actionStrong;
+  static const Color primaryGlow = actionGlow;
+  static const Color primarySurface = actionSurface;
+  static const Color primaryLight = actionLight;
+
+  // ── Social heat ──
+  static const Color socialAccent = Color(0xFFC84232);
+  static const Color socialStrong = Color(0xFFA53227);
+  static const Color socialLight = Color(0xFFE06B5B);
+  static const Color socialContainer = Color(0xFFFBE5E0);
+  static const Color socialSurface = socialContainer;
+
+  // ── Knockout violet ──
+  static const Color competitive = Color(0xFF6746B8);
+  static const Color competitiveStrong = Color(0xFF503394);
+  static const Color competitiveContainer = Color(0xFFECE6F8);
+  static const Color competitiveSurface = competitiveContainer;
+
+  // ── Verified tactical state ──
+  static const Color tactical = Color(0xFF167247);
+  static const Color tacticalDark = Color(0xFF0F5938);
+  static const Color tacticalLight = Color(0xFF3A9467);
+  static const Color tacticalContainer = Color(0xFFDEF1E5);
+  static const Color tacticalSurface = tacticalContainer;
+
+  static const Color brand = tactical;
+  static const Color brandDark = tacticalDark;
+  static const Color brandLight = tacticalLight;
+  static const Color brandSurface = tacticalSurface;
+
+  // ── Daylight chalk surfaces ──
+  static const Color black = Color(0xFF17202C);
+  static const Color shadowInk = black;
+  static const Color background = Color(0xFFEEF2F6);
+  static const Color backgroundDeep = Color(0xFFE3E8EF);
+  static const Color backgroundLight = Color(0xFFF6F8FB);
+  static const Color surface = Color(0xFFF8FAFC);
+  static const Color surfaceRaised = Color(0xFFFDFBF6);
+  static const Color surfaceSunken = Color(0xFFE7ECF2);
+  static const Color surfaceLight = Color(0xFFFDFEFF);
+  static const Color surfaceBorder = Color(0xFFCDD6E2);
+  static const Color surfaceBorderStrong = Color(0xFF8292A7);
+  static const double contextualGlowOpacity = 0.07;
 
   // ── Text ──
-  static const Color chalk = Color(0xFFF4F7EE);
-  static const Color textPrimary = chalk;
-  static const Color textPrimaryTinted = Color(0xFFF4F7EE);
-  static const Color textSecondary = Color(0xFFB7C0B3);
+  // chalk remains an asset/media neutral; operational text uses ink tokens.
+  static const Color chalk = Color(0xFFF5F7FB);
+  static const Color textPrimary = Color(0xFF17202C);
+  static const Color textPrimaryTinted = textPrimary;
+  static const Color textSecondary = Color(0xFF46566A);
   static const Color textSecondaryTinted = textSecondary;
-  static const Color textMuted = Color(0xFF96A190);
-  static const Color textOnPrimary = Color(0xFF0A1008);
+  static const Color textMuted = Color(0xFF617187);
+  static const Color textOnPrimary = Color(0xFFF8FAFC);
+  static const Color textOnTactical = Color(0xFFF8FAFC);
+  static const Color textOnSocial = Color(0xFFF8FAFC);
+  static const Color textOnCompetitive = Color(0xFFF8FAFC);
 
-  // ── Street burgundy: سطح سياقي لا حالة خطأ ──
-  static const Color burgundyDeep = Color(0xFF2B171C);
-  static const Color burgundySurface = Color(0xFF24171A);
+  // ── Context surfaces ──
+  static const Color burgundyDeep = Color(0xFFF3D9D7);
+  static const Color burgundySurface = Color(0xFFFBE8E5);
 
-  // ── Secondary (ذهبي الإنجازات) ──
-  static const Color secondary = Color(0xFFF5A623);
-  static const Color secondaryDark = Color(0xFFD4891A);
-  static const Color secondaryLight = Color(0xFFFFCB57);
+  // ── Earned achievement ──
+  static const Color achievement = Color(0xFF8A5A00);
+  static const Color achievementDark = Color(0xFF694200);
+  static const Color achievementLight = Color(0xFFD89B24);
+  static const Color achievementSurface = Color(0xFFF8EBC9);
 
-  // ── Accent (معلومة مساندة، وليس خصمًا) ──
-  static const Color accent = Color(0xFF4A90D9);
-  static const Color accentDark = Color(0xFF2E6DB5);
-  static const Color accentLight = Color(0xFF7DB4F0);
+  // ── Semantic states ──
+  static const Color success = tactical;
+  static const Color successSurface = tacticalSurface;
+  static const Color error = Color(0xFFBF2940);
+  static const Color errorSurface = Color(0xFFF9E2E7);
+  static const Color errorSurfaceSolid = errorSurface;
+  static const Color warning = Color(0xFF9A4A08);
+  static const Color warningSurface = Color(0xFFFBE8D6);
+  static const Color info = Color(0xFF086C91);
+  static const Color infoDark = Color(0xFF075675);
+  static const Color infoLight = Color(0xFF2D8AAF);
+  static const Color infoContainer = Color(0xFFDDEFF6);
+  static const Color infoSurface = infoContainer;
 
-  // ── Semantic ──
-  static const Color success = Color(0xFF63D471);
-  static const Color successSurface = Color(0x2463D471);
-  static const Color error = Color(0xFFFF6B6B);
-  static const Color errorSurface = Color(0x24FF6B6B);
-  static const Color errorSurfaceSolid = Color(0xFF2C191B);
-  static const Color warning = Color(0xFFF5B942);
-  static const Color warningSurface = Color(0x24F5B942);
-  static const Color info = Color(0xFF69AEF2);
-  static const Color infoSurface = Color(0x2469AEF2);
+  @Deprecated('Use a semantic AppColors role instead.')
+  static const Color secondary = info;
+  @Deprecated('Use a semantic AppColors role instead.')
+  static const Color secondaryDark = infoDark;
+  @Deprecated('Use a semantic AppColors role instead.')
+  static const Color secondaryLight = infoLight;
 
-  // ── Rank Tiers ──
-  static const Color rankBronze = Color(0xFFCD7F32);
-  static const Color rankSilver = Color(0xFFC0C0C0);
-  static const Color rankGold = Color(0xFFFFD700);
-  static const Color rankPlatinum = Color(0xFF00CED1);
-  static const Color rankDiamond = Color(0xFFB9F2FF);
-  static const Color rankLegendary1 = Color(0xFFFF6B6B);
-  static const Color rankLegendary2 = Color(0xFFFFA500);
+  static const Color accent = info;
+  static const Color accentDark = infoDark;
+  static const Color accentLight = infoLight;
 
-  // ── Functional glass: للتنقل وأدوات المعاينة فقط ──
-  // الأسماء الثلاثة الأولى باقية للتوافق مع المكوّنات الحالية.
-  static const Color glassBg = Color(0xC21A2019);
-  static const Color glassBorder = Color(0x523F493C);
-  static const Color glassShadow = Color(0x40000000); // 25% black
-  static const Color glassBaseBg = Color(0xC21A2019);
-  static const Color glassBaseBorder = Color(0x523F493C);
-  static const Color glassRaisedBg = Color(0xD9222A20);
-  static const Color glassRaisedBorder = Color(0x66465143);
-  static const Color glassPrideBg = Color(0xD924171A);
-  static const Color glassPrideBorder = Color(0x66F5A623);
-  static const Color glassErrorBg = Color(0xD9241919);
-  static const Color glassErrorBorder = Color(0x66FF6B6B);
-  static const Color glassSheetBg = Color(0xF20F130E);
+  // ── Rank tiers (identity-bearing and intentionally stable) ──
+  static const Color rankBronze = Color(0xFF9B5C24);
+  static const Color rankSilver = Color(0xFF667085);
+  static const Color rankGold = Color(0xFF9A6400);
+  static const Color rankPlatinum = Color(0xFF087F86);
+  static const Color rankDiamond = Color(0xFF287A9B);
+  static const Color rankLegendary1 = Color(0xFFC33F4D);
+  static const Color rankLegendary2 = Color(0xFFB55E00);
 
   // ── Gradients ──
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [primaryDark, primary],
+    colors: <Color>[actionStrong, actionPrimary],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient backgroundGradient = LinearGradient(
-    colors: [background, backgroundDeep],
+    colors: <Color>[backgroundLight, background],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
 
   static const LinearGradient goldGradient = LinearGradient(
-    colors: [Color(0xFFFFD700), Color(0xFFF5A623), Color(0xFFD4891A)],
+    colors: <Color>[achievementLight, achievement, achievementDark],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient legendaryGradient = LinearGradient(
-    colors: [rankLegendary1, rankLegendary2, Color(0xFFFFD700)],
+    colors: <Color>[rankLegendary1, rankLegendary2, achievement],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient ratingPositiveGradient = LinearGradient(
-    colors: [Color(0xFF1DB954), Color(0xFF4ADE80)],
+    colors: <Color>[tacticalDark, tacticalLight],
   );
 
   static const LinearGradient ratingNegativeGradient = LinearGradient(
-    colors: [Color(0xFFE53935), Color(0xFFFF6B6B)],
+    colors: <Color>[Color(0xFFB42336), Color(0xFFD85462)],
   );
 }

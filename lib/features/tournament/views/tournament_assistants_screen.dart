@@ -181,8 +181,7 @@ class TournamentAssistantsScreen
         break;
     }
 
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       margin: const EdgeInsets.only(bottom: AppDimensions.md),
       padding: const EdgeInsets.all(AppDimensions.md),
       radius: AppDimensions.radiusLg,
@@ -242,7 +241,8 @@ class TournamentAssistantsScreen
       StatefulBuilder(
         builder: (context, setModalState) {
           return El7reefGlassSurface(
-            variant: El7reefGlassVariant.sheet,
+            role: El7reefGlassRole.compactSheet,
+            tone: El7reefGlassTone.action,
             padding: const EdgeInsets.all(AppDimensions.xl),
             borderRadius: const BorderRadius.vertical(
               top: Radius.circular(AppDimensions.radiusXl),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:el7reef/core/widgets/el7reef_glass_surface.dart';
+import 'package:el7reef/core/widgets/el7reef_solid_surface.dart';
 import 'package:el7reef/core/services/tournament_top_scorers_resolver.dart';
 import 'package:el7reef/domain/entities/participant_ref.dart';
 import 'package:el7reef/features/shareables/controllers/top_scorers_share_controller.dart';
@@ -146,7 +146,8 @@ void main() {
     expect(find.text('3 أهداف'), findsOneWidget);
     expect(find.text('ضيف'), findsOneWidget);
     expect(find.text('الحريف'), findsOneWidget);
-    expect(find.byType(El7reefGlassSurface), findsOneWidget);
+    expect(find.byType(El7reefSolidSurface), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsNothing);
   });
 
   testWidgets('export mode keeps the top scorers image deterministic', (
@@ -176,7 +177,7 @@ void main() {
     );
 
     expect(find.text('Ali'), findsOneWidget);
-    expect(find.byType(El7reefGlassSurface), findsNothing);
+    expect(find.byType(El7reefSolidSurface), findsNothing);
     expect(find.byType(BackdropFilter), findsNothing);
   });
 }

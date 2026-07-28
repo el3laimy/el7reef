@@ -240,7 +240,7 @@ class _CompactStandingRow extends StatelessWidget {
                     _NumericCell(
                       value: '${entry.points}',
                       width: 44,
-                      color: AppColors.primary,
+                      color: AppColors.textPrimary,
                       emphasized: true,
                     ),
                   ],
@@ -353,7 +353,7 @@ class _WideStandingsTable extends StatelessWidget {
     return TableRow(
       decoration: BoxDecoration(
         color: isQualified
-            ? AppColors.primary.withValues(alpha: 0.045)
+            ? AppColors.tactical.withValues(alpha: 0.045)
             : Colors.transparent,
       ),
       children: [
@@ -394,7 +394,7 @@ class _WideStandingsTable extends StatelessWidget {
         _WideValueCell(_signedNumber(entry.goalDifference)),
         _WideValueCell(
           '${entry.points}',
-          color: AppColors.primary,
+          color: AppColors.textPrimary,
           emphasized: true,
         ),
       ],
@@ -415,7 +415,9 @@ class _HeaderCell extends StatelessWidget {
       label,
       textAlign: TextAlign.center,
       style: AppTextStyles.labelMedium.copyWith(
-        color: emphasized ? AppColors.primary : AppColors.textSecondaryTinted,
+        color: emphasized
+            ? AppColors.textPrimary
+            : AppColors.textSecondaryTinted,
         fontWeight: FontWeight.w800,
       ),
     );
@@ -476,7 +478,9 @@ class _WideHeaderCell extends StatelessWidget {
         label,
         textAlign: textAlign,
         style: AppTextStyles.labelMedium.copyWith(
-          color: emphasized ? AppColors.primary : AppColors.textSecondaryTinted,
+          color: emphasized
+              ? AppColors.textPrimary
+              : AppColors.textSecondaryTinted,
           fontWeight: FontWeight.w800,
         ),
       ),
@@ -552,7 +556,7 @@ class _QualificationText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isOfficial ? AppColors.success : AppColors.primary;
+    final color = isOfficial ? AppColors.tactical : AppColors.info;
     final style = AppTextStyles.bodySmall.copyWith(
       color: color,
       fontWeight: FontWeight.w700,

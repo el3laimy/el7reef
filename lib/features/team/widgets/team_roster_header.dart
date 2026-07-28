@@ -5,6 +5,9 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/enums/team_membership_status.dart';
+import '../../../core/identity/identity_preset.dart';
+import '../../../core/identity/identity_preset_picker_screen.dart';
+import '../../../core/identity/identity_visual.dart';
 import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../domain/entities/team.dart';
 import '../controllers/team_roster_controller.dart';
@@ -23,7 +26,8 @@ class TeamRosterHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+      role: El7reefGlassRole.hero,
+      tone: El7reefGlassTone.action,
       radius: AppDimensions.radiusXl,
       padding: const EdgeInsets.all(AppDimensions.lg),
       child: Column(
@@ -31,18 +35,66 @@ class TeamRosterHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: AppColors.primaryGradient,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  team.name.isNotEmpty ? team.name[0] : '?',
-                  style: AppTextStyles.headlineLarge.copyWith(
-                    color: AppColors.textPrimary,
+              Semantics(
+                button: controller.canManageRoster,
+                label: controller.canManageRoster
+                    ? 'شعار فريق ${team.name}، اضغط لتغييره'
+                    : 'شعار فريق ${team.name}',
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+                  onTap: controller.canManageRoster
+                      ? () => _pickIdentity(context)
+                      : null,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      IdentityVisual(
+                        source: team.logoUrl,
+                        size: 64,
+                        borderRadius: BorderRadius.circular(
+                          AppDimensions.radiusMd,
+                        ),
+                        semanticLabel: 'شعار فريق ${team.name}',
+                        fallbackBuilder: (_) => DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: AppColors.actionContainer,
+                            borderRadius: BorderRadius.circular(
+                              AppDimensions.radiusMd,
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              team.name.isNotEmpty ? team.name[0] : '?',
+                              style: AppTextStyles.headlineLarge.copyWith(
+                                color: AppColors.actionLight,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (controller.canManageRoster)
+                        const PositionedDirectional(
+                          end: -4,
+                          bottom: -4,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: AppColors.actionPrimary,
+                              shape: BoxShape.circle,
+                              border: Border.fromBorderSide(
+                                BorderSide(color: AppColors.surface, width: 2),
+                              ),
+                            ),
+                            child: Padding(
+                              padding: EdgeInsets.all(5),
+                              child: Icon(
+                                Icons.edit_rounded,
+                                size: 14,
+                                color: AppColors.textOnPrimary,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -75,7 +127,7 @@ class TeamRosterHeader extends StatelessWidget {
               TeamRosterCountChip(
                 label: 'احتياط',
                 count: controller.countByStatus(TeamMembershipStatus.bench),
-                color: AppColors.secondary,
+                color: AppColors.info,
               ),
               TeamRosterCountChip(
                 label: 'غير نشط',
@@ -87,5 +139,18 @@ class TeamRosterHeader extends StatelessWidget {
         ],
       ),
     ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.08);
+  }
+
+  Future<void> _pickIdentity(BuildContext context) async {
+    final selection = await IdentityPresetPickerScreen.show(
+      context,
+      scope: IdentityPresetScope.team,
+      initialReference: team.logoUrl,
+      previewTitle: team.name,
+    );
+    if (selection == null || !context.mounted) return;
+    await controller.updateTeamLogo(
+      selection.isCleared ? null : selection.reference,
+    );
   }
 }

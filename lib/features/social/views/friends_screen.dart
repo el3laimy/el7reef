@@ -145,16 +145,14 @@ class FriendsScreen extends GetView<FriendController> {
 
   Widget _buildFriendCard(Player? player, {required bool isRequest}) {
     if (player == null) {
-      return El7reefGlassSurface(
-        variant: El7reefGlassVariant.base,
+      return El7reefSolidSurface(
         margin: const EdgeInsets.only(bottom: AppDimensions.md),
         padding: const EdgeInsets.all(AppDimensions.md),
         child: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       margin: const EdgeInsets.only(bottom: AppDimensions.md),
       padding: const EdgeInsets.all(AppDimensions.md),
       radius: AppDimensions.radiusLg,

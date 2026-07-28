@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/enums/match_status.dart';
+import '../../../core/identity/identity_visual.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 
 class ProfessionalMatchHeader extends StatelessWidget {
   final String homeName;
@@ -45,45 +46,15 @@ class ProfessionalMatchHeader extends StatelessWidget {
         ? 'VS'
         : '${homeScore ?? 0} - ${awayScore ?? 0}';
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.28)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.backgroundDeep.withValues(alpha: 0.35),
-            blurRadius: 22,
-            offset: const Offset(0, 12),
-          ),
-        ],
-        gradient: const LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [
-            AppColors.backgroundDeep,
-            AppColors.surfaceSunken,
-            AppColors.surface,
-          ],
-        ),
-      ),
+    return El7reefGlassSurface(
+      role: El7reefGlassRole.hero,
+      tone: El7reefGlassTone.action,
+      padding: EdgeInsets.zero,
+      radius: AppDimensions.radiusXl,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
         child: Stack(
           children: [
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: const Alignment(0.1, -0.4),
-                    radius: 1.1,
-                    colors: [
-                      AppColors.primary.withValues(alpha: 0.2),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
             Padding(
               padding: const EdgeInsets.all(AppDimensions.lg),
               child: Column(
@@ -193,7 +164,7 @@ class ProfessionalMatchHeader extends StatelessWidget {
                         child: _TeamIdentity(
                           name: awayName,
                           logoUrl: awayLogoUrl,
-                          fallbackColor: AppColors.error,
+                          fallbackColor: AppColors.competitive,
                         ),
                       ),
                     ],
@@ -232,7 +203,7 @@ class ProfessionalMatchHeader extends StatelessWidget {
   Color _statusColor(MatchStatus? status) {
     return switch (status) {
       MatchStatus.live => AppColors.primaryLight,
-      MatchStatus.completed || MatchStatus.settled => AppColors.secondary,
+      MatchStatus.completed || MatchStatus.settled => AppColors.tactical,
       MatchStatus.cancelled || MatchStatus.frozen => AppColors.error,
       MatchStatus.open || MatchStatus.full => AppColors.warning,
       _ => AppColors.textMuted,
@@ -298,35 +269,28 @@ class _TeamIdentity extends StatelessWidget {
             ),
           ),
           clipBehavior: Clip.antiAlias,
-          child: logoUrl == null || logoUrl!.isEmpty
-              ? Center(
-                  child: Text(
-                    _initial(name),
-                    style: AppTextStyles.headlineMedium.copyWith(
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                )
-              : CachedNetworkImage(
-                  imageUrl: logoUrl!,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Center(
-                    child: Text(
-                      _initial(name),
-                      style: AppTextStyles.headlineMedium.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  errorWidget: (context, url, error) => Center(
-                    child: Text(
-                      _initial(name),
-                      style: AppTextStyles.headlineMedium.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
+          child: IdentityVisual(
+            source: logoUrl,
+            size: 56,
+            fit: BoxFit.cover,
+            semanticLabel: 'شعار $name',
+            fallbackBuilder: (_) => Center(
+              child: Text(
+                _initial(name),
+                style: AppTextStyles.headlineMedium.copyWith(
+                  color: AppColors.textPrimary,
                 ),
+              ),
+            ),
+            placeholderBuilder: (_) => Center(
+              child: Text(
+                _initial(name),
+                style: AppTextStyles.headlineMedium.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ),
         ),
         const SizedBox(height: AppDimensions.sm),
         Text(

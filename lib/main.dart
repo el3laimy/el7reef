@@ -10,6 +10,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:get/get.dart';
+import 'app/theme/app_colors.dart';
 import 'app/theme/app_theme.dart';
 import 'app/routes/app_pages.dart';
 import 'core/auth/auth_service.dart';
@@ -19,6 +20,8 @@ import 'core/navigation/pending_deep_link_service.dart';
 import 'core/services/feature_flag_service.dart';
 import 'core/utils/app_logger.dart';
 import 'core/widgets/el7reef_brand_mark.dart';
+import 'core/widgets/el7reef_daylight_backdrop.dart';
+import 'core/widgets/el7reef_glass_surface.dart';
 import 'firebase_options.dart';
 
 const bool _useFirestoreEmulator = bool.fromEnvironment(
@@ -86,9 +89,11 @@ void _configureSystemUi() {
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: Color(0xFF0A0E17),
-      systemNavigationBarIconBrightness: Brightness.light,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+      systemNavigationBarColor: AppColors.background,
+      systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarDividerColor: AppColors.background,
     ),
   );
 }
@@ -289,9 +294,8 @@ class _BootstrapShell extends StatelessWidget {
       title: 'الحريف',
       debugShowCheckedModeBanner: false,
       locale: const Locale('ar', 'EG'),
-      theme: AppTheme.darkTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.dark,
+      theme: AppTheme.lightTheme,
+      themeMode: ThemeMode.light,
       home: Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
@@ -299,11 +303,7 @@ class _BootstrapShell extends StatelessWidget {
             width: double.infinity,
             height: double.infinity,
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFF111827), Color(0xFF050807)],
-              ),
+              gradient: AppColors.backgroundGradient,
             ),
             child: SafeArea(
               child: Padding(
@@ -316,7 +316,7 @@ class _BootstrapShell extends StatelessWidget {
                     Text(
                       'الحريف',
                       style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        color: const Color(0xFF6EE15F),
+                        color: AppColors.brand,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -326,18 +326,18 @@ class _BootstrapShell extends StatelessWidget {
                           ? 'تعذر تجهيز التطبيق حالياً'
                           : 'بنجهز الملعب...',
                       textAlign: TextAlign.center,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.titleMedium?.copyWith(color: Colors.white70),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     if (hasError && kDebugMode) ...[
                       const SizedBox(height: 12),
                       Text(
                         '$error',
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: const Color(0xFFFFC4C4),
-                        ),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodySmall?.copyWith(color: AppColors.error),
                       ),
                     ],
                     const SizedBox(height: 28),
@@ -379,9 +379,8 @@ class El7reefApp extends StatelessWidget {
       textDirection: TextDirection.rtl,
 
       // ── Theme ──
-      theme: AppTheme.darkTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.dark,
+      theme: AppTheme.lightTheme,
+      themeMode: ThemeMode.light,
 
       // ── Routing ──
       initialRoute: AppPages.initial,
@@ -393,9 +392,13 @@ class El7reefApp extends StatelessWidget {
 
       // ── Builder for RTL ──
       builder: (context, child) {
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: child ?? const SizedBox.shrink(),
+        return El7reefDaylightBackdrop(
+          child: El7reefGlassScope(
+            child: Directionality(
+              textDirection: TextDirection.rtl,
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
         );
       },
     );

@@ -127,7 +127,7 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
             title: 'الاحتياط',
             status: TeamMembershipStatus.bench,
             icon: Icons.airline_seat_recline_extra,
-            accentColor: AppColors.secondary,
+            accentColor: AppColors.info,
             controller: controller,
           ),
           const SizedBox(height: AppDimensions.md),
@@ -176,12 +176,18 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
             ),
           ),
           const SizedBox(height: AppDimensions.sm),
-          Obx(
-            () => ProfessionalPitchCard(
-              slots: controller.visualSlots,
-              playersByKey: {
-                for (final p in controller.allVisualPlayers) p.key: p,
-              },
+          Obx(() {
+            // Read immutable snapshots inside the observer. Passing the RxList
+            // objects directly lets the pitch rebuild from its local drag
+            // state while the bench keeps painting its previous children.
+            final slots = controller.visualSlots.toList(growable: false);
+            final playersByKey = {
+              for (final player in controller.allVisualPlayers)
+                player.key: player,
+            };
+            return ProfessionalPitchCard(
+              slots: slots,
+              playersByKey: playersByKey,
               formationCode: controller.visualFormationCode.value,
               playerCount: controller.visualPlayerCount.value,
               teamName: team.name,
@@ -197,12 +203,13 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
                       LineupHaptics.commit();
                     }
                   : null,
-            ),
-          ),
+            );
+          }),
           const SizedBox(height: AppDimensions.sm),
-          Obx(
-            () => BenchBar(
-              players: controller.visualBench,
+          Obx(() {
+            final bench = controller.visualBench.toList(growable: false);
+            return BenchBar(
+              players: bench,
               draggable: controller.canManageRoster,
               selectedPlayerKey: controller.selectedVisualPlayerKey,
               onPlayerTap: controller.canManageRoster
@@ -230,8 +237,8 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
               onSelectedBenchSwapRequest: controller.canManageRoster
                   ? () => _showVisualStarterSwapSheet(context)
                   : null,
-            ),
-          ),
+            );
+          }),
           const SizedBox(
             height: AppDimensions.xxl * 2,
           ), // حشوة إضافية لضمان عدم تغطية الشريط العائم للعناصر
@@ -305,7 +312,7 @@ class TeamRosterScreen extends GetView<TeamRosterController> {
               ListTile(
                 leading: const Icon(
                   Icons.event_seat_rounded,
-                  color: AppColors.secondary,
+                  color: AppColors.info,
                 ),
                 title: const Text(
                   'نقل إلى البدلاء',

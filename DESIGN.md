@@ -1,31 +1,34 @@
 ---
 name: EL7REEF
-description: The ultimate street football tournament app.
+description: Arabic-first street football tournament app.
 colors:
-  primary: "#7ED957"
-  primary-dark: "#1F7A3E"
-  primary-light: "#4ADE80"
-  neutral-bg: "#121212"
-  neutral-surface: "#1E1E1E"
-  neutral-border: "#2A2A2A"
-  text-primary: "#FFFFFF"
-  text-secondary: "#A0A0A0"
-  text-muted: "#64748B"
-  secondary: "#F5A623"
-  accent: "#4A90D9"
+  background: "#EEF2F6"
+  surface: "#F8FAFC"
+  surface-raised: "#FDFBF6"
+  surface-sunken: "#E7ECF2"
+  text-primary: "#17202C"
+  text-secondary: "#46566A"
+  text-muted: "#617187"
+  action: "#315CC6"
+  social: "#C84232"
+  tactical: "#167247"
+  competitive: "#6746B8"
+  achievement: "#8A5A00"
+  border: "#CDD6E2"
+  border-strong: "#8292A7"
 typography:
   display:
     fontFamily: "Cairo, sans-serif"
     fontSize: "32px"
-    fontWeight: 700
+    fontWeight: 800
   headline:
     fontFamily: "Cairo, sans-serif"
     fontSize: "20px"
-    fontWeight: 600
+    fontWeight: 700
   title:
     fontFamily: "Cairo, sans-serif"
     fontSize: "16px"
-    fontWeight: 600
+    fontWeight: 700
   body:
     fontFamily: "Cairo, sans-serif"
     fontSize: "14px"
@@ -34,12 +37,14 @@ typography:
     fontFamily: "Cairo, sans-serif"
     fontSize: "12px"
     fontWeight: 700
-    letterSpacing: "0.5px"
 rounded:
   sm: "8px"
   md: "12px"
   lg: "16px"
-  xl: "24px"
+  glass-toolbar: "20px"
+  glass-preview: "24px"
+  glass-navigation: "28px"
+  glass-hero: "30px"
 spacing:
   space1: "4px"
   space2: "8px"
@@ -48,125 +53,163 @@ spacing:
   space5: "32px"
 components:
   button-primary:
-    backgroundColor: "{colors.primary}"
-    textColor: "#0B0B0B"
-    rounded: "{rounded.md}"
-    height: "48px"
-  button-outlined:
-    backgroundColor: "transparent"
-    textColor: "{colors.primary}"
+    backgroundColor: "{colors.action}"
+    textColor: "#F8FAFC"
     rounded: "{rounded.md}"
     height: "48px"
   card:
-    backgroundColor: "{colors.neutral-surface}"
+    backgroundColor: "{colors.surface}"
+    borderColor: "{colors.border}"
     rounded: "{rounded.lg}"
   input:
-    backgroundColor: "{colors.neutral-surface}"
+    backgroundColor: "{colors.surface}"
+    borderColor: "{colors.border-strong}"
     rounded: "{rounded.md}"
   chip:
-    backgroundColor: "{colors.primary-dark}"
-    textColor: "{colors.primary}"
+    backgroundColor: "{colors.surface-sunken}"
+    textColor: "{colors.text-primary}"
     rounded: "{rounded.sm}"
 ---
 
 # Design System: EL7REEF
 
-## 1. Overview
+## 1. Creative North Star
 
-**Creative North Star: "The Champion's Hub"**
+**Daylight Street Glass — زجاج خط التماس**
 
-The EL7REEF UI is designed to feel highly aggressive and competitive. It channels the raw energy of street football into a structured, professional, and imposing digital arena. We embrace high contrast, bold typography, and a dark, moody environment to make every tournament feel like a high-stakes championship. The design explicitly rejects boring data-entry tables and generic SaaS styling, opting instead for a street-authentic, hype-driven aesthetic that makes players feel like true stars.
+The governing scene is an organizer using one hand beside a football pitch in
+daylight. Content is high-contrast and grounded; Liquid Glass gives navigation,
+heroes, transient controls, and previews a clear spatial layer. It never makes
+dense tournament data harder to scan.
 
-**Key Characteristics:**
-- **Aggressive & Competitive:** High contrast and bold elements that demand attention.
-- **Ego-Driven:** Big typography and prominent player cards to amplify pride.
-- **Deep & Moody:** A dark canvas that makes the bright turf green pop intensely.
-- **Tactile:** Elements you want to press, with satisfying, chunky interactions.
+- Arabic RTL first and Android light-only.
+- One obvious next action per operational state.
+- Names, scores, qualification, and earned pride own the visual hierarchy.
+- Real team marks, player photos, and match data provide variety; decoration
+  does not compete with them.
+- Pride exports and pitch/camera canvases keep their stable dark media palette.
 
-## 2. Colors
+## 2. Chalk & Cobalt palette
 
-A deep, imposing dark canvas punctuated by aggressive, electric accents.
+The static app background runs from `#F6F8FB` to `#EEF2F6`. It may contain one
+contextual radial glow at 7% opacity. Backgrounds never animate.
 
-### Primary
-- **Electric Pitch** (#7ED957): The lifeblood of the app. Used for primary actions, active states, and to draw the eye immediately to the most critical interactive elements.
-- **Neon Glow** (#4ADE80): A lighter, hotter green used for gradients and hover states to give elements a radioactive lift.
-- **Deep Turf** (#1F7A3E): A darker, more grounded green for pressed states or subtle background tints behind primary text.
+- **Action Cobalt (`#315CC6`)**: primary action, current focus, and active
+  navigation.
+- **Social Heat (`#C84232`)**: invitations and share-first actions, never errors.
+- **Verified Turf (`#167247`)**: approved results and completed tactical states.
+- **Knockout Violet (`#6746B8`)**: unresolved and current knockout paths.
+- **Earned Gold (`#8A5A00`)**: champion, MVP, hat-trick, and real milestones only.
+- **Daylight Chalk (`#EEF2F6`)**: app background.
+- **Paper Card (`#F8FAFC`)**: cards, rows, tables, and forms.
+- **Warm Raised Surface (`#FDFBF6`)**: dialogs and short sheets.
+- **Ink (`#17202C`)**: primary text.
+- **Steel (`#CDD6E2` / `#8292A7`)**: separators and clear control borders.
 
-### Secondary
-- **Championship Gold** (#F5A623): Reserved exclusively for moments of high achievement—ranks, MVP badges, and tournament victories.
+Only one saturated accent may dominate a functional region. Secondary actions
+remain neutral until selected.
 
-### Tertiary
-- **Electric Blue** (#4A90D9): Used sparingly for secondary ratings or to contrast against the primary green in data visualizations.
+## 3. Functional Liquid Glass
 
-### Neutral
-- **Midnight Asphalt** (#121212): The absolute background of the app. It absorbs light and creates a void that makes the electric accents shine.
-- **Stadium Shadow** (#1E1E1E): Used for elevated surfaces like cards and dialogs, lifting them slightly off the asphalt.
-- **Chalk Line** (#2A2A2A): The subtle border color used to define edges without distracting from the content.
-- **Bright White** (#FFFFFF): Primary text color for maximum legibility against the dark backgrounds.
-- **Muted Dust** (#A0A0A0): Secondary text for less critical information.
+Glass is a functional layer, not a card style. Screens select a semantic role
+from `AppGlassTheme`; they cannot invent blur or opacity values.
 
-**The Electric Focus Rule.** The primary green (Electric Pitch) is incredibly powerful. Use it deliberately for primary CTAs and active states. Do not wash the screen in it; its impact comes from its contrast against the Midnight Asphalt.
+| Role | Fill | Blur | Radius | Usage |
+|---|---|---:|---:|---|
+| navigation | `#F8FAFC` 78% | 18 | 28 | floating app navigation |
+| hero | `#F8FAFC` 70% | 16 | 30 | one identity/next-action hero |
+| floatingToolbar | `#F8FAFC` 72% | 12 | 20 | filters, bracket, pitch controls |
+| compactSheet | `#FDFBF6` 91% | 16 | 28 | short sheets without keyboard |
+| previewToolbar | `#F8FAFC` 74% | 14 | 24 | Pride composer controls |
+| mediaOverlay | `#17202C` 58% | 10 | 20 | controls over pitch/image/camera |
 
-## 3. Typography
+Every role uses a 1dp outer edge (`#8292A7` at 24%), a 0.75dp top reflection,
+opaque text/icons, and a restrained charcoal shadow at 10–13%. Semantic tint is
+at most 8%.
 
-**Display Font:** Cairo (with system sans-serif fallback)
-**Body Font:** Cairo (with system sans-serif fallback)
+### Interaction
 
-**Character:** Cairo provides a strong, legible Arabic and Latin presence. It feels modern, structural, and slightly aggressive in its heavier weights, perfect for a sports context.
+- Press: scale to `0.98` with a 10% cobalt state layer over 150ms.
+- Selection: 220ms using `easeOutQuart`.
+- Short sheet: 250ms using `easeOutQuart`.
+- Never animate blur or run continuous shine.
+- Never nest glass inside glass.
 
-### Hierarchy
-- **Display** (Bold 700, 32px): Massive impact. Used for hero numbers, final scores, and top-level tournament names.
-- **Headline** (SemiBold 600, 20px): Section headers and prominent card titles.
-- **Title** (SemiBold 600, 16px): Standard list items, player names in rosters.
-- **Body** (Regular 400, 14px): General descriptive text, secondary stats.
-- **Label** (Bold 700, 12px, 0.5px letter-spacing): Small, uppercase/distinct tags, status indicators, and button text.
+### Layer budget and fallback
 
-**The Ego Type Rule.** Names and scores are the most important data in the app. They should always be typeset larger and bolder than standard data-entry labels.
+- Use `BackdropFilter.grouped` inside one `El7reefGlassScope`.
+- At most two glass filters may be visible on an operational route.
+- A covered route stops its backdrop filters while a modal sheet is open.
+- `El7reefLens` expresses repeated selected states without blur.
+- `El7reefSolidSurface` owns cards, forms, errors, rows, and tables.
+- Render the same solid fallback geometry when functional glass is disabled,
+  reduced effects/high contrast is enabled, animations are disabled, or a
+  keyboard is visible in a long sheet.
 
-## 4. Elevation
+## 4. Typography and accessibility
 
-The system is generally grounded, but uses subtle neon glows and shadows to make important elements "lift" off the screen, emphasizing interactivity and status.
+Cairo is bundled locally. Operational text is never smaller than 12sp. Scores
+use tabular figures and LTR direction only for the numeric score.
 
-### Shadow Vocabulary
-- **Neon Lift** (`box-shadow: 0 4px 12px rgba(126, 217, 87, 0.25)`): Applied to primary buttons or active elements to give them an electric, glowing hover state.
-- **Card Shadow** (`box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4)`): A deep, heavy drop shadow used for floating dialogs and elevated hero cards to pull them out of the Midnight Asphalt.
+- Small text contrast: at least 4.5:1.
+- Large text and essential non-text boundaries: at least 3:1.
+- Android touch targets: at least 48×48dp.
+- Text and icons on glass remain fully opaque.
+- `disableAnimations`, `accessibleNavigation`, high contrast, and the glass
+  kill switch all select the solid fallback.
 
-**The Tactical Glow Rule.** Glows are earned, not given. Only the most important, interactive elements (like the "Start Match" button or an MVP card) get the Neon Lift. Everything else remains grounded with subtle borders.
+## 5. Screen grammar
 
-## 5. Components
+- **Login / Splash:** one light-surface brand Hero.
+- **Home / Explore:** floating glass navigation; one featured/next-action Hero;
+  all tournament and match cards are solid.
+- **Tournament list:** glass search/filter toolbar; solid tournament cards.
+- **Tournament detail / operations:** one glass identity/progress/next-action
+  Hero, then solid data and action surfaces.
+- **Groups / standings:** glass group selector and progress control; solid table.
+- **Bracket:** light canvas, solid match nodes, and one glass round/zoom toolbar.
+- **Lineup:** stable dark pitch; glass header/formation/CTA chrome; solid bench
+  and player data.
+- **Result:** glass step/navigation chrome; solid goals, MVP, and penalties.
+- **Pride composer:** glass controls around a solid preview. Export output never
+  includes live glass or a `BackdropFilter`.
+- **Camera / QR:** dark camera canvas with `mediaOverlay` controls. QR modules and
+  quiet zone stay opaque black and white.
 
-### Buttons
-- **Shape:** Tactile and chunky with medium rounded corners (12px).
-- **Primary:** Electric Pitch background with stark black text (#0B0B0B). Thick padding, minimum height of 48px.
-- **Hover / Focus:** Receives the Neon Lift glow, background shifts slightly to Neon Glow.
-- **Secondary (Outlined):** Transparent background with a 1px Electric Pitch border and Electric Pitch text.
+## 6. Stable media palette
 
-### Cards / Containers
-- **Corner Style:** Slightly softer than buttons (16px radius) to contain complex content.
-- **Background:** Stadium Shadow (#1E1E1E).
-- **Shadow Strategy:** Grounded by default (flat with Chalk Line border). Hero cards receive Card Shadow.
-- **Internal Padding:** 16px standard, utilizing the 8px grid.
+`AppMediaColors` is independent from the light operational theme. It owns Pride
+exports, dark lineup/pitch canvases, camera overlays, and code-native identity
+art. A theme refactor must not alter exported pixels.
 
-### Inputs / Fields
-- **Style:** Filled with Stadium Shadow, 12px radius, and a subtle Chalk Line border.
-- **Focus:** Border snaps to a 2px Electric Pitch stroke, bringing the input into sharp focus.
+Do not use operational `AppColors` inside pure export render trees. Do not use
+glass, network-dependent decoration, or hidden animations during capture.
 
-### Chips (Tags)
-- **Style:** 15% opacity primary background with Electric Pitch text. Small 8px radius.
-- **State:** Used for statuses (e.g., "Guest", "Pending").
+## 7. Built-in identity presets
 
-## 6. Do's and Don'ts
+- Team captains choose original badges or street pennants; tournament
+  organizers choose tournament emblems.
+- Presets use flat silhouettes, at most two accents plus a neutral, and must
+  remain legible at 32dp and 1080px export size.
+- Gold, crowns, stars, and trophies remain earned and are not generic presets.
+- References stay versioned (`preset://v1/...`) so saved identities survive
+  asset reorganization.
+- The picker is full-screen RTL, with live preview, a three-column grid, 48dp
+  targets, cobalt selection, and one primary confirmation action.
+- National flags must come from a verified source. AI-generated real flags are
+  forbidden; generation may explore only original fictional marks.
 
-### Do:
-- **Do** use Electric Pitch (#7ED957) sparingly but aggressively for primary actions to maximize its punch.
-- **Do** use large, bold Cairo typography for player names, team names, and match scores.
-- **Do** make interactive elements feel tactile and chunky, with 48px minimum hit areas.
-- **Do** apply subtle neon glows to highlight the most critical actions on the screen.
+## 8. Do / Do not
 
-### Don't:
-- **Don't** use boring, generic SaaS tables for standings; make them feel like a sports leaderboard.
-- **Don't** build complex admin dashboard layouts; maintain a street-authentic, mobile-first vibe.
-- **Don't** include fake features or "coming soon" buttons that dilute the app's real value.
-- **Don't** wash the screen in green; let the Midnight Asphalt dominate so the accents shine.
-- **Don't** use border-left greater than 1px as a colored stripe on cards.
-- **Don't** use glassmorphism as a default decorative element unless it specifically serves a tactical purpose (like a modal overlay).
+**Do** keep most of every operational screen neutral, use one clear primary
+action, and let real football data carry the excitement.
+
+**Do** reserve coral for sharing, green for verified state, violet for knockout,
+and gold for earned pride.
+
+**Do not** turn lists, tables, player cards, or exported Pride files into glass.
+
+**Do not** replace the previous green dominance with cobalt dominance.
+
+**Do not** expose fake features, dead buttons, decorative tactical analysis, or
+an unfinished logo builder.

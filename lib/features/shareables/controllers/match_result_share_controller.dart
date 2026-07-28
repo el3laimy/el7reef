@@ -1,4 +1,4 @@
-import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_media_colors.dart';
 import '../../../core/enums/match_status.dart';
 import '../../../domain/entities/match.dart';
 import '../../../features/lineup/controllers/match_result_lineup_controller.dart';
@@ -59,11 +59,11 @@ class MatchResultShareController {
       teamAName: teamAName,
       teamALogoUrl: teamALogoUrl,
       teamAFormation: _nullableFormation(teamAFormation),
-      teamAAccent: AppColors.primary,
+      teamAAccent: AppMediaColors.actionPrimary,
       teamBName: teamBName,
       teamBLogoUrl: teamBLogoUrl,
       teamBFormation: _nullableFormation(teamBFormation),
-      teamBAccent: AppColors.accent,
+      teamBAccent: AppMediaColors.info,
       scoreA: scoreA,
       scoreB: scoreB,
       statusLabel: _statusLabel(match.status),

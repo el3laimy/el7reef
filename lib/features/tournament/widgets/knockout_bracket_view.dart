@@ -9,10 +9,23 @@ import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/enums/match_status.dart';
 import '../../../core/enums/tournament_ops_enums.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../domain/entities/knockout_tie.dart';
 import '../../../domain/entities/match.dart';
 
 enum KnockoutBracketViewMode { round, fullTree }
+
+class KnockoutBracketHeaderData {
+  final int teamCount;
+  final int byeCount;
+  final VoidCallback? onShare;
+
+  const KnockoutBracketHeaderData({
+    required this.teamCount,
+    required this.byeCount,
+    this.onShare,
+  });
+}
 
 class KnockoutBracketView extends StatefulWidget {
   static const double fullTreeBreakpoint = 720;
@@ -24,6 +37,7 @@ class KnockoutBracketView extends StatefulWidget {
   final ValueChanged<Match>? onOpenMatch;
   final bool Function(Match match)? canReviewMatch;
   final ValueChanged<Match>? onReviewMatch;
+  final KnockoutBracketHeaderData? headerData;
 
   const KnockoutBracketView({
     super.key,
@@ -34,6 +48,7 @@ class KnockoutBracketView extends StatefulWidget {
     this.onOpenMatch,
     this.canReviewMatch,
     this.onReviewMatch,
+    this.headerData,
   });
 
   @override
@@ -58,97 +73,42 @@ class _KnockoutBracketViewState extends State<KnockoutBracketView> {
             ? KnockoutBracketViewMode.fullTree
             : KnockoutBracketViewMode.round;
         final mode = _selectedMode ?? defaultMode;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _BracketJourneyHeader(
-              tiesByRound: tiesByRound,
-              participantLabel: widget.participantLabel,
-            ),
-            const SizedBox(height: AppDimensions.md),
-            Semantics(
-              container: true,
-              label: 'طريقة عرض الأدوار الإقصائية',
-              child: SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<KnockoutBracketViewMode>(
-                  key: const ValueKey('bracket-view-mode'),
-                  segments: const [
-                    ButtonSegment(
-                      value: KnockoutBracketViewMode.round,
-                      label: Text('الجولات'),
-                      icon: Icon(Icons.view_carousel_rounded),
-                    ),
-                    ButtonSegment(
-                      value: KnockoutBracketViewMode.fullTree,
-                      label: Text('الشجرة كاملة'),
-                      icon: Icon(Icons.account_tree_rounded),
-                    ),
-                  ],
-                  selected: <KnockoutBracketViewMode>{mode},
-                  showSelectedIcon: false,
-                  style: ButtonStyle(
-                    backgroundColor: WidgetStateProperty.resolveWith<Color>((
-                      states,
-                    ) {
-                      return states.contains(WidgetState.selected)
-                          ? AppColors.primary
-                          : Colors.transparent;
-                    }),
-                    foregroundColor: WidgetStateProperty.resolveWith<Color>((
-                      states,
-                    ) {
-                      return states.contains(WidgetState.selected)
-                          ? AppColors.textOnPrimary
-                          : AppColors.textPrimaryTinted;
-                    }),
-                    side: WidgetStateProperty.resolveWith<BorderSide>((states) {
-                      return BorderSide(
-                        color: states.contains(WidgetState.selected)
-                            ? AppColors.primary
-                            : AppColors.surfaceBorderStrong,
-                      );
-                    }),
-                    textStyle: WidgetStatePropertyAll<TextStyle>(
-                      AppTextStyles.labelLarge.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  onSelectionChanged: (selection) {
-                    setState(() => _selectedMode = selection.first);
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          switchInCurve: Curves.easeOutQuart,
+          switchOutCurve: Curves.easeOutQuart,
+          child: mode == KnockoutBracketViewMode.round
+              ? KnockoutRoundPager(
+                  key: const ValueKey('bracket-round-pager'),
+                  tiesByRound: tiesByRound,
+                  matchesById: widget.matchesById,
+                  participantLabel: widget.participantLabel,
+                  hideUnpublishedParticipants:
+                      widget.hideUnpublishedParticipants,
+                  onOpenMatch: widget.onOpenMatch,
+                  canReviewMatch: widget.canReviewMatch,
+                  onReviewMatch: widget.onReviewMatch,
+                  headerData: widget.headerData,
+                  onShowFullTree: () {
+                    setState(
+                      () => _selectedMode = KnockoutBracketViewMode.fullTree,
+                    );
+                  },
+                )
+              : KnockoutFullTree(
+                  key: const ValueKey('bracket-full-tree'),
+                  tiesByRound: tiesByRound,
+                  matchesById: widget.matchesById,
+                  participantLabel: widget.participantLabel,
+                  hideUnpublishedParticipants:
+                      widget.hideUnpublishedParticipants,
+                  onOpenMatch: widget.onOpenMatch,
+                  onShowRounds: () {
+                    setState(
+                      () => _selectedMode = KnockoutBracketViewMode.round,
+                    );
                   },
                 ),
-              ),
-            ),
-            const SizedBox(height: AppDimensions.md),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              switchInCurve: Curves.easeOutQuart,
-              switchOutCurve: Curves.easeOutQuart,
-              child: mode == KnockoutBracketViewMode.round
-                  ? KnockoutRoundPager(
-                      key: const ValueKey('bracket-round-pager'),
-                      tiesByRound: tiesByRound,
-                      matchesById: widget.matchesById,
-                      participantLabel: widget.participantLabel,
-                      hideUnpublishedParticipants:
-                          widget.hideUnpublishedParticipants,
-                      onOpenMatch: widget.onOpenMatch,
-                      canReviewMatch: widget.canReviewMatch,
-                      onReviewMatch: widget.onReviewMatch,
-                    )
-                  : KnockoutFullTree(
-                      key: const ValueKey('bracket-full-tree'),
-                      tiesByRound: tiesByRound,
-                      matchesById: widget.matchesById,
-                      participantLabel: widget.participantLabel,
-                      hideUnpublishedParticipants:
-                          widget.hideUnpublishedParticipants,
-                      onOpenMatch: widget.onOpenMatch,
-                    ),
-            ),
-          ],
         );
       },
     );
@@ -158,10 +118,14 @@ class _KnockoutBracketViewState extends State<KnockoutBracketView> {
 class _BracketJourneyHeader extends StatelessWidget {
   final Map<int, List<KnockoutTie>> tiesByRound;
   final String Function(String? participantId) participantLabel;
+  final KnockoutBracketHeaderData? headerData;
+  final VoidCallback onShowFullTree;
 
   const _BracketJourneyHeader({
     required this.tiesByRound,
     required this.participantLabel,
+    required this.headerData,
+    required this.onShowFullTree,
   });
 
   @override
@@ -174,214 +138,146 @@ class _BracketJourneyHeader extends StatelessWidget {
     final finalTie = tiesByRound[rounds.last]!.first;
     final championId = finalTie.winnerParticipantId;
     final hasChampion = championId?.isNotEmpty ?? false;
-
-    return Semantics(
-      container: true,
-      label: hasChampion
-          ? 'اكتملت الأدوار الإقصائية، البطل ${participantLabel(championId)}'
-          : 'تقدم الأدوار الإقصائية، $resolvedCount من ${ties.length} مواجهات حُسمت',
-      child: Container(
-        key: const ValueKey('bracket-journey-header'),
-        width: double.infinity,
-        padding: const EdgeInsets.all(AppDimensions.md),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceSunken,
-          borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-          border: Border.all(
-            color: hasChampion
-                ? AppColors.secondary.withValues(alpha: 0.44)
-                : AppColors.surfaceBorderStrong,
-          ),
-        ),
-        child: ExcludeSemantics(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: hasChampion
-                          ? AppColors.secondary.withValues(alpha: 0.14)
-                          : AppColors.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(
-                        AppDimensions.radiusMd,
-                      ),
-                    ),
-                    child: Icon(
-                      hasChampion
-                          ? Icons.emoji_events_rounded
-                          : Icons.route_rounded,
-                      color: hasChampion
-                          ? AppColors.secondary
-                          : AppColors.primary,
-                    ),
-                  ),
-                  const SizedBox(width: AppDimensions.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          hasChampion
-                              ? 'خُتم طريق البطولة'
-                              : 'الطريق إلى الكأس',
-                          style: AppTextStyles.titleLarge.copyWith(
-                            color: hasChampion
-                                ? AppColors.secondary
-                                : AppColors.textPrimaryTinted,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        Text(
-                          hasChampion
-                              ? participantLabel(championId)
-                              : '$resolvedCount من ${ties.length} مواجهات حُسمت',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textSecondaryTinted,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    '${rounds.length}',
-                    style: AppTextStyles.headlineSmall.copyWith(
-                      color: hasChampion
-                          ? AppColors.secondary
-                          : AppColors.primary,
-                      fontWeight: FontWeight.w900,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  const SizedBox(width: AppDimensions.xs),
-                  Text(
-                    'أدوار',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textSecondaryTinted,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppDimensions.md),
-              _BracketProgressRail(
-                rounds: rounds,
-                tiesByRound: tiesByRound,
-                hasChampion: hasChampion,
-              ),
-            ],
-          ),
-        ),
-      ),
+    final activeRound = hasChampion
+        ? rounds.last
+        : rounds.firstWhere(
+            (round) => tiesByRound[round]!.any(
+              (tie) => tie.winnerParticipantId?.isEmpty ?? true,
+            ),
+            orElse: () => rounds.last,
+          );
+    final activeRoundLabel = knockoutRoundLabel(
+      activeRound,
+      maxRoundIndex: rounds.last,
     );
-  }
-}
+    final details = <String>[
+      if (headerData != null) '${headerData!.teamCount} فريق',
+      '$resolvedCount/${ties.length} حُسمت',
+      if (headerData?.byeCount case final byeCount? when byeCount > 0)
+        '$byeCount تأهل مباشر',
+    ].join('  •  ');
 
-class _BracketProgressRail extends StatelessWidget {
-  final List<int> rounds;
-  final Map<int, List<KnockoutTie>> tiesByRound;
-  final bool hasChampion;
-
-  const _BracketProgressRail({
-    required this.rounds,
-    required this.tiesByRound,
-    required this.hasChampion,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      key: const ValueKey('bracket-journey-header'),
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (var index = 0; index < rounds.length; index++) ...[
-          if (index > 0)
+        Semantics(
+          container: true,
+          label: hasChampion
+              ? 'اكتملت الأدوار الإقصائية، البطل ${participantLabel(championId)}'
+              : 'تقدم الأدوار الإقصائية، $resolvedCount من ${ties.length} مواجهات حُسمت، الدور الجاري $activeRoundLabel',
+          child: ExcludeSemantics(
+            child: Row(
+              key: const ValueKey('bracket-screen-summary-bar'),
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: hasChampion
+                        ? AppColors.achievementSurface
+                        : AppColors.competitiveSurface,
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+                  ),
+                  child: Icon(
+                    hasChampion
+                        ? Icons.emoji_events_rounded
+                        : Icons.route_rounded,
+                    color: hasChampion
+                        ? AppColors.achievement
+                        : AppColors.competitive,
+                  ),
+                ),
+                const SizedBox(width: AppDimensions.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        hasChampion ? 'خُتم طريق البطولة' : 'الطريق إلى الكأس',
+                        style: AppTextStyles.titleLarge.copyWith(
+                          color: hasChampion
+                              ? AppColors.achievement
+                              : AppColors.textPrimaryTinted,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        hasChampion
+                            ? participantLabel(championId)
+                            : 'الدور الجاري: $activeRoundLabel',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSecondaryTinted,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: AppDimensions.xs),
+        Row(
+          children: [
             Expanded(
-              child: Container(
-                height: 2,
-                color: _roundResolved(index - 1)
-                    ? AppColors.primary.withValues(alpha: 0.72)
-                    : AppColors.surfaceBorderStrong,
+              child: Text(
+                details,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: AppColors.textSecondaryTinted,
+                  fontWeight: FontWeight.w700,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
             ),
-          _ProgressStop(
-            label: knockoutRoundLabel(
-              rounds[index],
-              maxRoundIndex: rounds.last,
+            if (headerData?.onShare != null) ...[
+              Semantics(
+                button: true,
+                label: 'شارك طريق النهائي',
+                onTap: headerData!.onShare,
+                child: ExcludeSemantics(
+                  child: IconButton(
+                    key: const ValueKey('share-knockout-road'),
+                    tooltip: 'شارك طريق النهائي',
+                    onPressed: headerData!.onShare,
+                    icon: const Icon(Icons.ios_share_rounded),
+                    color: AppColors.socialAccent,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppDimensions.xs),
+            ],
+            Semantics(
+              button: true,
+              label: 'افتح خريطة الشجرة الكاملة',
+              onTap: onShowFullTree,
+              child: ExcludeSemantics(
+                child: SizedBox(
+                  key: const ValueKey('bracket-view-mode'),
+                  child: OutlinedButton.icon(
+                    key: const ValueKey('bracket-open-full-tree'),
+                    onPressed: onShowFullTree,
+                    icon: const Icon(Icons.zoom_out_map_rounded, size: 18),
+                    label: const Text('الخريطة'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.competitive,
+                      side: BorderSide(
+                        color: AppColors.competitive.withValues(alpha: 0.46),
+                      ),
+                      minimumSize: const Size(0, AppDimensions.minTouchTarget),
+                    ),
+                  ),
+                ),
+              ),
             ),
-            isResolved: _roundResolved(index),
-            isFinal: index == rounds.length - 1,
-            hasChampion: hasChampion,
-          ),
-        ],
+          ],
+        ),
       ],
-    );
-  }
-
-  bool _roundResolved(int index) {
-    return tiesByRound[rounds[index]]!.every(
-      (tie) => tie.winnerParticipantId?.isNotEmpty ?? false,
-    );
-  }
-}
-
-class _ProgressStop extends StatelessWidget {
-  final String label;
-  final bool isResolved;
-  final bool isFinal;
-  final bool hasChampion;
-
-  const _ProgressStop({
-    required this.label,
-    required this.isResolved,
-    required this.isFinal,
-    required this.hasChampion,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isFinal && hasChampion
-        ? AppColors.secondary
-        : isResolved
-        ? AppColors.primary
-        : AppColors.textSecondaryTinted;
-    return SizedBox(
-      width: 48,
-      child: Column(
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: isFinal ? 30 : 24,
-            height: isFinal ? 30 : 24,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: isResolved ? 0.18 : 0.08),
-              shape: BoxShape.circle,
-              border: Border.all(color: color, width: isResolved ? 2 : 1),
-            ),
-            child: Icon(
-              isFinal
-                  ? Icons.emoji_events_rounded
-                  : Icons.sports_soccer_rounded,
-              size: isFinal ? 17 : 13,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: AppDimensions.xs),
-          Text(
-            label,
-            maxLines: 2,
-            overflow: TextOverflow.visible,
-            textAlign: TextAlign.center,
-            style: AppTextStyles.labelSmall.copyWith(
-              color: color,
-              fontWeight: isResolved ? FontWeight.w800 : FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -408,6 +304,8 @@ class KnockoutRoundPager extends StatefulWidget {
   final ValueChanged<Match>? onOpenMatch;
   final bool Function(Match match)? canReviewMatch;
   final ValueChanged<Match>? onReviewMatch;
+  final KnockoutBracketHeaderData? headerData;
+  final VoidCallback onShowFullTree;
 
   const KnockoutRoundPager({
     super.key,
@@ -418,6 +316,8 @@ class KnockoutRoundPager extends StatefulWidget {
     this.onOpenMatch,
     this.canReviewMatch,
     this.onReviewMatch,
+    required this.headerData,
+    required this.onShowFullTree,
   });
 
   @override
@@ -453,19 +353,21 @@ class _KnockoutRoundPagerState extends State<KnockoutRoundPager> {
     final resolvedInRound = selectedRoundTies
         .where((tie) => tie.winnerParticipantId?.isNotEmpty ?? false)
         .length;
+    final roundIsComplete = resolvedInRound == selectedRoundTies.length;
+    final featuredTie = _featuredTie(selectedRoundTies);
+    final remainingTies = selectedRoundTies
+        .where((tie) => tie.id != featuredTie.id)
+        .toList(growable: false);
     final nextRoundLabel = _page == rounds.length - 1
         ? null
         : knockoutRoundLabel(rounds[_page + 1], maxRoundIndex: finalRound);
-    final branchConfig = (
-      matchesById: widget.matchesById,
-      roundLabel: knockoutRoundLabel(selectedRound, maxRoundIndex: finalRound),
-      destinationLabel: nextRoundLabel,
-      participantLabel: widget.participantLabel,
-      hideUnpublishedParticipants: widget.hideUnpublishedParticipants,
-      onOpenMatch: widget.onOpenMatch,
-      canReviewMatch: widget.canReviewMatch,
-      onReviewMatch: widget.onReviewMatch,
+    final roundLabel = knockoutRoundLabel(
+      selectedRound,
+      maxRoundIndex: finalRound,
     );
+    final hasChampion =
+        selectedRound == finalRound &&
+        selectedRoundTies.first.winnerParticipantId?.isNotEmpty == true;
 
     return Semantics(
       container: true,
@@ -474,66 +376,35 @@ class _KnockoutRoundPagerState extends State<KnockoutRoundPager> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              IconButton.filledTonal(
-                key: const ValueKey('bracket-previous-round'),
-                tooltip: 'الجولة السابقة',
-                onPressed: _page == 0 ? null : () => _goToPage(_page - 1),
-                style: _roundNavigationButtonStyle,
-                icon: const Icon(Icons.east_rounded),
-              ),
-              const SizedBox(width: AppDimensions.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      knockoutRoundLabel(
-                        selectedRound,
-                        maxRoundIndex: finalRound,
-                      ),
-                      style: AppTextStyles.titleLarge.copyWith(
-                        color: AppColors.textPrimaryTinted,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      '${selectedRoundTies.length} مواجهات، $resolvedInRound حُسمت',
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.textSecondaryTinted,
-                        fontWeight: FontWeight.w700,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ],
+          El7reefGlassSurface(
+            role: El7reefGlassRole.floatingToolbar,
+            tone: El7reefGlassTone.competitive,
+            padding: const EdgeInsets.all(AppDimensions.md),
+            child: Column(
+              children: [
+                _BracketJourneyHeader(
+                  tiesByRound: widget.tiesByRound,
+                  participantLabel: widget.participantLabel,
+                  headerData: widget.headerData,
+                  onShowFullTree: widget.onShowFullTree,
                 ),
-              ),
-              const SizedBox(width: AppDimensions.sm),
-              IconButton.filledTonal(
-                key: const ValueKey('bracket-next-round'),
-                tooltip: 'الجولة التالية',
-                onPressed: _page == rounds.length - 1
-                    ? null
-                    : () => _goToPage(_page + 1),
-                style: _roundNavigationButtonStyle,
-                icon: const Icon(Icons.west_rounded),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppDimensions.sm),
-          _BracketRoundSelector(
-            rounds: rounds,
-            selectedPage: _page,
-            tiesByRound: widget.tiesByRound,
-            onSelected: _setPage,
-          ),
-          const SizedBox(height: AppDimensions.sm),
-          _RoundDestinationStrip(
-            isFinal: nextRoundLabel == null,
-            label: nextRoundLabel == null
-                ? 'المحطة الأخيرة: الفائز يرفع الكأس'
-                : 'كل فرعين يلتقيان في $nextRoundLabel',
+                const SizedBox(height: AppDimensions.sm),
+                const Divider(height: 1, color: AppColors.surfaceBorder),
+                const SizedBox(height: AppDimensions.sm),
+                _BracketRoundSelector(
+                  rounds: rounds,
+                  selectedPage: _page,
+                  tiesByRound: widget.tiesByRound,
+                  onSelected: _setPage,
+                ),
+                const SizedBox(height: AppDimensions.xs),
+                _RoundCompletionMeter(
+                  resolved: resolvedInRound,
+                  total: selectedRoundTies.length,
+                  completed: roundIsComplete,
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: AppDimensions.sm),
           GestureDetector(
@@ -562,23 +433,79 @@ class _KnockoutRoundPagerState extends State<KnockoutRoundPager> {
                 ),
               ),
               child: Column(
-                key: ValueKey('knockout-round-branches-$selectedRound'),
+                key: ValueKey('knockout-round-matches-$selectedRound'),
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (
-                    var branchStart = 0;
-                    branchStart < selectedRoundTies.length;
-                    branchStart += 2
-                  ) ...[
-                    _KnockoutPathBranch(
-                      branchIndex: branchStart ~/ 2,
-                      ties: selectedRoundTies
-                          .skip(branchStart)
-                          .take(2)
-                          .toList(growable: false),
-                      config: branchConfig,
+                  _RoundSectionLabel(
+                    icon: hasChampion
+                        ? Icons.emoji_events_rounded
+                        : Icons.play_circle_fill_rounded,
+                    color: hasChampion
+                        ? AppColors.achievement
+                        : AppColors.competitive,
+                    title: hasChampion
+                        ? 'مواجهة البطل'
+                        : roundIsComplete
+                        ? 'اكتمل $roundLabel'
+                        : featuredTie.isReady
+                        ? 'المواجهة الجاهزة الآن'
+                        : 'المواجهة التالية',
+                    subtitle: hasChampion
+                        ? 'الكأس حُسم ببيانات النهائي'
+                        : roundIsComplete && nextRoundLabel != null
+                        ? 'المتأهلون وصلوا إلى $nextRoundLabel'
+                        : nextRoundLabel == null
+                        ? 'الفائز يرفع الكأس'
+                        : 'الفائز يتقدم إلى $nextRoundLabel',
+                  ),
+                  const SizedBox(height: AppDimensions.sm),
+                  KeyedSubtree(
+                    key: ValueKey('bracket-featured-match-${featuredTie.id}'),
+                    child: _buildMatchCard(
+                      tie: featuredTie,
+                      roundLabel: roundLabel,
+                      displayLabel: selectedRound == finalRound
+                          ? 'المواجهة الحاسمة'
+                          : 'مواجهة ${featuredTie.slotNumber + 1}',
+                      emphasized: !roundIsComplete,
+                      champion: hasChampion,
+                      semanticsOrder: 0,
                     ),
-                    if (branchStart + 2 < selectedRoundTies.length)
-                      const SizedBox(height: AppDimensions.md),
+                  ),
+                  if (remainingTies.isNotEmpty) ...[
+                    const SizedBox(height: AppDimensions.lg),
+                    _RoundSectionLabel(
+                      icon: Icons.format_list_numbered_rtl_rounded,
+                      color: roundIsComplete
+                          ? AppColors.tactical
+                          : AppColors.textSecondaryTinted,
+                      title: 'بقية مواجهات الدور',
+                      subtitle:
+                          '${remainingTies.length} مواجهات مرتبة حسب مسار الشجرة',
+                    ),
+                    const SizedBox(height: AppDimensions.sm),
+                    Column(
+                      key: const ValueKey('bracket-round-match-list'),
+                      children: [
+                        for (
+                          var index = 0;
+                          index < remainingTies.length;
+                          index++
+                        ) ...[
+                          _buildMatchCard(
+                            tie: remainingTies[index],
+                            roundLabel: roundLabel,
+                            displayLabel:
+                                'مواجهة ${remainingTies[index].slotNumber + 1}',
+                            emphasized: false,
+                            champion: false,
+                            semanticsOrder: (index + 1).toDouble(),
+                          ),
+                          if (index < remainingTies.length - 1)
+                            const SizedBox(height: AppDimensions.sm),
+                        ],
+                      ],
+                    ),
                   ],
                 ],
               ),
@@ -589,8 +516,53 @@ class _KnockoutRoundPagerState extends State<KnockoutRoundPager> {
     );
   }
 
-  void _goToPage(int page) {
-    _setPage(page);
+  KnockoutTie _featuredTie(List<KnockoutTie> ties) {
+    for (final tie in ties) {
+      if (tie.winnerParticipantId == null && tie.isReady) return tie;
+    }
+    for (final tie in ties) {
+      if (tie.winnerParticipantId == null) return tie;
+    }
+    return ties.last;
+  }
+
+  Widget _buildMatchCard({
+    required KnockoutTie tie,
+    required String roundLabel,
+    required String displayLabel,
+    required bool emphasized,
+    required bool champion,
+    required double semanticsOrder,
+  }) {
+    final match = tie.matchId == null ? null : widget.matchesById[tie.matchId!];
+    final canReview =
+        match != null &&
+        widget.onReviewMatch != null &&
+        (widget.canReviewMatch?.call(match) ?? false);
+    return Semantics(
+      sortKey: OrdinalSortKey(semanticsOrder),
+      child: KnockoutMatchNode(
+        tie: tie,
+        match: match,
+        roundLabel: roundLabel,
+        displayLabel: displayLabel,
+        participantLabel: widget.participantLabel,
+        hideParticipants:
+            widget.hideUnpublishedParticipants &&
+            tie.matchId != null &&
+            match == null,
+        showActions: true,
+        isCurrentFocus: emphasized,
+        isChampionPath: champion,
+        openActionLabel: widget.canReviewMatch == null
+            ? 'عرض المباراة'
+            : 'إدارة المباراة',
+        onOpen: match == null || widget.onOpenMatch == null
+            ? null
+            : () => widget.onOpenMatch!(match),
+        onReview: canReview ? () => widget.onReviewMatch!(match) : null,
+      ),
+    );
   }
 
   void _setPage(int page) {
@@ -608,16 +580,6 @@ class _KnockoutRoundPagerState extends State<KnockoutRoundPager> {
     }
     return math.max(0, rounds.length - 1);
   }
-
-  ButtonStyle get _roundNavigationButtonStyle => IconButton.styleFrom(
-    backgroundColor: AppColors.primary.withValues(alpha: 0.14),
-    foregroundColor: AppColors.primary,
-    disabledBackgroundColor: AppColors.surfaceSunken,
-    disabledForegroundColor: AppColors.textSecondaryTinted.withValues(
-      alpha: 0.56,
-    ),
-    side: const BorderSide(color: AppColors.surfaceBorderStrong),
-  );
 }
 
 class _BracketRoundSelector extends StatefulWidget {
@@ -735,14 +697,14 @@ class _BracketRoundChip extends StatelessWidget {
     final contentColor = selected
         ? AppColors.textOnPrimary
         : completed
-        ? AppColors.primary
+        ? AppColors.tactical
         : AppColors.textSecondaryTinted;
     return Semantics(
       selected: selected,
       button: true,
       label: completed ? '$roundLabel، اكتمل' : roundLabel,
       child: Material(
-        color: selected ? AppColors.primary : AppColors.surface,
+        color: selected ? AppColors.competitive : AppColors.surface,
         borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
         child: InkWell(
           key: ValueKey('bracket-round-chip-$roundIndex'),
@@ -760,9 +722,9 @@ class _BracketRoundChip extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
               border: Border.all(
                 color: selected
-                    ? AppColors.primary
+                    ? AppColors.competitive
                     : completed
-                    ? AppColors.primary.withValues(alpha: 0.48)
+                    ? AppColors.tactical.withValues(alpha: 0.48)
                     : AppColors.surfaceBorderStrong,
               ),
             ),
@@ -793,234 +755,99 @@ class _BracketRoundChip extends StatelessWidget {
   }
 }
 
-class _RoundDestinationStrip extends StatelessWidget {
-  final bool isFinal;
-  final String label;
+class _RoundCompletionMeter extends StatelessWidget {
+  final int resolved;
+  final int total;
+  final bool completed;
 
-  const _RoundDestinationStrip({required this.isFinal, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isFinal ? AppColors.secondary : AppColors.primary;
-    return Container(
-      key: const ValueKey('bracket-round-destination'),
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimensions.md,
-        vertical: AppDimensions.sm,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isFinal ? Icons.emoji_events_rounded : Icons.route_rounded,
-            color: color,
-          ),
-          const SizedBox(width: AppDimensions.sm),
-          Expanded(
-            child: Text(
-              label,
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textPrimaryTinted,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-typedef _KnockoutPathBranchConfig = ({
-  Map<String, Match> matchesById,
-  String roundLabel,
-  String? destinationLabel,
-  String Function(String? participantId) participantLabel,
-  bool hideUnpublishedParticipants,
-  ValueChanged<Match>? onOpenMatch,
-  bool Function(Match match)? canReviewMatch,
-  ValueChanged<Match>? onReviewMatch,
-});
-
-class _KnockoutPathBranch extends StatelessWidget {
-  final int branchIndex;
-  final List<KnockoutTie> ties;
-  final _KnockoutPathBranchConfig config;
-
-  const _KnockoutPathBranch({
-    required this.branchIndex,
-    required this.ties,
-    required this.config,
+  const _RoundCompletionMeter({
+    required this.resolved,
+    required this.total,
+    required this.completed,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isFinal = config.destinationLabel == null;
-    final destinationColor = isFinal ? AppColors.secondary : AppColors.primary;
-    final resolved = ties
-        .map((tie) => tie.winnerParticipantId?.isNotEmpty ?? false)
-        .toList(growable: false);
-
+    final progress = total == 0 ? 0.0 : (resolved / total).clamp(0.0, 1.0);
+    final color = completed ? AppColors.tactical : AppColors.competitive;
     return Semantics(
-      container: true,
-      explicitChildNodes: true,
-      label: isFinal
-          ? 'المسار الحاسم نحو الكأس'
-          : 'المسار ${branchIndex + 1} نحو ${config.destinationLabel}',
-      child: Padding(
-        key: ValueKey('knockout-path-branch-${config.roundLabel}-$branchIndex'),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppDimensions.xs,
-          vertical: AppDimensions.sm,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: destinationColor.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    isFinal ? Icons.emoji_events_rounded : Icons.route_rounded,
-                    color: destinationColor,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: AppDimensions.sm),
-                Expanded(
-                  child: Text(
-                    isFinal
-                        ? 'المسار الحاسم نحو الكأس'
-                        : 'المسار ${branchIndex + 1} إلى ${config.destinationLabel}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.labelLarge.copyWith(
-                      color: destinationColor,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ],
+      label: 'تقدم الدور، $resolved من $total مواجهات حُسمت',
+      child: ExcludeSemantics(
+        child: Container(
+          height: 6,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: AppColors.surfaceSunken,
+            borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+          ),
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FractionallySizedBox(
+              widthFactor: progress,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutQuart,
+                color: color,
+              ),
             ),
-            const SizedBox(height: AppDimensions.sm),
-            Stack(
-              children: [
-                if (ties.length > 1)
-                  Positioned(
-                    left: 0,
-                    top: 24,
-                    bottom: 24,
-                    width: 28,
-                    child: RepaintBoundary(
-                      child: CustomPaint(
-                        painter: _BranchConnectorPainter(resolved: resolved),
-                      ),
-                    ),
-                  ),
-                Padding(
-                  padding: EdgeInsets.only(left: ties.length > 1 ? 32 : 0),
-                  child: Column(
-                    children: [
-                      for (var index = 0; index < ties.length; index++) ...[
-                        _buildTie(ties[index], index),
-                        if (index < ties.length - 1)
-                          const SizedBox(height: AppDimensions.sm),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildTie(KnockoutTie tie, int index) {
-    final match = tie.matchId == null ? null : config.matchesById[tie.matchId!];
-    final canReview =
-        match != null &&
-        config.onReviewMatch != null &&
-        (config.canReviewMatch?.call(match) ?? false);
-    return Semantics(
-      sortKey: OrdinalSortKey(index.toDouble()),
-      child: KnockoutMatchNode(
-        tie: tie,
-        match: match,
-        roundLabel: config.roundLabel,
-        displayLabel: ties.length == 1
-            ? 'المواجهة الحاسمة'
-            : 'مواجهة ${tie.slotNumber + 1}',
-        participantLabel: config.participantLabel,
-        hideParticipants:
-            config.hideUnpublishedParticipants &&
-            tie.matchId != null &&
-            match == null,
-        showActions: true,
-        openActionLabel: config.canReviewMatch == null
-            ? 'عرض المباراة'
-            : 'إدارة المباراة',
-        onOpen: match == null || config.onOpenMatch == null
-            ? null
-            : () => config.onOpenMatch!(match),
-        onReview: canReview ? () => config.onReviewMatch!(match) : null,
       ),
     );
   }
 }
 
-class _BranchConnectorPainter extends CustomPainter {
-  final List<bool> resolved;
+class _RoundSectionLabel extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
 
-  const _BranchConnectorPainter({required this.resolved});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final joinX = size.width * 0.52;
-    final middleY = size.height / 2;
-    final firstY = size.height * 0.25;
-    final secondY = size.height * 0.75;
-    final pendingPaint = Paint()
-      ..color = AppColors.surfaceBorderStrong
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round;
-    final resolvedPaint = Paint()
-      ..color = AppColors.primary.withValues(alpha: 0.82)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5
-      ..strokeCap = StrokeCap.round;
-
-    void drawLeg(double y, bool isResolved) {
-      final paint = isResolved ? resolvedPaint : pendingPaint;
-      canvas.drawLine(Offset(size.width, y), Offset(joinX, y), paint);
-      canvas.drawCircle(Offset(size.width - 1, y), 3, paint);
-    }
-
-    drawLeg(firstY, resolved.isNotEmpty && resolved.first);
-    drawLeg(secondY, resolved.length > 1 && resolved[1]);
-    final branchPaint = resolved.every((value) => value)
-        ? resolvedPaint
-        : pendingPaint;
-    canvas.drawLine(Offset(joinX, firstY), Offset(joinX, secondY), branchPaint);
-    canvas.drawLine(Offset(joinX, middleY), Offset(0, middleY), branchPaint);
-    canvas.drawCircle(Offset(1, middleY), 3.5, branchPaint);
-  }
+  const _RoundSectionLabel({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+  });
 
   @override
-  bool shouldRepaint(covariant _BranchConnectorPainter oldDelegate) {
-    return !listEquals(oldDelegate.resolved, resolved);
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        const SizedBox(width: AppDimensions.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: AppTextStyles.titleMedium.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                subtitle,
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.textSecondaryTinted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -1037,6 +864,7 @@ class KnockoutFullTree extends StatefulWidget {
   final String Function(String? participantId) participantLabel;
   final bool hideUnpublishedParticipants;
   final ValueChanged<Match>? onOpenMatch;
+  final VoidCallback onShowRounds;
 
   const KnockoutFullTree({
     super.key,
@@ -1045,6 +873,7 @@ class KnockoutFullTree extends StatefulWidget {
     required this.participantLabel,
     required this.hideUnpublishedParticipants,
     this.onOpenMatch,
+    required this.onShowRounds,
   });
 
   @override
@@ -1120,9 +949,10 @@ class _KnockoutFullTreeState extends State<KnockoutFullTree> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'اسحب للتنقل وقرّب بإصبعين. الخط المضيء يوضح طريق المتأهلين نحو الكأس.',
+            'خريطة عامة: اسحب للتنقل وقرّب بإصبعين. التشغيل اليومي أوضح في عرض الجولات.',
             style: AppTextStyles.bodySmall.copyWith(
               color: AppColors.textSecondaryTinted,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: AppDimensions.xs),
@@ -1131,12 +961,12 @@ class _KnockoutFullTreeState extends State<KnockoutFullTree> {
             runSpacing: AppDimensions.xs,
             children: [
               const _BracketLegendDot(
-                color: AppColors.primary,
+                color: AppColors.tactical,
                 label: 'مسار متأهل',
               ),
               if (championId?.isNotEmpty ?? false)
                 const _BracketLegendDot(
-                  color: AppColors.secondary,
+                  color: AppColors.achievement,
                   label: 'مسار البطل',
                 ),
             ],
@@ -1246,36 +1076,61 @@ class _KnockoutFullTreeState extends State<KnockoutFullTree> {
                     ),
                     PositionedDirectional(
                       top: AppDimensions.sm,
+                      start: AppDimensions.sm,
                       end: AppDimensions.sm,
-                      child: Row(
-                        children: [
-                          _TreeControlButton(
-                            key: const ValueKey('bracket-focus-current'),
-                            tooltip: 'الانتقال إلى المواجهة الحالية',
-                            icon: Icons.my_location_rounded,
-                            label: 'الحالي',
-                            onPressed: () => _focusCurrent(geometry),
-                          ),
-                          const SizedBox(width: AppDimensions.xs),
-                          _TreeControlButton(
-                            key: const ValueKey('bracket-reset-view'),
-                            tooltip: 'عرض الشجرة كاملة',
-                            icon: Icons.fit_screen_rounded,
-                            label: 'كامل',
-                            onPressed: () => _resetView(geometry),
-                          ),
-                          const SizedBox(width: AppDimensions.xs),
-                          _TreeControlButton(
-                            key: const ValueKey('bracket-focus-trophy'),
-                            tooltip: 'الانتقال إلى النهائي والكأس',
-                            icon: Icons.emoji_events_rounded,
-                            label: 'الكأس',
-                            color: championId?.isNotEmpty ?? false
-                                ? AppColors.secondary
-                                : AppColors.primary,
-                            onPressed: () => _focusTrophy(geometry),
-                          ),
-                        ],
+                      child: El7reefGlassSurface(
+                        key: const ValueKey('bracket-map-toolbar'),
+                        role: El7reefGlassRole.floatingToolbar,
+                        tone: El7reefGlassTone.competitive,
+                        padding: const EdgeInsets.all(AppDimensions.xs),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _TreeControlButton(
+                                key: const ValueKey('bracket-back-to-rounds'),
+                                tooltip: 'العودة إلى عرض الجولات',
+                                icon: Icons.view_carousel_rounded,
+                                label: 'جولات',
+                                color: AppColors.competitive,
+                                onPressed: widget.onShowRounds,
+                              ),
+                            ),
+                            const SizedBox(width: AppDimensions.xs),
+                            Expanded(
+                              child: _TreeControlButton(
+                                key: const ValueKey('bracket-focus-current'),
+                                tooltip: 'الانتقال إلى المواجهة الحالية',
+                                icon: Icons.my_location_rounded,
+                                label: 'الحالي',
+                                color: AppColors.competitive,
+                                onPressed: () => _focusCurrent(geometry),
+                              ),
+                            ),
+                            const SizedBox(width: AppDimensions.xs),
+                            Expanded(
+                              child: _TreeControlButton(
+                                key: const ValueKey('bracket-reset-view'),
+                                tooltip: 'نظرة عامة للشجرة كلها',
+                                icon: Icons.fit_screen_rounded,
+                                label: 'نظرة',
+                                onPressed: () => _resetView(geometry),
+                              ),
+                            ),
+                            const SizedBox(width: AppDimensions.xs),
+                            Expanded(
+                              child: _TreeControlButton(
+                                key: const ValueKey('bracket-focus-trophy'),
+                                tooltip: 'الانتقال إلى النهائي والكأس',
+                                icon: Icons.emoji_events_rounded,
+                                label: 'الكأس',
+                                color: championId?.isNotEmpty ?? false
+                                    ? AppColors.achievement
+                                    : AppColors.competitive,
+                                onPressed: () => _focusTrophy(geometry),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -1656,13 +1511,11 @@ class _BracketChampionAnchor extends StatelessWidget {
         key: const ValueKey('bracket-champion-anchor'),
         padding: const EdgeInsets.all(AppDimensions.sm),
         decoration: BoxDecoration(
-          color: hasChampion
-              ? AppColors.secondary.withValues(alpha: 0.12)
-              : AppColors.surface,
+          color: hasChampion ? AppColors.achievementSurface : AppColors.surface,
           borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
           border: Border.all(
             color: hasChampion
-                ? AppColors.secondary.withValues(alpha: 0.78)
+                ? AppColors.achievement.withValues(alpha: 0.78)
                 : AppColors.surfaceBorderStrong,
             width: hasChampion ? 2 : 1,
           ),
@@ -1677,7 +1530,7 @@ class _BracketChampionAnchor extends StatelessWidget {
                     : Icons.emoji_events_outlined,
                 size: 38,
                 color: hasChampion
-                    ? AppColors.secondary
+                    ? AppColors.achievement
                     : AppColors.textSecondaryTinted,
               ),
               const SizedBox(height: AppDimensions.xs),
@@ -1685,7 +1538,7 @@ class _BracketChampionAnchor extends StatelessWidget {
                 hasChampion ? 'البطل' : 'نحو الكأس',
                 style: AppTextStyles.labelLarge.copyWith(
                   color: hasChampion
-                      ? AppColors.secondary
+                      ? AppColors.achievement
                       : AppColors.textSecondaryTinted,
                   fontWeight: FontWeight.w900,
                 ),
@@ -1723,30 +1576,42 @@ class _TreeControlButton extends StatelessWidget {
     required this.tooltip,
     required this.icon,
     required this.label,
-    this.color = AppColors.primary,
+    this.color = AppColors.actionPrimary,
     required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
+    final showLabel = MediaQuery.textScalerOf(context).scale(1) <= 1.4;
     return Tooltip(
       message: tooltip,
-      child: FilledButton.tonalIcon(
+      child: FilledButton.tonal(
         onPressed: onPressed,
         style: FilledButton.styleFrom(
-          minimumSize: const Size(0, AppDimensions.minTouchTarget),
-          padding: const EdgeInsets.symmetric(horizontal: AppDimensions.sm),
+          minimumSize: const Size(0, 52),
+          padding: const EdgeInsets.symmetric(horizontal: AppDimensions.xs),
           backgroundColor: AppColors.surface.withValues(alpha: 0.94),
           foregroundColor: color,
           side: const BorderSide(color: AppColors.surfaceBorderStrong),
         ),
-        icon: Icon(icon, size: 18),
-        label: Text(
-          label,
-          style: AppTextStyles.labelMedium.copyWith(
-            color: color,
-            fontWeight: FontWeight.w900,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18),
+            if (showLabel) ...[
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -1805,6 +1670,7 @@ class KnockoutMatchNode extends StatelessWidget {
       statusLabel: status.label,
     ));
     final opensFromCard = onOpen != null && !showActions;
+    final isResolved = tie.winnerParticipantId?.isNotEmpty ?? false;
 
     return Semantics(
       container: true,
@@ -1814,9 +1680,11 @@ class KnockoutMatchNode extends StatelessWidget {
       hint: opensFromCard ? 'اضغط لعرض المباراة' : null,
       child: Material(
         color: isChampionPath
-            ? AppColors.secondary.withValues(alpha: 0.06)
+            ? AppColors.achievement.withValues(alpha: 0.06)
             : isCurrentFocus
-            ? AppColors.primary.withValues(alpha: 0.06)
+            ? AppColors.competitiveSurface
+            : isResolved
+            ? AppColors.tactical.withValues(alpha: 0.04)
             : AppColors.surface,
         borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
         child: InkWell(
@@ -1831,9 +1699,11 @@ class KnockoutMatchNode extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
               border: Border.all(
                 color: isChampionPath
-                    ? AppColors.secondary.withValues(alpha: 0.72)
+                    ? AppColors.achievement.withValues(alpha: 0.72)
                     : isCurrentFocus
-                    ? AppColors.primary.withValues(alpha: 0.82)
+                    ? AppColors.competitive.withValues(alpha: 0.82)
+                    : isResolved
+                    ? AppColors.tactical.withValues(alpha: 0.44)
                     : AppColors.surfaceBorderStrong,
                 width: isChampionPath || isCurrentFocus ? 2 : 1,
               ),
@@ -1872,8 +1742,8 @@ class KnockoutMatchNode extends StatelessWidget {
                             tie.participantAId != null &&
                             tie.participantAId == tie.winnerParticipantId,
                         winnerColor: isChampionPath
-                            ? AppColors.secondary
-                            : AppColors.primary,
+                            ? AppColors.achievement
+                            : AppColors.tactical,
                         compact: compact,
                       ),
                       const SizedBox(height: AppDimensions.xs),
@@ -1884,8 +1754,8 @@ class KnockoutMatchNode extends StatelessWidget {
                             tie.participantBId != null &&
                             tie.participantBId == tie.winnerParticipantId,
                         winnerColor: isChampionPath
-                            ? AppColors.secondary
-                            : AppColors.primary,
+                            ? AppColors.achievement
+                            : AppColors.tactical,
                         compact: compact,
                       ),
                       if (!compact && match?.scheduledAt != null) ...[
@@ -1911,7 +1781,7 @@ class KnockoutMatchNode extends StatelessWidget {
                               Text(
                                 'ركلات الترجيح',
                                 style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.primary,
+                                  color: AppColors.info,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
@@ -1919,7 +1789,7 @@ class KnockoutMatchNode extends StatelessWidget {
                                 penaltyScore,
                                 textDirection: TextDirection.ltr,
                                 style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.primary,
+                                  color: AppColors.info,
                                   fontWeight: FontWeight.w800,
                                   fontFeatures: const [
                                     FontFeature.tabularFigures(),
@@ -2009,7 +1879,7 @@ class _KnockoutTeamLine extends StatelessWidget {
     required this.label,
     required this.score,
     required this.isWinner,
-    this.winnerColor = AppColors.primary,
+    this.winnerColor = AppColors.tactical,
     this.compact = false,
   });
 
@@ -2150,11 +2020,11 @@ class _BracketConnectorPainter extends CustomPainter {
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round
           ..color = connector.isChampionPath
-              ? AppColors.secondary.withValues(alpha: 0.92)
+              ? AppColors.achievement.withValues(alpha: 0.92)
               : connector.isActivePath
-              ? AppColors.primary.withValues(alpha: 0.92)
+              ? AppColors.competitive.withValues(alpha: 0.92)
               : connector.isResolved
-              ? AppColors.primary.withValues(alpha: 0.64)
+              ? AppColors.tactical.withValues(alpha: 0.64)
               : AppColors.surfaceBorderStrong,
       );
     }
@@ -2186,7 +2056,7 @@ _TieStatusPresentation _tieStatus(
   if (_isBye(tie)) {
     return const _TieStatusPresentation(
       label: 'تأهل مباشر',
-      color: AppColors.primary,
+      color: AppColors.tactical,
       icon: Icons.fast_forward_rounded,
     );
   }
@@ -2223,7 +2093,7 @@ _TieStatusPresentation _tieStatus(
   if (tie.isReady) {
     return const _TieStatusPresentation(
       label: 'جاهزة',
-      color: AppColors.info,
+      color: AppColors.competitive,
       icon: Icons.sports_soccer_rounded,
     );
   }

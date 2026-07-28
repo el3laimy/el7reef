@@ -12,13 +12,13 @@ class MatchStatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (Color color, String label) = switch (status) {
-      MatchStatus.open => (AppColors.success, '🟢 مفتوحة'),
-      MatchStatus.live => (AppColors.primary, '🔵 جارية'),
-      MatchStatus.completed => (AppColors.secondary, '⏳ بانتظار الاعتماد'),
-      MatchStatus.settled => (AppColors.textMuted, '✅ منتهية'),
+      MatchStatus.open => (AppColors.actionPrimary, 'مفتوحة'),
+      MatchStatus.live => (AppColors.tactical, 'مباشر'),
+      MatchStatus.completed => (AppColors.warning, 'بانتظار الاعتماد'),
+      MatchStatus.settled => (AppColors.success, 'معتمدة'),
       MatchStatus.pendingReview => (AppColors.warning, '🟠 قيد المراجعة'),
       MatchStatus.frozen => (AppColors.error, '🔒 مجمدة'),
-      MatchStatus.full => (AppColors.accent, '🔴 مكتملة'),
+      MatchStatus.full => (AppColors.textSecondary, 'مكتملة العدد'),
       MatchStatus.cancelled => (AppColors.error, '❌ ملغاة'),
       _ => (AppColors.textMuted, '⏸ معلقة'),
     };

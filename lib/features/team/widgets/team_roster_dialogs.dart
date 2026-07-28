@@ -320,8 +320,8 @@ Future<void> _showTeamRosterSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (sheetContext) => El7reefGlassSurface(
-      variant: El7reefGlassVariant.sheet,
+    builder: (sheetContext) => El7reefSolidSurface(
+      elevated: true,
       borderRadius: const BorderRadius.vertical(
         top: Radius.circular(AppDimensions.radiusXl),
       ),

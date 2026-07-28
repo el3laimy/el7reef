@@ -73,24 +73,31 @@ async function seedGuestPlayer(id, data = {}) {
   });
 }
 
+function guestTeamData(data = {}) {
+  return {
+    name: 'فريق ضيف',
+    normalizedName: 'فريق ضيف',
+    creatorId: 'creator-1',
+    contactName: 'كابتن ضيف',
+    contactPhone: '01111111111',
+    logoUrl: null,
+    tournamentIds: ['tournament-1'],
+    captainGuestPlayerId: null,
+    claimCode: 'TEAM-CODE-1',
+    createdAt: now,
+    updatedAt: now,
+    claimStatus: 'invited',
+    linkedTeamId: null,
+    ...data,
+  };
+}
+
 async function seedGuestTeam(id, data = {}) {
   await testEnv.withSecurityRulesDisabled(async (context) => {
-    await setDoc(doc(context.firestore(), 'guestTeams', id), {
-      name: 'فريق ضيف',
-      normalizedName: 'فريق ضيف',
-      creatorId: 'creator-1',
-      contactName: 'كابتن ضيف',
-      contactPhone: '01111111111',
-      logoUrl: null,
-      tournamentIds: ['tournament-1'],
-      captainGuestPlayerId: null,
-      claimCode: 'TEAM-CODE-1',
-      createdAt: now,
-      updatedAt: now,
-      claimStatus: 'invited',
-      linkedTeamId: null,
-      ...data,
-    });
+    await setDoc(
+      doc(context.firestore(), 'guestTeams', id),
+      guestTeamData(data),
+    );
   });
 }
 
@@ -256,6 +263,38 @@ describe('guest PII Firestore rules', () => {
     assert.strictEqual(creatorSnapshot.exists(), true);
     assert.strictEqual(organizerSnapshot.exists(), true);
     assert.strictEqual(creatorSnapshot.data().contactPhone, '01111111111');
+  });
+
+  it('allows only trusted guest team logo sources on create and update', async () => {
+    const creatorDb = testEnv.authenticatedContext('creator-1').firestore();
+
+    await assertSucceeds(
+      setDoc(
+        doc(creatorDb, 'guestTeams', 'guest-team-preset'),
+        guestTeamData({
+          logoUrl: 'preset://v1/team_pennant/diagonal_dash',
+        }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(creatorDb, 'guestTeams', 'guest-team-unknown'),
+        guestTeamData({
+          logoUrl: 'preset://v1/team_pennant/not_in_catalog',
+        }),
+      ),
+    );
+
+    await assertSucceeds(
+      updateDoc(doc(creatorDb, 'guestTeams', 'guest-team-preset'), {
+        logoUrl: 'https://cdn.el7reef.app/guest-team/logo.png',
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(creatorDb, 'guestTeams', 'guest-team-preset'), {
+        logoUrl: 'javascript:alert(1)',
+      }),
+    );
   });
 
   it('allows tournament organizer to update only guest team roster captain', async () => {

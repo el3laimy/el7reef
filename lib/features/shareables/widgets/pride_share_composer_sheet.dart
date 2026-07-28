@@ -5,6 +5,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/constants/feature_flags.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../domain/entities/share_payload.dart';
 import '../models/pride_card_format.dart';
 import '../models/pride_export.dart';
@@ -46,6 +47,11 @@ Future<PrideShareSelection?> showPrideShareComposer({
     context: context,
     useSafeArea: true,
     isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    sheetAnimationStyle: const AnimationStyle(
+      duration: Duration(milliseconds: AppDimensions.animSlow),
+      reverseDuration: Duration(milliseconds: AppDimensions.animNormal),
+    ),
     builder: (_) => _PrideShareComposerSheet(
       initialSelection: initialSelection,
       videoAvailable: videoAvailable,
@@ -108,105 +114,146 @@ class _PrideShareComposerSheetState extends State<_PrideShareComposerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          AppDimensions.lg,
-          AppDimensions.md,
-          AppDimensions.lg,
-          MediaQuery.viewInsetsOf(context).bottom + AppDimensions.lg,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Align(
-                child: Container(
-                  width: 44,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.textMuted.withValues(alpha: 0.45),
-                    borderRadius: BorderRadius.circular(99),
+    return El7reefSolidSurface(
+      color: AppColors.surfaceRaised,
+      borderColor: AppColors.surfaceBorder,
+      padding: EdgeInsets.zero,
+      borderRadius: const BorderRadius.vertical(
+        top: Radius.circular(AppDimensions.radiusXl),
+      ),
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppDimensions.lg,
+            AppDimensions.md,
+            AppDimensions.lg,
+            MediaQuery.viewInsetsOf(context).bottom + AppDimensions.lg,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                El7reefGlassSurface(
+                  role: El7reefGlassRole.previewToolbar,
+                  tone: El7reefGlassTone.social,
+                  padding: const EdgeInsets.all(AppDimensions.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Align(
+                        child: Container(
+                          width: 44,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppColors.textMuted.withValues(alpha: 0.45),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppDimensions.md),
+                      Text(
+                        'جهّز لحظة الفخر',
+                        style: AppTextStyles.headlineSmall,
+                      ),
+                      const SizedBox(height: AppDimensions.xs),
+                      Text(
+                        'عاين الكارت واختار الشكل قبل فتح شاشة المشاركة.',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSecondaryTinted,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(height: AppDimensions.md),
-              Text('جهّز لحظة الفخر', style: AppTextStyles.headlineSmall),
-              const SizedBox(height: AppDimensions.xs),
-              Text(
-                'عاين الكارت واختار الشكل قبل فتح شاشة المشاركة.',
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.textSecondaryTinted,
-                ),
-              ),
-              const SizedBox(height: AppDimensions.md),
-              _PreviewPanel(
-                format: _format,
-                preview: widget.previewBuilder(_format),
-              ),
-              if (widget.videoAvailable) ...[
                 const SizedBox(height: AppDimensions.md),
-                SegmentedButton<PrideMediaType>(
-                  segments: const [
-                    ButtonSegment(
-                      value: PrideMediaType.image,
-                      icon: Icon(Icons.image_rounded),
-                      label: Text('صورة'),
-                    ),
-                    ButtonSegment(
-                      value: PrideMediaType.video,
-                      icon: Icon(Icons.movie_creation_rounded),
-                      label: Text('فيديو'),
-                    ),
-                  ],
-                  selected: {_mediaType},
-                  onSelectionChanged: (selection) {
-                    setState(() => _mediaType = selection.single);
-                  },
+                _PreviewPanel(
+                  format: _format,
+                  preview: widget.previewBuilder(_format),
                 ),
-              ],
-              const SizedBox(height: AppDimensions.md),
-              Text('المقاس', style: AppTextStyles.titleMedium),
-              const SizedBox(height: AppDimensions.sm),
-              _FormatChoices(
-                selected: _format,
-                onSelected: (format) => setState(() => _format = format),
-              ),
-              if (_mediaType == PrideMediaType.video) ...[
-                const SizedBox(height: AppDimensions.sm),
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  value: _includeAudio,
-                  onChanged: (enabled) {
-                    setState(() => _includeAudio = enabled);
-                  },
-                  secondary: const Icon(
-                    Icons.graphic_eq_rounded,
-                    color: AppColors.primary,
+                const SizedBox(height: AppDimensions.md),
+                El7reefGlassSurface(
+                  role: El7reefGlassRole.previewToolbar,
+                  tone: El7reefGlassTone.social,
+                  padding: const EdgeInsets.all(AppDimensions.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (widget.videoAvailable) ...[
+                        SegmentedButton<PrideMediaType>(
+                          segments: const [
+                            ButtonSegment(
+                              value: PrideMediaType.image,
+                              icon: Icon(Icons.image_rounded),
+                              label: Text('صورة'),
+                            ),
+                            ButtonSegment(
+                              value: PrideMediaType.video,
+                              icon: Icon(Icons.movie_creation_rounded),
+                              label: Text('فيديو'),
+                            ),
+                          ],
+                          selected: {_mediaType},
+                          onSelectionChanged: (selection) {
+                            setState(() => _mediaType = selection.single);
+                          },
+                        ),
+                        const SizedBox(height: AppDimensions.md),
+                      ],
+                      Text('المقاس', style: AppTextStyles.titleMedium),
+                      const SizedBox(height: AppDimensions.sm),
+                      _FormatChoices(
+                        selected: _format,
+                        onSelected: (format) =>
+                            setState(() => _format = format),
+                      ),
+                      if (_mediaType == PrideMediaType.video) ...[
+                        const SizedBox(height: AppDimensions.sm),
+                        SwitchListTile.adaptive(
+                          contentPadding: EdgeInsets.zero,
+                          value: _includeAudio,
+                          onChanged: (enabled) {
+                            setState(() => _includeAudio = enabled);
+                          },
+                          secondary: const Icon(
+                            Icons.graphic_eq_rounded,
+                            color: AppColors.socialAccent,
+                          ),
+                          title: const Text('بصمة صوت الحريف'),
+                          subtitle: const Text(
+                            'يمكنك كتمها قبل تجهيز الفيديو.',
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: AppDimensions.lg),
+                      FilledButton.icon(
+                        key: const ValueKey('pride-share-confirm'),
+                        onPressed: _isSaving ? null : _confirmSelection,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.socialAccent,
+                          foregroundColor: AppColors.textOnPrimary,
+                        ),
+                        icon: _isSaving
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.textOnPrimary,
+                                ),
+                              )
+                            : const Icon(Icons.ios_share_rounded),
+                        label: Text(
+                          _mediaType == PrideMediaType.video
+                              ? 'جهّز الفيديو وافتح المشاركة'
+                              : 'افتح مشاركة الصورة',
+                        ),
+                      ),
+                    ],
                   ),
-                  title: const Text('بصمة صوت الحريف'),
-                  subtitle: const Text('يمكنك كتمها قبل تجهيز الفيديو.'),
                 ),
               ],
-              const SizedBox(height: AppDimensions.lg),
-              FilledButton.icon(
-                key: const ValueKey('pride-share-confirm'),
-                onPressed: _isSaving ? null : _confirmSelection,
-                icon: _isSaving
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.ios_share_rounded),
-                label: Text(
-                  _mediaType == PrideMediaType.video
-                      ? 'جهّز الفيديو وافتح المشاركة'
-                      : 'افتح مشاركة الصورة',
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

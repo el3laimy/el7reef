@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_media_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../models/pride_card_format.dart';
 import '../models/top_scorers_share_data.dart';
@@ -61,18 +61,18 @@ class _TopScorersBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [AppColors.surfaceRaised, AppColors.backgroundDeep],
+              colors: [AppMediaColors.raised, AppMediaColors.canvasDeep],
             ),
           ),
           child: SizedBox.expand(),
         ),
         Align(
           alignment: Alignment.topLeft,
-          child: _Glow(color: AppColors.primary),
+          child: _Glow(color: AppMediaColors.actionPrimary),
         ),
         Align(
           alignment: Alignment.bottomRight,
-          child: _Glow(color: AppColors.secondary),
+          child: _Glow(color: AppMediaColors.achievement),
         ),
         Positioned.fill(child: CustomPaint(painter: _PitchStripePainter())),
       ],
@@ -98,34 +98,34 @@ class _TopScorersContent extends StatelessWidget {
         format == PrideCardFormat.square1x1 || format.isLandscape || dense;
     final titleStyle = dense
         ? const TextStyle(
-            color: AppColors.textPrimary,
+            color: AppMediaColors.textPrimary,
             fontSize: 14,
             fontWeight: FontWeight.w900,
           )
         : exportMode
         ? const TextStyle(
-            color: AppColors.textPrimary,
+            color: AppMediaColors.textPrimary,
             fontSize: 24,
             fontWeight: FontWeight.w900,
           )
         : AppTextStyles.headlineMedium.copyWith(
-            color: AppColors.textPrimary,
+            color: AppMediaColors.textPrimary,
             fontWeight: FontWeight.w900,
           );
     final tournamentStyle = dense
         ? TextStyle(
-            color: AppColors.textSecondaryTinted.withValues(alpha: 0.76),
+            color: AppMediaColors.textSecondary.withValues(alpha: 0.76),
             fontSize: 8,
             fontWeight: FontWeight.w700,
           )
         : exportMode
         ? TextStyle(
-            color: AppColors.textSecondaryTinted.withValues(alpha: 0.76),
+            color: AppMediaColors.textSecondary.withValues(alpha: 0.76),
             fontSize: 13,
             fontWeight: FontWeight.w700,
           )
         : AppTextStyles.labelLarge.copyWith(
-            color: AppColors.textSecondaryTinted.withValues(alpha: 0.76),
+            color: AppMediaColors.textSecondary.withValues(alpha: 0.76),
           );
 
     return Padding(
@@ -191,7 +191,7 @@ class _TopScorersContent extends StatelessWidget {
                         ? const TextStyle(fontSize: 10)
                         : AppTextStyles.labelSmall)
                     .copyWith(
-                      color: AppColors.textSecondaryTinted.withValues(
+                      color: AppMediaColors.textSecondary.withValues(
                         alpha: 0.62,
                       ),
                     ),
@@ -220,30 +220,32 @@ class _ShareScorerRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final nameStyle = dense
         ? const TextStyle(
-            color: AppColors.textPrimary,
+            color: AppMediaColors.textPrimary,
             fontSize: 9,
             fontWeight: FontWeight.w800,
           )
         : exportMode
         ? const TextStyle(
-            color: AppColors.textPrimary,
+            color: AppMediaColors.textPrimary,
             fontSize: 15,
             fontWeight: FontWeight.w800,
           )
-        : AppTextStyles.titleMedium.copyWith(color: AppColors.textPrimary);
+        : AppTextStyles.titleMedium.copyWith(color: AppMediaColors.textPrimary);
     final goalStyle = dense
         ? const TextStyle(
-            color: AppColors.primary,
+            color: AppMediaColors.actionPrimary,
             fontSize: 9,
             fontWeight: FontWeight.w900,
           )
         : exportMode
         ? const TextStyle(
-            color: AppColors.primary,
+            color: AppMediaColors.actionPrimary,
             fontSize: 13,
             fontWeight: FontWeight.w900,
           )
-        : AppTextStyles.labelLarge.copyWith(color: AppColors.primary);
+        : AppTextStyles.labelLarge.copyWith(
+            color: AppMediaColors.actionPrimary,
+          );
 
     return Container(
       margin: EdgeInsets.only(bottom: dense ? 3 : (compact ? 5 : 10)),
@@ -252,10 +254,10 @@ class _ShareScorerRow extends StatelessWidget {
         vertical: dense ? 3 : (compact ? 5 : 10),
       ),
       decoration: BoxDecoration(
-        color: AppColors.textPrimaryTinted.withValues(alpha: 0.08),
+        color: AppMediaColors.textPrimary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: AppColors.textPrimaryTinted.withValues(alpha: 0.10),
+          color: AppMediaColors.textPrimary.withValues(alpha: 0.10),
         ),
       ),
       child: Row(
@@ -266,7 +268,9 @@ class _ShareScorerRow extends StatelessWidget {
             imageUrl: scorer.photoUrl,
             initials: scorer.initials,
             size: dense ? 20 : (compact ? 24 : (exportMode ? 30 : 34)),
-            accent: scorer.isGuest ? AppColors.secondary : AppColors.primary,
+            accent: scorer.isGuest
+                ? AppMediaColors.achievement
+                : AppMediaColors.actionPrimary,
           ),
           SizedBox(width: dense ? 4 : (compact ? 5 : 8)),
           Expanded(
@@ -284,7 +288,7 @@ class _ShareScorerRow extends StatelessWidget {
                   Text(
                     'ضيف',
                     style: TextStyle(
-                      color: AppColors.secondary,
+                      color: AppMediaColors.achievement,
                       fontSize: dense ? 7 : (compact ? 8 : 9),
                       fontWeight: FontWeight.w800,
                     ),
@@ -321,13 +325,13 @@ class _RankBadge extends StatelessWidget {
       height: dense ? 22 : 30,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.18),
+        color: AppMediaColors.actionPrimary.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         '$rank',
         style: TextStyle(
-          color: AppColors.primary,
+          color: AppMediaColors.actionPrimary,
           fontSize: dense ? 8 : (exportMode ? 13 : 12),
           fontWeight: FontWeight.w900,
         ),
@@ -352,7 +356,7 @@ class _BrandMark extends StatelessWidget {
     return Text(
       label,
       style: TextStyle(
-        color: AppColors.textPrimary,
+        color: AppMediaColors.textPrimary,
         fontSize: dense ? 8 : (exportMode ? 13 : 12),
         fontWeight: FontWeight.w900,
       ),
@@ -381,13 +385,13 @@ class _MetaChip extends StatelessWidget {
         vertical: dense ? 3 : 5,
       ),
       decoration: BoxDecoration(
-        color: AppColors.textPrimaryTinted.withValues(alpha: 0.10),
+        color: AppMediaColors.textPrimary.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: AppColors.textPrimary,
+          color: AppMediaColors.textPrimary,
           fontSize: dense ? 7 : (exportMode ? 9 : 10),
           fontWeight: FontWeight.w900,
         ),
@@ -421,7 +425,7 @@ class _PitchStripePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.textPrimaryTinted.withValues(alpha: 0.045)
+      ..color = AppMediaColors.textPrimary.withValues(alpha: 0.045)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
 

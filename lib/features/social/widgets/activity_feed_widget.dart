@@ -101,8 +101,7 @@ class ActivityFeedWidget extends StatelessWidget {
               start: AppDimensions.md,
               bottom: 8,
             ),
-            child: const El7reefGlassSurface(
-              variant: El7reefGlassVariant.base,
+            child: const El7reefSolidSurface(
               padding: EdgeInsets.all(AppDimensions.md),
               radius: AppDimensions.radiusLg,
               child: Center(
@@ -120,8 +119,7 @@ class ActivityFeedWidget extends StatelessWidget {
       padding: const EdgeInsets.symmetric(
         horizontal: AppDimensions.pagePadding,
       ),
-      child: El7reefGlassSurface(
-        variant: El7reefGlassVariant.base,
+      child: El7reefSolidSurface(
         padding: const EdgeInsets.all(AppDimensions.lg),
         radius: AppDimensions.radiusLg,
         child: Column(
@@ -148,8 +146,7 @@ class ActivityFeedWidget extends StatelessWidget {
         start: AppDimensions.md,
         bottom: 8,
       ), // Shadow space
-      child: El7reefGlassSurface(
-        variant: El7reefGlassVariant.base,
+      child: El7reefSolidSurface(
         padding: const EdgeInsets.all(AppDimensions.md),
         radius: AppDimensions.radiusLg,
         child: Row(

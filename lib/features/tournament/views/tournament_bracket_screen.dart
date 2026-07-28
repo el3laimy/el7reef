@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
-import '../../../app/theme/app_text_styles.dart';
 import '../../../core/constants/feature_flags.dart';
 import '../../../core/enums/match_status.dart';
 import '../../../core/enums/tournament_ops_enums.dart';
@@ -65,11 +64,6 @@ class TournamentBracketScreen extends GetView<TournamentOperationsController> {
           for (final participant in controller.participants)
             participant.id: participant,
         };
-        final tiesByRound = groupKnockoutTiesByRound(
-          controller.knockoutTies.toList(growable: false),
-        );
-        final roundCount = tiesByRound.length;
-
         String participantLabel(String? participantId) {
           if (participantId == null || participantId.isEmpty) {
             return 'لم يتحدد';
@@ -94,22 +88,6 @@ class TournamentBracketScreen extends GetView<TournamentOperationsController> {
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: [
-                    _BracketScreenSummaryBar(
-                      teamCount: bracket.qualifierParticipantIds.length,
-                      roundCount: roundCount,
-                      byeCount: bracket.byeParticipantIds.length,
-                      championLabel: bracket.championParticipantId == null
-                          ? null
-                          : participantLabel(bracket.championParticipantId),
-                      onShare: FeatureFlags.prideShareCatalogV2Enabled
-                          ? () => _shareBracket(
-                              context,
-                              matchesById: matchesById,
-                              participantsById: participantsById,
-                            )
-                          : null,
-                    ),
-                    const SizedBox(height: AppDimensions.md),
                     if (controller.knockoutTies.isEmpty)
                       TournamentStageStateView(
                         title: 'جارٍ تجهيز المواجهات',
@@ -142,6 +120,17 @@ class TournamentBracketScreen extends GetView<TournamentOperationsController> {
                                 AppRoutes.scoreApprovalForMatch(match.id),
                               )
                             : null,
+                        headerData: KnockoutBracketHeaderData(
+                          teamCount: bracket.qualifierParticipantIds.length,
+                          byeCount: bracket.byeParticipantIds.length,
+                          onShare: FeatureFlags.prideShareCatalogV2Enabled
+                              ? () => _shareBracket(
+                                  context,
+                                  matchesById: matchesById,
+                                  participantsById: participantsById,
+                                )
+                              : null,
+                        ),
                       ),
                     const SizedBox(height: AppDimensions.xl),
                   ],
@@ -261,112 +250,6 @@ class TournamentBracketScreen extends GetView<TournamentOperationsController> {
       fileName: 'el7reef_bracket_${bracket.id}',
       text: 'طريق النهائي في ${tournament.name}',
       payload: payload,
-    );
-  }
-}
-
-class _BracketScreenSummaryBar extends StatelessWidget {
-  final int teamCount;
-  final int roundCount;
-  final int byeCount;
-  final String? championLabel;
-  final VoidCallback? onShare;
-
-  const _BracketScreenSummaryBar({
-    required this.teamCount,
-    required this.roundCount,
-    required this.byeCount,
-    required this.championLabel,
-    required this.onShare,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final hasChampion = championLabel?.isNotEmpty ?? false;
-    final color = hasChampion ? AppColors.secondary : AppColors.primary;
-    final details = <String>[
-      '$teamCount فريق',
-      '$roundCount أدوار',
-      if (byeCount > 0) '$byeCount تأهل مباشر',
-    ].join('  •  ');
-
-    return Container(
-      key: const ValueKey('bracket-screen-summary-bar'),
-      width: double.infinity,
-      padding: const EdgeInsetsDirectional.fromSTEB(
-        AppDimensions.md,
-        AppDimensions.sm,
-        AppDimensions.sm,
-        AppDimensions.sm,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-        border: Border.all(
-          color: hasChampion
-              ? AppColors.secondary.withValues(alpha: 0.42)
-              : AppColors.surfaceBorder,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-            ),
-            child: Icon(
-              hasChampion
-                  ? Icons.emoji_events_rounded
-                  : Icons.account_tree_rounded,
-              color: color,
-            ),
-          ),
-          const SizedBox(width: AppDimensions.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  hasChampion ? 'البطل: $championLabel' : 'المسار الرسمي',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.titleMedium.copyWith(
-                    color: hasChampion
-                        ? AppColors.secondary
-                        : AppColors.textPrimaryTinted,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  details,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textSecondaryTinted,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (onShare != null) ...[
-            const SizedBox(width: AppDimensions.xs),
-            TextButton.icon(
-              key: const ValueKey('share-knockout-road'),
-              onPressed: onShare,
-              icon: const Icon(Icons.ios_share_rounded, size: 20),
-              label: const Text('شارك'),
-              style: TextButton.styleFrom(
-                minimumSize: const Size(0, AppDimensions.minTouchTarget),
-                foregroundColor: AppColors.primary,
-              ),
-            ),
-          ],
-        ],
-      ),
     );
   }
 }

@@ -146,8 +146,7 @@ class _UsernameScreenState extends State<UsernameScreen> {
                 const SizedBox(height: AppDimensions.xxl),
 
                 // ── Input ──
-                El7reefGlassSurface(
-                  variant: El7reefGlassVariant.base,
+                El7reefSolidSurface(
                   padding: const EdgeInsets.all(AppDimensions.lg),
                   radius: AppDimensions.radiusLg,
                   child: Column(
@@ -331,8 +330,7 @@ class _UsernameScreenState extends State<UsernameScreen> {
 class _RulesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       padding: const EdgeInsets.all(AppDimensions.md),
       radius: AppDimensions.radiusMd,
       child: Column(

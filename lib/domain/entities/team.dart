@@ -5,7 +5,8 @@ class Team {
   final String? logoUrl;
   final String ownerId;
   final List<String> viceCaptainIds;
-  final List<String> playerIds; // Includes owner, viceCaptains, and regular players
+  // Includes owner, vice captains, and regular players.
+  final List<String> playerIds;
   final List<String> invitedIds;
   final double avgRating;
   final List<String> tournamentIds;
@@ -36,7 +37,7 @@ class Team {
   Team copyWith({
     String? id,
     String? name,
-    String? logoUrl,
+    Object? logoUrl = _unset,
     String? ownerId,
     List<String>? viceCaptainIds,
     List<String>? playerIds,
@@ -51,7 +52,7 @@ class Team {
     return Team(
       id: id ?? this.id,
       name: name ?? this.name,
-      logoUrl: logoUrl ?? this.logoUrl,
+      logoUrl: identical(logoUrl, _unset) ? this.logoUrl : logoUrl as String?,
       ownerId: ownerId ?? this.ownerId,
       viceCaptainIds: viceCaptainIds ?? this.viceCaptainIds,
       playerIds: playerIds ?? this.playerIds,
@@ -65,3 +66,5 @@ class Team {
     );
   }
 }
+
+const Object _unset = Object();

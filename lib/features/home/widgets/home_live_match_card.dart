@@ -13,14 +13,18 @@ class HomeLiveMatchCard extends StatelessWidget {
   final Match match;
   final int index;
 
-  const HomeLiveMatchCard({super.key, required this.match, required this.index});
+  const HomeLiveMatchCard({
+    super.key,
+    required this.match,
+    required this.index,
+  });
 
   @override
   Widget build(BuildContext context) {
     final Color statusColor = match.status == MatchStatus.live
-        ? AppColors.primary
+        ? AppColors.tactical
         : match.status == MatchStatus.open
-        ? AppColors.success
+        ? AppColors.actionPrimary
         : AppColors.textMuted;
     final matchController = Get.find<MatchController>();
 
@@ -34,13 +38,6 @@ class HomeLiveMatchCard extends StatelessWidget {
               color: statusColor.withValues(alpha: 0.35),
               width: 1,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: statusColor.withValues(alpha: 0.12),
-                blurRadius: 10,
-                spreadRadius: 1,
-              ),
-            ],
           ),
           child: Padding(
             padding: const EdgeInsets.all(AppDimensions.md),
@@ -73,7 +70,7 @@ class HomeLiveMatchCard extends StatelessWidget {
                     if (match.isGoldenRating)
                       const Icon(
                         Icons.star_rounded,
-                        color: AppColors.secondary,
+                        color: AppColors.competitive,
                         size: 16,
                       ),
                   ],

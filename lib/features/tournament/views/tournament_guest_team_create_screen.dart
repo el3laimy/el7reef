@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/enums/tournament_registration_mode.dart';
+import '../../../core/identity/identity_preset.dart';
+import '../../../core/identity/identity_preset_field.dart';
 import '../controllers/tournament_guest_team_create_controller.dart';
 
 class TournamentGuestTeamCreateScreen
@@ -71,6 +73,13 @@ class TournamentGuestTeamCreateScreen
                   validator: controller.validateTeamName,
                 ),
                 const SizedBox(height: 12),
+                IdentityPresetField(
+                  scope: IdentityPresetScope.team,
+                  value: controller.selectedLogoUrl.value,
+                  previewTitleController: controller.teamNameController,
+                  onChanged: controller.selectLogo,
+                ),
+                const SizedBox(height: 12),
                 TextFormField(
                   controller: controller.contactNameController,
                   decoration: const InputDecoration(
@@ -119,8 +128,9 @@ class TournamentGuestTeamCreateScreen
                 ],
                 const SizedBox(height: 20),
                 FilledButton.icon(
-                  onPressed:
-                      controller.isSubmitting.value ? null : controller.submit,
+                  onPressed: controller.isSubmitting.value
+                      ? null
+                      : controller.submit,
                   icon: controller.isSubmitting.value
                       ? const SizedBox(
                           width: 16,

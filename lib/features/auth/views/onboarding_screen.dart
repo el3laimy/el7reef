@@ -44,7 +44,8 @@ class OnboardingScreen extends StatelessWidget {
                           ),
                           const Spacer(),
                           El7reefGlassSurface(
-                                variant: El7reefGlassVariant.raised,
+                                role: El7reefGlassRole.hero,
+                                tone: El7reefGlassTone.action,
                                 padding: const EdgeInsets.all(AppDimensions.xl),
                                 radius: AppDimensions.radiusXl,
                                 child: Column(

@@ -59,7 +59,7 @@ class LineupStatusPanel extends StatelessWidget {
       curve: Curves.easeOutCubic,
       padding: const EdgeInsets.all(AppDimensions.md),
       decoration: BoxDecoration(
-        color: AppColors.surfaceRaised.withValues(alpha: 0.94),
+        color: AppColors.surfaceRaised,
         borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
         border: Border.all(color: statusColor.withValues(alpha: 0.42)),
         boxShadow: [
@@ -202,7 +202,7 @@ class LineupStatusPanel extends StatelessWidget {
               _LineupMetricChip(
                 icon: Icons.event_seat_rounded,
                 label: '$benchCount بدلاء',
-                color: AppColors.secondaryLight,
+                color: AppColors.infoLight,
               ),
             ],
           ),

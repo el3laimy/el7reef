@@ -30,7 +30,7 @@ class FeatureUnavailableScreen extends StatelessWidget {
                 const Icon(
                   Icons.construction_rounded,
                   size: 72,
-                  color: AppColors.secondary,
+                  color: AppColors.info,
                 ),
                 const SizedBox(height: AppDimensions.lg),
                 Text(

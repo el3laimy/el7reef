@@ -44,8 +44,8 @@ class _CreateMatchSheetState extends State<CreateMatchSheet> {
     final hasTeamController = Get.isRegistered<TeamController>();
     final teamCtrl = hasTeamController ? Get.find<TeamController>() : null;
 
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.sheet,
+    return El7reefSolidSurface(
+      elevated: true,
       borderRadius: const BorderRadius.vertical(
         top: Radius.circular(AppDimensions.radiusXl),
       ),

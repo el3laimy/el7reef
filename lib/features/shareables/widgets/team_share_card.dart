@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_media_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../models/pride_card_format.dart';
 import '../models/team_share_data.dart';
@@ -37,11 +37,11 @@ class TeamShareCard extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
-          colors: [AppColors.primaryDark, AppColors.backgroundDeep],
+          colors: [AppMediaColors.actionStrong, AppMediaColors.canvasDeep],
         ),
         borderRadius: BorderRadius.circular(exportMode ? 16 : 22),
         border: Border.all(
-          color: AppColors.primaryLight.withValues(alpha: 0.55),
+          color: AppMediaColors.actionLight.withValues(alpha: 0.55),
         ),
       ),
       child: Padding(
@@ -57,7 +57,7 @@ class TeamShareCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: AppColors.textPrimaryTinted,
+                      color: AppMediaColors.textPrimary,
                       fontWeight: FontWeight.w900,
                       fontSize: dense ? 8 : 13,
                     ),
@@ -75,7 +75,7 @@ class TeamShareCard extends StatelessWidget {
                 imageUrl: data.logoUrl,
                 initials: data.initials,
                 size: dense ? 42 : (compact ? 64 : 112),
-                accent: AppColors.primary,
+                accent: AppMediaColors.actionPrimary,
                 fallbackIcon: Icons.shield_rounded,
               ),
             ),
@@ -89,7 +89,7 @@ class TeamShareCard extends StatelessWidget {
                           ? TextStyle(fontSize: compact ? 22 : 30)
                           : AppTextStyles.displaySmall)
                       .copyWith(
-                        color: AppColors.textPrimaryTinted,
+                        color: AppMediaColors.textPrimary,
                         fontWeight: FontWeight.w900,
                         height: 1.12,
                       ),
@@ -102,7 +102,7 @@ class TeamShareCard extends StatelessWidget {
               Text(
                 data.tournamentName!,
                 style: TextStyle(
-                  color: AppColors.textPrimaryTinted.withValues(alpha: 0.78),
+                  color: AppMediaColors.textPrimary.withValues(alpha: 0.78),
                   fontSize: dense ? 8 : (exportMode ? 13 : 14),
                   fontWeight: FontWeight.w700,
                 ),
@@ -133,7 +133,7 @@ class TeamShareCard extends StatelessWidget {
             Text(
               'فريق واحد · هدف واحد',
               style: TextStyle(
-                color: AppColors.textPrimaryTinted.withValues(alpha: 0.7),
+                color: AppMediaColors.textPrimary.withValues(alpha: 0.7),
                 fontSize: dense ? 7 : (exportMode ? 10 : 11),
                 fontWeight: FontWeight.w700,
               ),
@@ -170,16 +170,16 @@ class _Tag extends StatelessWidget {
         vertical: dense ? 3 : 5,
       ),
       decoration: BoxDecoration(
-        color: AppColors.textPrimaryTinted.withValues(alpha: 0.14),
+        color: AppMediaColors.textPrimary.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: AppColors.textPrimaryTinted.withValues(alpha: 0.22),
+          color: AppMediaColors.textPrimary.withValues(alpha: 0.22),
         ),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: AppColors.textPrimaryTinted,
+          color: AppMediaColors.textPrimary,
           fontSize: dense ? 7 : 10,
           fontWeight: FontWeight.w800,
         ),
@@ -211,7 +211,7 @@ class _Metric extends StatelessWidget {
         horizontal: dense ? 3 : 6,
       ),
       decoration: BoxDecoration(
-        color: AppColors.textPrimaryTinted.withValues(alpha: 0.1),
+        color: AppMediaColors.textPrimary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -219,7 +219,7 @@ class _Metric extends StatelessWidget {
           Text(
             '$value',
             style: TextStyle(
-              color: AppColors.textPrimaryTinted,
+              color: AppMediaColors.textPrimary,
               fontSize: dense ? 10 : (compact ? 16 : 18),
               fontWeight: FontWeight.w900,
               height: 1,
@@ -229,7 +229,7 @@ class _Metric extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: AppColors.textSecondaryTinted,
+              color: AppMediaColors.textSecondary,
               fontSize: dense ? 6.5 : 10,
               fontWeight: FontWeight.w700,
               height: 1,

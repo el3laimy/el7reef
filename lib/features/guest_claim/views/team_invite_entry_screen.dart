@@ -36,8 +36,7 @@ class TeamInviteEntryScreen extends GetView<TeamInviteEntryController> {
                 final team = controller.team.value;
                 if (team == null) return const SizedBox.shrink();
 
-                return El7reefGlassSurface(
-                  variant: El7reefGlassVariant.base,
+                return El7reefSolidSurface(
                   padding: const EdgeInsets.all(AppDimensions.xl),
                   radius: AppDimensions.radiusXl,
                   child: Column(
@@ -57,7 +56,7 @@ class TeamInviteEntryScreen extends GetView<TeamInviteEntryController> {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.3),
+                              color: AppColors.primary.withValues(alpha: 0.12),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),
@@ -67,13 +66,13 @@ class TeamInviteEntryScreen extends GetView<TeamInviteEntryController> {
                         child: Text(
                           team.name.isNotEmpty ? team.name[0] : '?',
                           style: AppTextStyles.headlineLarge.copyWith(
-                            color: AppColors.textPrimary,
+                            color: AppColors.textOnPrimary,
                             fontSize: 48,
                           ),
                         ),
                       ).animate().scale(
-                        duration: 500.ms,
-                        curve: Curves.easeOutBack,
+                        duration: 250.ms,
+                        curve: Curves.easeOutQuart,
                       ),
                       const SizedBox(height: AppDimensions.xl),
                       Text(
@@ -119,8 +118,7 @@ class TeamInviteEntryScreen extends GetView<TeamInviteEntryController> {
   }
 
   Widget _buildErrorState() {
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       padding: const EdgeInsets.all(AppDimensions.xl),
       radius: AppDimensions.radiusXl,
       child: Column(
@@ -130,7 +128,7 @@ class TeamInviteEntryScreen extends GetView<TeamInviteEntryController> {
             Icons.link_off_rounded,
             size: 64,
             color: AppColors.error,
-          ).animate().shake(duration: 400.ms),
+          ).animate().shake(duration: 220.ms),
           const SizedBox(height: AppDimensions.lg),
           Text(
             'عذراً',

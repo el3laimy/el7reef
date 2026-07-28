@@ -67,10 +67,55 @@ service cloud.firestore {
         (value is int && value >= minValue && value <= maxValue);
     }
 
+    function validTournamentLogoUrl(value) {
+      return value == null || value in [
+        'preset://v1/tournament_emblem/floodlights',
+        'preset://v1/tournament_emblem/center_circle',
+        'preset://v1/tournament_emblem/street_gate',
+        'preset://v1/tournament_emblem/whistle',
+        'preset://v1/tournament_emblem/match_ball',
+        'preset://v1/tournament_emblem/tournament_flame'
+      ];
+    }
+
+    function validTeamPresetLogoUrl(value) {
+      return value == null || value in [
+        'preset://v1/team_badge/street_bolt',
+        'preset://v1/team_badge/falcon_wing',
+        'preset://v1/team_badge/fortress_gate',
+        'preset://v1/team_badge/street_flame',
+        'preset://v1/team_badge/city_bridge',
+        'preset://v1/team_badge/shield_stripes',
+        'preset://v1/team_badge/night_panther',
+        'preset://v1/team_badge/goal_net',
+        'preset://v1/team_badge/sunrise_pitch',
+        'preset://v1/team_badge/crossed_lines',
+        'preset://v1/team_badge/twin_floodlights',
+        'preset://v1/team_badge/city_blocks',
+        'preset://v1/team_pennant/diagonal_dash',
+        'preset://v1/team_pennant/sharp_chevron',
+        'preset://v1/team_pennant/split_lanes',
+        'preset://v1/team_pennant/horizon_wave',
+        'preset://v1/team_pennant/fast_sash',
+        'preset://v1/team_pennant/goal_channels'
+      ];
+    }
+
+    function validTeamLogoUrl(value) {
+      return validTeamPresetLogoUrl(value) ||
+        (
+          value is string &&
+          value.size() > 8 &&
+          value.size() <= 2048 &&
+          value.matches('^https://[^ ]+$')
+        );
+    }
+
     function validTournamentDocument(data) {
       return data.keys().hasOnly([
           'organizerId',
           'name',
+          'logoUrl',
           'description',
           'location',
           'format',
@@ -121,6 +166,7 @@ service cloud.firestore {
         data.name is string &&
         data.name.size() > 0 &&
         data.name.size() <= 120 &&
+        validTournamentLogoUrl(data.get('logoUrl', null)) &&
         validOptionalTournamentString(data.get('description', null), 600) &&
         validOptionalTournamentString(data.get('location', null), 160) &&
         data.format in [
@@ -2271,10 +2317,25 @@ service cloud.firestore {
     match /teams/{teamId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() &&
-        request.resource.data.ownerId == request.auth.uid;
-      allow update: if isAuthenticated() &&
+        request.resource.data.ownerId == request.auth.uid &&
+        validTeamLogoUrl(request.resource.data.get('logoUrl', null));
+      allow update: if (
+        isAuthenticated() &&
         resource.data.ownerId == request.auth.uid &&
-        request.resource.data.ownerId == resource.data.ownerId;
+        request.resource.data.ownerId == resource.data.ownerId &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['logoUrl']) ||
+          validTeamLogoUrl(request.resource.data.get('logoUrl', null))
+        )
+      ) ||
+        (
+          canManageTeamById(teamId) &&
+          request.resource.data.ownerId == resource.data.ownerId &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['logoUrl']) &&
+          validTeamPresetLogoUrl(request.resource.data.get('logoUrl', null))
+        );
       allow delete: if false;
     }
 
@@ -2310,10 +2371,16 @@ service cloud.firestore {
 
     match /guestTeams/{guestTeamId} {
       allow read: if canReadGuestTeam(resource.data);
-      allow create: if canManageGuestTeam(request.resource.data);
+      allow create: if canManageGuestTeam(request.resource.data) &&
+        validTeamLogoUrl(request.resource.data.get('logoUrl', null));
       allow update: if (
         canManageGuestTeam(resource.data) &&
-        request.resource.data.creatorId == resource.data.creatorId
+        request.resource.data.creatorId == resource.data.creatorId &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['logoUrl']) ||
+          validTeamLogoUrl(request.resource.data.get('logoUrl', null))
+        )
       ) || canSelfClaimGuestTeam(guestTeamId) ||
         canUpdateGuestTeamRosterCaptain(guestTeamId);
       allow delete: if false;

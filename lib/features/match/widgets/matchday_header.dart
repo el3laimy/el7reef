@@ -4,6 +4,7 @@ import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../core/enums/match_attendance_status.dart';
 import '../../../core/enums/match_status.dart';
 import '../controllers/matchday_controller.dart';
@@ -18,20 +19,10 @@ class MatchdayHeader extends StatelessWidget {
     final match = controller.match.value;
     final tournament = controller.tournament.value;
 
-    return Container(
+    return El7reefSolidSurface(
       padding: const EdgeInsets.all(AppDimensions.md),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.surfaceBorder, width: 0.5),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.backgroundDeep.withValues(alpha: 0.3),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
+      radius: AppDimensions.radiusLg,
+      elevated: true,
       child: Column(
         children: [
           // Tournament name
@@ -151,7 +142,7 @@ class MatchdayHeader extends StatelessWidget {
                 label: const Text('تسجيل وإنهاء المباراة'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.success,
-                  foregroundColor: AppColors.textPrimary,
+                  foregroundColor: AppColors.textOnTactical,
                 ),
               ),
             ),
@@ -251,26 +242,16 @@ class _TeamBadge extends StatelessWidget {
       height: 48,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [color, color.withValues(alpha: 0.6)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.3),
-            blurRadius: 10,
-            spreadRadius: 1,
-          ),
-        ],
+        color: color.withValues(alpha: 0.12),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
       ),
       child: Center(
         child: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
+            color: color,
           ),
         ),
       ),
@@ -475,7 +456,7 @@ class _StepDot extends StatelessWidget {
                 ? const Icon(
                     Icons.check,
                     size: 16,
-                    color: AppColors.textPrimary,
+                    color: AppColors.textOnTactical,
                   )
                 : active
                 ? Container(

@@ -99,7 +99,7 @@ void main() {
           automaticQualifiersPerGroup: 2,
           bestRankedAdditionalQualifiers: 8,
         ),
-      );
+      ).copyWith(logoUrl: 'preset://v1/tournament_emblem/floodlights');
       final result = const GroupStageBuilder().build(
         tournament: tournament,
         participants: _participants(48),
@@ -144,15 +144,18 @@ void main() {
       );
       expect(roundTrip.isFeatured, isFalse);
       expect(roundTrip.featuredPriority, 1000);
+      expect(roundTrip.logoUrl, 'preset://v1/tournament_emblem/floodlights');
 
       final legacyRoundTrip = TournamentModel.fromJson(
         {...encoded}
           ..remove('isFeatured')
-          ..remove('featuredPriority'),
+          ..remove('featuredPriority')
+          ..remove('logoUrl'),
         tournament.id,
       ).toEntity();
       expect(legacyRoundTrip.isFeatured, isFalse);
       expect(legacyRoundTrip.featuredPriority, 1000);
+      expect(legacyRoundTrip.logoUrl, isNull);
     });
   });
 

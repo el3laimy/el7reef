@@ -6,11 +6,13 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/enums/tournament_enums.dart';
+import '../../../core/identity/identity_visual.dart';
 import '../../../core/constants/feature_flags.dart';
 import '../../../core/permissions/tournament_viewer_context.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../core/widgets/el7reef_badge.dart';
 import '../../../core/widgets/el7reef_button.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../core/widgets/el7reef_surface.dart';
 import '../../../core/widgets/section_state_card.dart';
 import '../../../core/services/tournament_top_scorers_resolver.dart';
@@ -337,10 +339,13 @@ class _TournamentHeroAppBar extends StatelessWidget {
           // threshold left too little vertical room for the stage rail.
           final expanded = constraints.maxHeight >= expandedHeight - 8;
           return ClipRect(
-            child: TournamentFieldPattern(
-              color: spec.accent,
-              child: ColoredBox(
-                color: AppColors.surfaceRaised.withValues(alpha: 0.93),
+            child: El7reefGlassSurface(
+              role: El7reefGlassRole.hero,
+              tone: El7reefGlassTone.competitive,
+              radius: 0,
+              padding: EdgeInsets.zero,
+              child: TournamentFieldPattern(
+                color: spec.accent,
                 child: SafeArea(
                   bottom: false,
                   child: Padding(
@@ -356,23 +361,53 @@ class _TournamentHeroAppBar extends StatelessWidget {
                             children: [
                               TournamentStatusPill(spec: spec),
                               const Spacer(),
-                              Text(
-                                tournament.name,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppTextStyles.displaySmall.copyWith(
-                                  color: AppColors.textPrimaryTinted,
-                                  fontWeight: FontWeight.w900,
-                                  height: 1.15,
-                                ),
-                              ),
-                              const SizedBox(height: AppDimensions.xs),
-                              Text(
-                                '${tournamentFormatLabel(tournament.format)}  •  ${tournament.teamSize.value} ضد ${tournament.teamSize.value}',
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.textSecondaryTinted,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                              Row(
+                                children: [
+                                  if (tournament.logoUrl != null) ...[
+                                    IdentityVisual(
+                                      source: tournament.logoUrl,
+                                      size: 64,
+                                      borderRadius: BorderRadius.circular(
+                                        AppDimensions.radiusMd,
+                                      ),
+                                      semanticLabel:
+                                          'رمز بطولة ${tournament.name}',
+                                    ),
+                                    const SizedBox(width: AppDimensions.md),
+                                  ],
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          tournament.name,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: AppTextStyles.displaySmall
+                                              .copyWith(
+                                                color:
+                                                    AppColors.textPrimaryTinted,
+                                                fontWeight: FontWeight.w900,
+                                                height: 1.15,
+                                              ),
+                                        ),
+                                        const SizedBox(
+                                          height: AppDimensions.xs,
+                                        ),
+                                        Text(
+                                          '${tournamentFormatLabel(tournament.format)}  •  ${tournament.teamSize.value} ضد ${tournament.teamSize.value}',
+                                          style: AppTextStyles.bodySmall
+                                              .copyWith(
+                                                color: AppColors
+                                                    .textSecondaryTinted,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: AppDimensions.lg),
                               TournamentStageRail(
@@ -718,7 +753,7 @@ class _StoryBeat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = earned ? AppColors.secondary : AppColors.primary;
+    final color = earned ? AppColors.achievement : AppColors.actionPrimary;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppDimensions.xs),
       child: Row(
@@ -1089,7 +1124,7 @@ class _TopScorersSection extends StatelessWidget {
     return El7reefSurface(
       elevated: scorers.isNotEmpty,
       borderColor: scorers.isNotEmpty
-          ? AppColors.secondary.withValues(alpha: 0.25)
+          ? AppColors.achievement.withValues(alpha: 0.25)
           : AppColors.surfaceBorder,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1098,7 +1133,7 @@ class _TopScorersSection extends StatelessWidget {
             children: [
               const El7reefBadge(
                 label: 'لوحة الفخر',
-                color: AppColors.secondary,
+                color: AppColors.achievement,
                 icon: Icons.local_fire_department_rounded,
               ),
               const Spacer(),
@@ -1207,7 +1242,7 @@ class _TopScorersSection extends StatelessWidget {
             rank: 1,
             height: 90,
             pillarColor: AppColors.primarySurface,
-            badgeColor: AppColors.secondary,
+            badgeColor: AppColors.achievement,
             badgeLabel: '👑 البطل',
             isChampion: true,
           )
@@ -1303,13 +1338,13 @@ class _PodiumPillar extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
               decoration: BoxDecoration(
-                color: AppColors.secondary.withValues(alpha: 0.15),
+                color: AppColors.infoSurface,
                 borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
               ),
               child: Text(
                 'ضيف',
                 style: AppTextStyles.labelSmall.copyWith(
-                  color: AppColors.secondary,
+                  color: AppColors.info,
                   fontSize: 8,
                   fontWeight: FontWeight.w700,
                 ),
@@ -1432,7 +1467,7 @@ class _TopScorerRow extends StatelessWidget {
                           vertical: 1,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.secondary.withValues(alpha: 0.14),
+                          color: AppColors.infoSurface,
                           borderRadius: BorderRadius.circular(
                             AppDimensions.radiusFull,
                           ),
@@ -1440,7 +1475,7 @@ class _TopScorerRow extends StatelessWidget {
                         child: Text(
                           'ضيف',
                           style: AppTextStyles.labelSmall.copyWith(
-                            color: AppColors.secondary,
+                            color: AppColors.info,
                             fontWeight: FontWeight.w800,
                             fontSize: 8,
                           ),

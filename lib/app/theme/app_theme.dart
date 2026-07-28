@@ -3,31 +3,32 @@ import 'package:flutter/services.dart';
 
 import 'app_colors.dart';
 import 'app_dimensions.dart';
+import 'app_glass_theme.dart';
 import 'app_text_styles.dart';
 
-/// نظام «ختم الحارة» المبني على Material 3 لأندرويد.
+/// نظام «نهار البطولة» المبني على Material 3 Expressive لأندرويد.
 ///
 /// الأسطح التشغيلية صلبة. لا يضيف الـTheme ضبابية لأي Card أو Dialog؛ الزجاج
 /// الوظيفي يظل قرارًا صريحًا في شريط التنقل أو أدوات المعاينة فقط.
 abstract final class AppTheme {
-  static const ColorScheme _streetGlassScheme = ColorScheme.dark(
-    primary: AppColors.primary,
+  static const ColorScheme _daylightScheme = ColorScheme.light(
+    primary: AppColors.actionPrimary,
     onPrimary: AppColors.textOnPrimary,
-    primaryContainer: AppColors.primaryDark,
-    onPrimaryContainer: AppColors.textPrimary,
-    secondary: AppColors.secondary,
+    primaryContainer: AppColors.actionContainer,
+    onPrimaryContainer: AppColors.actionStrong,
+    secondary: AppColors.info,
     onSecondary: AppColors.textOnPrimary,
-    secondaryContainer: AppColors.burgundyDeep,
-    onSecondaryContainer: AppColors.secondaryLight,
-    tertiary: AppColors.accentLight,
+    secondaryContainer: AppColors.infoContainer,
+    onSecondaryContainer: AppColors.infoDark,
+    tertiary: AppColors.tactical,
     onTertiary: AppColors.textOnPrimary,
-    tertiaryContainer: AppColors.accentDark,
-    onTertiaryContainer: AppColors.textPrimary,
+    tertiaryContainer: AppColors.tacticalContainer,
+    onTertiaryContainer: AppColors.tacticalDark,
     error: AppColors.error,
     onError: AppColors.textOnPrimary,
     errorContainer: AppColors.errorSurface,
     onErrorContainer: AppColors.error,
-    surface: AppColors.background,
+    surface: AppColors.surface,
     onSurface: AppColors.textPrimary,
     surfaceDim: AppColors.backgroundDeep,
     surfaceBright: AppColors.surfaceRaised,
@@ -40,31 +41,33 @@ abstract final class AppTheme {
     outline: AppColors.surfaceBorderStrong,
     outlineVariant: AppColors.surfaceBorder,
     shadow: AppColors.black,
-    scrim: Color(0xB3090C09),
+    scrim: Color(0x5217202C),
     inverseSurface: AppColors.textPrimary,
-    onInverseSurface: AppColors.black,
-    inversePrimary: AppColors.primaryDark,
+    onInverseSurface: AppColors.chalk,
+    inversePrimary: AppColors.actionLight,
     surfaceTint: Colors.transparent,
   );
 
-  static ThemeData get darkTheme {
+  static ThemeData get lightTheme {
     final textTheme = AppTextStyles.textTheme;
 
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.dark,
-      colorScheme: _streetGlassScheme,
-      scaffoldBackgroundColor: AppColors.background,
+      brightness: Brightness.light,
+      colorScheme: _daylightScheme,
+      // The app-level daylight backdrop owns the single static gradient/glow.
+      scaffoldBackgroundColor: Colors.transparent,
       canvasColor: AppColors.background,
       textTheme: textTheme,
       primaryTextTheme: textTheme,
       materialTapTargetSize: MaterialTapTargetSize.padded,
       visualDensity: VisualDensity.standard,
       splashFactory: InkSparkle.splashFactory,
-      focusColor: AppColors.primary.withValues(alpha: 0.18),
-      hoverColor: AppColors.primary.withValues(alpha: 0.08),
+      focusColor: AppColors.actionPrimary.withValues(alpha: 0.18),
+      hoverColor: AppColors.actionPrimary.withValues(alpha: 0.08),
       highlightColor: Colors.transparent,
       disabledColor: AppColors.textMuted.withValues(alpha: 0.45),
+      extensions: const <ThemeExtension<dynamic>>[AppGlassTheme.daylight],
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: <TargetPlatform, PageTransitionsBuilder>{
           TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
@@ -82,10 +85,10 @@ abstract final class AppTheme {
         toolbarHeight: 64,
         systemOverlayStyle: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-          statusBarBrightness: Brightness.dark,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
           systemNavigationBarColor: AppColors.background,
-          systemNavigationBarIconBrightness: Brightness.light,
+          systemNavigationBarIconBrightness: Brightness.dark,
           systemNavigationBarDividerColor: AppColors.background,
         ),
         titleTextStyle: AppTextStyles.headlineSmall,
@@ -129,7 +132,7 @@ abstract final class AppTheme {
         backgroundColor: AppColors.surfaceRaised,
         modalBackgroundColor: AppColors.surfaceRaised,
         surfaceTintColor: Colors.transparent,
-        modalBarrierColor: Color(0xB3090C09),
+        modalBarrierColor: Color(0x5217202C),
         elevation: 0,
         showDragHandle: true,
         dragHandleColor: AppColors.surfaceBorderStrong,
@@ -156,16 +159,22 @@ abstract final class AppTheme {
             if (states.contains(WidgetState.disabled)) {
               return AppColors.textMuted.withValues(alpha: 0.55);
             }
-            return AppColors.primary;
+            return AppColors.textPrimary;
           }),
           overlayColor: WidgetStatePropertyAll<Color>(
-            AppColors.primary.withValues(alpha: 0.1),
+            AppColors.actionPrimary.withValues(alpha: 0.1),
           ),
           side: WidgetStateProperty.resolveWith<BorderSide>((states) {
             if (states.contains(WidgetState.disabled)) {
               return const BorderSide(color: AppColors.surfaceBorder);
             }
-            return const BorderSide(color: AppColors.primary);
+            if (states.contains(WidgetState.focused)) {
+              return const BorderSide(
+                color: AppColors.actionPrimary,
+                width: 1.5,
+              );
+            }
+            return const BorderSide(color: AppColors.surfaceBorderStrong);
           }),
           shape: WidgetStatePropertyAll<OutlinedBorder>(
             RoundedRectangleBorder(
@@ -173,7 +182,7 @@ abstract final class AppTheme {
             ),
           ),
           textStyle: WidgetStatePropertyAll<TextStyle>(
-            AppTextStyles.buttonText.copyWith(color: AppColors.primary),
+            AppTextStyles.buttonText.copyWith(color: AppColors.textPrimary),
           ),
           animationDuration: const Duration(
             milliseconds: AppDimensions.animFast,
@@ -186,10 +195,10 @@ abstract final class AppTheme {
             Size(AppDimensions.minTouchTarget, AppDimensions.minTouchTarget),
           ),
           foregroundColor: const WidgetStatePropertyAll<Color>(
-            AppColors.primary,
+            AppColors.actionPrimary,
           ),
           overlayColor: WidgetStatePropertyAll<Color>(
-            AppColors.primary.withValues(alpha: 0.1),
+            AppColors.actionPrimary.withValues(alpha: 0.1),
           ),
           textStyle: WidgetStatePropertyAll<TextStyle>(
             AppTextStyles.labelLarge,
@@ -213,7 +222,7 @@ abstract final class AppTheme {
             AppColors.textPrimary,
           ),
           overlayColor: WidgetStatePropertyAll<Color>(
-            AppColors.primary.withValues(alpha: 0.1),
+            AppColors.actionPrimary.withValues(alpha: 0.1),
           ),
           shape: const WidgetStatePropertyAll<OutlinedBorder>(CircleBorder()),
         ),
@@ -222,7 +231,7 @@ abstract final class AppTheme {
       // ── Inputs ──
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surfaceSunken,
+        fillColor: AppColors.surface,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppDimensions.md,
           vertical: 14,
@@ -232,16 +241,16 @@ abstract final class AppTheme {
         ),
         labelStyle: AppTextStyles.bodyMedium,
         floatingLabelStyle: AppTextStyles.labelMedium.copyWith(
-          color: AppColors.primary,
+          color: AppColors.actionPrimary,
         ),
         helperStyle: AppTextStyles.bodySmall,
         errorStyle: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
-        border: _inputBorder(AppColors.surfaceBorder),
-        enabledBorder: _inputBorder(AppColors.surfaceBorder),
+        border: _inputBorder(AppColors.surfaceBorderStrong),
+        enabledBorder: _inputBorder(AppColors.surfaceBorderStrong),
         disabledBorder: _inputBorder(
           AppColors.surfaceBorder.withValues(alpha: 0.55),
         ),
-        focusedBorder: _inputBorder(AppColors.primary, width: 2),
+        focusedBorder: _inputBorder(AppColors.actionPrimary, width: 2),
         errorBorder: _inputBorder(AppColors.error),
         focusedErrorBorder: _inputBorder(AppColors.error, width: 2),
       ),
@@ -251,14 +260,14 @@ abstract final class AppTheme {
         height: AppDimensions.bottomNavHeight,
         backgroundColor: AppColors.surface,
         surfaceTintColor: Colors.transparent,
-        indicatorColor: AppColors.primarySurface,
+        indicatorColor: AppColors.actionSurface,
         indicatorShape: const StadiumBorder(),
         elevation: 0,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         iconTheme: WidgetStateProperty.resolveWith<IconThemeData>((states) {
           return IconThemeData(
             color: states.contains(WidgetState.selected)
-                ? AppColors.primary
+                ? AppColors.actionPrimary
                 : AppColors.textMuted,
             size: AppDimensions.iconMd,
           );
@@ -266,7 +275,7 @@ abstract final class AppTheme {
         labelTextStyle: WidgetStateProperty.resolveWith<TextStyle>((states) {
           return AppTextStyles.labelSmall.copyWith(
             color: states.contains(WidgetState.selected)
-                ? AppColors.primary
+                ? AppColors.textPrimary
                 : AppColors.textMuted,
             fontWeight: states.contains(WidgetState.selected)
                 ? FontWeight.w700
@@ -276,22 +285,22 @@ abstract final class AppTheme {
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: AppColors.surface,
-        selectedItemColor: AppColors.primary,
+        selectedItemColor: AppColors.actionPrimary,
         unselectedItemColor: AppColors.textMuted,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
         enableFeedback: true,
         selectedLabelStyle: AppTextStyles.labelSmall.copyWith(
-          color: AppColors.primary,
+          color: AppColors.textPrimary,
           fontWeight: FontWeight.w700,
         ),
         unselectedLabelStyle: AppTextStyles.labelSmall,
       ),
       tabBarTheme: TabBarThemeData(
         dividerColor: Colors.transparent,
-        indicatorColor: AppColors.primary,
+        indicatorColor: AppColors.actionPrimary,
         indicatorSize: TabBarIndicatorSize.label,
-        labelColor: AppColors.primary,
+        labelColor: AppColors.textPrimary,
         unselectedLabelColor: AppColors.textMuted,
         labelStyle: AppTextStyles.labelLarge,
         unselectedLabelStyle: AppTextStyles.labelLarge.copyWith(
@@ -313,9 +322,9 @@ abstract final class AppTheme {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.surfaceSunken,
-        selectedColor: AppColors.primarySurface,
+        selectedColor: AppColors.actionSurface,
         disabledColor: AppColors.surfaceSunken.withValues(alpha: 0.55),
-        checkmarkColor: AppColors.primary,
+        checkmarkColor: AppColors.actionPrimary,
         side: const BorderSide(color: AppColors.surfaceBorder),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
@@ -323,7 +332,7 @@ abstract final class AppTheme {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         labelStyle: AppTextStyles.labelMedium,
         secondaryLabelStyle: AppTextStyles.labelMedium.copyWith(
-          color: AppColors.primary,
+          color: AppColors.textPrimary,
         ),
       ),
       dividerTheme: const DividerThemeData(
@@ -350,7 +359,7 @@ abstract final class AppTheme {
       // ── Feedback & selection ──
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.surfaceRaised,
-        actionTextColor: AppColors.primary,
+        actionTextColor: AppColors.actionPrimary,
         disabledActionTextColor: AppColors.textMuted,
         contentTextStyle: AppTextStyles.bodyMedium.copyWith(
           color: AppColors.textPrimary,
@@ -364,7 +373,7 @@ abstract final class AppTheme {
         ),
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
-        color: AppColors.primary,
+        color: AppColors.actionPrimary,
         linearTrackColor: AppColors.surfaceBorder,
         circularTrackColor: AppColors.surfaceBorder,
       ),
@@ -374,7 +383,9 @@ abstract final class AppTheme {
           borderRadius: BorderRadius.circular(AppDimensions.space1),
         ),
         fillColor: WidgetStateProperty.resolveWith<Color?>((states) {
-          if (states.contains(WidgetState.selected)) return AppColors.primary;
+          if (states.contains(WidgetState.selected)) {
+            return AppColors.actionPrimary;
+          }
           return null;
         }),
         checkColor: const WidgetStatePropertyAll<Color>(
@@ -385,7 +396,7 @@ abstract final class AppTheme {
       radioTheme: RadioThemeData(
         fillColor: WidgetStateProperty.resolveWith<Color>((states) {
           return states.contains(WidgetState.selected)
-              ? AppColors.primary
+              ? AppColors.actionPrimary
               : AppColors.surfaceBorderStrong;
         }),
       ),
@@ -397,7 +408,7 @@ abstract final class AppTheme {
         }),
         trackColor: WidgetStateProperty.resolveWith<Color>((states) {
           return states.contains(WidgetState.selected)
-              ? AppColors.primary
+              ? AppColors.actionPrimary
               : AppColors.surfaceBorder;
         }),
         trackOutlineColor: const WidgetStatePropertyAll<Color>(
@@ -406,13 +417,11 @@ abstract final class AppTheme {
       ),
       tooltipTheme: TooltipThemeData(
         decoration: BoxDecoration(
-          color: AppColors.surfaceRaised,
-          border: Border.all(color: AppColors.surfaceBorder),
+          color: AppColors.textPrimary,
+          border: Border.all(color: AppColors.textPrimary),
           borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
         ),
-        textStyle: AppTextStyles.labelSmall.copyWith(
-          color: AppColors.textPrimary,
-        ),
+        textStyle: AppTextStyles.labelSmall.copyWith(color: AppColors.chalk),
       ),
     );
   }
@@ -428,8 +437,8 @@ abstract final class AppTheme {
       if (states.contains(WidgetState.disabled)) {
         return AppColors.surfaceBorder;
       }
-      if (states.contains(WidgetState.pressed)) return AppColors.primaryLight;
-      return AppColors.primary;
+      if (states.contains(WidgetState.pressed)) return AppColors.actionStrong;
+      return AppColors.actionPrimary;
     }),
     foregroundColor: WidgetStateProperty.resolveWith<Color>((states) {
       if (states.contains(WidgetState.disabled)) return AppColors.textMuted;

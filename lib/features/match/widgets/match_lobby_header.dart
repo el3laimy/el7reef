@@ -28,13 +28,11 @@ class StartWithoutLineupNudgeSheet extends StatelessWidget {
         .toList(growable: false);
 
     return SafeArea(
-      child: Container(
+      child: El7reefGlassSurface(
+        role: El7reefGlassRole.compactSheet,
         padding: const EdgeInsets.all(AppDimensions.lg),
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppDimensions.radiusXl),
-          ),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppDimensions.radiusXl),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -89,8 +87,7 @@ class ReadinessStepper extends StatelessWidget {
       padding: const EdgeInsets.symmetric(
         horizontal: AppDimensions.pagePadding,
       ),
-      child: El7reefGlassSurface(
-        variant: El7reefGlassVariant.base,
+      child: El7reefSolidSurface(
         padding: const EdgeInsets.all(AppDimensions.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

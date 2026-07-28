@@ -89,22 +89,31 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _currentIndex,
         children: [for (final destination in _destinations) destination.page],
       ),
-      bottomNavigationBar: El7reefGlassSurface(
-        variant: El7reefGlassVariant.sheet,
-        padding: EdgeInsets.zero,
-        borderRadius: BorderRadius.zero,
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
-          backgroundColor: Colors.transparent,
-          selectedItemColor: AppColors.primary,
-          unselectedItemColor: AppColors.textMuted,
-          type: BottomNavigationBarType.fixed,
-          elevation: 0,
-          items: [
-            for (final destination in _destinations)
-              destination.spec.navigationItem,
-          ],
+      bottomNavigationBar: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.fromLTRB(
+          AppDimensions.sm,
+          0,
+          AppDimensions.sm,
+          AppDimensions.sm,
+        ),
+        child: El7reefGlassSurface(
+          role: El7reefGlassRole.navigation,
+          padding: EdgeInsets.zero,
+          radius: 28,
+          child: BottomNavigationBar(
+            currentIndex: _currentIndex,
+            onTap: (index) => setState(() => _currentIndex = index),
+            backgroundColor: Colors.transparent,
+            selectedItemColor: AppColors.primary,
+            unselectedItemColor: AppColors.textMuted,
+            type: BottomNavigationBarType.fixed,
+            elevation: 0,
+            items: [
+              for (final destination in _destinations)
+                destination.spec.navigationItem,
+            ],
+          ),
         ),
       ),
     );
@@ -274,8 +283,7 @@ class _HomeTab extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppDimensions.pagePadding,
                       ),
-                      child: El7reefGlassSurface(
-                        variant: El7reefGlassVariant.base,
+                      child: El7reefSolidSurface(
                         padding: const EdgeInsets.all(AppDimensions.lg),
                         radius: AppDimensions.radiusLg,
                         child: Row(
@@ -346,7 +354,7 @@ class _HomeTab extends StatelessWidget {
                             _actionCard(
                               Icons.emoji_events_rounded,
                               'البطولات',
-                              AppColors.secondary,
+                              AppColors.competitive,
                               () => onNavigateToDestination(
                                 _HomeDestinationKey.tournaments,
                               ),
@@ -442,8 +450,7 @@ class _HomeTab extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppDimensions.pagePadding,
                         ),
-                        child: El7reefGlassSurface(
-                          variant: El7reefGlassVariant.base,
+                        child: El7reefSolidSurface(
                           padding: const EdgeInsets.all(AppDimensions.lg),
                           child: Row(
                             children: [
@@ -546,8 +553,7 @@ class _HomeTab extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppDimensions.pagePadding,
                         ),
-                        child: El7reefGlassSurface(
-                          variant: El7reefGlassVariant.base,
+                        child: El7reefSolidSurface(
                           padding: const EdgeInsets.all(AppDimensions.lg),
                           child: Row(
                             children: [
@@ -683,7 +689,8 @@ class _NextActionHero extends StatelessWidget {
       );
 
       return El7reefGlassSurface(
-        variant: spec.variant,
+        role: El7reefGlassRole.hero,
+        tone: El7reefGlassTone.action,
         padding: const EdgeInsets.all(AppDimensions.lg),
         radius: AppDimensions.radiusXl,
         child: Row(
@@ -753,7 +760,6 @@ class _NextActionHero extends StatelessWidget {
         subtitle: 'سجل دخولك عشان بطولاتك وفرقك وكروت الفخر تبقى محفوظة.',
         tooltip: 'تسجيل الدخول',
         accentColor: AppColors.primary,
-        variant: El7reefGlassVariant.raised,
         onTap: () => Get.toNamed(AppRoutes.login),
       );
     }
@@ -765,8 +771,7 @@ class _NextActionHero extends StatelessWidget {
         title: 'كمل تشغيل دورتك',
         subtitle: tournament.name,
         tooltip: 'فتح لوحة إدارة البطولة',
-        accentColor: AppColors.secondary,
-        variant: El7reefGlassVariant.pride,
+        accentColor: AppColors.actionPrimary,
         onTap: () => Get.toNamed(
           AppRoutes.organizerDashboardForTournament(tournament.id),
         ),
@@ -781,7 +786,6 @@ class _NextActionHero extends StatelessWidget {
         subtitle: tournament.name,
         tooltip: 'فتح تفاصيل البطولة',
         accentColor: AppColors.primary,
-        variant: El7reefGlassVariant.raised,
         onTap: () => Get.toNamed(AppRoutes.tournamentDetailById(tournament.id)),
       );
     }
@@ -793,7 +797,6 @@ class _NextActionHero extends StatelessWidget {
         subtitle: 'راجع بطولاتك أو استكشف بطولة مفتوحة تناسب فريقك.',
         tooltip: 'فتح البطولات',
         accentColor: AppColors.primary,
-        variant: El7reefGlassVariant.raised,
         onTap: () => onNavigateToDestination(_HomeDestinationKey.tournaments),
       );
     }
@@ -803,8 +806,7 @@ class _NextActionHero extends StatelessWidget {
       title: 'ابدأ دورة شعبية',
       subtitle: 'ضيف فرق مسجلة أو ضيوف، وبعد أول نتيجة تظهر كروت الفخر.',
       tooltip: 'فتح البطولات',
-      accentColor: AppColors.secondary,
-      variant: El7reefGlassVariant.pride,
+      accentColor: AppColors.actionPrimary,
       onTap: () => onNavigateToDestination(_HomeDestinationKey.tournaments),
     );
   }
@@ -816,7 +818,6 @@ class _NextActionSpec {
   final String subtitle;
   final String tooltip;
   final Color accentColor;
-  final El7reefGlassVariant variant;
   final VoidCallback onTap;
 
   const _NextActionSpec({
@@ -825,7 +826,6 @@ class _NextActionSpec {
     required this.subtitle,
     required this.tooltip,
     required this.accentColor,
-    required this.variant,
     required this.onTap,
   });
 }

@@ -1,0 +1,19 @@
+{
+  "score": 5,
+  "summary": "Tournament, registered-team, and guest-team identity writes are ownership-bound, type- and catalog-constrained, and covered on create and update paths. The Firestore emulator suite passed 198 tests.",
+  "findings": [],
+  "checks": {
+    "updateBypass": "Tournament create and update both call validTournamentDocument. Registered-team and guest-team logo changes call validTeamLogoUrl when the field changes, while vice captains can change only logoUrl to an allowlisted preset.",
+    "authoritySource": "Tournament authority comes from the existing resource organizerId. Registered-team authority comes from the existing ownerId and viceCaptainIds. Guest-team updates use the existing creatorId; no newly supplied role field grants authority.",
+    "businessLogic": "Tournament organizers can save a tournament emblem; registered-team owners, vice captains, and guest-team creators can save a team badge or pennant without gaining unrelated write access.",
+    "storageAbuse": "Tournament and team presets use exact allowlists. Creator-managed HTTPS logo URLs are limited to 2048 characters and reject non-HTTPS schemes.",
+    "typeSafety": "Optional identity fields accept null or bounded strings that match the intended source policy.",
+    "fieldLevelSecurity": "Vice-captain updates require affectedKeys().hasOnly(['logoUrl']) in addition to existing-team membership authority."
+  },
+  "verification": {
+    "command": "npm run test:rules:emulator",
+    "result": "198 passing",
+    "databaseEdition": "STANDARD",
+    "databaseMode": "CLOUD_FIRESTORE"
+  }
+}

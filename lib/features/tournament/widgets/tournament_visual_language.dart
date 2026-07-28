@@ -34,14 +34,14 @@ TournamentVisualSpec tournamentVisualSpec(TournamentStatus status) {
       statusLabel: 'التسجيل مفتوح',
       stageLabel: 'التسجيل',
       icon: Icons.how_to_reg_rounded,
-      accent: AppColors.primary,
+      accent: AppColors.actionPrimary,
       stageIndex: 0,
     ),
     TournamentStatus.groupStage => const TournamentVisualSpec(
       statusLabel: 'دور المجموعات',
       stageLabel: 'المجموعات',
       icon: Icons.grid_view_rounded,
-      accent: AppColors.primary,
+      accent: AppColors.info,
       stageIndex: 1,
     ),
     TournamentStatus.transferWindow => const TournamentVisualSpec(
@@ -55,14 +55,14 @@ TournamentVisualSpec tournamentVisualSpec(TournamentStatus status) {
       statusLabel: 'الأدوار الإقصائية',
       stageLabel: 'الإقصائيات',
       icon: Icons.account_tree_rounded,
-      accent: AppColors.accent,
+      accent: AppColors.competitive,
       stageIndex: 2,
     ),
     TournamentStatus.completed => const TournamentVisualSpec(
       statusLabel: 'بطولة مكتملة',
       stageLabel: 'البطل',
       icon: Icons.emoji_events_rounded,
-      accent: AppColors.secondary,
+      accent: AppColors.achievement,
       stageIndex: 3,
     ),
     TournamentStatus.cancelled => const TournamentVisualSpec(
@@ -91,7 +91,7 @@ class TournamentFieldPattern extends StatelessWidget {
   const TournamentFieldPattern({
     super.key,
     required this.child,
-    this.color = AppColors.primary,
+    this.color = AppColors.surfaceBorderStrong,
   });
 
   @override

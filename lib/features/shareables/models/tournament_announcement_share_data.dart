@@ -4,10 +4,12 @@ import '../../../domain/entities/share_payload.dart';
 
 sealed class TournamentAnnouncementShareData {
   final String tournamentName;
+  final String? tournamentLogoUrl;
   final SharePayload sharePayload;
 
   const TournamentAnnouncementShareData({
     required this.tournamentName,
+    this.tournamentLogoUrl,
     required this.sharePayload,
   });
 
@@ -24,6 +26,7 @@ final class TournamentInviteShareData extends TournamentAnnouncementShareData {
 
   const TournamentInviteShareData({
     required super.tournamentName,
+    super.tournamentLogoUrl,
     required this.teamSizeLabel,
     required this.maxTeams,
     this.location,
@@ -46,6 +49,7 @@ final class UpcomingFixtureShareData extends TournamentAnnouncementShareData {
 
   const UpcomingFixtureShareData({
     required super.tournamentName,
+    super.tournamentLogoUrl,
     required this.teamAName,
     required this.teamBName,
     required this.scheduledAt,

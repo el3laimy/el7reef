@@ -115,7 +115,8 @@ class _PublicTeamContent extends StatelessWidget {
       padding: const EdgeInsets.all(AppDimensions.pagePadding),
       children: [
         El7reefGlassSurface(
-          variant: El7reefGlassVariant.pride,
+          role: El7reefGlassRole.hero,
+          tone: El7reefGlassTone.social,
           padding: const EdgeInsets.all(AppDimensions.lg),
           radius: AppDimensions.radiusXl,
           child: Column(
@@ -140,8 +141,8 @@ class _PublicTeamContent extends StatelessWidget {
                 profile.kindLabel,
                 style: AppTextStyles.labelMedium.copyWith(
                   color: profile.isGuestTeam
-                      ? AppColors.secondary
-                      : AppColors.primary,
+                      ? AppColors.info
+                      : AppColors.actionPrimary,
                 ),
               ),
               if (metrics.isNotEmpty) ...[

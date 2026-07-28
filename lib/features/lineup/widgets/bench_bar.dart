@@ -46,7 +46,10 @@ class BenchBar extends StatelessWidget {
       padding: const EdgeInsets.all(AppDimensions.md),
       decoration: BoxDecoration(
         color: hasTapBenchTarget || hasSelectedBenchSwapTarget
-            ? AppColors.warning.withValues(alpha: 0.08)
+            ? Color.alphaBlend(
+                AppColors.warning.withValues(alpha: 0.08),
+                AppColors.surface,
+              )
             : AppColors.surface,
         borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
         border: Border.all(

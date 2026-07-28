@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:el7reef/app/theme/app_colors.dart';
+import 'package:el7reef/app/theme/app_media_colors.dart';
 import 'package:el7reef/core/lineup/lineup_types.dart';
 import 'package:el7reef/domain/entities/participant_ref.dart';
 import 'package:el7reef/domain/entities/share_payload.dart';
@@ -123,9 +123,9 @@ List<Widget> _cards(PrideCardFormat format, {bool exportMode = true}) {
         title: 'النتيجة الرسمية',
         subtitle: 'نهائي بطولة أبطال شوارع القاهرة الكبرى',
         teamAName: 'نجوم الحارة الشرقية',
-        teamAAccent: AppColors.primary,
+        teamAAccent: AppMediaColors.actionPrimary,
         teamBName: 'أسود الميدان الغربية',
-        teamBAccent: AppColors.accent,
+        teamBAccent: AppMediaColors.info,
         scoreA: 5,
         scoreB: 4,
         statusLabel: 'معتمدة',
@@ -221,7 +221,7 @@ List<Widget> _cards(PrideCardFormat format, {bool exportMode = true}) {
         teamName: 'نجوم الحارة الشرقية',
         teamLabel: 'فريق رسمي',
         initials: 'نح',
-        accentColor: AppColors.primary,
+        accentColor: AppMediaColors.actionPrimary,
         formationCode: '2-2',
         teamSize: 5,
         lineupTypeLabel: 'فريق رسمي',

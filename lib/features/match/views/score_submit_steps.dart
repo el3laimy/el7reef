@@ -133,13 +133,13 @@ class _ScoreSubmitMvpStep extends StatelessWidget {
       ),
       children: [
         El7reefSurface(
-          borderColor: AppColors.secondary.withValues(alpha: 0.28),
+          borderColor: AppColors.actionPrimary.withValues(alpha: 0.28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const El7reefBadge(
                 label: 'لحظة الفخر',
-                color: AppColors.secondary,
+                color: AppColors.actionPrimary,
                 icon: Icons.star_rounded,
               ),
               const SizedBox(height: AppDimensions.md),
@@ -229,7 +229,7 @@ class _ScoreSubmitReviewStep extends StatelessWidget {
         attributionOverview,
         const SizedBox(height: AppDimensions.md),
         El7reefSurface(
-          borderColor: AppColors.secondary.withValues(alpha: 0.28),
+          borderColor: AppColors.actionPrimary.withValues(alpha: 0.28),
           child: _ReviewRow(
             label: 'نجم المباراة',
             value: mvp?.displayName ?? 'بدون اختيار',

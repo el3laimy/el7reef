@@ -29,15 +29,16 @@ class El7reefSurface extends StatelessWidget {
       margin: margin,
       padding: padding ?? const EdgeInsets.all(AppDimensions.cardPadding),
       decoration: BoxDecoration(
-        color: color ?? (elevated ? AppColors.surfaceRaised : AppColors.surface),
+        color:
+            color ?? (elevated ? AppColors.surfaceRaised : AppColors.surface),
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: borderColor ?? AppColors.surfaceBorder),
         boxShadow: elevated
             ? [
                 BoxShadow(
-                  color: AppColors.backgroundDeep.withValues(alpha: 0.34),
+                  color: AppColors.shadowInk.withValues(alpha: 0.08),
                   blurRadius: 18,
-                  offset: const Offset(0, 10),
+                  offset: const Offset(0, 8),
                 ),
               ]
             : null,

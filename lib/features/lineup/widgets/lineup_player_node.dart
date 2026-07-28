@@ -49,6 +49,7 @@ class LineupPlayerNode extends StatelessWidget {
         child: SquadPlayerCard(
           player: player,
           role: role,
+          canvas: SquadPlayerCardCanvas.pitch,
           size: dense
               ? SquadPlayerCardSize.dense
               : compact

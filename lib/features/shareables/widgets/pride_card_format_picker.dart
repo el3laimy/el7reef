@@ -6,12 +6,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../models/pride_card_format.dart';
 
 Future<PrideCardFormat?> showPrideCardFormatPicker(BuildContext context) {
   return showModalBottomSheet<PrideCardFormat>(
     context: context,
     useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    sheetAnimationStyle: const AnimationStyle(
+      duration: Duration(milliseconds: AppDimensions.animSlow),
+      reverseDuration: Duration(milliseconds: AppDimensions.animNormal),
+    ),
     builder: (sheetContext) => const _PrideCardFormatSheet(),
   );
 }
@@ -58,7 +64,12 @@ class _PrideCardFormatSheetState extends State<_PrideCardFormatSheet> {
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Padding(
+      child: El7reefGlassSurface(
+        role: El7reefGlassRole.compactSheet,
+        tone: El7reefGlassTone.social,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppDimensions.radiusXl),
+        ),
         padding: const EdgeInsets.all(AppDimensions.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,

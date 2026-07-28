@@ -20,8 +20,8 @@ class MatchdayEmptyRosterCard extends StatelessWidget {
     final route = _rosterRouteForSelectedSide();
     final isGuestSide = side?.isGuestTeam == true;
 
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.raised,
+    return El7reefSolidSurface(
+      elevated: true,
       padding: const EdgeInsets.all(AppDimensions.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,

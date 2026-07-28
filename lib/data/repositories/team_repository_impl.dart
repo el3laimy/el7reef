@@ -76,6 +76,13 @@ class TeamRepositoryImpl implements TeamRepository {
   }
 
   @override
+  Future<void> updateTeamLogo(String teamId, String? logoUrl) async {
+    return FirebaseErrorHandler.guard(() async {
+      await _teamsRef.doc(teamId).update({'logoUrl': logoUrl});
+    });
+  }
+
+  @override
   Future<List<Team>> getPlayerTeams(String playerId) async {
     return FirebaseErrorHandler.guard(() async {
       final snapshot = await _teamsRef

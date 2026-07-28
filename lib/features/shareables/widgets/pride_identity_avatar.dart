@@ -1,7 +1,7 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_media_colors.dart';
+import '../../../core/identity/identity_visual.dart';
 
 class PrideIdentityAvatar extends StatelessWidget {
   final String? imageUrl;
@@ -15,29 +15,30 @@ class PrideIdentityAvatar extends StatelessWidget {
     this.imageUrl,
     required this.initials,
     required this.size,
-    this.accent = AppColors.primary,
+    this.accent = AppMediaColors.actionPrimary,
     this.fallbackIcon = Icons.person_rounded,
   });
 
   @override
   Widget build(BuildContext context) {
-    final url = imageUrl?.trim();
+    final normalizedSource = imageUrl?.trim();
     final fallback = _FallbackAvatar(
       initials: initials,
       size: size,
       accent: accent,
       fallbackIcon: fallbackIcon,
     );
-    if (url == null || url.isEmpty) return fallback;
-
+    // Keep the direct fallback path pixel-stable for existing Pride exports.
+    if (normalizedSource == null || normalizedSource.isEmpty) return fallback;
     return ClipOval(
-      child: CachedNetworkImage(
-        imageUrl: url,
-        width: size,
-        height: size,
+      child: IdentityVisual(
+        source: normalizedSource,
+        size: size,
         fit: BoxFit.cover,
-        placeholder: (_, _) => fallback,
-        errorWidget: (_, _, _) => fallback,
+        semanticLabel: 'صورة الهوية',
+        appearance: IdentityVisualAppearance.onDarkMedia,
+        fallbackBuilder: (_) => fallback,
+        placeholderBuilder: (_) => fallback,
       ),
     );
   }
@@ -71,20 +72,20 @@ class _FallbackAvatar extends StatelessWidget {
           colors: [accent, accent.withValues(alpha: 0.55)],
         ),
         border: Border.all(
-          color: AppColors.textPrimaryTinted.withValues(alpha: 0.48),
+          color: AppMediaColors.textPrimary.withValues(alpha: 0.48),
           width: 2,
         ),
       ),
       child: normalizedInitials.isEmpty
           ? Icon(
               fallbackIcon,
-              color: AppColors.textOnPrimary,
+              color: AppMediaColors.inkOnAccent,
               size: size * 0.42,
             )
           : Text(
               normalizedInitials,
               style: TextStyle(
-                color: AppColors.textOnPrimary,
+                color: AppMediaColors.inkOnAccent,
                 fontSize: size * 0.30,
                 fontWeight: FontWeight.w900,
               ),

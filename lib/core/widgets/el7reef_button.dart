@@ -3,7 +3,7 @@ import '../../app/theme/app_colors.dart';
 import '../../app/theme/app_dimensions.dart';
 import '../../app/theme/app_text_styles.dart';
 
-/// زر EL7REEF الرئيسي مع gradient وتأثيرات
+/// زر EL7REEF الرئيسي؛ صلب وواضح ويستمد حالاته من الـTheme.
 class El7reefButton extends StatelessWidget {
   final String text;
   final VoidCallback? onPressed;
@@ -26,19 +26,20 @@ class El7reefButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onPressed != null && !isLoading;
+    final childColor = isLoading
+        ? AppColors.textPrimary
+        : isOutlined
+        ? (enabled ? AppColors.textPrimary : AppColors.textMuted)
+        : (enabled ? AppColors.textOnPrimary : AppColors.textMuted);
+
     if (isOutlined) {
       return SizedBox(
         width: width ?? double.infinity,
         height: height,
         child: OutlinedButton(
           onPressed: isLoading ? null : onPressed,
-          style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: AppColors.primary, width: 1.5),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-            ),
-          ),
-          child: _buildChild(AppColors.primary),
+          child: _buildChild(childColor),
         ),
       );
     }
@@ -46,34 +47,9 @@ class El7reefButton extends StatelessWidget {
     return SizedBox(
       width: width ?? double.infinity,
       height: height,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: onPressed == null
-              ? null
-              : AppColors.primaryGradient,
-          color: onPressed == null ? AppColors.surfaceLight : null,
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-          boxShadow: onPressed == null
-              ? null
-              : [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-        ),
-        child: ElevatedButton(
-          onPressed: isLoading ? null : onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-            ),
-          ),
-          child: _buildChild(AppColors.textOnPrimary),
-        ),
+      child: FilledButton(
+        onPressed: isLoading ? null : onPressed,
+        child: _buildChild(childColor),
       ),
     );
   }

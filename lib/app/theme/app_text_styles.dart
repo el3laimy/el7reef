@@ -144,10 +144,10 @@ abstract final class AppTextStyles {
     fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
   );
   static final TextStyle ratingLarge = scoreLarge.copyWith(
-    color: AppColors.primary,
+    color: AppColors.textPrimary,
   );
   static final TextStyle ratingMedium = scoreMedium.copyWith(
-    color: AppColors.primary,
+    color: AppColors.textPrimary,
   );
   static final TextStyle ratingDelta = _cairo(
     size: 20,

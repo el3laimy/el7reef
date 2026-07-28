@@ -6,6 +6,7 @@ import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/enums/tournament_ops_enums.dart';
 import '../../../core/widgets/el7reef_badge.dart';
+import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../core/widgets/el7reef_surface.dart';
 import '../../../domain/entities/group_standing_snapshot.dart';
 import '../../../domain/entities/match.dart';
@@ -147,27 +148,34 @@ class _TournamentGroupStageOverviewState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TournamentGroupSelector(
-          items: widget.groups
-              .map(
-                (group) => TournamentGroupSelectorItem(
-                  id: group.id,
-                  label: group.name,
-                  trailingCount:
-                      widget.participantsByGroupId[group.id]?.length ?? 0,
-                ),
-              )
-              .toList(growable: false),
-          selectedId: selectedGroup.id,
-          onSelected: (groupId) {
-            setState(() {
-              _selectedGroupId = groupId;
-              _selectedRoundNumber = 1;
-            });
-          },
+        El7reefGlassSurface(
+          role: El7reefGlassRole.floatingToolbar,
+          tone: El7reefGlassTone.action,
+          padding: const EdgeInsets.all(AppDimensions.xs),
+          child: TournamentGroupSelector(
+            items: widget.groups
+                .map(
+                  (group) => TournamentGroupSelectorItem(
+                    id: group.id,
+                    label: group.name,
+                    trailingCount:
+                        widget.participantsByGroupId[group.id]?.length ?? 0,
+                  ),
+                )
+                .toList(growable: false),
+            selectedId: selectedGroup.id,
+            onSelected: (groupId) {
+              setState(() {
+                _selectedGroupId = groupId;
+                _selectedRoundNumber = 1;
+              });
+            },
+          ),
         ),
         const SizedBox(height: AppDimensions.md),
-        El7reefSurface(
+        El7reefGlassSurface(
+          role: El7reefGlassRole.hero,
+          tone: El7reefGlassTone.action,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

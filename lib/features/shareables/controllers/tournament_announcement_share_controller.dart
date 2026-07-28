@@ -22,6 +22,7 @@ class TournamentAnnouncementShareController {
 
     return TournamentInviteShareData(
       tournamentName: tournamentName,
+      tournamentLogoUrl: tournament.logoUrl,
       teamSizeLabel:
           '${tournament.teamSize.value} ضد ${tournament.teamSize.value}',
       maxTeams: tournament.maxTeams,
@@ -62,6 +63,7 @@ class TournamentAnnouncementShareController {
 
     return UpcomingFixtureShareData(
       tournamentName: tournamentName,
+      tournamentLogoUrl: tournament.logoUrl,
       teamAName: teamAName,
       teamBName: teamBName,
       scheduledAt: scheduledAt,

@@ -5,6 +5,9 @@ import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/identity/identity_preset.dart';
+import '../../../core/identity/identity_preset_field.dart';
+import '../../../core/identity/identity_visual.dart';
 import '../../../core/widgets/el7reef_button.dart';
 import '../../../core/widgets/section_state_card.dart';
 import '../../../domain/entities/team.dart';
@@ -51,7 +54,7 @@ class MyTeamsScreen extends GetView<TeamController> {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.25),
+              color: AppColors.primary.withValues(alpha: 0.12),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -135,7 +138,7 @@ class MyTeamsScreen extends GetView<TeamController> {
       roleIcon = Icons.stars;
     } else if (team.viceCaptainIds.contains(uid)) {
       roleLabel = 'نائب القائد';
-      roleColor = AppColors.secondary;
+      roleColor = AppColors.info;
       roleIcon = Icons.shield;
     }
 
@@ -152,18 +155,24 @@ class MyTeamsScreen extends GetView<TeamController> {
             child: Row(
               children: [
                 // شعار الفريق
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: AppColors.primaryGradient,
-                  ),
-                  child: Center(
-                    child: Text(
-                      team.name.isNotEmpty ? team.name[0] : '?',
-                      style: AppTextStyles.headlineLarge.copyWith(
-                        color: AppColors.textPrimary,
+                IdentityVisual(
+                  source: team.logoUrl,
+                  size: 56,
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+                  semanticLabel: 'شعار فريق ${team.name}',
+                  fallbackBuilder: (_) => DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.actionContainer,
+                      borderRadius: BorderRadius.circular(
+                        AppDimensions.radiusMd,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        team.name.isNotEmpty ? team.name[0] : '?',
+                        style: AppTextStyles.headlineLarge.copyWith(
+                          color: AppColors.actionLight,
+                        ),
                       ),
                     ),
                   ),
@@ -281,6 +290,15 @@ class MyTeamsScreen extends GetView<TeamController> {
                   prefixIcon: Icon(Icons.group, color: AppColors.textMuted),
                 ),
               ),
+              const SizedBox(height: AppDimensions.md),
+              Obx(
+                () => IdentityPresetField(
+                  scope: IdentityPresetScope.team,
+                  value: controller.selectedLogoUrl.value,
+                  previewTitleController: controller.teamNameController,
+                  onChanged: controller.selectLogo,
+                ),
+              ),
               const SizedBox(height: AppDimensions.lg),
               Obx(
                 () => El7reefButton(
@@ -373,6 +391,15 @@ class _CreateTeamIntentSheet extends StatelessWidget {
                 labelText: 'اسم الفريق',
                 hintText: 'مثال: نجوم الشارع',
                 prefixIcon: Icon(Icons.group, color: AppColors.textMuted),
+              ),
+            ),
+            const SizedBox(height: AppDimensions.md),
+            Obx(
+              () => IdentityPresetField(
+                scope: IdentityPresetScope.team,
+                value: controller.selectedLogoUrl.value,
+                previewTitleController: controller.teamNameController,
+                onChanged: controller.selectLogo,
               ),
             ),
             const SizedBox(height: AppDimensions.lg),

@@ -57,6 +57,7 @@ function quickCreateTournamentData(overrides = {}) {
     discoverable: true,
     isFeatured: false,
     featuredPriority: 1000,
+    logoUrl: null,
     participantViewerIds: [],
     prizePool: null,
     prizeDescription: null,
@@ -502,6 +503,31 @@ describe('tournament permission Firestore rules', () => {
       );
     });
 
+    it('allows only catalog tournament emblems for the organizer', async () => {
+      await seed(
+        'tournaments/tournament-1',
+        quickCreateTournamentData(),
+      );
+      const organizerDb = authedDb('organizer-1');
+      const strangerDb = authedDb('account-b');
+
+      await assertSucceeds(
+        updateDoc(doc(organizerDb, 'tournaments', 'tournament-1'), {
+          logoUrl: 'preset://v1/tournament_emblem/floodlights',
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(organizerDb, 'tournaments', 'tournament-1'), {
+          logoUrl: 'preset://v1/tournament_emblem/not_in_catalog',
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(strangerDb, 'tournaments', 'tournament-1'), {
+          logoUrl: 'preset://v1/tournament_emblem/whistle',
+        }),
+      );
+    });
+
     it('denies self-assigned organizer membership for another organizer tournament', async () => {
       await seed(
         'tournaments/other-cup',
@@ -930,6 +956,58 @@ describe('tournament permission Firestore rules', () => {
             where('userId', '==', 'player-2'),
           ),
         ),
+      );
+    });
+  });
+
+  describe('team identity presets', () => {
+    it('keeps https logos compatible but rejects untrusted schemes', async () => {
+      await seed('teams/team-identity', teamData());
+      const ownerDb = authedDb('team-owner-1');
+
+      await assertSucceeds(
+        updateDoc(doc(ownerDb, 'teams', 'team-identity'), {
+          logoUrl: 'https://cdn.el7reef.app/team/logo.png',
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(ownerDb, 'teams', 'team-identity'), {
+          logoUrl: 'javascript:alert(1)',
+        }),
+      );
+    });
+
+    it('lets a vice captain update only the logo with a catalog preset', async () => {
+      await seed(
+        'teams/team-identity',
+        teamData({viceCaptainIds: ['vice-1']}),
+      );
+      const viceDb = authedDb('vice-1');
+
+      await assertSucceeds(
+        updateDoc(doc(viceDb, 'teams', 'team-identity'), {
+          logoUrl: 'preset://v1/team_badge/street_bolt',
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(viceDb, 'teams', 'team-identity'), {
+          logoUrl: 'preset://v1/team_badge/not_in_catalog',
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(viceDb, 'teams', 'team-identity'), {
+          name: 'Forged team name',
+        }),
+      );
+    });
+
+    it('denies an unrelated player changing the team identity', async () => {
+      await seed('teams/team-identity', teamData());
+
+      await assertFails(
+        updateDoc(doc(authedDb('stranger-1'), 'teams', 'team-identity'), {
+          logoUrl: 'preset://v1/team_pennant/diagonal_dash',
+        }),
       );
     });
   });

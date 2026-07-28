@@ -8,6 +8,9 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/enums/tournament_enums.dart';
+import '../../../core/identity/identity_preset.dart';
+import '../../../core/identity/identity_preset_field.dart';
+import '../../../core/identity/identity_visual.dart';
 import '../../../core/widgets/el7reef_button.dart';
 import '../../../core/widgets/el7reef_glass_surface.dart';
 import '../../../core/widgets/el7reef_surface.dart';
@@ -105,34 +108,38 @@ class TournamentListScreen extends GetView<TournamentController> {
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppDimensions.pagePadding,
                       ),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        child: Row(
-                          children: [
-                            _buildFilterChip(
-                              label: 'كل بطولاتي',
-                              filter: 'all',
-                            ),
-                            const SizedBox(width: AppDimensions.sm),
-                            _buildFilterChip(
-                              label: 'تسجيل مفتوح',
-                              filter: 'registration',
-                            ),
-                            const SizedBox(width: AppDimensions.sm),
-                            _buildFilterChip(
-                              label: 'جارية الآن',
-                              filter: 'active',
-                            ),
-                            const SizedBox(width: AppDimensions.sm),
-                            _buildFilterChip(
-                              label: 'منتهية',
-                              filter: 'completed',
-                            ),
-                          ],
+                      child: El7reefGlassSurface(
+                        role: El7reefGlassRole.floatingToolbar,
+                        padding: const EdgeInsets.all(AppDimensions.xs),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          child: Row(
+                            children: [
+                              _buildFilterChip(
+                                label: 'كل بطولاتي',
+                                filter: 'all',
+                              ),
+                              const SizedBox(width: AppDimensions.sm),
+                              _buildFilterChip(
+                                label: 'تسجيل مفتوح',
+                                filter: 'registration',
+                              ),
+                              const SizedBox(width: AppDimensions.sm),
+                              _buildFilterChip(
+                                label: 'جارية الآن',
+                                filter: 'active',
+                              ),
+                              const SizedBox(width: AppDimensions.sm),
+                              _buildFilterChip(
+                                label: 'منتهية',
+                                filter: 'completed',
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ).animate().fadeIn(duration: 500.ms),
+                      ).animate().fadeIn(duration: 500.ms),
+                    ),
                   ),
                   const SliverToBoxAdapter(
                     child: SizedBox(height: AppDimensions.md),
@@ -324,7 +331,7 @@ class TournamentListScreen extends GetView<TournamentController> {
               child: const Icon(
                 Icons.emoji_events_rounded,
                 size: 56,
-                color: AppColors.secondary,
+                color: AppColors.competitive,
               ),
             ),
             const SizedBox(height: AppDimensions.md),
@@ -395,15 +402,13 @@ class _TournamentPortfolioHeader extends StatelessWidget {
         AppDimensions.pagePadding,
         AppDimensions.xs,
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
-        child: TournamentFieldPattern(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: AppColors.surfaceRaised,
-              border: Border.all(color: AppColors.surfaceBorderStrong),
-              borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
-            ),
+      child: El7reefSolidSurface(
+        tone: El7reefGlassTone.competitive,
+        elevated: true,
+        padding: EdgeInsets.zero,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(30),
+          child: TournamentFieldPattern(
             child: Padding(
               padding: const EdgeInsets.all(AppDimensions.lg),
               child: Column(
@@ -766,6 +771,9 @@ class _TournamentExploreScreenState extends State<TournamentExploreScreen> {
                           ),
                           child: _FeaturedTournamentCard(
                             tournament: featuredTournaments[i],
+                            presentation: i == 0
+                                ? _FeaturedTournamentPresentation.hero
+                                : _FeaturedTournamentPresentation.solid,
                           ),
                         ),
                         childCount: featuredTournaments.length,
@@ -888,10 +896,16 @@ class _ExploreSectionHeader extends StatelessWidget {
   }
 }
 
+enum _FeaturedTournamentPresentation { hero, solid }
+
 class _FeaturedTournamentCard extends StatelessWidget {
   final Tournament tournament;
+  final _FeaturedTournamentPresentation presentation;
 
-  const _FeaturedTournamentCard({required this.tournament});
+  const _FeaturedTournamentCard({
+    required this.tournament,
+    required this.presentation,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -900,14 +914,9 @@ class _FeaturedTournamentCard extends StatelessWidget {
     return Semantics(
       button: true,
       label: 'بطولة مميزة، ${tournament.name}، ${spec.statusLabel}',
-      child: Material(
+      child: _FeaturedTournamentShell(
         key: ValueKey('featured-tournament-${tournament.id}'),
-        color: AppColors.surfaceRaised,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
-          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.48)),
-        ),
-        clipBehavior: Clip.antiAlias,
+        presentation: presentation,
         child: InkWell(
           onTap: () =>
               Get.toNamed(AppRoutes.tournamentDetailById(tournament.id)),
@@ -947,15 +956,46 @@ class _FeaturedTournamentCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: AppDimensions.md),
-                  Text(
-                    tournament.name,
-                    maxLines: textScale >= 1.5 ? 3 : 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.headlineLarge.copyWith(
-                      color: AppColors.textPrimaryTinted,
-                      fontWeight: FontWeight.w900,
-                      height: 1.15,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      IdentityVisual(
+                        source: tournament.logoUrl,
+                        size: 64,
+                        borderRadius: BorderRadius.circular(
+                          AppDimensions.radiusMd,
+                        ),
+                        semanticLabel: 'رمز بطولة ${tournament.name}',
+                        fallbackBuilder: (_) => DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: AppColors.actionContainer,
+                            borderRadius: BorderRadius.circular(
+                              AppDimensions.radiusMd,
+                            ),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.emoji_events_outlined,
+                              color: AppColors.actionLight,
+                              size: 30,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppDimensions.md),
+                      Expanded(
+                        child: Text(
+                          tournament.name,
+                          maxLines: textScale >= 1.5 ? 3 : 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.headlineLarge.copyWith(
+                            color: AppColors.textPrimaryTinted,
+                            fontWeight: FontWeight.w900,
+                            height: 1.15,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   if (tournament.description?.trim().isNotEmpty ?? false) ...[
                     const SizedBox(height: AppDimensions.sm),
@@ -1023,6 +1063,36 @@ class _FeaturedTournamentCard extends StatelessWidget {
   }
 }
 
+class _FeaturedTournamentShell extends StatelessWidget {
+  const _FeaturedTournamentShell({
+    super.key,
+    required this.presentation,
+    required this.child,
+  });
+
+  final _FeaturedTournamentPresentation presentation;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (presentation) {
+      _FeaturedTournamentPresentation.hero => El7reefGlassSurface(
+        role: El7reefGlassRole.hero,
+        tone: El7reefGlassTone.action,
+        padding: EdgeInsets.zero,
+        child: child,
+      ),
+      _FeaturedTournamentPresentation.solid => El7reefSolidSurface(
+        tone: El7reefGlassTone.action,
+        elevated: true,
+        radius: 30,
+        padding: EdgeInsets.zero,
+        child: child,
+      ),
+    };
+  }
+}
+
 // ══════════════════════════════════════════
 // ── بطاقة الدورة المطورة بصرياً ──
 // ══════════════════════════════════════════
@@ -1079,19 +1149,31 @@ class _TournamentCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: AppDimensions.md),
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: spec.accent.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(
-                            AppDimensions.radiusMd,
+                      IdentityVisual(
+                        source: tournament.logoUrl,
+                        size: 48,
+                        borderRadius: BorderRadius.circular(
+                          AppDimensions.radiusMd,
+                        ),
+                        semanticLabel: 'رمز بطولة ${tournament.name}',
+                        fallbackBuilder: (_) => DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: spec.accent.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(
+                              AppDimensions.radiusMd,
+                            ),
+                            border: Border.all(
+                              color: spec.accent.withValues(alpha: 0.28),
+                            ),
                           ),
-                          border: Border.all(
-                            color: spec.accent.withValues(alpha: 0.28),
+                          child: Center(
+                            child: Icon(
+                              spec.icon,
+                              color: spec.accent,
+                              size: 24,
+                            ),
                           ),
                         ),
-                        child: Icon(spec.icon, color: spec.accent, size: 24),
                       ),
                     ],
                   ),
@@ -1170,7 +1252,8 @@ class _CreateTournamentSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return El7reefGlassSurface(
-      variant: El7reefGlassVariant.sheet,
+      role: El7reefGlassRole.compactSheet,
+      tone: El7reefGlassTone.competitive,
       borderRadius: const BorderRadius.vertical(
         top: Radius.circular(AppDimensions.radiusXl),
       ),
@@ -1204,7 +1287,7 @@ class _CreateTournamentSheet extends StatelessWidget {
                   children: [
                     const Icon(
                       Icons.emoji_events_rounded,
-                      color: AppColors.secondary,
+                      color: AppColors.competitive,
                       size: 28,
                     ),
                     const SizedBox(width: AppDimensions.sm),
@@ -1239,6 +1322,16 @@ class _CreateTournamentSheet extends StatelessWidget {
                       Icons.emoji_events_outlined,
                       color: AppColors.primary,
                     ),
+                  ),
+                ),
+                const SizedBox(height: AppDimensions.md),
+
+                Obx(
+                  () => IdentityPresetField(
+                    scope: IdentityPresetScope.tournament,
+                    value: controller.selectedLogoUrl.value,
+                    previewTitleController: controller.nameController,
+                    onChanged: controller.selectLogo,
                   ),
                 ),
                 const SizedBox(height: AppDimensions.md),

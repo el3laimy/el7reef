@@ -4,6 +4,8 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:el7reef/core/services/feature_flag_service.dart';
+import 'package:el7reef/core/widgets/el7reef_glass_surface.dart';
+import 'package:el7reef/core/widgets/el7reef_solid_surface.dart';
 import 'package:el7reef/domain/entities/share_payload.dart';
 import 'package:el7reef/features/shareables/models/pride_card_format.dart';
 import 'package:el7reef/features/shareables/models/pride_export.dart';
@@ -87,6 +89,41 @@ void main() {
 
     expect(find.text('فيديو'), findsNothing);
     expect(find.text('بصمة صوت الحريف'), findsNothing);
+  });
+
+  testWidgets('long composer is solid with two preview toolbars only', (
+    tester,
+  ) async {
+    Get.put(
+      FeatureFlagService(
+        overrides: const {
+          FeatureFlagKey.functionalGlassEnabled: true,
+          FeatureFlagKey.prideVideoExportEnabled: false,
+        },
+      ),
+    );
+    await tester.pumpWidget(
+      const _ComposerLauncher(cardType: ShareCardType.matchResult),
+    );
+
+    await tester.tap(find.text('افتح التجهيز'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(El7reefSolidSurface), findsOneWidget);
+    expect(find.byType(El7reefGlassSurface), findsNWidgets(2));
+    for (final surface in tester.widgetList<El7reefGlassSurface>(
+      find.byType(El7reefGlassSurface),
+    )) {
+      expect(surface.role, El7reefGlassRole.previewToolbar);
+    }
+    expect(find.byType(BackdropFilter), findsNWidgets(2));
+    expect(
+      find.ancestor(
+        of: find.text('preview-square1x1'),
+        matching: find.byType(El7reefGlassSurface),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('preference storage failure does not block sharing', (

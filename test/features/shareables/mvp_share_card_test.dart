@@ -5,7 +5,7 @@ import 'package:el7reef/core/enums/match_status.dart';
 import 'package:el7reef/domain/entities/match.dart';
 import 'package:el7reef/domain/entities/match_event.dart';
 import 'package:el7reef/domain/entities/participant_ref.dart';
-import 'package:el7reef/core/widgets/el7reef_glass_surface.dart';
+import 'package:el7reef/core/widgets/el7reef_solid_surface.dart';
 import 'package:el7reef/features/shareables/controllers/mvp_share_controller.dart';
 import 'package:el7reef/features/shareables/models/mvp_share_data.dart';
 import 'package:el7reef/features/shareables/widgets/mvp_share_card.dart';
@@ -189,7 +189,8 @@ void main() {
     expect(find.text('الخصم'), findsOneWidget);
     expect(find.text('ضيف'), findsOneWidget);
     expect(find.text('الحريف'), findsWidgets);
-    expect(find.byType(El7reefGlassSurface), findsOneWidget);
+    expect(find.byType(El7reefSolidSurface), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsNothing);
   });
 
   testWidgets('export mode keeps the share image free of live glass blur', (
@@ -211,7 +212,7 @@ void main() {
     );
 
     expect(find.text('Ali MVP'), findsOneWidget);
-    expect(find.byType(El7reefGlassSurface), findsNothing);
+    expect(find.byType(El7reefSolidSurface), findsNothing);
     expect(find.byType(BackdropFilter), findsNothing);
   });
 }

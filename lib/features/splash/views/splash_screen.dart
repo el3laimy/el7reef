@@ -83,7 +83,7 @@ class _SplashScreenState extends State<SplashScreen> {
               children: [
                 const Spacer(),
                 El7reefGlassSurface(
-                  variant: El7reefGlassVariant.raised,
+                  role: El7reefGlassRole.hero,
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppDimensions.xl,
                     vertical: AppDimensions.xl,
@@ -97,11 +97,11 @@ class _SplashScreenState extends State<SplashScreen> {
                               borderRadius: BorderRadius.circular(32),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primary.withValues(
-                                    alpha: 0.32,
+                                  color: AppColors.black.withValues(
+                                    alpha: 0.12,
                                   ),
-                                  blurRadius: 36,
-                                  spreadRadius: 4,
+                                  blurRadius: 26,
+                                  offset: const Offset(0, 14),
                                 ),
                               ],
                             ),
@@ -111,7 +111,7 @@ class _SplashScreenState extends State<SplashScreen> {
                           .scale(
                             begin: const Offset(0.92, 0.92),
                             end: const Offset(1.0, 1.0),
-                            duration: 450.ms,
+                            duration: 250.ms,
                             curve: Curves.easeOutCubic,
                           )
                           .fadeIn(duration: 260.ms),
@@ -119,16 +119,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       Text(
                             AppConstants.appName,
                             style: AppTextStyles.displayLarge.copyWith(
-                              foreground: Paint()
-                                ..shader =
-                                    const LinearGradient(
-                                      colors: [
-                                        AppColors.primary,
-                                        AppColors.primaryLight,
-                                      ],
-                                    ).createShader(
-                                      const Rect.fromLTWH(0, 0, 200, 70),
-                                    ),
+                              color: AppColors.textPrimary,
                             ),
                           )
                           .animate()
@@ -152,7 +143,7 @@ class _SplashScreenState extends State<SplashScreen> {
                         child: CircularProgressIndicator(
                           strokeWidth: 3,
                           valueColor: AlwaysStoppedAnimation(
-                            AppColors.primary.withValues(alpha: 0.78),
+                            AppColors.actionPrimary.withValues(alpha: 0.86),
                           ),
                         ),
                       ).animate().fadeIn(delay: 260.ms, duration: 260.ms),

@@ -22,8 +22,7 @@ class MatchdayNoManagedSideCard extends StatelessWidget {
         : controller.isLoggedIn
         ? 'لا توجد أطراف تملك صلاحية إدارتها في هذه المباراة من حسابك الحالي.'
         : 'سجّل الدخول أولًا حتى تظهر لك أطراف المباراة التي يمكنك إدارتها.';
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       padding: const EdgeInsets.all(AppDimensions.lg),
       child: Column(
         children: [

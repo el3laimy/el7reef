@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_media_colors.dart';
 import '../models/pride_card_format.dart';
 import '../models/tournament_stage_share_data.dart';
 import 'pride_card_shell.dart';
@@ -39,15 +39,15 @@ class TournamentStageShareCard extends StatelessWidget {
     final visibleRows = data.rows.take(rowLimit).toList(growable: false);
     final hiddenCount = data.rows.length - visibleRows.length;
     final accent = data.kind == TournamentStagePrideKind.groupStandings
-        ? AppColors.primary
-        : AppColors.accent;
+        ? AppMediaColors.actionPrimary
+        : AppMediaColors.info;
     final body = Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
-          colors: [accent.withValues(alpha: 0.28), AppColors.backgroundDeep],
+          colors: [accent.withValues(alpha: 0.28), AppMediaColors.canvasDeep],
         ),
         borderRadius: BorderRadius.circular(exportMode ? 16 : 22),
         border: Border.all(color: accent.withValues(alpha: 0.52)),
@@ -88,7 +88,7 @@ class TournamentStageShareCard extends StatelessWidget {
                         Text(
                           '+$hiddenCount صفوف أخرى',
                           style: TextStyle(
-                            color: AppColors.textSecondaryTinted,
+                            color: AppMediaColors.textSecondary,
                             fontSize: dense ? 6 : (compact ? 9 : 10),
                             fontWeight: FontWeight.w700,
                           ),
@@ -190,7 +190,7 @@ class _StageHeader extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: AppColors.textPrimaryTinted,
+            color: AppMediaColors.textPrimary,
             fontSize: dense ? 12 : (compact ? 19 : 24),
             height: 1.1,
             fontWeight: FontWeight.w900,
@@ -203,7 +203,7 @@ class _StageHeader extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: AppColors.textSecondaryTinted,
+            color: AppMediaColors.textSecondary,
             fontSize: dense ? 7 : (compact ? 10 : 12),
             fontWeight: FontWeight.w700,
           ),
@@ -230,10 +230,10 @@ class _StageRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rowAccent = row.earned
-        ? AppColors.secondary
+        ? AppMediaColors.achievement
         : row.emphasized
         ? accent
-        : AppColors.textSecondaryTinted;
+        : AppMediaColors.textSecondary;
     return Container(
       constraints: BoxConstraints(minHeight: dense ? 28 : (compact ? 34 : 40)),
       padding: EdgeInsets.symmetric(
@@ -272,7 +272,7 @@ class _StageRow extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: AppColors.textPrimaryTinted,
+                    color: AppMediaColors.textPrimary,
                     fontSize: dense ? 7.5 : (compact ? 11 : 12),
                     fontWeight: FontWeight.w800,
                   ),
@@ -283,7 +283,7 @@ class _StageRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: AppColors.textSecondaryTinted,
+                      color: AppMediaColors.textSecondary,
                       fontSize: dense ? 6 : (compact ? 8 : 9),
                       fontWeight: FontWeight.w600,
                     ),

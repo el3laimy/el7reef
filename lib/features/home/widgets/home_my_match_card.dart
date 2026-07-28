@@ -35,13 +35,12 @@ class HomeMyMatchCard extends StatelessWidget {
         resultColor = AppColors.error;
         resultLabel = 'خسارة';
       } else {
-        resultColor = AppColors.secondary;
+        resultColor = AppColors.info;
         resultLabel = 'تعادل';
       }
     }
 
-    return El7reefGlassSurface(
-          variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
           padding: const EdgeInsets.symmetric(
             horizontal: AppDimensions.md,
             vertical: AppDimensions.sm,

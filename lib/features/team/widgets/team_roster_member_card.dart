@@ -86,12 +86,14 @@ class TeamRosterMemberCard extends StatelessWidget {
                   children: [
                     TeamRosterTag(
                       label: entry.isGuest ? 'ضيف' : 'مسجل',
-                      color: entry.isGuest ? AppColors.accent : AppColors.primary,
+                      color: entry.isGuest
+                          ? AppColors.accent
+                          : AppColors.primary,
                     ),
                     TeamRosterTag(
                       label: roleLabel(membership.role),
                       color: membership.role == TeamMembershipRole.viceCaptain
-                          ? AppColors.secondary
+                          ? AppColors.info
                           : AppColors.textSecondary,
                     ),
                     TeamRosterTag(

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:el7reef/app/theme/app_colors.dart';
+import 'package:el7reef/app/theme/app_media_colors.dart';
 import 'package:el7reef/core/lineup/formation_engine.dart';
 import 'package:el7reef/core/lineup/lineup_types.dart';
-import 'package:el7reef/core/widgets/el7reef_glass_surface.dart';
+import 'package:el7reef/core/widgets/el7reef_solid_surface.dart';
 import 'package:el7reef/features/shareables/models/lineup_share_data.dart';
 import 'package:el7reef/features/shareables/models/pride_card_format.dart';
 import 'package:el7reef/features/shareables/widgets/lineup_share_card.dart';
@@ -13,7 +13,7 @@ import 'pride_card_test_font.dart';
 
 void main() {
   setUpAll(loadPrideCardTestFont);
-  testWidgets('renders lineup card text and uses pride glass in preview', (
+  testWidgets('renders lineup card text on a solid preview surface', (
     tester,
   ) async {
     final data = _data();
@@ -34,12 +34,8 @@ void main() {
     expect(find.text('نهائي الشارع'), findsOneWidget);
     expect(find.text('اضغط من البداية'), findsNothing);
     expect(find.byIcon(Icons.star), findsNothing);
-    expect(find.byType(El7reefGlassSurface), findsOneWidget);
-
-    final surface = tester.widget<El7reefGlassSurface>(
-      find.byType(El7reefGlassSurface),
-    );
-    expect(surface.variant, El7reefGlassVariant.pride);
+    expect(find.byType(El7reefSolidSurface), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsNothing);
   });
 
   testWidgets('export mode keeps the lineup image free of live glass blur', (
@@ -56,7 +52,7 @@ void main() {
     );
 
     expect(find.text('التشكيلة الرسمية'), findsOneWidget);
-    expect(find.byType(El7reefGlassSurface), findsNothing);
+    expect(find.byType(El7reefSolidSurface), findsNothing);
     expect(find.byType(BackdropFilter), findsNothing);
     expect(
       tester.getSize(find.byType(Directionality).last),
@@ -156,7 +152,7 @@ LineupShareData _data() {
     teamName: 'الحريف',
     teamLabel: 'فريق رسمي',
     initials: 'ح',
-    accentColor: AppColors.primary,
+    accentColor: AppMediaColors.actionPrimary,
     formationCode: '2-2',
     formationLabel: '2-2',
     teamSize: 5,
@@ -193,7 +189,7 @@ LineupShareData _elevenPlayerData() {
     teamName: 'نجوم الحارة',
     teamLabel: 'فريق رسمي',
     initials: 'نح',
-    accentColor: AppColors.primary,
+    accentColor: AppMediaColors.actionPrimary,
     formationCode: '4-2-3-1',
     teamSize: 11,
     lineupTypeLabel: 'فريق رسمي',

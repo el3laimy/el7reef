@@ -88,8 +88,7 @@ class _CollapsibleTeamSectionState extends State<CollapsibleTeamSection> {
       padding: const EdgeInsets.symmetric(
         horizontal: AppDimensions.pagePadding,
       ),
-      child: El7reefGlassSurface(
-        variant: El7reefGlassVariant.base,
+      child: El7reefSolidSurface(
         padding: const EdgeInsets.all(AppDimensions.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

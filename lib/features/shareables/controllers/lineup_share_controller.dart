@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' as intl;
 
-import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_media_colors.dart';
 import '../../../core/lineup/formation_engine.dart';
 import '../../../core/lineup/formation_library.dart';
 import '../../../core/lineup/lineup_types.dart';
@@ -48,7 +48,7 @@ class LineupShareController {
       lineupOwnerType: LineupShareOwnerType.officialTeam,
       lineupTypeLabel: 'فريق رسمي',
       matchLabel: matchLabel,
-      accentColor: AppColors.primary,
+      accentColor: AppMediaColors.actionPrimary,
     );
   }
 
@@ -77,7 +77,7 @@ class LineupShareController {
       lineupOwnerType: LineupShareOwnerType.temporarySide,
       lineupTypeLabel: 'فريق مؤقت',
       matchLabel: matchLabel ?? 'مباراة ودية',
-      accentColor: AppColors.primaryLight,
+      accentColor: AppMediaColors.actionLight,
     );
   }
 
@@ -89,7 +89,7 @@ class LineupShareController {
     LineupShareOwnerType? lineupOwnerType,
     String? lineupTypeLabel,
     String? matchLabel,
-    Color accentColor = AppColors.primary,
+    Color accentColor = AppMediaColors.actionPrimary,
   }) {
     final ownerType = lineupOwnerType ?? _ownerTypeForSnapshot(snapshot);
     final resolvedName = _normalizeName(teamName);

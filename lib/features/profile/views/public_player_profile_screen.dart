@@ -268,7 +268,7 @@ class _PublicPlayerProfileContent extends StatelessWidget {
       padding: const EdgeInsets.all(AppDimensions.pagePadding),
       children: [
         El7reefGlassSurface(
-          variant: El7reefGlassVariant.base,
+          role: El7reefGlassRole.hero,
           padding: const EdgeInsets.all(AppDimensions.lg),
           radius: AppDimensions.radiusLg,
           child: Column(
@@ -281,8 +281,8 @@ class _PublicPlayerProfileContent extends StatelessWidget {
                     initials: _initials(profile.displayName),
                     size: 56,
                     accent: profile.isGuest
-                        ? AppColors.secondary
-                        : AppColors.primary,
+                        ? AppColors.info
+                        : AppColors.actionPrimary,
                     fallbackIcon: profile.isGuest
                         ? Icons.person_outline_rounded
                         : Icons.person_rounded,
@@ -379,7 +379,7 @@ class _MilestoneShareAction extends StatelessWidget {
         : 'عندك إنجاز أهداف وإنجاز نجومية، اختار اللحظة اللي هتشاركها.';
     return El7reefSurface(
       elevated: true,
-      borderColor: AppColors.secondary.withValues(alpha: 0.34),
+      borderColor: AppColors.achievement.withValues(alpha: 0.34),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -387,7 +387,7 @@ class _MilestoneShareAction extends StatelessWidget {
             children: [
               const Icon(
                 Icons.military_tech_rounded,
-                color: AppColors.secondary,
+                color: AppColors.achievement,
               ),
               const SizedBox(width: AppDimensions.sm),
               Expanded(
@@ -456,8 +456,8 @@ class _MilestonePickerSheet extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
                 minTileHeight: 56,
                 leading: CircleAvatar(
-                  backgroundColor: AppColors.secondary.withValues(alpha: 0.16),
-                  foregroundColor: AppColors.secondary,
+                  backgroundColor: AppColors.achievementSurface,
+                  foregroundColor: AppColors.achievement,
                   child: Icon(
                     milestone.metric == PlayerMilestoneMetric.goals
                         ? Icons.sports_soccer_rounded
@@ -491,8 +491,7 @@ class _SafetyActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       padding: const EdgeInsets.all(AppDimensions.md),
       radius: AppDimensions.radiusMd,
       child: Column(
@@ -683,12 +682,12 @@ class _KindBadge extends StatelessWidget {
         vertical: 4,
       ),
       decoration: BoxDecoration(
-        color: AppColors.secondary.withValues(alpha: 0.16),
+        color: AppColors.infoSurface,
         borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
       ),
       child: Text(
         label,
-        style: AppTextStyles.labelSmall.copyWith(color: AppColors.secondary),
+        style: AppTextStyles.labelSmall.copyWith(color: AppColors.info),
       ),
     );
   }
@@ -749,8 +748,7 @@ class _ClaimAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       padding: const EdgeInsets.all(AppDimensions.md),
       radius: AppDimensions.radiusMd,
       child: Column(
@@ -781,8 +779,7 @@ class _InfoPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       padding: const EdgeInsets.all(AppDimensions.md),
       radius: AppDimensions.radiusMd,
       child: Text(

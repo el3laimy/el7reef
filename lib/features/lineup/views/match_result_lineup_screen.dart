@@ -6,9 +6,11 @@ import 'package:get/get.dart';
 import '../../../app/routes/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
+import '../../../app/theme/app_media_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/constants/feature_flags.dart';
+import '../../../core/identity/identity_preset_catalog.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../core/widgets/el7reef_badge.dart';
 import '../../../core/widgets/el7reef_surface.dart';
@@ -138,15 +140,18 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
                         controller: controller,
                         title: home.label,
                         side: home,
-                        onShare: () =>
-                            _shareLineup(context, home, AppColors.primary),
+                        onShare: () => _shareLineup(
+                          context,
+                          home,
+                          AppMediaColors.actionPrimary,
+                        ),
                       );
                       final awayCard = _ResultTeamLineupCard(
                         controller: controller,
                         title: away.label,
                         side: away,
                         onShare: () =>
-                            _shareLineup(context, away, AppColors.error),
+                            _shareLineup(context, away, AppMediaColors.error),
                       );
                       if (!wide) {
                         return Column(
@@ -618,6 +623,7 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
     for (final logoUrl in [shareData.teamALogoUrl, shareData.teamBLogoUrl]) {
       final url = logoUrl?.trim();
       if (url == null || url.isEmpty) continue;
+      if (IdentityPresetCatalog.containsReference(url)) continue;
       if (!context.mounted) return;
       try {
         await precacheImage(NetworkImage(url), context);
@@ -634,6 +640,7 @@ class MatchResultLineupScreen extends GetView<MatchResultLineupController> {
   ) async {
     final url = shareData.logoUrl?.trim();
     if (url == null || url.isEmpty) return;
+    if (IdentityPresetCatalog.containsReference(url)) return;
     try {
       await precacheImage(NetworkImage(url), context);
     } catch (error) {
@@ -694,13 +701,13 @@ class _PrideSharePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return El7reefSurface(
       elevated: true,
-      borderColor: AppColors.secondary.withValues(alpha: 0.30),
+      borderColor: AppColors.socialAccent.withValues(alpha: 0.30),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const El7reefBadge(
             label: 'كروت الفخر جاهزة',
-            color: AppColors.secondary,
+            color: AppColors.socialAccent,
             icon: Icons.ios_share_rounded,
           ),
           const SizedBox(height: AppDimensions.md),

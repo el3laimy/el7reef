@@ -146,7 +146,7 @@ class SearchPlayersScreen extends GetView<SearchPlayersController> {
             borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.3),
+                color: AppColors.primary.withValues(alpha: 0.12),
                 blurRadius: 8,
                 spreadRadius: 1,
               ),
@@ -155,7 +155,7 @@ class SearchPlayersScreen extends GetView<SearchPlayersController> {
           child: IconButton(
             icon: const Icon(
               Icons.qr_code_scanner,
-              color: AppColors.background,
+              color: AppColors.textOnPrimary,
             ),
             onPressed: () {
               Get.toNamed(AppRoutes.qrScanner);
@@ -168,8 +168,7 @@ class SearchPlayersScreen extends GetView<SearchPlayersController> {
 
   Widget _buildPlayerCard(Player player) {
     // نستخدم FriendController للتأكد من إمكانية الإضافة (يمكن التحقق مستقبلا من حالة الصداقة)
-    return El7reefGlassSurface(
-      variant: El7reefGlassVariant.base,
+    return El7reefSolidSurface(
       margin: const EdgeInsets.only(bottom: AppDimensions.md),
       padding: const EdgeInsets.all(AppDimensions.md),
       radius: AppDimensions.radiusLg,
@@ -250,10 +249,10 @@ class SearchPlayersScreen extends GetView<SearchPlayersController> {
 
           // Challenge Button
           IconButton(
-            icon: const Icon(Icons.flash_on, color: AppColors.secondary),
+            icon: const Icon(Icons.flash_on, color: AppColors.competitive),
             padding: const EdgeInsets.all(12),
             style: IconButton.styleFrom(
-              backgroundColor: AppColors.secondary.withValues(alpha: 0.1),
+              backgroundColor: AppColors.competitiveSurface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
