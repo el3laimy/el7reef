@@ -2,10 +2,13 @@
 
 # مهام إصلاح المعمارية وتقليل الدين التقني
 
-**الحالة:** قائمة تنفيذ تابعة للخطة الموحدة وليست Roadmap منتج مستقلة  
+**الحالة:** `ARCHIVED SNAPSHOT`؛ نتائجها المحلية لا تمثل بوابة الإصدار الحالية
+
 **آخر تحديث:** 2026-07-14  
 **النطاق:** Tournament Ego Core Loop، Flutter، Cloud Functions، وعقود Firestore  
-**المرجع التنفيذي الأعلى:** <bdi dir="ltr">docs/core/08_Unified_V1_Completion_And_Workspace_Plan.md</bdi>
+**المرجع التنفيذي الحالي:** <bdi dir="ltr">docs/core/17_V1_Security_And_Release_Completion_Plan.md</bdi>
+
+> فحص 28 يوليو 2026 أثبت أن <bdi dir="ltr">check:hotspots</bdi> يفشل في سبعة ملفات، وأن نشر Functions ما زال غير منفذ. لذلك لا تُستخدم علامات الاكتمال القديمة هنا لإثبات جاهزية CI أو Backend؛ الإغلاق الحالي تحكمه التذكرتان <bdi dir="ltr">V3-402</bdi> و<bdi dir="ltr">V3-502</bdi>&rlm;.
 
 ترتبط الشريحة الحرجة هنا بالتذاكر <bdi dir="ltr">UCP-004</bdi> و<bdi dir="ltr">UCP-104</bdi> و<bdi dir="ltr">UCP-108</bdi>. أما مهام التحسين الهيكلي اللاحقة فلا تبدأ قبل إدراجها في نافذة تنفيذ معتمدة داخل الخطة الموحدة؛ الهدف هو خفض المخاطر دون فتح Roadmap موازية أو إعادة كتابة شاملة.
 
@@ -326,7 +329,8 @@
 - [x] <bdi dir="ltr">npm run test:functions</bdi>: عدد 62 اختبارًا ناجحًا.
 - [x] <bdi dir="ltr">npm run test:rules:emulator</bdi>: عدد 168 اختبارًا ناجحًا.
 - [x] <bdi dir="ltr">npm run test:functions:emulator</bdi>: نجاح <bdi dir="ltr">6/6 auth gates</bdi> وحراسات roster والتسوية وعمليات report/block/audit/delete.
-- [x] <bdi dir="ltr">npm run check:architecture</bdi> و<bdi dir="ltr">npm run check:indexes</bdi> و<bdi dir="ltr">npm run check:hotspots</bdi> و<bdi dir="ltr">npm run check:format:changed</bdi>: ناجحة.
+- [x] <bdi dir="ltr">npm run check:architecture</bdi> و<bdi dir="ltr">npm run check:indexes</bdi> و<bdi dir="ltr">npm run check:format:changed</bdi>: ناجحة في لقطة 14 يوليو.
+- [ ] <bdi dir="ltr">npm run check:hotspots</bdi>: فشل في 28 يوليو بسبعة ملفات فوق الميزانية؛ انتقل الإصلاح إلى <bdi dir="ltr">V3-402</bdi>&rlm;.
 - [x] <bdi dir="ltr">git diff --check</bdi>: ناجح.
 - [x] جرد هويات production: صفر <bdi dir="ltr">matchEvents</bdi> وصفر أنواع غير صالحة في لقطة 2026-07-14.
 - [x] deploy dry-run لقواعد وفهارس Firestore: ناجح بعد الحفاظ على كل فهارس production.

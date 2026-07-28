@@ -15,15 +15,18 @@
 | 5 | `05_Project_Roadmap_and_Sprint_Plan.md` | خطة المشروع والـ Sprint Plan |
 | 6 | `06_UX_Hardening_And_Liquid_Glass_Plan.md` | خطة تقوية تجربة المستخدم وحالات الاستخدام واتجاه Liquid Glass |
 | 7 | `07_Tournament_Ego_UX_Audit_And_Repair_Plan.md` | تدقيق رحلة البطولة والمشاركة قبل توحيد الخطط |
-| 8 | `08_Unified_V1_Completion_And_Workspace_Plan.md` | **الخطة التنفيذية الوحيدة النشطة لإكمال V1 وترتيب مساحة العمل** |
+| 8 | `08_Unified_V1_Completion_And_Workspace_Plan.md` | لقطة خطة V1 السابقة حتى استبدالها في 28 يوليو 2026 |
 | 9 | `09_Workspace_Change_Manifest.md` | Manifest الحزمة الحالية وتقسيمها إلى checkpoints قابلة للمراجعة |
 | 10 | `10_Documentation_Claim_Audit.md` | تدقيق الادعاءات الحية واللقطات التاريخية لوثائق التنفيذ |
 | 11 | `11_Tournament_Membership_Migration_Runbook.md` | تشغيل آمن لترحيل عضويات منظمي البطولات القديمة |
 | 12 | `12_Data_Inventory_Retention_And_Data_Safety.md` | جرد البيانات ومصفوفة الاحتفاظ وورقة Data Safety |
 | 13 | `13_Play_Review_And_Moderation_Runbook.md` | حزمة مراجعة Play ومسار الإشراف على المحتوى |
-| 14 | `14_Execution_Progress_Report.md` | تقرير التقدم الحي ومحاولات التحقق ومنع الدوران |
+| 14 | `14_Execution_Progress_Report.md` | لقطة التقدم التاريخية حتى 14 يوليو ومحاولات منع الدوران |
+| 15 | `15_Team_Lineup_Ultimate_Squad_Redesign_Plan.md` | خطة التشكيلة المكتملة واختبارات الانحدار الخاصة بها |
+| 16 | `16_Architecture_Technical_Debt_Remediation_Tasks.md` | سجل معالجة الدين المعماري وبوابة النشر المتبقية |
+| 17 | `17_V1_Security_And_Release_Completion_Plan.md` | **المصدر التنفيذي الوحيد النشط لإغلاق الأمن وإطلاق Android V1** |
 
-> ابتداءً من 2026-07-11، الوثيقة رقم 8 هي مصدر ترتيب التنفيذ والقبول الوحيد. الوثائق والخطط الأقدم تبقى مراجع قرار وأدلة تاريخية، ولا تُستخدم كـ backlog موازية.
+> ابتداءً من 2026-07-28، الوثيقة رقم 17 هي مصدر ترتيب التنفيذ والقبول الوحيد. الوثائق والخطط الأقدم تبقى مراجع قرار وأدلة تاريخية، ولا تُستخدم كـbacklog موازية.
 
 ---
 
@@ -45,6 +48,7 @@
 - `el_7_reef_current_code_gap_audit_initial_pass.md` — المسح الأولي لفجوات الكود
 - `V1_RELEASE_RISK_REVIEW.md` — مراجعة مخاطر إصدار V1
 - `V1_RELEASE_SCOPE_AUDIT.md` — تدقيق نطاق الإصدار
+- `2026-07-28_v1_security_completion_audit.json` — الحكم القابل للآلة على ثغرات الأمن وCI المرتبطة بخطة الإطلاق الحالية
 
 ---
 

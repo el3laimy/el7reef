@@ -1,0 +1,81 @@
+{
+  "score": 1,
+  "scope": "Candidate Android V1 code paths for audit logging, fan voting, disputes, player profile creation, public player reads, CI, and Functions dependencies.",
+  "summary": "Six application-security findings are confirmed in the candidate code. The generic audit callable is not deployed today because el7reef-app currently has no Cloud Functions, but it is a release blocker. The CI lockfile finding is confirmed, the hotspot count is seven rather than six, and the reported dependency-vulnerability count could not be refreshed without an authorized online npm audit.",
+  "findings": [
+    {
+      "id": "SEC-AUDIT-001",
+      "severity": "critical",
+      "verdict": "confirmed-in-candidate-code",
+      "issue": "recordAuditEvent authenticates the caller but trusts client-supplied entity, action, and payload data before writing with Admin SDK.",
+      "productionNuance": "No Cloud Functions are currently deployed in el7reef-app, so this callable is not exposed in production today.",
+      "requiredFix": "Remove the generic export and append verified audit events inside trusted backend transactions only."
+    },
+    {
+      "id": "SEC-VOTE-001",
+      "severity": "major",
+      "verdict": "confirmed",
+      "issue": "The client transaction creates a user vote and updates fanVotingSessions while rules deny the session update, so the transaction cannot commit.",
+      "requiredFix": "Move voting to an authenticated, authorized, idempotent callable and deny all client writes."
+    },
+    {
+      "id": "SEC-DISPUTE-001",
+      "severity": "critical",
+      "verdict": "confirmed",
+      "issue": "Any authenticated user can read every dispute and create a dispute for themselves against an unrelated or nonexistent match.",
+      "requiredFix": "Authorize reads by relationship and move dispute creation and decisions to trusted callables."
+    },
+    {
+      "id": "SEC-DISPUTE-002",
+      "severity": "major",
+      "verdict": "confirmed",
+      "issue": "Dispute creation/closure and match freeze/unfreeze are separate writes; pendingReview is also rejected by the current organizer-safe rule.",
+      "requiredFix": "Use one idempotent backend transaction for each dispute transition and restore or advance match status explicitly."
+    },
+    {
+      "id": "SEC-PLAYER-001",
+      "severity": "major",
+      "verdict": "confirmed",
+      "issue": "The first players/{uid} create is owner-bound but has no strict schema or trusted defaults, allowing forged rating, counters, trust, role, and createdAt.",
+      "requiredFix": "Create profiles with server-controlled defaults, then deny direct client creation."
+    },
+    {
+      "id": "SEC-PRIVACY-001",
+      "severity": "critical",
+      "verdict": "confirmed",
+      "issue": "Every authenticated user can read player documents containing phone and friendship/follow/block arrays; Firestore cannot hide individual fields.",
+      "requiredFix": "Keep players private and serve a backend-written, sanitized playerPublicProfiles projection."
+    },
+    {
+      "id": "CI-LOCK-001",
+      "severity": "major",
+      "verdict": "confirmed-with-correction",
+      "issue": "The root package-lock.json is ignored and untracked while both CI jobs use npm ci. The current hotspot gate fails for seven files, not six.",
+      "requiredFix": "Track deterministic lockfiles, fix cache paths, reconcile hotspot responsibilities, and prove the workflow from a clean checkout."
+    },
+    {
+      "id": "DEP-AUDIT-001",
+      "severity": "unknown-until-refresh",
+      "verdict": "not-currently-verifiable",
+      "issue": "The reported total of ten npm vulnerabilities was not reproducible without sending the dependency tree to the npm audit service. The lock currently resolves fast-xml-parser 5.9.3.",
+      "requiredFix": "Run an explicitly authorized online production-tree audit, save its JSON artifact, and remove all high/critical findings without force upgrades."
+    }
+  ],
+  "verifiedState": {
+    "date": "2026-07-28",
+    "project": "el7reef-app",
+    "database": "(default)",
+    "databaseEdition": "STANDARD",
+    "databaseLocation": "nam5",
+    "deployedFunctions": 0,
+    "branch": "main",
+    "head": "8799959",
+    "workingTree": "clean",
+    "rootLockTracked": false,
+    "hotspotFailures": 7,
+    "firebaseAdmin": "13.10.0",
+    "firebaseFunctions": "6.6.0",
+    "fastXmlParser": "5.9.3"
+  },
+  "releaseGate": "Do not deploy Functions or release Android V1 until the security plan is implemented and the scoped rules audit reaches 5/5 with attack tests passing."
+}
