@@ -2,6 +2,8 @@
 
 <h1>تقرير مراجعة مسارات البطولة عبر التطبيق</h1>
 
+<blockquote><strong>الحالة: HISTORICAL EVIDENCE.</strong> هذه لقطة تحليلية من 21 أبريل 2026 وليست خطة أو وصفًا للحالة الحالية. المرجع التنفيذي الوحيد هو <code>docs/core/00_Master_Product_Development_Plan.md</code>&rlm;.</blockquote>
+
 <h2>الغرض من التقرير</h2>
 
 <p>

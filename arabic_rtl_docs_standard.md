@@ -88,7 +88,7 @@
 <h2>الملف المرجعي الحالي</h2>
 
 <ul>
-  <li><code>tournament_tos_walkthrough_ar.md</code> هو أول ملف مطبق عليه هذا الأسلوب.</li>
+  <li><code>docs/core/00_Master_Product_Development_Plan.md</code> هو المرجع الحي المطبق عليه هذا الأسلوب؛ وتحفظ الأمثلة التاريخية داخل <code>docs/archive/evidence</code>&rlm;.</li>
 </ul>
 
 <h2>اعتماد المعيار</h2>

@@ -1,4 +1,8 @@
-# Sprint 2 / Task 6: Claim Code Exposure Security Hardening Plan
+# Sprint 2 / Task 6: Claim Code Exposure Security Audit
+
+**Status:** `HISTORICAL SECURITY EVIDENCE — NOT AN ACTIVE PLAN`&rlm;
+
+**Current authority:** `docs/core/00_Master_Product_Development_Plan.md`&rlm;, especially `ELR-SEC-*` and `ELR-IDN-*`&rlm;.
 
 ## Executive Summary
 

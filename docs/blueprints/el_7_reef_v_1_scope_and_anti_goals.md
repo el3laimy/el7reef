@@ -1,5 +1,7 @@
 # El7reef V1 Scope & Anti-goals — Draft 0
 
+**Status:** `REFERENCE — NOT AN ACTIVE PLAN`&rlm;. Current scope decisions and execution status live in `docs/core/00_Master_Product_Development_Plan.md`&rlm;.
+
 ## 0. الهدف من الوثيقة
 
 هذه الوثيقة تحدد أقل نسخة V1 متماسكة من تطبيق الحريف. ليست الغاية أن تحتوي V1 على كل ما نريده، بل أن تحتوي على أقل مجموعة features تجعل المنتج منطقيًا، قابلًا للاختبار الواقعي، وآمنًا من ناحية الملكية والصلاحيات.
@@ -543,4 +545,3 @@ Before any implementation task resumes, we need two more design documents:
 2. `Tournament_Lifecycle_Scheduling_Blueprint.md`
 
 Then we compare current code against these documents and decide what must be fixed before V1.
-

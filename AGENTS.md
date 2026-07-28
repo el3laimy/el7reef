@@ -68,7 +68,7 @@ Out of scope for V1:
 
 ## Key technical decisions for V1
 - MatchEvent is the source of truth for goals, MVP, and match statistics — not scattered player_stats fields.
-- PlayerIdentityRef (registered | guest | matchSidePlayer) is used everywhere stats or share cards reference a player.
+- `ParticipantRef` (`player | guestPlayer | matchSidePlayer`) is the current identity-aware contract used by `MatchEvent`; do not introduce a second player identity union without an ADR.
 - Guest players receive full statistical treatment identical to registered players.
 - Services handle all sensitive operations — not controllers writing directly to Firestore.
 - Feature gates are explicit: fantasy is off, social feed is secondary.
@@ -107,7 +107,8 @@ At the end of every task, report:
 - Firestore rules exist but may need updates for new collections like matchEvents.
 - Lineups are optional, not required.
 - If a user starts a match without a lineup, show encouragement/nudge, not a hard block.
-- The immediate roadmap follows the Sprint Plan in docs/core/05_Project_Roadmap_and_Sprint_Plan.md.
+- The only active roadmap, ticket status source, and idea vault is `docs/core/00_Master_Product_Development_Plan.md`.
+- Do not create a parallel roadmap or backlog file. Add new work to the master plan with an `ELR-*` identifier and an approved status.
 - Score submission must support guest players as goal scorers and MVP — the old message "temporary players don't get stats" must be removed.
 
 ## Do not do this
@@ -126,4 +127,5 @@ See `docs/` for the full V1 documentation pack:
 - `docs/core/02_SRS_Software_Requirements_Specification.md`
 - `docs/core/03_SAD_System_Architecture_Document.md`
 - `docs/core/04_UI_UX_Designs.md`
-- `docs/core/05_Project_Roadmap_and_Sprint_Plan.md`
+- `docs/core/00_Master_Product_Development_Plan.md`
+- `docs/archive/PLANNING_RETIREMENT_MANIFEST.md` (recovery map only, never an active backlog)

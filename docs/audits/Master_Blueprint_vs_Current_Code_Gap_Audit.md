@@ -3,7 +3,7 @@
 Audit date: 2026-05-07  
 Scope: non-implementation audit only. No production code, tests, or Firestore rules were changed.
 
-Primary reference inspected: `docs/el_7_reef_master_blueprint_working_version.md` plus the V1 scope, lifecycle/scheduling, role/permission, and roadmap docs in `docs/`.
+Primary reference inspected at the time: the retired master blueprint recorded in `docs/archive/PLANNING_RETIREMENT_MANIFEST.md`, plus the retained V1 scope, lifecycle/scheduling, and role/permission references. Current execution authority is `docs/core/00_Master_Product_Development_Plan.md`.
 
 ## 1. Executive summary
 

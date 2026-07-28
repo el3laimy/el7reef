@@ -2,6 +2,8 @@
 
 <h1>شرح آخر خطوة في Tournament TOS</h1>
 
+<blockquote><strong>الحالة: HISTORICAL EVIDENCE.</strong> هذا شرح للخطوة المنفذة وقت اللقطة، وليس تعليمات تنفيذ حالية. المرجع التنفيذي الوحيد هو <code>docs/core/00_Master_Product_Development_Plan.md</code>&rlm;.</blockquote>
+
 <h2>آخر خطوة تم تنفيذها</h2>
 
 <p>

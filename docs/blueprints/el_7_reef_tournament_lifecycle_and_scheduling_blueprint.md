@@ -1,5 +1,7 @@
 # El7reef Tournament Lifecycle & Scheduling Blueprint — Draft 0
 
+**Status:** `REFERENCE — NOT AN ACTIVE PLAN`&rlm;. Any implementation gap must be registered in `docs/core/00_Master_Product_Development_Plan.md`&rlm;.
+
 ## 0. الهدف من الوثيقة
 
 هذه الوثيقة تحدد كيف تتحول البطولة من فكرة إلى بطولة مكتملة داخل تطبيق الحريف.
@@ -907,4 +909,3 @@ The audit should identify:
 - admin operations without role checks.
 - rules gaps.
 - tests missing.
-

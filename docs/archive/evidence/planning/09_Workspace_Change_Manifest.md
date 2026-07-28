@@ -2,6 +2,10 @@
 
 # Manifest مساحة العمل — UCP-001 إلى UCP-003
 
+**الحالة:** `HISTORICAL SNAPSHOT — NOT AN ACTIVE PLAN`&rlm;
+
+**المرجع الحالي:** `docs/core/00_Master_Product_Development_Plan.md`&rlm;
+
 **تاريخ اللقطة:** 2026-07-11  
 **المصدر:** `git status --short` و`git diff --name-only` و`git ls-files --others --exclude-standard`  
 **الغرض:** جعل الحزمة الحالية قابلة للمراجعة على checkpoints، دون staging أو commit أو حذف أي عمل للمستخدم.

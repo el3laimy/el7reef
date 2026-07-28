@@ -1,12 +1,14 @@
 {
   "scripts": {
     "check:architecture": "node tool/architecture_guard.js",
+    "check:docs-plan": "node tool/docs_plan_guard.js",
     "check:indexes": "node tool/firestore_index_guard.js",
     "check:format:changed": "node tool/check_changed_dart_format.js",
     "check:hotspots": "node tool/hotspot_report.js --check",
     "report:hotspots": "node tool/hotspot_report.js",
     "rollback:firestore-rules": "node tool/firestore_ruleset_rollback.js",
     "test:functions": "mocha \"test/functions/**/*.test.js\" --timeout 20000",
+    "test:docs-plan": "node --test test/tool/docs_plan_guard_test.js",
     "test:functions:emulator": "env FIREBASE_CLI_DISABLE_UPDATE_CHECK=true npx firebase-tools --config firebase.json --project demo-el7reef emulators:exec --only functions,firestore,auth,storage \"node functions/scripts/emulator_smoke.js\"",
     "test:pride-sting": "node --test test/tool/pride_sting_generator_test.js",
     "test:world-cup-data": "node --test test/tool/world_cup_2026_squads_test.js",

@@ -23,6 +23,8 @@ jobs:
       - run: npm ci
       - run: npm --prefix functions ci
       - run: flutter pub get
+      - run: npm run check:docs-plan
+      - run: npm run test:docs-plan
       - run: npm run check:format:changed
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}

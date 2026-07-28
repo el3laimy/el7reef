@@ -1,5 +1,7 @@
 # El7reef Role & Permission Matrix — Draft 0
 
+**Status:** `REFERENCE — NOT AN ACTIVE PLAN`&rlm;. Current security work and ticket status live in `docs/core/00_Master_Product_Development_Plan.md`&rlm;.
+
 ## 0. الهدف من الوثيقة
 
 هذه الوثيقة تحدد من يملك ماذا، ومن يرى ماذا، ومن ينفذ ماذا داخل تطبيق الحريف.
@@ -523,4 +525,3 @@ Tournament Lifecycle & Scheduling Blueprint
 ```text
 Current Code Permission Gap Audit
 ```
-

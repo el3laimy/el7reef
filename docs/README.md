@@ -1,44 +1,44 @@
-# El7reef V1 — فهرس التوثيق
+# الحريف — فهرس التوثيق الحاكم
 
-هذه الحزمة تحتوي على وثائق أول إصدار عملي من تطبيق الحريف وفق الاتجاه المنتجي: **Tournament Ego MVP**.
+هذه الحزمة تحتوي على مواصفات وأدلة تطوير تطبيق الحريف وفق اتجاه **نواة مجد البطولات**. المرجع الوحيد للأولوية والحالة وصندوق الأفكار هو `docs/core/00_Master_Product_Development_Plan.md`&rlm;.
 
 ---
 
 ## 📁 `core/` — الوثائق الأساسية
 
-| # | الوثيقة | الوصف |
+| النوع | الوثيقة | الوصف |
 |---|---------|-------|
+| المرجع الحاكم | `00_Master_Product_Development_Plan.md` | **الخطة النشطة الوحيدة، لوحة V1، خارطة ما بعد الإصدار وصندوق الأفكار** |
 | 1 | `01_PRD_Product_Requirements_Document.md` | وثيقة متطلبات المنتج |
 | 2 | `02_SRS_Software_Requirements_Specification.md` | مواصفات متطلبات البرنامج |
 | 3 | `03_SAD_System_Architecture_Document.md` | هيكلية النظام والتصميم عالي المستوى |
 | 4 | `04_UI_UX_Designs.md` | تصميمات واجهة وتجربة المستخدم |
-| 5 | `05_Project_Roadmap_and_Sprint_Plan.md` | خطة المشروع والـ Sprint Plan |
-| 6 | `06_UX_Hardening_And_Liquid_Glass_Plan.md` | خطة تقوية تجربة المستخدم وحالات الاستخدام واتجاه Liquid Glass |
-| 7 | `07_Tournament_Ego_UX_Audit_And_Repair_Plan.md` | تدقيق رحلة البطولة والمشاركة قبل توحيد الخطط |
-| 8 | `08_Unified_V1_Completion_And_Workspace_Plan.md` | لقطة خطة V1 السابقة حتى استبدالها في 28 يوليو 2026 |
-| 9 | `09_Workspace_Change_Manifest.md` | Manifest الحزمة الحالية وتقسيمها إلى checkpoints قابلة للمراجعة |
-| 10 | `10_Documentation_Claim_Audit.md` | تدقيق الادعاءات الحية واللقطات التاريخية لوثائق التنفيذ |
 | 11 | `11_Tournament_Membership_Migration_Runbook.md` | تشغيل آمن لترحيل عضويات منظمي البطولات القديمة |
 | 12 | `12_Data_Inventory_Retention_And_Data_Safety.md` | جرد البيانات ومصفوفة الاحتفاظ وورقة Data Safety |
 | 13 | `13_Play_Review_And_Moderation_Runbook.md` | حزمة مراجعة Play ومسار الإشراف على المحتوى |
-| 14 | `14_Execution_Progress_Report.md` | لقطة التقدم التاريخية حتى 14 يوليو ومحاولات منع الدوران |
-| 15 | `15_Team_Lineup_Ultimate_Squad_Redesign_Plan.md` | خطة التشكيلة المكتملة واختبارات الانحدار الخاصة بها |
-| 16 | `16_Architecture_Technical_Debt_Remediation_Tasks.md` | سجل معالجة الدين المعماري وبوابة النشر المتبقية |
-| 17 | `17_V1_Security_And_Release_Completion_Plan.md` | **المصدر التنفيذي الوحيد النشط لإغلاق الأمن وإطلاق Android V1** |
 
-> ابتداءً من 2026-07-28، الوثيقة رقم 17 هي مصدر ترتيب التنفيذ والقبول الوحيد. الوثائق والخطط الأقدم تبقى مراجع قرار وأدلة تاريخية، ولا تُستخدم كـbacklog موازية.
+> ابتداءً من 2026-07-29، لا ينشأ ملف Roadmap أو Backlog جديد. تستخدم المراجع المتخصصة للتفاصيل فقط، بينما تتغير الأولوية والحالة داخل الوثيقة `00` وحدها.
 
 ---
 
-## 📁 `blueprints/` — التصميمات والخطط المعمارية
+## 📁 `blueprints/` — مراجع معمارية متخصصة
 
-- `el_7_reef_complete_product_blueprint_draft_0.md` — مسودة المخطط الشامل للمنتج
-- `el_7_reef_master_blueprint_working_version.md` — نسخة العمل من المخطط الرئيسي
 - `el_7_reef_tournament_lifecycle_and_scheduling_blueprint.md` — دورة حياة البطولة والجدولة
 - `el_7_reef_role_and_permission_matrix.md` — مصفوفة الأدوار والصلاحيات
 - `el_7_reef_v_1_scope_and_anti_goals.md` — نطاق V1 والأهداف المستبعدة
-- `El7reef_V1_Complete_Documentation.md` — التوثيق الشامل لـ V1
 - `GUEST_AWARE_STATS_ARCHITECTURE_PROPOSAL.md` — اقتراح معمارية الإحصائيات للضيوف
+
+هذه الملفات `REFERENCE — NOT AN ACTIVE PLAN`&rlm;، وتعود أي فجوة تنفيذية منها إلى معرّف داخل المرجع الحاكم.
+
+---
+
+## 📁 `archive/` — الاستعادة والأدلة التاريخية
+
+- يسجل `PLANNING_RETIREMENT_MANIFEST.md`&rlm; الـGit blobs والـCrosswalk ومسارات استعادة الخطط المتقاعدة.
+- يحفظ `evidence/planning/`&rlm; لقطات مساحة العمل والتقدم القديمة.
+- يحفظ `evidence/tournament/`&rlm; تقارير رحلة البطولة التاريخية.
+
+لا يحمل هذا المجلد حالات تنفيذ حية.
 
 ---
 

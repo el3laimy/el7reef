@@ -5,6 +5,8 @@
 **Scope:** V1 Tournament Ego MVP — smallest safe architecture  
 **Status:** ✅ APPROVED — product decisions locked, ready for implementation
 
+**Documentation role:** `REFERENCE — NOT AN ACTIVE PLAN`&rlm;. The current code state and any remaining work are governed by `docs/core/00_Master_Product_Development_Plan.md`&rlm;.
+
 ---
 
 ## 1. Current State Summary

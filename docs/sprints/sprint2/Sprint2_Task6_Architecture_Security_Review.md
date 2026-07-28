@@ -1,7 +1,7 @@
 # Sprint 2 / Task 6 — Architecture Security Review
 
 **Reviewed:** 2026-05-06  
-**Scope:** Claim Code Exposure Security Hardening Plan  
+**Scope:** Claim Code Exposure Security Audit
 **Verdict:** ✅ PASS — accurate threat model, correctly conservative recommendation
 
 ---
@@ -10,7 +10,7 @@
 
 | File | Lines | Type |
 |---|---|---|
-| `docs/Sprint2_Task6_Claim_Code_Security_Hardening_Plan.md` | 283 | Analysis document — no production code |
+| `docs/sprints/sprint2/Sprint2_Task6_Claim_Code_Security_Audit.md` | 283 | Historical security analysis — no production code |
 
 ### Zero production code changed — VERIFIED
 

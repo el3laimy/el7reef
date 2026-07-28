@@ -52,6 +52,7 @@
 | `docs/core/09_Workspace_Change_Manifest.md` | `9ff1fc35bce80eed3549e2fe8075d0e9f9ee417d` | `9ec47e2` | `docs/archive/evidence/planning/09_Workspace_Change_Manifest.md` | `HISTORICAL SNAPSHOT` |
 | `docs/core/10_Documentation_Claim_Audit.md` | `3ec1a269f2323cfc9e5f1d5d4d2d5124266d940a` | `9ec47e2` | `docs/archive/evidence/planning/10_Documentation_Claim_Audit.md` | `HISTORICAL SNAPSHOT` |
 | `docs/core/14_Execution_Progress_Report.md` | `6fd552a7390a2c8d1fe8fa697ea694f6b71b92d9` | `7eb4ece` | `docs/archive/evidence/planning/14_Execution_Progress_Report.md` | `HISTORICAL SNAPSHOT` |
+| `A1_changes.diff` | `849463b389d42831ff30ab72cf1ebc76113e5c3c` | `271dfbc` | `docs/archive/evidence/planning/A1_changes.diff` | `HISTORICAL PATCH EVIDENCE` |
 
 ## 4. الملفات المعاد تسميتها دون فقد المحتوى
 
