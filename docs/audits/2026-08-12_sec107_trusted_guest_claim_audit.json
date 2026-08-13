@@ -1,0 +1,229 @@
+{
+  "score": 5,
+  "maximumScore": 5,
+  "scope": "ELR-SEC-107 only: trusted guest-player and guest-team Claim issuance, inspection, consumption, legacy-token compatibility, atomic roster relinking, trusted audit writes, and the directly related Firestore client boundaries.",
+  "scopeLimit": "This is not an application-wide security or Android V1 release score. Production secret provisioning, deployment, second-account Android QA, account-deletion saga work, fan voting, disputes, player profile separation, App Check rollout, and Play release gates remain outside this result.",
+  "date": "2026-08-12",
+  "lastVerifiedAt": "2026-08-12",
+  "candidate": {
+    "baseGitRevision": "297b87d",
+    "workingTree": "dirty-uncommitted",
+    "note": "Verification applies to the current local candidate layered on this base revision. No commit, push, Firebase deployment, Remote Config update, Android release, or production mutation was performed."
+  },
+  "target": {
+    "firebaseProject": "el7reef-app",
+    "database": "(default)",
+    "edition": "STANDARD",
+    "location": "nam5",
+    "verificationSource": "Repository inspection plus local Firebase Functions, Auth, Firestore, and Storage emulators using a local-only Claim secret."
+  },
+  "verdict": "pass-local-independent-review-complete",
+  "summary": "Guest Claim no longer trusts Flutter to issue, inspect, consume, or finalize player/team claims. Four authenticated callables derive the actor from Firebase Auth, keep the raw bearer token issuer-only, persist only its SHA-256 key/binding, validate canonical organizer and assistant authority, and transact the target, claim, roster conversion, team links, and bounded trusted audit events together. The final AppSec pass removed the global player phone/name lookup that exposed an account-existence oracle, clears guest phone data after a successful player claim, and added a fail-closed hourly quota in the existing backend-only safety quota document with actor, target, and window bounds. Legacy raw-code documents remain accepted only after strict schema, target binding, and current issuer-authority checks, then migrate atomically. Automated gates and the independent scoped AppSec review pass locally.",
+  "controls": [
+    {
+      "id": "ELR-SEC-107-A",
+      "status": "pass",
+      "evidence": [
+        "issueGuestClaimCode, inspectGuestClaim, claimGuestPlayer, and claimGuestTeam are authenticated callables and derive actorId exclusively from Firebase Auth",
+        "Flutter GuestClaimService and guest Claim screens use CloudSensitiveOpsService; no Claim completion fallback writes Firestore",
+        "the public audit writer remains absent from the Functions entrypoint"
+      ]
+    },
+    {
+      "id": "ELR-SEC-107-B",
+      "status": "pass",
+      "evidence": [
+        "new tokens use HMAC-SHA-256 with a server secret of at least 32 bytes and a bounded requestId",
+        "the raw bearer token is returned only to the authorized issuer; Firestore stores the SHA-256 token document ID and target binding, never the raw token",
+        "replacement issuance expires the previous active binding and idempotent request retries return the same deterministic token without duplicate state"
+      ]
+    },
+    {
+      "id": "ELR-SEC-107-C",
+      "status": "pass",
+      "evidence": [
+        "guest-player issuance accepts only the creator, registered-team owner or vice captain, tournament organizer, or active canonical assistant with canManageGuestRoster",
+        "guest-team issuance accepts only the guest-team creator; consumption rechecks registered-team ownership and approval state",
+        "canonical assistant authority is tournaments/{tournamentId}/assistants/{uid}; legacy assistant arrays do not grant Claim authority"
+      ]
+    },
+    {
+      "id": "ELR-SEC-107-D",
+      "status": "pass",
+      "evidence": [
+        "player and team Claim transitions, claim consumption, membership conversion, legacy team synchronization, and audit events commit in one Firestore transaction",
+        "duplicate retries return stable alreadyClaimed or approvalRequired outcomes without duplicate roster or audit writes",
+        "legacy raw-code documents require strict schema, current target binding, and current issuer authority before atomic hash migration",
+        "audit events use a one-way token digest and exclude the raw bearer token, names, phone numbers, and conflicting account IDs"
+      ]
+    },
+    {
+      "id": "ELR-SEC-107-E",
+      "status": "pass",
+      "evidence": [
+        "Functions unit 139/139, multi-emulator smoke, Firestore Rules Emulator 222/222, focused Flutter 30/30, and Dart analysis all pass",
+        "the local Firebase Rules audit found no remaining expression-budget warning in the final 222-test run",
+        "an independent AppSec reviewer reproduced the focused Claim tests, verified the final diff, and reported no actionable P0-P3 finding"
+      ]
+    }
+  ],
+  "attackMatrix": [
+    {
+      "attack": "unauthenticated caller invokes any guest Claim callable",
+      "expected": "reject before reads or writes",
+      "result": "pass-functions-emulator"
+    },
+    {
+      "attack": "authenticated unrelated player issues a Claim token",
+      "expected": "permission-denied without target or token mutation",
+      "result": "pass-functions-unit"
+    },
+    {
+      "attack": "revoked, malformed, legacy-array-only, or cross-tournament assistant issues a guest-player token",
+      "expected": "deny; only the active canonical assistant document is authoritative",
+      "result": "pass-functions-unit"
+    },
+    {
+      "attack": "caller forges playerId, teamId, target type, route target, or response target",
+      "expected": "derive actor from Auth and reject or return a safe conflict without identity disclosure",
+      "result": "pass-functions-and-flutter"
+    },
+    {
+      "attack": "client reads, lists, creates, updates, or consumes a guest-player or guest-team Claim document directly",
+      "expected": "deny while the callable backend remains functional",
+      "result": "pass-rules-emulator"
+    },
+    {
+      "attack": "client injects Claim fields, unknown fields, malformed types, oversized strings, invalid times, or forged membership identity",
+      "expected": "deny create and update bypasses",
+      "result": "pass-rules-emulator"
+    },
+    {
+      "attack": "secondary tournament organizer changes the global captain of a shared guest team",
+      "expected": "deny; only the creator or canonical first-tournament authority may change global captain state",
+      "result": "pass-rules-emulator"
+    },
+    {
+      "attack": "expired, superseded, unbound, or forged-hash token is consumed",
+      "expected": "expire or reject without changing guest identity or roster",
+      "result": "pass-functions-unit-and-emulator"
+    },
+    {
+      "attack": "legacy raw-code document has invalid schema, target binding, or issuer authority",
+      "expected": "reject without migration or identity mutation",
+      "result": "pass-functions-unit"
+    },
+    {
+      "attack": "same token is retried or team approval is retried",
+      "expected": "one stable outcome with no duplicate roster, team, claim, or audit writes",
+      "result": "pass-functions-unit-and-emulator"
+    },
+    {
+      "attack": "trusted audit creation fails after domain writes are staged",
+      "expected": "roll back the complete Claim transaction",
+      "result": "pass-functions-unit"
+    },
+    {
+      "attack": "raw token or conflicting identity is copied into Audit",
+      "expected": "store only a one-way bounded digest and opaque conflict type",
+      "result": "pass-functions-unit"
+    },
+    {
+      "attack": "authorized organizer changes a guest phone and uses Claim responses to test whether registered accounts exist",
+      "expected": "never query global player phone/name identity; return the same claim outcome and clear guest phone after successful linking",
+      "result": "pass-functions-unit-and-independent-review"
+    },
+    {
+      "attack": "authenticated actor repeatedly issues, inspects, or consumes one or many Claim targets",
+      "expected": "count every attempt in a backend-only hourly quota, reject above actor, target, or target-cardinality bounds, and fail closed on malformed quota state",
+      "result": "pass-functions-unit-and-independent-review"
+    }
+  ],
+  "verification": {
+    "functionsUnit": {
+      "command": "npm run test:functions",
+      "result": "pass",
+      "testsPassed": 139
+    },
+    "functionsEmulatorSmoke": {
+      "command": "npm run test:functions:emulator",
+      "result": "pass",
+      "exportedCallables": 10,
+      "coverage": "All ten authentication gates, trusted guest Claim issuance/inspection/player consumption/team approval and consumption, settlement roster guards, legacy safety hardening, trusted audit writes, and account deletion writes passed with exit code 0. The emulator used GUEST_CLAIM_TOKEN_SECRET=local-emulator-only-guest-claim-secret-v1; the observed Secret Manager 403 for demo-el7reef was non-fatal and no production secret was read."
+    },
+    "firestoreRulesEmulator": {
+      "command": "npm run test:rules:emulator",
+      "result": "pass",
+      "testsPassed": 222,
+      "warnings": "No maximum-of-1000-expression or unused-variable warning remained in firestore-debug.log."
+    },
+    "focusedFlutter": {
+      "command": "flutter test --no-pub --reporter expanded test/core/services/cloud_sensitive_ops_service_test.dart test/core/services/guest_claim_service_test.dart test/core/services/share_link_service_test.dart test/features/guest_claim/guest_claim_screen_test.dart",
+      "result": "pass",
+      "testsPassed": 30
+    },
+    "dartAnalysis": {
+      "command": "dart analyze lib/",
+      "result": "pass"
+    },
+    "diffCheck": {
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  },
+  "findings": [
+    {
+      "id": "ELR-SEC-107-REVIEW-001",
+      "severity": "verification-gate",
+      "status": "CLOSED",
+      "finding": "An independent AppSec reviewer inspected the scoped candidate and final corrective diff, reproduced the focused 33-test Claim suite, and reported no actionable P0-P3 finding."
+    },
+    {
+      "id": "ELR-SEC-107-APPSEC-001",
+      "severity": "high",
+      "status": "CLOSED",
+      "finding": "The first independent pass found a phone-account existence oracle through distinguishable duplicatePhone responses. The global players.phone and players.nameLower lookups were removed, the guest phone is cleared on successful claim, and a regression test proves identical outcomes whether the phone exists or not."
+    },
+    {
+      "id": "ELR-SEC-107-APPSEC-002",
+      "severity": "moderate",
+      "status": "CLOSED",
+      "finding": "The first independent pass found no request quota. The final candidate counts attempts in the backend-only safetyActionQuotas actor document with 240 attempts per hour, 24 per hashed target, and 128 targets per hour; invalid-token attempts count and malformed state fails closed."
+    }
+  ],
+  "remainingRisks": [
+    {
+      "id": "ELR-SEC-107-DEPLOY-001",
+      "status": "BLOCKED",
+      "risk": "GUEST_CLAIM_TOKEN_SECRET is not provisioned or verified in production and the four callables and Rules are not deployed. Provisioning, deployment, rollback preparation, and Android second-account QA require explicit owner authorization."
+    },
+    {
+      "id": "ELR-SEC-701",
+      "status": "INBOX",
+      "risk": "The trusted Claim quota now bounds authenticated abuse, but Firebase App Check and production abuse monitoring remain defense-in-depth work before broad public growth. They must not replace Auth, authorization, token entropy, or the server quota."
+    },
+    {
+      "id": "ELR-SEC-108",
+      "status": "READY",
+      "risk": "Account deletion still requires the planned resumable saga and must not be represented as atomic across Firestore, Storage, and Auth."
+    },
+    {
+      "id": "ELR-OPS-402",
+      "status": "READY",
+      "risk": "functions/guest_claim.js is a large security-sensitive module and is not covered by the current Dart-only hotspot budget. Split issuance, player consumption, team consumption, and legacy migration only after AppSec review, with characterization tests preserving the verified transaction contract."
+    },
+    {
+      "id": "ELR-SEC-102..104",
+      "status": "READY",
+      "risk": "Fan voting and disputes remain disabled until their trusted callable and scoped-read tickets pass."
+    }
+  ],
+  "recommendations": [
+    "Keep Claim issuance, inspection, and consumption callable-only; never restore direct Flutter mutation of Claim fields or raw-code documents.",
+    "Provision GUEST_CLAIM_TOKEN_SECRET through approved production secret management only after review; never reuse the local emulator value.",
+    "Add Firebase App Check and production abuse monitoring before broad social rollout, without treating either as a replacement for authorization or the server quota.",
+    "Add Functions JavaScript to the hotspot guard and split the Claim module in a behavior-preserving maintenance change after the security checkpoint.",
+    "Deploy no Firebase or Android change from this audit without explicit owner approval, rollback preparation, and second-account Claim QA."
+  ],
+  "releaseDecision": "ELR-SEC-107 is DONE locally at 5/5 within its scoped candidate. This audit authorizes no Firebase, Remote Config, Hosting, Android, Play, or iOS release; production secret provisioning, deployment, rollback preparation, and second-account Android Claim QA remain release gates."
+}

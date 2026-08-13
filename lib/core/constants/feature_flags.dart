@@ -26,6 +26,8 @@ abstract class FeatureFlags {
   static bool get hybridTournamentRegistrationEnabled =>
       _read(FeatureFlagKey.hybridTournamentRegistrationEnabled);
   static bool get matchdayUiEnabled => _read(FeatureFlagKey.matchdayUiEnabled);
+  static bool get fanVotingEnabled => _read(FeatureFlagKey.fanVotingEnabled);
+  static bool get disputesEnabled => _read(FeatureFlagKey.disputesEnabled);
   static bool get prideGrowthLinksEnabled =>
       _read(FeatureFlagKey.prideGrowthLinksEnabled);
   static bool get postMatchPrideHubEnabled =>

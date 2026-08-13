@@ -2,6 +2,8 @@
 
 # مصفوفة ملكية الكتابات الحساسة
 
+> **تنبيه تاريخي:** هذه المصفوفة دليل لحالة 2026-07-13 وليست عقد التنفيذ الحالي. أزيل النداء العام `recordAuditEvent` ضمن `ELR-SEC-002`، وتوجد نتيجة الاحتواء الحالية في `docs/audits/2026-07-29_wave0_containment_audit.json`&rlm;. تحكم الأولويات والعقود الحالية الخطة `docs/core/00_Master_Product_Development_Plan.md`&rlm;.
+
 **التاريخ:** 2026-07-13  
 **النطاق:** Tournament Ego Core Loop
 

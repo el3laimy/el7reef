@@ -112,7 +112,9 @@ class GuestPlayerClaimScreen extends GetView<GuestPlayerClaimController> {
                   ),
                 ] else ...[
                   FilledButton(
-                    onPressed: controller.isSubmitting.value
+                    onPressed:
+                        controller.isSubmitting.value ||
+                            !controller.canSubmitClaim
                         ? null
                         : controller.submitClaim,
                     child: Text(

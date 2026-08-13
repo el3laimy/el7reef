@@ -27,7 +27,7 @@ class FriendController extends GetxController {
     if (currentUserId != null) {
       loadAllData();
     }
-    
+
     // إعادة التحميل إذا تغير المستخدم
     ever(_authService.currentPlayer, (player) {
       if (player != null) {
@@ -45,15 +45,15 @@ class FriendController extends GetxController {
     if (currentUserId == null) return;
     try {
       isLoading.value = true;
-      
+
       final friendsFuture = _repository.getFriends(currentUserId!);
       final requestsFuture = _repository.getPendingRequests(currentUserId!);
 
       final results = await Future.wait([friendsFuture, requestsFuture]);
-      
+
       final friendsList = results[0];
       final requestsList = results[1];
-      
+
       friends.value = friendsList;
       pendingRequests.value = requestsList;
 
@@ -74,7 +74,6 @@ class FriendController extends GetxController {
           }
         }
       }
-
     } catch (e) {
       Get.snackbar('خطأ', 'فشل تحميل بيانات الأصدقاء: $e');
     } finally {
@@ -85,7 +84,7 @@ class FriendController extends GetxController {
   /// إرسال طلب صداقة
   Future<bool> sendFriendRequest(String receiverId) async {
     if (currentUserId == null || currentUserId == receiverId) return false;
-    
+
     try {
       await _repository.sendFriendRequest(currentUserId!, receiverId);
       Get.snackbar('تم', 'تم إرسال طلب الصداقة بنجاح');
@@ -99,9 +98,13 @@ class FriendController extends GetxController {
   /// قبول طلب صداقة
   Future<bool> acceptRequest(String senderId) async {
     if (currentUserId == null) return false;
-    
+
     try {
-      await _repository.acceptFriendRequest(currentUserId!, senderId, currentUserId!);
+      await _repository.acceptFriendRequest(
+        currentUserId!,
+        senderId,
+        currentUserId!,
+      );
       Get.snackbar('تم', 'أصبحتم أصدقاء الآن 🎉');
       await loadAllData();
       return true;
@@ -114,7 +117,7 @@ class FriendController extends GetxController {
   /// رفض طلب صداقة أو إنهاء صداقة
   Future<bool> removeFriendship(String otherUserId) async {
     if (currentUserId == null) return false;
-    
+
     try {
       await _repository.removeFriendship(currentUserId!, otherUserId);
       await loadAllData();
@@ -128,9 +131,9 @@ class FriendController extends GetxController {
   /// حظر مستخدم
   Future<bool> blockUser(String blockedId) async {
     if (currentUserId == null) return false;
-    
+
     try {
-      await _repository.blockUser(currentUserId!, blockedId);
+      await _repository.blockUser(blockedId);
       Get.snackbar('تم الحظر', 'تم حظر المستخدم ولن يتمكن من التفاعل معك');
       await loadAllData();
       return true;
@@ -143,9 +146,9 @@ class FriendController extends GetxController {
   /// فك حظر مستخدم
   Future<bool> unblockUser(String blockedId) async {
     if (currentUserId == null) return false;
-    
+
     try {
-      await _repository.unblockUser(currentUserId!, blockedId);
+      await _repository.unblockUser(blockedId);
       Get.snackbar('تم التحديث', 'تم فك الحظر عن المستخدم');
       return true;
     } catch (e) {
@@ -157,7 +160,7 @@ class FriendController extends GetxController {
   /// متابعة لاعب
   Future<bool> followUser(String followedId) async {
     if (currentUserId == null) return false;
-    
+
     try {
       await _repository.followUser(currentUserId!, followedId);
       Get.snackbar('تم', 'أنت تتابع هذا اللاعب الآن');
@@ -172,7 +175,7 @@ class FriendController extends GetxController {
   /// إلغاء متابعة
   Future<bool> unfollowUser(String followedId) async {
     if (currentUserId == null) return false;
-    
+
     try {
       await _repository.unfollowUser(currentUserId!, followedId);
       // يمكن تحديث ملف اللاعب الحالي هنا

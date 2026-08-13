@@ -14,11 +14,11 @@ abstract class FriendRepository {
   /// رفض أو إلغاء أو حذف طلب صداقة
   Future<void> removeFriendship(String idA, String idB);
 
-  /// حظر مستخدم (في الاتجاهين)
-  Future<void> blockUser(String blockerId, String blockedId);
+  /// حظر مستخدم عبر العملية الخادمية الموثوقة
+  Future<void> blockUser(String blockedId);
 
   /// فك الحظر
-  Future<void> unblockUser(String blockerId, String blockedId);
+  Future<void> unblockUser(String blockedId);
 
   /// متابعة مستخدم (لا يحتاج موافقة - يحفظ في قائمة المُتَابَعين)
   /// المتابعة أحادية الاتجاه ولا تحفظ في نفس الموديل كصداقة معتمدة لتجنب التعقيد،

@@ -1,6 +1,14 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // SEC-107 client-writable schemas use millisecond integer timestamps.
+    // Claim token bindings and linked identities are server-authoritative.
+    // guestPlayers: bounded names/contact/roster references, immutable creator
+    // and source references, and guest|invited|claimed|archived status.
+    // guestTeams: bounded identity/contact fields, up to five tournament IDs,
+    // immutable creator/createdAt, and a verified captain reference.
+    // teamMemberships: one player identity, bounded roster enums and IDs,
+    // immutable team/identity/joinedAt/inviter fields after creation.
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -331,9 +339,110 @@ service cloud.firestore {
         data.linkedPlayerId == request.auth.uid;
     }
 
+    function validGuestPlayerDocumentKeys(data) {
+      return data.keys().hasOnly([
+          'displayName',
+          'normalizedName',
+          'phoneNumber',
+          'jerseyNumber',
+          'preferredPosition',
+          'teamId',
+          'guestTeamId',
+          'tournamentId',
+          'createdBy',
+          'createdAt',
+          'updatedAt',
+          'claimStatus',
+          'claimCode',
+          'activeClaimTokenHash',
+          'linkedPlayerId',
+          'notes'
+        ]);
+    }
+
+    function validOptionalBoundedString(value, maxLength) {
+      return value == null ||
+        (value is string && value.size() <= maxLength);
+    }
+
+    function validOptionalDocumentId(value) {
+      return value == null || isBoundedDocumentId(value);
+    }
+
+    function validEpochMillis(value) {
+      return value is int && value >= 0 && value <= 4102444800000;
+    }
+
+    function validOptionalClaimCode(value) {
+      return value == null ||
+        (
+          value is string &&
+          value.size() > 0 &&
+          value.size() <= 128 &&
+          value.matches('^[A-Za-z0-9_-]+$')
+        );
+    }
+
+    function validOptionalClaimTokenHash(value) {
+      return value == null ||
+        (
+          value is string &&
+          value.size() == 64 &&
+          value.matches('^[a-f0-9]+$')
+        );
+    }
+
+    function validGuestClaimStatus(status) {
+      return status in ['guest', 'invited', 'claimed', 'archived'];
+    }
+
+    function validGuestPlayerDocument(data) {
+      return validGuestPlayerDocumentKeys(data) &&
+        data.keys().hasAll([
+          'displayName',
+          'normalizedName',
+          'createdBy',
+          'createdAt',
+          'updatedAt',
+          'claimStatus'
+        ]) &&
+        data.displayName is string &&
+        data.displayName.size() > 0 &&
+        data.displayName.size() <= 120 &&
+        data.normalizedName is string &&
+        data.normalizedName.size() > 0 &&
+        data.normalizedName.size() <= 180 &&
+        validOptionalBoundedString(data.get('phoneNumber', null), 32) &&
+        (
+          data.get('jerseyNumber', null) == null ||
+          (
+            data.jerseyNumber is int &&
+            data.jerseyNumber >= 0 &&
+            data.jerseyNumber <= 999
+          )
+        ) &&
+        validOptionalBoundedString(data.get('preferredPosition', null), 80) &&
+        validOptionalDocumentId(data.get('teamId', null)) &&
+        validOptionalDocumentId(data.get('guestTeamId', null)) &&
+        validOptionalDocumentId(data.get('tournamentId', null)) &&
+        isBoundedDocumentId(data.createdBy) &&
+        validEpochMillis(data.createdAt) &&
+        validEpochMillis(data.updatedAt) &&
+        data.updatedAt >= data.createdAt &&
+        validGuestClaimStatus(data.claimStatus) &&
+        validOptionalClaimCode(data.get('claimCode', null)) &&
+        validOptionalClaimTokenHash(data.get('activeClaimTokenHash', null)) &&
+        validOptionalDocumentId(data.get('linkedPlayerId', null)) &&
+        validOptionalBoundedString(data.get('notes', null), 500);
+    }
+
     function canCreateGuestPlayer(data) {
       return isAuthenticated() &&
         data.createdBy == request.auth.uid &&
+        validGuestPlayerDocument(data) &&
+        data.get('claimStatus', 'guest') == 'guest' &&
+        data.get('claimCode', null) == null &&
+        data.get('activeClaimTokenHash', null) == null &&
         data.get('linkedPlayerId', null) == null &&
         (
           (data.teamId is string && canManageTeamById(data.teamId)) ||
@@ -350,37 +459,186 @@ service cloud.firestore {
         );
     }
 
+    function guestPlayerAuthorityFieldsUnchanged() {
+      return request.resource.data.get('claimCode', null) ==
+          resource.data.get('claimCode', null) &&
+        request.resource.data.get('activeClaimTokenHash', null) ==
+          resource.data.get('activeClaimTokenHash', null) &&
+        request.resource.data.get('linkedPlayerId', null) ==
+          resource.data.get('linkedPlayerId', null);
+    }
+
+    function guestPlayerSourceFieldsUnchanged() {
+      return request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.get('teamId', null) ==
+          resource.data.get('teamId', null) &&
+        request.resource.data.get('guestTeamId', null) ==
+          resource.data.get('guestTeamId', null) &&
+        request.resource.data.get('tournamentId', null) ==
+          resource.data.get('tournamentId', null);
+    }
+
+    function validGuestPlayerStatusTransition() {
+      return request.resource.data.claimStatus == resource.data.claimStatus ||
+        (
+          request.resource.data.claimStatus == 'archived' &&
+          resource.data.claimStatus == 'guest' &&
+          resource.data.get('claimCode', null) == null &&
+          resource.data.get('activeClaimTokenHash', null) == null &&
+          resource.data.get('linkedPlayerId', null) == null
+        );
+    }
+
     function canManageGuestTeam(data) {
       return isAuthenticated() &&
         data.creatorId is string &&
         data.creatorId == request.auth.uid;
     }
 
-    function canUpdateGuestTeamRosterCaptain(guestTeamId) {
-      return isAuthenticated() &&
-        resource.data.tournamentIds is list &&
+    function validGuestTeamDocumentKeys(data) {
+      return data.keys().hasOnly([
+          'name',
+          'normalizedName',
+          'creatorId',
+          'contactName',
+          'contactPhone',
+          'logoUrl',
+          'tournamentIds',
+          'captainGuestPlayerId',
+          'claimStatus',
+          'claimCode',
+          'activeClaimTokenHash',
+          'linkedTeamId',
+          'createdAt',
+          'updatedAt'
+        ]);
+    }
+
+    function validInitialGuestTeam(data) {
+      return validGuestTeamDocument(data) &&
+        data.get('claimStatus', 'guest') == 'guest' &&
+        data.get('claimCode', null) == null &&
+        data.get('activeClaimTokenHash', null) == null &&
+        data.get('linkedTeamId', null) == null &&
+        data.get('captainGuestPlayerId', null) == null;
+    }
+
+    function validGuestTeamTournamentIds(value) {
+      return value is list &&
+        value.size() <= 5 &&
+        (value.size() <= 0 || isBoundedDocumentId(value[0])) &&
+        (value.size() <= 1 || isBoundedDocumentId(value[1])) &&
+        (value.size() <= 2 || isBoundedDocumentId(value[2])) &&
+        (value.size() <= 3 || isBoundedDocumentId(value[3])) &&
+        (value.size() <= 4 || isBoundedDocumentId(value[4]));
+    }
+
+    function validGuestTeamDocument(data) {
+      return validGuestTeamDocumentKeys(data) &&
+        data.keys().hasAll([
+          'name',
+          'normalizedName',
+          'creatorId',
+          'tournamentIds',
+          'claimStatus',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.name is string &&
+        data.name.size() > 0 &&
+        data.name.size() <= 120 &&
+        data.normalizedName is string &&
+        data.normalizedName.size() > 0 &&
+        data.normalizedName.size() <= 180 &&
+        isBoundedDocumentId(data.creatorId) &&
+        validOptionalBoundedString(data.get('contactName', null), 120) &&
+        validOptionalBoundedString(data.get('contactPhone', null), 32) &&
+        validTeamLogoUrl(data.get('logoUrl', null)) &&
+        validGuestTeamTournamentIds(data.tournamentIds) &&
+        validOptionalDocumentId(data.get('captainGuestPlayerId', null)) &&
+        validGuestClaimStatus(data.claimStatus) &&
+        validOptionalClaimCode(data.get('claimCode', null)) &&
+        validOptionalClaimTokenHash(data.get('activeClaimTokenHash', null)) &&
+        validOptionalDocumentId(data.get('linkedTeamId', null)) &&
+        validEpochMillis(data.createdAt) &&
+        validEpochMillis(data.updatedAt) &&
+        data.updatedAt >= data.createdAt;
+    }
+
+    function validGuestTeamStatusTransition() {
+      return request.resource.data.claimStatus == resource.data.claimStatus ||
         (
-          canReadGuestTeamByTournamentIds(resource.data.tournamentIds) ||
-          canManageGuestRosterByTournamentIds(resource.data.tournamentIds)
-        ) &&
+          request.resource.data.claimStatus == 'archived' &&
+          resource.data.claimStatus == 'guest' &&
+          resource.data.get('claimCode', null) == null &&
+          resource.data.get('activeClaimTokenHash', null) == null &&
+          resource.data.get('linkedTeamId', null) == null
+        );
+    }
+
+    function validGuestTeamClientUpdate(data, guestTeamId) {
+      return data.diff(resource.data).affectedKeys().hasOnly([
+          'name',
+          'normalizedName',
+          'contactName',
+          'contactPhone',
+          'logoUrl',
+          'tournamentIds',
+          'captainGuestPlayerId',
+          'claimStatus',
+          'updatedAt'
+        ]) &&
+        data.name is string &&
+        data.name.size() > 0 &&
+        data.name.size() <= 120 &&
+        data.normalizedName is string &&
+        data.normalizedName.size() > 0 &&
+        data.normalizedName.size() <= 180 &&
+        validOptionalBoundedString(data.get('contactName', null), 120) &&
+        validOptionalBoundedString(data.get('contactPhone', null), 32) &&
+        validTeamLogoUrl(data.get('logoUrl', null)) &&
+        validGuestTeamTournamentIds(data.tournamentIds) &&
+        validOptionalDocumentId(data.get('captainGuestPlayerId', null)) &&
+        validGuestClaimStatus(data.claimStatus) &&
+        validEpochMillis(data.updatedAt) &&
+        data.updatedAt >= resource.data.createdAt &&
+        validGuestTeamStatusTransition() &&
+        validGuestTeamCaptain(data, guestTeamId);
+    }
+
+    function validGuestTeamCaptain(data, guestTeamId) {
+      return data.get('captainGuestPlayerId', null) == null ||
+        (
+          isBoundedDocumentId(data.captainGuestPlayerId) &&
+          exists(
+            /databases/$(database)/documents/guestPlayers/$(data.captainGuestPlayerId)
+          ) &&
+          get(
+            /databases/$(database)/documents/guestPlayers/$(data.captainGuestPlayerId)
+          ).data.guestTeamId == guestTeamId &&
+          get(
+            /databases/$(database)/documents/guestPlayers/$(data.captainGuestPlayerId)
+          ).data.claimStatus != 'archived'
+        );
+    }
+
+    // captainGuestPlayerId is global guest-team state. Only the authority for
+    // the canonical first tournament may change it; later tournaments must
+    // keep their roster choices in tournament-scoped documents.
+    function canUpdateGuestTeamRosterCaptain() {
+      return isAuthenticated() &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['captainGuestPlayerId', 'updatedAt']) &&
         request.resource.data.creatorId == resource.data.creatorId &&
         request.resource.data.tournamentIds == resource.data.tournamentIds &&
-        request.resource.data.updatedAt is int &&
+        resource.data.tournamentIds is list &&
+        resource.data.tournamentIds.size() > 0 &&
+        resource.data.tournamentIds[0] is string &&
         (
-          request.resource.data.captainGuestPlayerId == null ||
-          (
-            request.resource.data.captainGuestPlayerId is string &&
-            exists(
-              /databases/$(database)/documents/guestPlayers/$(request.resource.data.captainGuestPlayerId)
-            ) &&
-            get(
-              /databases/$(database)/documents/guestPlayers/$(request.resource.data.captainGuestPlayerId)
-            ).data.guestTeamId == guestTeamId &&
-            get(
-              /databases/$(database)/documents/guestPlayers/$(request.resource.data.captainGuestPlayerId)
-            ).data.claimStatus != 'archived'
+          organizesTournamentById(resource.data.tournamentIds[0]) ||
+          hasActiveGuestRosterAssistantPermission(
+            resource.data.tournamentIds[0]
           )
         );
     }
@@ -435,42 +693,27 @@ service cloud.firestore {
           (
             tournamentIds.size() > 0 &&
             tournamentIds[0] is string &&
-            hasActiveTournamentAssistantPermission(
-              tournamentIds[0],
-              'canManageGuestRoster'
-            )
+            hasActiveGuestRosterAssistantPermission(tournamentIds[0])
           ) ||
           (
             tournamentIds.size() > 1 &&
             tournamentIds[1] is string &&
-            hasActiveTournamentAssistantPermission(
-              tournamentIds[1],
-              'canManageGuestRoster'
-            )
+            hasActiveGuestRosterAssistantPermission(tournamentIds[1])
           ) ||
           (
             tournamentIds.size() > 2 &&
             tournamentIds[2] is string &&
-            hasActiveTournamentAssistantPermission(
-              tournamentIds[2],
-              'canManageGuestRoster'
-            )
+            hasActiveGuestRosterAssistantPermission(tournamentIds[2])
           ) ||
           (
             tournamentIds.size() > 3 &&
             tournamentIds[3] is string &&
-            hasActiveTournamentAssistantPermission(
-              tournamentIds[3],
-              'canManageGuestRoster'
-            )
+            hasActiveGuestRosterAssistantPermission(tournamentIds[3])
           ) ||
           (
             tournamentIds.size() > 4 &&
             tournamentIds[4] is string &&
-            hasActiveTournamentAssistantPermission(
-              tournamentIds[4],
-              'canManageGuestRoster'
-            )
+            hasActiveGuestRosterAssistantPermission(tournamentIds[4])
           )
         );
     }
@@ -668,293 +911,58 @@ service cloud.firestore {
 
     function canCreateClaimCode(data) {
       return isAuthenticated() &&
+        data.keys().hasOnly([
+          'targetType',
+          'targetId',
+          'scope',
+          'teamId',
+          'tournamentId',
+          'createdBy',
+          'requiresApproval',
+          'status',
+          'createdAt',
+          'updatedAt',
+          'expiresAt',
+          'claimedByPlayerId',
+          'claimedAt'
+        ]) &&
         data.createdBy == request.auth.uid &&
-        (
-          (
-            data.targetType == 'guestPlayer' &&
-            data.targetId is string &&
-            exists(/databases/$(database)/documents/guestPlayers/$(data.targetId)) &&
-            canManageGuestPlayer(
-              get(/databases/$(database)/documents/guestPlayers/$(data.targetId)).data
-            )
-          ) ||
-          (
-            data.targetType == 'guestTeam' &&
-            data.targetId is string &&
-            exists(/databases/$(database)/documents/guestTeams/$(data.targetId)) &&
-            canManageGuestTeam(
-              get(/databases/$(database)/documents/guestTeams/$(data.targetId)).data
-            )
-          ) ||
-          (
-            data.targetType == 'teamInvite' &&
-            data.teamId is string &&
-            data.targetId == data.teamId &&
-            canManageTeamById(data.teamId)
-          )
-        );
-    }
-
-    function isActiveGuestPlayerClaimCode(claimCode, guestPlayerId) {
-      return claimCode is string &&
-        exists(/databases/$(database)/documents/claimCodes/$(claimCode)) &&
-        get(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.targetType == 'guestPlayer' &&
-        get(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.targetId == guestPlayerId &&
-        get(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.status == 'active' &&
-        (
-          !(get(/databases/$(database)/documents/claimCodes/$(claimCode))
-            .data.expiresAt is int) ||
-          get(/databases/$(database)/documents/claimCodes/$(claimCode))
-            .data.expiresAt > request.time.toMillis()
-        );
-    }
-
-    function isActiveGuestTeamClaimCode(claimCode, guestTeamId) {
-      return claimCode is string &&
-        exists(/databases/$(database)/documents/claimCodes/$(claimCode)) &&
-        get(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.targetType == 'guestTeam' &&
-        get(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.targetId == guestTeamId &&
-        get(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.status == 'active' &&
-        (
-          !(get(/databases/$(database)/documents/claimCodes/$(claimCode))
-            .data.expiresAt is int) ||
-          get(/databases/$(database)/documents/claimCodes/$(claimCode))
-            .data.expiresAt > request.time.toMillis()
-        );
-    }
-
-    function hasSameBatchGuestPlayerClaimProof(claimCode, guestPlayerId) {
-      return claimCode is string &&
-        exists(/databases/$(database)/documents/claimCodes/$(claimCode)) &&
-        getAfter(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.targetType == 'guestPlayer' &&
-        getAfter(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.targetId == guestPlayerId &&
-        getAfter(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.status == 'claimed' &&
-        getAfter(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.claimedByPlayerId == request.auth.uid &&
-        getAfter(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.claimedAt is int &&
-        getAfter(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.updatedAt is int;
-    }
-
-    function hasSameBatchGuestTeamClaimProof(claimCode, guestTeamId, teamId) {
-      return claimCode is string &&
-        exists(/databases/$(database)/documents/claimCodes/$(claimCode)) &&
-        getAfter(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.targetType == 'guestTeam' &&
-        getAfter(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.targetId == guestTeamId &&
-        getAfter(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.status == 'claimed' &&
-        getAfter(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.claimedByPlayerId == request.auth.uid &&
-        getAfter(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.teamId == teamId &&
-        getAfter(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.claimedAt is int &&
-        getAfter(/databases/$(database)/documents/claimCodes/$(claimCode))
-          .data.updatedAt is int;
-    }
-
-    function canSelfClaimGuestPlayer(guestPlayerId) {
-      return isAuthenticated() &&
-        resource.data.claimCode is string &&
-        isActiveGuestPlayerClaimCode(resource.data.claimCode, guestPlayerId) &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly([
-            'claimStatus',
-            'linkedPlayerId',
-            'updatedAt'
-          ]) &&
-        request.resource.data.updatedAt is int &&
-        request.resource.data.displayName == resource.data.displayName &&
-        request.resource.data.normalizedName == resource.data.normalizedName &&
-        request.resource.data.phoneNumber == resource.data.phoneNumber &&
-        request.resource.data.jerseyNumber == resource.data.jerseyNumber &&
-        request.resource.data.preferredPosition == resource.data.preferredPosition &&
-        request.resource.data.teamId == resource.data.teamId &&
-        request.resource.data.tournamentId == resource.data.tournamentId &&
-        request.resource.data.createdBy == resource.data.createdBy &&
-        request.resource.data.createdAt == resource.data.createdAt &&
-        request.resource.data.claimCode == resource.data.claimCode &&
-        request.resource.data.notes == resource.data.notes &&
-        request.resource.data.claimStatus == 'claimed' &&
-        request.resource.data.linkedPlayerId == request.auth.uid &&
-        hasSameBatchGuestPlayerClaimProof(
-          resource.data.claimCode,
-          guestPlayerId
-        );
-    }
-
-    function canSelfClaimGuestTeam(guestTeamId) {
-      return isAuthenticated() &&
-        resource.data.claimCode is string &&
-        isActiveGuestTeamClaimCode(resource.data.claimCode, guestTeamId) &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly([
-            'claimStatus',
-            'linkedTeamId',
-            'updatedAt'
-          ]) &&
-        request.resource.data.updatedAt is int &&
-        request.resource.data.name == resource.data.name &&
-        request.resource.data.normalizedName == resource.data.normalizedName &&
-        request.resource.data.creatorId == resource.data.creatorId &&
-        request.resource.data.contactName == resource.data.contactName &&
-        request.resource.data.contactPhone == resource.data.contactPhone &&
-        request.resource.data.logoUrl == resource.data.logoUrl &&
-        request.resource.data.tournamentIds == resource.data.tournamentIds &&
-        request.resource.data.captainGuestPlayerId == resource.data.captainGuestPlayerId &&
-        request.resource.data.claimCode == resource.data.claimCode &&
-        request.resource.data.createdAt == resource.data.createdAt &&
-        request.resource.data.claimStatus == 'claimed' &&
-        request.resource.data.linkedTeamId is string &&
-        ownsTeamById(request.resource.data.linkedTeamId) &&
-        hasSameBatchGuestTeamClaimProof(
-          resource.data.claimCode,
-          guestTeamId,
-          request.resource.data.linkedTeamId
-        );
-    }
-
-    function canFinalizeGuestPlayerClaimCode() {
-      return isAuthenticated() &&
-        resource.data.targetType == 'guestPlayer' &&
-        resource.data.status == 'active' &&
-        (
-          !(resource.data.expiresAt is int) ||
-          resource.data.expiresAt > request.time.toMillis()
-        ) &&
-        request.resource.data.targetType == resource.data.targetType &&
-        request.resource.data.targetId == resource.data.targetId &&
-        request.resource.data.scope == resource.data.scope &&
-        request.resource.data.teamId == resource.data.teamId &&
-        request.resource.data.tournamentId == resource.data.tournamentId &&
-        request.resource.data.createdBy == resource.data.createdBy &&
-        request.resource.data.requiresApproval == resource.data.requiresApproval &&
-        request.resource.data.createdAt == resource.data.createdAt &&
-        request.resource.data.expiresAt == resource.data.expiresAt &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly([
-            'status',
-            'claimedByPlayerId',
-            'claimedAt',
-            'updatedAt'
-          ]) &&
-        request.resource.data.claimedAt is int &&
-        request.resource.data.updatedAt is int &&
-        request.resource.data.status == 'claimed' &&
-        request.resource.data.claimedByPlayerId == request.auth.uid;
-    }
-
-    function canRequestGuestTeamClaimCode() {
-      return isAuthenticated() &&
-        resource.data.targetType == 'guestTeam' &&
-        resource.data.status == 'active' &&
-        (
-          !(resource.data.expiresAt is int) ||
-          resource.data.expiresAt > request.time.toMillis()
-        ) &&
-        request.resource.data.targetType == resource.data.targetType &&
-        request.resource.data.targetId == resource.data.targetId &&
-        request.resource.data.scope == resource.data.scope &&
-        request.resource.data.tournamentId == resource.data.tournamentId &&
-        request.resource.data.createdBy == resource.data.createdBy &&
-        request.resource.data.requiresApproval == resource.data.requiresApproval &&
-        request.resource.data.createdAt == resource.data.createdAt &&
-        request.resource.data.expiresAt == resource.data.expiresAt &&
-        request.resource.data.status == 'active' &&
-        request.resource.data.claimedAt == resource.data.claimedAt &&
-        request.resource.data.claimedByPlayerId == request.auth.uid &&
-        request.resource.data.teamId is string &&
-        ownsTeamById(request.resource.data.teamId) &&
-        (
-          !(resource.data.teamId is string) ||
-          resource.data.teamId == request.resource.data.teamId
-        ) &&
-        (
-          !(resource.data.claimedByPlayerId is string) ||
-          resource.data.claimedByPlayerId == request.auth.uid
-        );
-    }
-
-    function canFinalizeGuestTeamClaimCode() {
-      return isAuthenticated() &&
-        resource.data.targetType == 'guestTeam' &&
-        resource.data.status == 'active' &&
-        (
-          !(resource.data.expiresAt is int) ||
-          resource.data.expiresAt > request.time.toMillis()
-        ) &&
-        request.resource.data.targetType == resource.data.targetType &&
-        request.resource.data.targetId == resource.data.targetId &&
-        request.resource.data.scope == resource.data.scope &&
-        request.resource.data.tournamentId == resource.data.tournamentId &&
-        request.resource.data.createdBy == resource.data.createdBy &&
-        request.resource.data.requiresApproval == resource.data.requiresApproval &&
-        request.resource.data.createdAt == resource.data.createdAt &&
-        request.resource.data.expiresAt == resource.data.expiresAt &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly([
-            'teamId',
-            'status',
-            'claimedByPlayerId',
-            'claimedAt',
-            'updatedAt'
-          ]) &&
-        request.resource.data.status == 'claimed' &&
-        request.resource.data.claimedAt is int &&
-        request.resource.data.updatedAt is int &&
-        request.resource.data.teamId is string &&
-        (
-          (
-            ownsTeamById(request.resource.data.teamId) &&
-            request.resource.data.claimedByPlayerId == request.auth.uid
-          ) ||
-          (
-            resource.data.createdBy == request.auth.uid &&
-            resource.data.teamId is string &&
-            resource.data.teamId == request.resource.data.teamId &&
-            resource.data.claimedByPlayerId is string &&
-            request.resource.data.claimedByPlayerId == resource.data.claimedByPlayerId
-          )
-        );
-    }
-
-    function canSelfClaimMembership() {
-      return isAuthenticated() &&
-        resource.data.guestPlayerId is string &&
-        isActiveGuestPlayerClaimCode(
-          get(/databases/$(database)/documents/guestPlayers/$(resource.data.guestPlayerId))
-            .data.claimCode,
-          resource.data.guestPlayerId
-        ) &&
-        request.resource.data.teamId == resource.data.teamId &&
-        request.resource.data.playerId == request.auth.uid &&
-        request.resource.data.guestPlayerId == null &&
-        request.resource.data.claimedFromGuestPlayerId == resource.data.guestPlayerId &&
-        request.resource.data.role == resource.data.role &&
-        request.resource.data.status == resource.data.status &&
-        request.resource.data.availability == resource.data.availability &&
-        request.resource.data.joinedAt == resource.data.joinedAt &&
-        request.resource.data.invitedBy == resource.data.invitedBy;
+        data.targetType == 'teamInvite' &&
+        data.targetId is string &&
+        data.teamId is string &&
+        data.targetId == data.teamId &&
+        data.scope in ['team', 'tournament', 'hybrid'] &&
+        data.requiresApproval == false &&
+        data.status == 'active' &&
+        data.createdAt is int &&
+        data.updatedAt is int &&
+        data.expiresAt is int &&
+        data.claimedByPlayerId == null &&
+        data.claimedAt == null &&
+        canManageTeamById(data.teamId);
     }
 
     function canUpdateClaimCode(data) {
       return isAuthenticated() &&
+        data.targetType == 'teamInvite' &&
         data.createdBy == request.auth.uid &&
+        canManageTeamById(data.teamId) &&
         request.resource.data.targetType == resource.data.targetType &&
         request.resource.data.targetId == resource.data.targetId &&
-        request.resource.data.createdBy == resource.data.createdBy;
+        request.resource.data.scope == resource.data.scope &&
+        request.resource.data.teamId == resource.data.teamId &&
+        request.resource.data.tournamentId == resource.data.tournamentId &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.requiresApproval == resource.data.requiresApproval &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.expiresAt == resource.data.expiresAt &&
+        request.resource.data.claimedByPlayerId == resource.data.claimedByPlayerId &&
+        request.resource.data.claimedAt == resource.data.claimedAt &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'updatedAt']) &&
+        resource.data.status == 'active' &&
+        request.resource.data.status == 'expired' &&
+        request.resource.data.updatedAt is int;
     }
 
     function ownsFantasyTeam(teamId) {
@@ -1001,225 +1009,6 @@ service cloud.firestore {
         (value.size() <= 15 || isBoundedDocumentId(value[15]));
     }
 
-    function isAllowedAnalyticsCardType(value) {
-      return value in [
-        'matchResult',
-        'mvp',
-        'topScorers',
-        'lineup',
-        'champion',
-        'player',
-        'team',
-        'tournamentInvite',
-        'upcomingFixture',
-        'goalScorer',
-        'qualification',
-        'groupStandings',
-        'knockoutBracket',
-        'playerMilestone'
-      ];
-    }
-
-    function isAllowedAnalyticsEntityType(value) {
-      return value in [
-        'match',
-        'player',
-        'guestPlayer',
-        'team',
-        'tournament',
-        'lineup'
-      ];
-    }
-
-    function isValidAnalyticsCampaignSource(value) {
-      return value is string &&
-        value.size() > 0 &&
-        value.size() <= 64 &&
-        value.matches('^[a-z0-9][a-z0-9_-]{0,63}$');
-    }
-
-    function isValidPrideAnalyticsParameters(parameters) {
-      return parameters is map &&
-        parameters.keys().hasAll([
-          'cardType',
-          'entityType',
-          'entityId',
-          'campaignSource',
-          'schemaVersion'
-        ]) &&
-        parameters.keys().hasOnly([
-          'cardType',
-          'entityType',
-          'entityId',
-          'tournamentId',
-          'matchId',
-          'campaignSource',
-          'schemaVersion'
-        ]) &&
-        isAllowedAnalyticsCardType(parameters.cardType) &&
-        isAllowedAnalyticsEntityType(parameters.entityType) &&
-        isBoundedDocumentId(parameters.entityId) &&
-        (
-          !parameters.keys().hasAny(['tournamentId']) ||
-          isBoundedDocumentId(parameters.tournamentId)
-        ) &&
-        (
-          !parameters.keys().hasAny(['matchId']) ||
-          isBoundedDocumentId(parameters.matchId)
-        ) &&
-        isValidAnalyticsCampaignSource(parameters.campaignSource) &&
-        parameters.schemaVersion is int &&
-        parameters.schemaVersion == 1;
-    }
-
-    function isValidPrideAnalyticsEvent(data) {
-      return data.keys().hasOnly(['eventName', 'parameters', 'createdAt']) &&
-        data.eventName in [
-          'pride_card_viewed',
-          'share_started',
-          'share_sheet_returned',
-          'share_link_opened',
-          'claim_started_from_card',
-          'claim_completed_from_card'
-        ] &&
-        isValidPrideAnalyticsParameters(data.parameters);
-    }
-
-    function isValidPrideExportParameters(parameters) {
-      return parameters is map &&
-        parameters.keys().hasAll([
-          'cardType',
-          'format',
-          'mediaType',
-          'exportDurationMs',
-          'fallbackUsed'
-        ]) &&
-        parameters.keys().hasOnly([
-          'cardType',
-          'format',
-          'mediaType',
-          'exportDurationMs',
-          'fallbackUsed',
-          'failureCode'
-        ]) &&
-        isAllowedAnalyticsCardType(parameters.cardType) &&
-        parameters.format in [
-          'square1x1',
-          'feed4x5',
-          'story9x16',
-          'landscape16x9'
-        ] &&
-        parameters.mediaType in ['image', 'video'] &&
-        parameters.exportDurationMs is int &&
-        parameters.exportDurationMs >= 0 &&
-        parameters.exportDurationMs <= 600000 &&
-        parameters.fallbackUsed is bool &&
-        (
-          !parameters.keys().hasAny(['failureCode']) ||
-          (
-            parameters.failureCode is string &&
-            parameters.failureCode.size() > 0 &&
-            parameters.failureCode.size() <= 64 &&
-            parameters.failureCode.matches('^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$')
-          )
-        );
-    }
-
-    function isValidPrideExportAnalyticsEvent(data) {
-      return data.keys().hasOnly(['eventName', 'parameters', 'createdAt']) &&
-        data.eventName == 'pride_export_finished' &&
-        isValidPrideExportParameters(data.parameters);
-    }
-
-    function isAllowedLegacyAnalyticsType(eventName, type) {
-      return (
-          eventName == 'invite_sent' &&
-          type in ['guest_player', 'guest_team', 'team_invite']
-        ) ||
-        (
-          eventName == 'claim_open' &&
-          type in ['guestPlayer', 'guestTeam', 'teamInvite', 'team_invite']
-        ) ||
-        (
-          eventName == 'claim_completion' &&
-          type in ['guest_player', 'guest_team']
-        ) ||
-        (
-          eventName == 'join_completion' &&
-          type == 'team_invite'
-        );
-    }
-
-    function isValidLegacyAnalyticsParameters(data) {
-      let requiresActor = data.eventName in [
-        'invite_sent',
-        'claim_completion',
-        'join_completion'
-      ];
-      return data.parameters is map &&
-        data.parameters.keys().hasAll(['type', 'targetId']) &&
-        data.parameters.keys().hasOnly(
-          requiresActor
-            ? ['type', 'targetId', 'actorId']
-            : ['type', 'targetId']
-        ) &&
-        isAllowedLegacyAnalyticsType(
-          data.eventName,
-          data.parameters.type
-        ) &&
-        isBoundedDocumentId(data.parameters.targetId) &&
-        (
-          !requiresActor ||
-          (
-            data.parameters.keys().hasAll(['actorId']) &&
-            data.parameters.actorId == request.auth.uid &&
-            isBoundedDocumentId(data.parameters.actorId)
-          )
-        );
-    }
-
-    function isValidLegacyAnalyticsEvent(data) {
-      let requiresActor = data.eventName in [
-        'invite_sent',
-        'claim_completion',
-        'join_completion'
-      ];
-      return data.eventName in [
-          'invite_sent',
-          'claim_open',
-          'claim_completion',
-          'join_completion'
-        ] &&
-        data.keys().hasOnly(
-          requiresActor
-            ? ['eventName', 'actorId', 'parameters', 'createdAt']
-            : ['eventName', 'parameters', 'createdAt']
-        ) &&
-        (
-          !requiresActor ||
-          (
-            data.keys().hasAll(['actorId']) &&
-            data.actorId == request.auth.uid &&
-            isBoundedDocumentId(data.actorId)
-          )
-        ) &&
-        isValidLegacyAnalyticsParameters(data);
-    }
-
-    function isValidAnalyticsEvent(data) {
-      return isAuthenticated() &&
-        data.keys().hasAll(['eventName', 'parameters', 'createdAt']) &&
-        data.eventName is string &&
-        data.createdAt is int &&
-        data.createdAt >= 0 &&
-        data.createdAt <= request.time.toMillis() + 300000 &&
-        (
-          isValidLegacyAnalyticsEvent(data) ||
-          isValidPrideAnalyticsEvent(data) ||
-          isValidPrideExportAnalyticsEvent(data)
-        );
-    }
-
     function clientMatchDecisionFieldsAreUnset(data) {
       return data.get('penaltyScoreTeamA', null) == null &&
         data.get('penaltyScoreTeamB', null) == null &&
@@ -1262,6 +1051,19 @@ service cloud.firestore {
         get(
           /databases/$(database)/documents/tournaments/$(tournamentId)/assistants/$(request.auth.uid)
         ).data.permissions.get(permissionName, false) == true;
+    }
+
+    function hasActiveGuestRosterAssistantPermission(tournamentId) {
+      let assistant = get(
+        /databases/$(database)/documents/tournaments/$(tournamentId)/assistants/$(request.auth.uid)
+      );
+      return isAuthenticated() &&
+        exists(
+          /databases/$(database)/documents/tournaments/$(tournamentId)/assistants/$(request.auth.uid)
+        ) &&
+        assistant.data.status == 'active' &&
+        assistant.data.permissions is map &&
+        assistant.data.permissions.get('canManageGuestRoster', false) == true;
     }
 
     function hasActiveAssistantPermissionForMatch(matchId, permissionName) {
@@ -2273,6 +2075,231 @@ service cloud.firestore {
         data.createdAt is int;
     }
 
+    // Temporary Wave 0 bootstrap contract. Wave 2 replaces this client create
+    // with ensurePlayerProfile(), then this allowance is removed entirely.
+    function validInitialPlayerProfile(data, playerId) {
+      return data.keys().hasOnly([
+          'name',
+          'nameLower',
+          'username',
+          'usernameLower',
+          'photoUrl',
+          'photoThumbUrl',
+          'photoFrame',
+          'qrCode',
+          'phone',
+          'position',
+          'rating',
+          'totalMatches',
+          'wins',
+          'draws',
+          'losses',
+          'mvpCount',
+          'trustWeight',
+          'trustLevel',
+          'role',
+          'achievementIds',
+          'teamIds',
+          'friendIds',
+          'followingIds',
+          'blockedIds',
+          'privacySetting',
+          'isGuest',
+          'createdAt',
+          'lastActiveAt'
+        ]) &&
+        data.keys().hasAll([
+          'name',
+          'nameLower',
+          'username',
+          'usernameLower',
+          'photoUrl',
+          'photoThumbUrl',
+          'photoFrame',
+          'qrCode',
+          'phone',
+          'position',
+          'rating',
+          'totalMatches',
+          'wins',
+          'draws',
+          'losses',
+          'mvpCount',
+          'trustWeight',
+          'trustLevel',
+          'role',
+          'achievementIds',
+          'teamIds',
+          'friendIds',
+          'followingIds',
+          'blockedIds',
+          'privacySetting',
+          'isGuest',
+          'createdAt',
+          'lastActiveAt'
+        ]) &&
+        data.name is string &&
+        data.name.size() > 0 &&
+        data.name.size() <= 120 &&
+        data.nameLower is string &&
+        data.nameLower.size() > 0 &&
+        data.nameLower.size() <= 120 &&
+        data.username == null &&
+        data.usernameLower == null &&
+        (
+          data.photoUrl == null ||
+          (
+            data.photoUrl is string &&
+            data.photoUrl.size() <= 2048 &&
+            data.photoUrl.matches('^https://[^ ]+$')
+          )
+        ) &&
+        data.photoThumbUrl == null &&
+        data.photoFrame == 'newcomer' &&
+        data.qrCode == '7reef://player/' + playerId &&
+        (
+          data.phone == null ||
+          (data.phone is string && data.phone.size() <= 32)
+        ) &&
+        data.position == null &&
+        data.rating == 1000 &&
+        data.totalMatches == 0 &&
+        data.wins == 0 &&
+        data.draws == 0 &&
+        data.losses == 0 &&
+        data.mvpCount == 0 &&
+        data.trustWeight == 0.5 &&
+        data.trustLevel == 'newPlayer' &&
+        data.role == 'player' &&
+        data.achievementIds is list &&
+        data.achievementIds.size() == 0 &&
+        data.teamIds is list &&
+        data.teamIds.size() == 0 &&
+        data.friendIds is list &&
+        data.friendIds.size() == 0 &&
+        data.followingIds is list &&
+        data.followingIds.size() == 0 &&
+        data.blockedIds is list &&
+        data.blockedIds.size() == 0 &&
+        data.privacySetting == 'public' &&
+        data.isGuest == false &&
+        data.createdAt is int &&
+        data.lastActiveAt is int &&
+        data.createdAt == data.lastActiveAt &&
+        data.createdAt >= request.time.toMillis() - 300000 &&
+        data.createdAt <= request.time.toMillis() + 300000;
+    }
+
+    function clientBlockedIdsUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['blockedIds']);
+    }
+
+    function validPlayerRelationshipLists(data) {
+      return data.friendIds is list &&
+        data.friendIds.size() <= 1000 &&
+        data.followingIds is list &&
+        data.followingIds.size() <= 1000 &&
+        data.blockedIds is list &&
+        data.blockedIds.size() <= 1000;
+    }
+
+    function validPlayerRelationshipListChanges() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return (
+          !changed.hasAny(['friendIds']) ||
+          (
+            request.resource.data.friendIds is list &&
+            request.resource.data.friendIds.size() <= 1000
+          )
+        ) &&
+        (
+          !changed.hasAny(['followingIds']) ||
+          (
+            request.resource.data.followingIds is list &&
+            request.resource.data.followingIds.size() <= 1000
+          )
+        ) &&
+        (
+          !changed.hasAny(['blockedIds']) ||
+          (
+            request.resource.data.blockedIds is list &&
+            request.resource.data.blockedIds.size() <= 1000
+          )
+        );
+    }
+
+    function validClientFriendship(data, friendshipId) {
+      return data.keys().hasAll([
+          'userId1',
+          'userId2',
+          'participants',
+          'status',
+          'lastActionBy',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'userId1',
+          'userId2',
+          'participants',
+          'status',
+          'lastActionBy',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isBoundedDocumentId(data.userId1) &&
+        isBoundedDocumentId(data.userId2) &&
+        data.userId1 != data.userId2 &&
+        data.userId1 < data.userId2 &&
+        friendshipId == data.userId1 + '_' + data.userId2 &&
+        data.participants is list &&
+        data.participants.size() == 2 &&
+        data.participants == [data.userId1, data.userId2] &&
+        data.status in ['pending', 'accepted'] &&
+        data.lastActionBy in data.participants &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function playerDoesNotBlock(playerId, otherPlayerId) {
+      return exists(/databases/$(database)/documents/players/$(playerId)) &&
+        get(/databases/$(database)/documents/players/$(playerId))
+          .data.get('blockedIds', []) is list &&
+        !(otherPlayerId in get(
+          /databases/$(database)/documents/players/$(playerId)
+        ).data.get('blockedIds', []));
+    }
+
+    function friendshipPairIsUnblocked(data) {
+      return playerDoesNotBlock(data.userId1, data.userId2) &&
+        playerDoesNotBlock(data.userId2, data.userId1);
+    }
+
+    function validClientFriendshipCreate(data, friendshipId) {
+      return validClientFriendship(data, friendshipId) &&
+        data.status == 'pending' &&
+        data.lastActionBy == request.auth.uid &&
+        friendshipPairIsUnblocked(data);
+    }
+
+    function validClientFriendshipAcceptance(data, friendshipId) {
+      return validClientFriendship(data, friendshipId) &&
+        friendshipIdentityUnchanged() &&
+        friendshipPairIsUnblocked(data) &&
+        resource.data.status == 'pending' &&
+        data.status == 'accepted' &&
+        resource.data.lastActionBy != request.auth.uid &&
+        data.lastActionBy == request.auth.uid;
+    }
+
+    function friendshipIdentityUnchanged() {
+      return request.resource.data.userId1 == resource.data.userId1 &&
+        request.resource.data.userId2 == resource.data.userId2 &&
+        request.resource.data.participants == resource.data.participants &&
+        request.resource.data.createdAt == resource.data.createdAt;
+    }
+
     function matchSidePlayerRefsUnchanged() {
       return matchOperationRefsUnchanged() &&
         request.resource.data.sideId == resource.data.sideId &&
@@ -2282,8 +2309,12 @@ service cloud.firestore {
 
     match /players/{playerId} {
       allow read: if isAuthenticated();
-      allow create: if isOwner(playerId);
+      allow create: if isOwner(playerId) &&
+        validInitialPlayerProfile(request.resource.data, playerId) &&
+        validPlayerRelationshipLists(request.resource.data);
       allow update: if isOwner(playerId) &&
+        validPlayerRelationshipListChanges() &&
+        clientBlockedIdsUnchanged() &&
         !request.resource.data.diff(resource.data).affectedKeys()
           .hasAny([
             'rating',
@@ -2307,10 +2338,11 @@ service cloud.firestore {
       allow create: if canCreateGuestPlayer(request.resource.data);
       allow update: if (
         canManageGuestPlayer(resource.data) &&
-        request.resource.data.createdBy == resource.data.createdBy &&
-        request.resource.data.get('linkedPlayerId', null) ==
-          resource.data.get('linkedPlayerId', null)
-      ) || canSelfClaimGuestPlayer(guestPlayerId);
+        validGuestPlayerDocument(request.resource.data) &&
+        guestPlayerSourceFieldsUnchanged() &&
+        guestPlayerAuthorityFieldsUnchanged() &&
+        validGuestPlayerStatusTransition()
+      );
       allow delete: if false;
     }
 
@@ -2339,15 +2371,94 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    function validInitialClientTeamMembershipIdentity(data) {
+      return data.get('claimedFromGuestPlayerId', null) == null &&
+        (
+          (
+            isBoundedDocumentId(data.get('playerId', null)) &&
+            data.get('guestPlayerId', null) == null
+          ) ||
+          (
+            data.get('playerId', null) == null &&
+            isBoundedDocumentId(data.get('guestPlayerId', null))
+          )
+        );
+    }
+
+    function validTeamMembershipDocument(data) {
+      return data.keys().hasOnly([
+          'teamId',
+          'playerId',
+          'guestPlayerId',
+          'claimedFromGuestPlayerId',
+          'role',
+          'status',
+          'availability',
+          'joinedAt',
+          'updatedAt',
+          'invitedBy'
+        ]) &&
+        data.keys().hasAll([
+          'teamId',
+          'role',
+          'status',
+          'availability',
+          'joinedAt',
+          'updatedAt'
+        ]) &&
+        isBoundedDocumentId(data.teamId) &&
+        validOptionalDocumentId(data.get('playerId', null)) &&
+        validOptionalDocumentId(data.get('guestPlayerId', null)) &&
+        validOptionalDocumentId(data.get('claimedFromGuestPlayerId', null)) &&
+        data.role in [
+          'owner',
+          'viceCaptain',
+          'player',
+          'manager',
+          'assistantManager'
+        ] &&
+        data.status in ['starter', 'bench', 'inactive'] &&
+        data.availability in [
+          'available',
+          'unavailable',
+          'injured',
+          'pending'
+        ] &&
+        validEpochMillis(data.joinedAt) &&
+        validEpochMillis(data.updatedAt) &&
+        data.updatedAt >= data.joinedAt &&
+        validOptionalDocumentId(data.get('invitedBy', null));
+    }
+
+    function teamMembershipIdentityUnchanged() {
+      return request.resource.data.get('playerId', null) ==
+          resource.data.get('playerId', null) &&
+        request.resource.data.get('guestPlayerId', null) ==
+          resource.data.get('guestPlayerId', null) &&
+        request.resource.data.get('claimedFromGuestPlayerId', null) ==
+          resource.data.get('claimedFromGuestPlayerId', null);
+    }
+
+    function teamMembershipSourceFieldsUnchanged() {
+      return request.resource.data.teamId == resource.data.teamId &&
+        request.resource.data.joinedAt == resource.data.joinedAt &&
+        request.resource.data.get('invitedBy', null) ==
+          resource.data.get('invitedBy', null);
+    }
+
     match /teamMemberships/{membershipId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() &&
-        canManageTeamById(request.resource.data.teamId);
+        canManageTeamById(request.resource.data.teamId) &&
+        validTeamMembershipDocument(request.resource.data) &&
+        validInitialClientTeamMembershipIdentity(request.resource.data);
       allow update: if (
         isAuthenticated() &&
         canManageTeamById(resource.data.teamId) &&
-        request.resource.data.teamId == resource.data.teamId
-      ) || canSelfClaimMembership();
+        validTeamMembershipDocument(request.resource.data) &&
+        teamMembershipSourceFieldsUnchanged() &&
+        teamMembershipIdentityUnchanged()
+      );
       allow delete: if false;
     }
 
@@ -2372,17 +2483,12 @@ service cloud.firestore {
     match /guestTeams/{guestTeamId} {
       allow read: if canReadGuestTeam(resource.data);
       allow create: if canManageGuestTeam(request.resource.data) &&
-        validTeamLogoUrl(request.resource.data.get('logoUrl', null));
+        validInitialGuestTeam(request.resource.data);
       allow update: if (
-        canManageGuestTeam(resource.data) &&
-        request.resource.data.creatorId == resource.data.creatorId &&
-        (
-          !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['logoUrl']) ||
-          validTeamLogoUrl(request.resource.data.get('logoUrl', null))
-        )
-      ) || canSelfClaimGuestTeam(guestTeamId) ||
-        canUpdateGuestTeamRosterCaptain(guestTeamId);
+          canManageGuestTeam(resource.data) ||
+          canUpdateGuestTeamRosterCaptain()
+        ) &&
+        validGuestTeamClientUpdate(request.resource.data, guestTeamId);
       allow delete: if false;
     }
 
@@ -2635,9 +2741,19 @@ service cloud.firestore {
     }
 
     match /friendships/{friendshipId} {
-      allow read: if isAuthenticated();
-      allow create: if isParticipant(request.resource.data.participants);
-      allow update, delete: if isParticipant(resource.data.participants);
+      allow read: if isParticipant(resource.data.participants);
+      allow create: if validClientFriendshipCreate(
+          request.resource.data,
+          friendshipId
+        );
+      allow update: if isParticipant(resource.data.participants) &&
+        resource.data.status != 'blocked' &&
+        validClientFriendshipAcceptance(
+          request.resource.data,
+          friendshipId
+        );
+      allow delete: if isParticipant(resource.data.participants) &&
+        resource.data.status != 'blocked';
     }
 
     match /reservedUsernames/{username} {
@@ -2648,18 +2764,16 @@ service cloud.firestore {
     }
 
     match /claimCodes/{claimCodeId} {
-      // V1 claim links treat the exact claim code document id as
-      // proof-of-possession for client claim entry. Listing/querying all claim
-      // codes would expose active invite tokens, so list access is limited to
-      // creator-scoped reuse queries.
-      allow get: if isAuthenticated();
+      // Guest-player/team claim tokens are resolved and consumed only by
+      // trusted callables. The remaining client-readable documents are the
+      // separate V1 team-invite flow and require exact bearer possession.
+      allow get: if isAuthenticated() &&
+        resource.data.targetType == 'teamInvite';
       allow list: if isAuthenticated() &&
+        resource.data.targetType == 'teamInvite' &&
         resource.data.createdBy == request.auth.uid;
       allow create: if canCreateClaimCode(request.resource.data);
-      allow update: if canUpdateClaimCode(resource.data) ||
-        canFinalizeGuestPlayerClaimCode() ||
-        canRequestGuestTeamClaimCode() ||
-        canFinalizeGuestTeamClaimCode();
+      allow update: if canUpdateClaimCode(resource.data);
       allow delete: if false;
     }
 
@@ -2671,9 +2785,7 @@ service cloud.firestore {
 
     match /userVotes/{voteId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() &&
-        request.resource.data.userId == request.auth.uid;
-      allow update, delete: if false;
+      allow create, update, delete: if false;
     }
 
     match /fantasyLeagues/{leagueId} {
@@ -2722,26 +2834,32 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /userReports/{reportId} {
+      allow read, write: if false;
+    }
+
+    match /safetyActionQuotas/{actorId} {
+      // Trusted callables own anti-abuse counters. Exposing either the actor
+      // document or its windows would leak moderation activity.
+      allow read, write: if false;
+    }
+
+    match /accountDeletionRequests/{requestId} {
+      // This tombstone prevents a cached token from reviving safety actions.
+      // Account deletion status is exposed only through trusted operations.
+      allow read, write: if false;
+    }
+
     match /analyticsEvents/{eventId} {
-      allow read: if isAuthenticated();
-      allow create: if isValidAnalyticsEvent(request.resource.data);
-      allow update, delete: if false;
+      // ELR-SEC-105 containment: client telemetry was forgeable and exposed
+      // stable activity identifiers. Trusted aggregate ingestion is deferred
+      // to ELR-OPS-405, so every client operation fails closed for now.
+      allow read, write: if false;
     }
 
     match /disputes/{disputeId} {
       allow read: if isAuthenticated();
-      // Players can create disputes on their own matches
-      allow create: if isAuthenticated() &&
-        request.resource.data.raisedBy == request.auth.uid &&
-        request.resource.data.matchId is string;
-      // Only the tournament organizer can resolve/reject
-      allow update: if isAuthenticated() &&
-        resource.data.matchId is string &&
-        isMatchOrganizerById(resource.data.matchId) &&
-        request.resource.data.matchId == resource.data.matchId &&
-        request.resource.data.raisedBy == resource.data.raisedBy &&
-        request.resource.data.createdAt == resource.data.createdAt;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     // ── Catch-all: block any unknown collection ──

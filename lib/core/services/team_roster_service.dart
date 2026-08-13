@@ -27,13 +27,13 @@ class TeamRosterService {
     GuestPlayerRepository? guestPlayerRepository,
     TeamRosterPolicy? policy,
     Uuid? uuid,
-  })  : _teamRepository = teamRepository ?? TeamRepositoryImpl(),
-        _membershipRepository =
-            membershipRepository ?? TeamMembershipRepositoryImpl(),
-        _guestPlayerRepository =
-            guestPlayerRepository ?? GuestPlayerRepositoryImpl(),
-        _policy = policy ?? const TeamRosterPolicy(),
-        _uuid = uuid ?? const Uuid();
+  }) : _teamRepository = teamRepository ?? TeamRepositoryImpl(),
+       _membershipRepository =
+           membershipRepository ?? TeamMembershipRepositoryImpl(),
+       _guestPlayerRepository =
+           guestPlayerRepository ?? GuestPlayerRepositoryImpl(),
+       _policy = policy ?? const TeamRosterPolicy(),
+       _uuid = uuid ?? const Uuid();
 
   Future<List<TeamMembership>> getTeamRoster(
     String teamId, {
@@ -75,7 +75,9 @@ class TeamRosterService {
       throw Exception(validationError);
     }
 
-    final inactiveMembership = existingMemberships.cast<TeamMembership?>().firstWhere(
+    final inactiveMembership = existingMemberships
+        .cast<TeamMembership?>()
+        .firstWhere(
           (membership) =>
               membership != null &&
               membership.playerId == playerId &&
@@ -84,23 +86,23 @@ class TeamRosterService {
         );
 
     final membership = (inactiveMembership != null
-            ? inactiveMembership.copyWith(
-                role: role,
-                status: status,
-                availability: availability,
-                updatedAt: effectiveNow,
-              )
-            : TeamMembership(
-                id: _uuid.v4(),
-                teamId: teamId,
-                playerId: playerId,
-                role: role,
-                status: status,
-                availability: availability,
-                joinedAt: effectiveNow,
-                updatedAt: effectiveNow,
-                invitedBy: actorId,
-              ));
+        ? inactiveMembership.copyWith(
+            role: role,
+            status: status,
+            availability: availability,
+            updatedAt: effectiveNow,
+          )
+        : TeamMembership(
+            id: _uuid.v4(),
+            teamId: teamId,
+            playerId: playerId,
+            role: role,
+            status: status,
+            availability: availability,
+            joinedAt: effectiveNow,
+            updatedAt: effectiveNow,
+            invitedBy: actorId,
+          ));
 
     if (inactiveMembership != null) {
       await _membershipRepository.updateMembership(membership);
@@ -162,10 +164,7 @@ class TeamRosterService {
 
     if (guestPlayer.teamId != teamId) {
       await _guestPlayerRepository.updateGuestPlayer(
-        guestPlayer.copyWith(
-          teamId: teamId,
-          updatedAt: effectiveNow,
-        ),
+        guestPlayer.copyWith(teamId: teamId, updatedAt: effectiveNow),
       );
     }
 
@@ -214,56 +213,19 @@ class TeamRosterService {
     return updated;
   }
 
+  @Deprecated(
+    'Guest identity conversion must use the trusted guest-claim callable.',
+  )
   Future<TeamMembership> replaceGuestWithRegisteredPlayer({
     required String teamId,
     required String actorId,
     required String guestPlayerId,
     required String playerId,
     DateTime? now,
-  }) async {
-    final effectiveNow = now ?? DateTime.now();
-    final team = await _requireTeam(teamId);
-    _assertCanManage(team, actorId);
-    await _bootstrapLegacyMemberships(team);
-
-    final existingMemberships = await _membershipRepository.getTeamMemberships(
-      teamId,
-      includeInactive: true,
+  }) {
+    throw UnsupportedError(
+      'لا يمكن تحويل اللاعب الضيف يدويًا؛ استخدم رابط استلام اللاعب الآمن.',
     );
-    final guestMembership = await _membershipRepository.getMembershipByGuestPlayerId(
-      teamId: teamId,
-      guestPlayerId: guestPlayerId,
-    );
-    if (guestMembership == null) {
-      throw Exception('لم يتم العثور على اللاعب الضيف داخل قائمة الفريق.');
-    }
-
-    final validationError = _policy.validateReplacement(
-      guestMembership: guestMembership,
-      existingMemberships: existingMemberships,
-      playerId: playerId,
-    );
-    if (validationError != null) {
-      throw Exception(validationError);
-    }
-
-    final updatedMembership = guestMembership.copyWith(
-      playerId: playerId,
-      guestPlayerId: null,
-      claimedFromGuestPlayerId: guestPlayerId,
-      updatedAt: effectiveNow,
-    );
-    await _membershipRepository.updateMembership(updatedMembership);
-
-    await _teamRepository.updateTeam(
-      _updatedTeamForMembership(
-        team,
-        membership: updatedMembership,
-        addPlayer: true,
-      ),
-    );
-
-    return updatedMembership;
   }
 
   Future<TeamMembership> updateMembershipRole({
@@ -365,8 +327,8 @@ class TeamRosterService {
       final role = playerId == team.ownerId
           ? TeamMembershipRole.owner
           : team.viceCaptainIds.contains(playerId)
-              ? TeamMembershipRole.viceCaptain
-              : TeamMembershipRole.player;
+          ? TeamMembershipRole.viceCaptain
+          : TeamMembershipRole.player;
       final membership = TeamMembership(
         id: _uuid.v4(),
         teamId: team.id,
@@ -407,10 +369,7 @@ class TeamRosterService {
       viceCaptainIds.remove(playerId);
     }
 
-    return team.copyWith(
-      playerIds: playerIds,
-      viceCaptainIds: viceCaptainIds,
-    );
+    return team.copyWith(playerIds: playerIds, viceCaptainIds: viceCaptainIds);
   }
 
   Team _updatedTeamForRoleChange(
@@ -442,7 +401,9 @@ class TeamRosterService {
   }
 
   Future<GuestPlayer> _requireGuestPlayer(String guestPlayerId) async {
-    final guestPlayer = await _guestPlayerRepository.getGuestPlayer(guestPlayerId);
+    final guestPlayer = await _guestPlayerRepository.getGuestPlayer(
+      guestPlayerId,
+    );
     if (guestPlayer == null) {
       throw Exception('اللاعب الضيف المطلوب غير موجود.');
     }
@@ -463,7 +424,10 @@ class TeamRosterService {
     }
   }
 
-  void _assertMembershipBelongsToTeam(TeamMembership membership, String teamId) {
+  void _assertMembershipBelongsToTeam(
+    TeamMembership membership,
+    String teamId,
+  ) {
     if (membership.teamId != teamId) {
       throw Exception('هذه العضوية لا تنتمي إلى الفريق المطلوب.');
     }

@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:el7reef/core/constants/firebase_paths.dart';
 
 void main() {
-  test('Functions and Flutter share settlement collection names', () {
+  test('Functions and Flutter share trusted collection names', () {
     final rawContract = File(
       'functions/firestore_collections.json',
     ).readAsStringSync();
@@ -14,6 +14,13 @@ void main() {
     const flutterPaths = <String, String>{
       'players': FirebasePaths.players,
       'guestPlayers': FirebasePaths.guestPlayers,
+      'guestTeams': FirebasePaths.guestTeams,
+      'teams': FirebasePaths.teams,
+      'claimCodes': FirebasePaths.claimCodes,
+      'friendships': FirebasePaths.friendships,
+      'userReports': FirebasePaths.userReports,
+      'safetyActionQuotas': FirebasePaths.safetyActionQuotas,
+      'accountDeletionRequests': FirebasePaths.accountDeletionRequests,
       'teamMemberships': FirebasePaths.teamMemberships,
       'matches': FirebasePaths.matches,
       'matchEvents': FirebasePaths.matchEvents,

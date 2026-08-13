@@ -32,6 +32,10 @@ void main() {
 
       await tester.pumpWidget(_testApp());
       final deleted = await controller.deleteAccount();
+      await tester.pump();
+
+      expect(find.text('تم قبول طلب الحذف'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 4));
       await tester.pumpAndSettle();
 
       expect(deleted, isTrue);

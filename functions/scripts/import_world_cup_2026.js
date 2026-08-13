@@ -2,6 +2,8 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const {initializeApp} = require("firebase-admin/app");
+const {getFirestore} = require("firebase-admin/firestore");
 
 const {
   assertLocalFirestoreEmulator,
@@ -46,9 +48,8 @@ async function main() {
   }
 
   assertLocalFirestoreEmulator(process.env);
-  const admin = require("firebase-admin");
-  admin.initializeApp({projectId: options.projectId});
-  const written = await writeImportDocuments(admin.firestore(), documents);
+  const app = initializeApp({projectId: options.projectId});
+  const written = await writeImportDocuments(getFirestore(app), documents);
   console.log(JSON.stringify({mode: "applied", written}, null, 2));
 }
 

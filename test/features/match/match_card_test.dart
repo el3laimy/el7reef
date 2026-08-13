@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 
 import 'package:el7reef/core/auth/auth_service.dart';
 import 'package:el7reef/core/enums/match_status.dart';
+import 'package:el7reef/core/services/feature_flag_service.dart';
 import 'package:el7reef/core/services/match_cancellation_service.dart';
 import 'package:el7reef/core/services/match_settlement_service.dart';
 import 'package:el7reef/core/services/match_start_service.dart';
@@ -58,6 +59,39 @@ void main() {
     expect(find.text('تفاصيل مباراتي'), findsOneWidget);
     expect(find.text('إدارة المباراة'), findsNothing);
   });
+
+  testWidgets('hides the fan voting entrance while Wave 0 flag is off', (
+    tester,
+  ) async {
+    final controller = _controllerFor(currentUserId: 'viewer-1');
+
+    await _pumpCard(
+      tester,
+      controller: controller,
+      match: _match(status: MatchStatus.settled),
+    );
+
+    expect(find.text('تصويت رجل المباراة (الجماهير)'), findsNothing);
+  });
+
+  testWidgets('shows fan voting only after an explicit flag override', (
+    tester,
+  ) async {
+    Get.put(
+      FeatureFlagService(
+        overrides: const {FeatureFlagKey.fanVotingEnabled: true},
+      ),
+    );
+    final controller = _controllerFor(currentUserId: 'viewer-1');
+
+    await _pumpCard(
+      tester,
+      controller: controller,
+      match: _match(status: MatchStatus.settled),
+    );
+
+    expect(find.text('تصويت رجل المباراة (الجماهير)'), findsOneWidget);
+  });
 }
 
 MatchController _controllerFor({required String currentUserId}) {
@@ -110,6 +144,7 @@ Match _match({
   String? teamBId,
   List<String> teamAPlayerIds = const [],
   List<String> teamBPlayerIds = const [],
+  MatchStatus status = MatchStatus.open,
 }) {
   return Match(
     id: 'match-1',
@@ -118,7 +153,7 @@ Match _match({
     teamBId: teamBId,
     teamAPlayerIds: teamAPlayerIds,
     teamBPlayerIds: teamBPlayerIds,
-    status: MatchStatus.open,
+    status: status,
     isOrganized: isOrganized,
     createdAt: DateTime(2026, 6, 5),
   );

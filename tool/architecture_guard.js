@@ -27,6 +27,20 @@ const rules = [
       /_matchEventService\.(recordGoal|recordGoals|recordMvp|voidEvent)\(|updatePrideEventsPending\(/,
     message: 'score, MatchEvent, and settlement-state writes must use the server settlement boundary',
   },
+  {
+    name: 'clientAnalyticsAccess',
+    applies: () => true,
+    pattern:
+      /FirebasePaths\.analyticsEvents|\.collection\(\s*['"]analyticsEvents['"]\s*\)/,
+    message: 'ELR-SEC-105 forbids Flutter reads and writes to analyticsEvents',
+  },
+  {
+    name: 'clientBlockAuthorityWrites',
+    applies: () => true,
+    pattern:
+      /FriendshipStatus\.blocked|['"]blockedIds['"]\s*:\s*FieldValue\.(arrayUnion|arrayRemove)/,
+    message: 'ELR-SEC-106 requires block state changes through trusted callables',
+  },
 ];
 
 const files = dartFiles(libRoot);

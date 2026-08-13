@@ -115,34 +115,37 @@ class TeamLineupEditorController extends GetxController {
   };
 
   List<LineupPlayer> get benchPlayers {
-    final onPitch = slots
-        .map((slot) => slot.occupantKey)
-        .whereType<String>()
-        .toSet();
-    return members
-        .where(
-          (member) => member.membership.status != TeamMembershipStatus.inactive,
-        )
+    final onPitch = _starterParticipantIdentityKeys;
+    return _activeUniqueMembers
+        .where((member) => !onPitch.contains(_participantIdentityKey(member)))
         .map((member) => member.player)
-        .where((player) => !onPitch.contains(player.key))
         .toList(growable: false);
   }
 
   List<String> get starterMembershipIds {
-    return slots
-        .map((slot) => slot.playerId ?? slot.guestPlayerId)
-        .whereType<String>()
-        .toList(growable: false);
+    final seenParticipants = <String>{};
+    final starterIds = <String>[];
+    for (final slot in slots) {
+      final membershipId = slot.playerId ?? slot.guestPlayerId;
+      if (membershipId == null) continue;
+      if (seenParticipants.add(
+        _participantIdentityForMembershipId(membershipId),
+      )) {
+        starterIds.add(membershipId);
+      }
+    }
+    return starterIds;
   }
 
   List<String> get benchMembershipIds {
-    final starters = starterMembershipIds.toSet();
-    return members
-        .where(
-          (member) => member.membership.status != TeamMembershipStatus.inactive,
-        )
+    final starterParticipants = _starterParticipantIdentityKeys;
+    return _activeUniqueMembers
         .map((member) => member.membership.id)
-        .where((id) => !starters.contains(id))
+        .where(
+          (membershipId) => !starterParticipants.contains(
+            _participantIdentityForMembershipId(membershipId),
+          ),
+        )
         .toList(growable: false);
   }
 
@@ -221,7 +224,7 @@ class TeamLineupEditorController extends GetxController {
       newSlots: generated,
       playersByKey: playersByKey,
     );
-    slots.assignAll(result.slots);
+    _assignUniqueSlots(result.slots);
     isLineupDirty.value = true;
     selectedLineupPayload.value = null;
     final moved = previousStarters
@@ -246,7 +249,7 @@ class TeamLineupEditorController extends GetxController {
       newSlots: generated,
       playersByKey: playersByKey,
     );
-    slots.assignAll(result.slots);
+    _assignUniqueSlots(result.slots);
     isLineupDirty.value = true;
     selectedLineupPayload.value = null;
   }
@@ -265,14 +268,14 @@ class TeamLineupEditorController extends GetxController {
       slots: generated,
       starters: currentStarters,
     );
-    slots.assignAll(result.slots);
+    _assignUniqueSlots(result.slots);
     isLineupDirty.value = true;
     selectedLineupPayload.value = null;
   }
 
   void assignPlayerToSlot(LineupPlayer player, FormationSlot slot) {
     if (!canEdit) return;
-    slots.assignAll(
+    _assignUniqueSlots(
       LineupUtils.assignPlayerToSlot(
         slots: slots,
         player: player,
@@ -298,7 +301,7 @@ class TeamLineupEditorController extends GetxController {
 
   void movePlayerToBench(LineupPlayer player) {
     if (!canEdit) return;
-    slots.assignAll(
+    _assignUniqueSlots(
       LineupUtils.removePlayerFromSlots(slots: slots, player: player),
     );
     isLineupDirty.value = true;
@@ -393,7 +396,7 @@ class TeamLineupEditorController extends GetxController {
       slots: generated,
       starters: starters,
     );
-    slots.assignAll(assigned.slots);
+    _assignUniqueSlots(assigned.slots);
     isLineupDirty.value = false;
     selectedLineupPayload.value = null;
   }
@@ -408,6 +411,7 @@ class TeamLineupEditorController extends GetxController {
         : getDefaultFormation(count);
     playerCount.value = count;
     formationCode.value = code;
+    _seedMembersFromSnapshot(snapshot);
     final lineupPlayers = snapshot.starters
         .map(_playerFromSnapshotEntry)
         .toList(growable: false);
@@ -439,7 +443,7 @@ class TeamLineupEditorController extends GetxController {
           }
         }
       }
-      slots.assignAll(slotMap.values.toList());
+      _assignUniqueSlots(slotMap.values.toList());
     } else {
       final generated = FormationEngine.generateFormationSlots(
         playerCount: count,
@@ -449,29 +453,50 @@ class TeamLineupEditorController extends GetxController {
         slots: generated,
         starters: lineupPlayers,
       );
-      slots.assignAll(assigned.slots);
+      _assignUniqueSlots(assigned.slots);
     }
     isLineupDirty.value = false;
     selectedLineupPayload.value = null;
+  }
 
-    members.assignAll(
-      [...snapshot.starters, ...snapshot.bench].map((entry) {
-        final player = _playerFromSnapshotEntry(entry);
-        return TeamLineupEditorMember(
-          membership: TeamMembership(
-            id: player.id,
-            teamId: teamId,
-            playerId: player.isRegistered ? player.id : null,
-            guestPlayerId: player.isRegistered ? null : player.id,
-            status: snapshot.starters.contains(entry)
-                ? TeamMembershipStatus.starter
-                : TeamMembershipStatus.bench,
-            joinedAt: snapshot.lockedAt,
-            updatedAt: snapshot.lockedAt,
-          ),
-          player: player,
-        );
-      }),
+  void _seedMembersFromSnapshot(MatchLineupSnapshot snapshot) {
+    members.assignAll([
+      for (final entry in snapshot.starters)
+        _memberFromSnapshotEntry(
+          entry,
+          status: TeamMembershipStatus.starter,
+          lockedAt: snapshot.lockedAt,
+        ),
+      for (final entry in snapshot.bench)
+        _memberFromSnapshotEntry(
+          entry,
+          status: TeamMembershipStatus.bench,
+          lockedAt: snapshot.lockedAt,
+        ),
+    ]);
+  }
+
+  TeamLineupEditorMember _memberFromSnapshotEntry(
+    MatchLineupEntry entry, {
+    required TeamMembershipStatus status,
+    required DateTime lockedAt,
+  }) {
+    final player = _playerFromSnapshotEntry(entry);
+    return TeamLineupEditorMember(
+      membership: TeamMembership(
+        id: player.id,
+        teamId: teamId,
+        // The lineup player itself is keyed by team-membership ID so that the
+        // lock service can write it back. The membership identity below must
+        // instead retain the real participant ID; otherwise old duplicate
+        // memberships make one person look like two visual players.
+        playerId: entry.playerId,
+        guestPlayerId: entry.guestPlayerId,
+        status: status,
+        joinedAt: lockedAt,
+        updatedAt: lockedAt,
+      ),
+      player: player,
     );
   }
 
@@ -549,23 +574,73 @@ class TeamLineupEditorController extends GetxController {
   }
 
   void _assignUniqueSlots(List<FormationSlot> updatedSlots) {
-    assert(_hasUniqueOccupants(updatedSlots));
-    if (!_hasUniqueOccupants(updatedSlots)) {
-      return;
-    }
-    slots.assignAll(updatedSlots);
+    final normalized = _withoutDuplicateParticipants(updatedSlots);
+    assert(_hasUniqueParticipants(normalized));
+    slots.assignAll(normalized);
   }
 
-  bool _hasUniqueOccupants(List<FormationSlot> value) {
+  bool _hasUniqueParticipants(List<FormationSlot> slotsToCheck) {
     final seen = <String>{};
-    for (final slot in value) {
-      final key = slot.occupantKey;
-      if (key == null) continue;
-      if (!seen.add(key)) {
+    for (final slot in slotsToCheck) {
+      final membershipId = slot.playerId ?? slot.guestPlayerId;
+      if (membershipId == null) continue;
+      if (!seen.add(_participantIdentityForMembershipId(membershipId))) {
         return false;
       }
     }
     return true;
+  }
+
+  List<TeamLineupEditorMember> get _activeUniqueMembers {
+    final seen = <String>{};
+    return members
+        .where(
+          (member) => member.membership.status != TeamMembershipStatus.inactive,
+        )
+        .where((member) => seen.add(_participantIdentityKey(member)))
+        .toList(growable: false);
+  }
+
+  Set<String> get _starterParticipantIdentityKeys {
+    return starterMembershipIds
+        .map(_participantIdentityForMembershipId)
+        .toSet();
+  }
+
+  String _participantIdentityForMembershipId(String membershipId) {
+    for (final member in members) {
+      if (member.membership.id == membershipId) {
+        return _participantIdentityKey(member);
+      }
+    }
+    // A missing legacy membership must not accidentally collide with a valid
+    // participant. Its prefixed membership ID is still stable for this draft.
+    return 'membership:$membershipId';
+  }
+
+  String _participantIdentityKey(TeamLineupEditorMember member) {
+    final playerId = member.membership.playerId;
+    if (playerId != null && playerId.isNotEmpty) {
+      return 'player:$playerId';
+    }
+    final guestPlayerId = member.membership.guestPlayerId;
+    if (guestPlayerId != null && guestPlayerId.isNotEmpty) {
+      return 'guest:$guestPlayerId';
+    }
+    return member.player.key;
+  }
+
+  List<FormationSlot> _withoutDuplicateParticipants(List<FormationSlot> value) {
+    final seen = <String>{};
+    return value
+        .map((slot) {
+          final membershipId = slot.playerId ?? slot.guestPlayerId;
+          if (membershipId == null) return slot;
+          return seen.add(_participantIdentityForMembershipId(membershipId))
+              ? slot
+              : slot.clearPlayer();
+        })
+        .toList(growable: false);
   }
 
   String _readableError(Object error) {

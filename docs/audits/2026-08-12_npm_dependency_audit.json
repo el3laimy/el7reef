@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-08-12",
+  "tickets": [
+    "ELR-OPS-403",
+    "ELR-OPS-404"
+  ],
+  "candidate": {
+    "workingTree": "dirty-uncommitted",
+    "nodeUsedForLocalVerification": "22.23.2",
+    "declaredFunctionsRuntime": "22",
+    "deployedRuntimeChanged": false,
+    "deploymentPerformed": false
+  },
+  "commands": {
+    "productionAudit": "Node 22: npm audit --omit=dev --json --prefix functions",
+    "rootToolingAudit": "npm audit --json",
+    "functionsInstall": "Node 22: npm ci --ignore-scripts --prefix functions",
+    "functionsTests": "Node 22: mocha test/functions/**/*.test.js --timeout 20000",
+    "functionsEmulator": "Node 22: firebase emulators:exec --only functions,firestore,auth,storage"
+  },
+  "before": {
+    "functionsProduction": {
+      "dependencies": 252,
+      "vulnerabilities": {
+        "critical": 0,
+        "high": 1,
+        "moderate": 9,
+        "low": 1,
+        "total": 11
+      },
+      "blockingFinding": "fast-xml-parser 5.9.3 was affected by GHSA-8r6m-32jq-jx6q."
+    },
+    "rootTooling": {
+      "dependencies": 798,
+      "vulnerabilities": {
+        "critical": 2,
+        "high": 12,
+        "moderate": 14,
+        "low": 2,
+        "total": 30
+      },
+      "productionImpact": "none-direct; the root package contains test, emulator, and CLI tooling only"
+    }
+  },
+  "changes": [
+    {
+      "package": "fast-xml-parser",
+      "from": "5.9.3",
+      "to": "5.10.1",
+      "reason": "minimum version outside GHSA-8r6m-32jq-jx6q and permitted by @google-cloud/storage 7.21.0"
+    },
+    {
+      "package": "firebase-functions",
+      "from": "6.6.0",
+      "to": "7.3.2",
+      "reason": "current stable SDK verified with firebase-admin 14.2.0 and Node 22"
+    },
+    {
+      "package": "firebase-admin",
+      "from": "13.10.0",
+      "to": "14.2.0",
+      "reason": "current Admin SDK after migrating every Functions entrypoint and administration script from the removed namespace API to modular imports"
+    },
+    {
+      "runtime": "node",
+      "from": "20.20.0",
+      "to": "22.23.2",
+      "reason": "firebase-admin 14 requires Node 22; the declared Functions runtime and both GitHub Actions jobs now match"
+    }
+  ],
+  "after": {
+    "functionsProduction": {
+      "dependencies": 291,
+      "installed": {
+        "firebase-admin": "14.2.0",
+        "firebase-functions": "7.3.2",
+        "fast-xml-parser": "5.10.1"
+      },
+      "vulnerabilities": {
+        "critical": 0,
+        "high": 0,
+        "moderate": 7,
+        "low": 0,
+        "total": 7
+      },
+      "functionsUnitTests": {
+        "result": "pass",
+        "testsPassed": 139
+      },
+      "functionsEmulator": {
+        "result": "pass",
+        "runtime": "node@22",
+        "authGatesPassed": 10,
+        "coverage": [
+          "trusted guest claims",
+          "match settlement and approval",
+          "user safety and trusted audit",
+          "Storage profile deletion",
+          "account deletion"
+        ]
+      },
+      "legacyNamespaceSearch": {
+        "result": "pass",
+        "matches": 0
+      }
+    }
+  },
+  "moderateExceptions": [
+    {
+      "id": "ELR-OPS-403-EX-001",
+      "packages": [
+        "firebase-admin",
+        "@google-cloud/storage",
+        "gaxios",
+        "retry-request",
+        "teeny-request",
+        "uuid"
+      ],
+      "owner": "ENG + AppSec",
+      "reason": "The current firebase-admin 14.2.0 still resolves @google-cloud/storage 7.21.0 through uuid 9.0.1. npm proposes firebase-admin 10.3.0 as the automatic fix, which is an unsafe major downgrade and is not accepted. Forcing uuid 11 across upstream major constraints is also not accepted without Firebase compatibility evidence.",
+      "expiresOn": "2026-09-12",
+      "nextAction": "Monitor Firebase Admin and @google-cloud/storage releases, refresh the lock without --force, repeat the production audit, and obtain AppSec disposition before the exception expires."
+    },
+    {
+      "id": "ELR-OPS-403-EX-002",
+      "packages": [
+        "firebase-functions"
+      ],
+      "owner": "ENG + AppSec",
+      "reason": "npm reports firebase-functions through its firebase-admin peer chain and proposes a downgrade to 4.9.0. The candidate uses firebase-functions 7.3.2 with firebase-admin 14.2.0; unit and full Emulator tests pass on Node 22, so the suggested downgrade is not accepted.",
+      "expiresOn": "2026-09-12",
+      "nextAction": "Re-audit with upstream Firebase releases before the shared exception expires."
+    }
+  ],
+  "rootToolingDisposition": {
+    "status": "OPEN",
+    "owner": "ENG",
+    "reason": "The findings are confined to local Firebase CLI, emulator, web test SDK, and Mocha dependency trees, but CI executes this tooling and the lock must still be refreshed and retested.",
+    "nextReviewOn": "2026-08-19",
+    "nextAction": "Update the tracked root lock from a clean checkout, run rules and Functions emulator suites, and repeat the root audit without changing production dependency conclusions."
+  },
+  "decision": {
+    "productionGate": "PASS_WITH_TIME_BOUND_MODERATE_EXCEPTIONS",
+    "ops404LocalGate": "PASS",
+    "rootToolingGate": "OPEN",
+    "releaseAuthorized": false
+  }
+}

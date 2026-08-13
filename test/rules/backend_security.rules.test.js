@@ -7,12 +7,16 @@ const {
 } = require('@firebase/rules-unit-testing');
 
 const {
+  collection,
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
+  query,
   setDoc,
   Timestamp,
   updateDoc,
+  where,
 } = require('firebase/firestore');
 
 const projectId = 'demo-no-project';
@@ -110,38 +114,6 @@ function analyticsEventData(overrides = {}) {
   };
 }
 
-function prideAnalyticsEventData(overrides = {}) {
-  return {
-    eventName: 'pride_card_viewed',
-    parameters: {
-      cardType: 'mvp',
-      entityType: 'guestPlayer',
-      entityId: 'guest-player-1',
-      tournamentId: 'tournament-1',
-      matchId: 'match-1',
-      campaignSource: 'post_match_mvp',
-      schemaVersion: 1,
-    },
-    createdAt: now,
-    ...overrides,
-  };
-}
-
-function prideExportAnalyticsEventData(overrides = {}) {
-  return {
-    eventName: 'pride_export_finished',
-    parameters: {
-      cardType: 'matchResult',
-      format: 'story9x16',
-      mediaType: 'video',
-      exportDurationMs: 11800,
-      fallbackUsed: false,
-    },
-    createdAt: now,
-    ...overrides,
-  };
-}
-
 function auditEventData(overrides = {}) {
   return {
     entityType: 'tournament',
@@ -150,6 +122,53 @@ function auditEventData(overrides = {}) {
     actorId: 'organizer-1',
     metadata: { tournamentId: 'tournament-1' },
     createdAt: now,
+    ...overrides,
+  };
+}
+
+function initialPlayerData(uid, overrides = {}) {
+  return {
+    name: 'لاعب جديد',
+    nameLower: 'لاعب جديد',
+    username: null,
+    usernameLower: null,
+    photoUrl: 'https://example.test/avatar.png',
+    photoThumbUrl: null,
+    photoFrame: 'newcomer',
+    qrCode: `7reef://player/${uid}`,
+    phone: null,
+    position: null,
+    rating: 1000,
+    totalMatches: 0,
+    wins: 0,
+    draws: 0,
+    losses: 0,
+    mvpCount: 0,
+    trustWeight: 0.5,
+    trustLevel: 'newPlayer',
+    role: 'player',
+    achievementIds: [],
+    teamIds: [],
+    friendIds: [],
+    followingIds: [],
+    blockedIds: [],
+    privacySetting: 'public',
+    isGuest: false,
+    createdAt: now,
+    lastActiveAt: now,
+    ...overrides,
+  };
+}
+
+function friendshipData(userId1, userId2, overrides = {}) {
+  return {
+    userId1,
+    userId2,
+    participants: [userId1, userId2],
+    status: 'pending',
+    lastActionBy: userId1,
+    createdAt: Timestamp.fromMillis(now),
+    updatedAt: Timestamp.fromMillis(now),
     ...overrides,
   };
 }
@@ -333,260 +352,47 @@ describe('backend security Firestore rules', () => {
     );
   });
 
-  it('requires authentication for analytics events', async () => {
+  it('denies every client analytics read and write operation', async () => {
     const anonymousDb = testEnv.unauthenticatedContext().firestore();
     const actorDb = testEnv.authenticatedContext('actor-1').firestore();
+    await seed('analyticsEvents/existing-event', analyticsEventData());
 
     await assertFails(
       setDoc(doc(anonymousDb, 'analyticsEvents', 'event-1'), analyticsEventData()),
     );
-    await assertSucceeds(
+    await assertFails(
       setDoc(
         doc(actorDb, 'analyticsEvents', 'event-2'),
         analyticsEventData(),
       ),
     );
-  });
-
-  it('allows only the current invite, claim, and join analytics schemas', async () => {
-    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
-
-    await assertSucceeds(
-      setDoc(
-        doc(actorDb, 'analyticsEvents', 'invite-valid'),
-        analyticsEventData(),
-      ),
-    );
-    await assertSucceeds(
-      setDoc(doc(actorDb, 'analyticsEvents', 'claim-open-valid'), {
-        eventName: 'claim_open',
-        parameters: { type: 'guestPlayer', targetId: 'guest-player-1' },
-        createdAt: now,
-      }),
-    );
-    await assertSucceeds(
-      setDoc(doc(actorDb, 'analyticsEvents', 'claim-complete-valid'), {
-        eventName: 'claim_completion',
-        actorId: 'actor-1',
+    await assertFails(
+      setDoc(doc(actorDb, 'analyticsEvents', 'pride-event'), {
+        eventName: 'pride_card_viewed',
         parameters: {
-          type: 'guest_player',
-          targetId: 'guest-player-1',
-          actorId: 'actor-1',
+          cardType: 'mvp',
+          entityType: 'guestPlayer',
+          entityId: 'guest-player-1',
+          campaignSource: 'post_match_mvp',
+          schemaVersion: 1,
         },
         createdAt: now,
       }),
     );
-    await assertSucceeds(
-      setDoc(doc(actorDb, 'analyticsEvents', 'join-valid'), {
-        eventName: 'join_completion',
-        actorId: 'actor-1',
-        parameters: {
-          type: 'team_invite',
-          targetId: 'team-1',
-          actorId: 'actor-1',
-        },
-        createdAt: now,
+    await assertFails(
+      getDoc(doc(anonymousDb, 'analyticsEvents', 'existing-event')),
+    );
+    await assertFails(
+      getDoc(doc(actorDb, 'analyticsEvents', 'existing-event')),
+    );
+    await assertFails(getDocs(collection(actorDb, 'analyticsEvents')));
+    await assertFails(
+      updateDoc(doc(actorDb, 'analyticsEvents', 'existing-event'), {
+        createdAt: now + 1,
       }),
     );
-  });
-
-  it('allows privacy-safe pride funnel and export analytics events', async () => {
-    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
-
-    await assertSucceeds(
-      setDoc(
-        doc(actorDb, 'analyticsEvents', 'pride-valid'),
-        prideAnalyticsEventData(),
-      ),
-    );
-    await assertSucceeds(
-      setDoc(
-        doc(actorDb, 'analyticsEvents', 'export-valid'),
-        prideExportAnalyticsEventData({
-          parameters: {
-            ...prideExportAnalyticsEventData().parameters,
-            fallbackUsed: true,
-            failureCode: 'encoder_unavailable',
-          },
-        }),
-      ),
-    );
-  });
-
-  it('rejects PII and extra fields in analytics parameters', async () => {
-    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
-
     await assertFails(
-      setDoc(
-        doc(actorDb, 'analyticsEvents', 'pride-player-name'),
-        prideAnalyticsEventData({
-          parameters: {
-            ...prideAnalyticsEventData().parameters,
-            playerName: 'Secret Player',
-          },
-        }),
-      ),
-    );
-    await assertFails(
-      setDoc(
-        doc(actorDb, 'analyticsEvents', 'pride-top-level-extra'),
-        prideAnalyticsEventData({ email: 'player@example.com' }),
-      ),
-    );
-    await assertFails(
-      setDoc(
-        doc(actorDb, 'analyticsEvents', 'export-extra'),
-        prideExportAnalyticsEventData({
-          parameters: {
-            ...prideExportAnalyticsEventData().parameters,
-            targetUrl: 'https://example.com/private',
-          },
-        }),
-      ),
-    );
-  });
-
-  it('rejects invalid pride analytics enums, types, and ranges', async () => {
-    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
-
-    await assertFails(
-      setDoc(
-        doc(actorDb, 'analyticsEvents', 'pride-bad-card'),
-        prideAnalyticsEventData({
-          parameters: {
-            ...prideAnalyticsEventData().parameters,
-            cardType: 'fakeAward',
-          },
-        }),
-      ),
-    );
-    await assertFails(
-      setDoc(
-        doc(actorDb, 'analyticsEvents', 'pride-bad-schema'),
-        prideAnalyticsEventData({
-          parameters: {
-            ...prideAnalyticsEventData().parameters,
-            schemaVersion: 2,
-          },
-        }),
-      ),
-    );
-    await assertFails(
-      setDoc(
-        doc(actorDb, 'analyticsEvents', 'pride-bad-entity'),
-        prideAnalyticsEventData({
-          parameters: {
-            ...prideAnalyticsEventData().parameters,
-            entityType: 'profile',
-          },
-        }),
-      ),
-    );
-    await assertFails(
-      setDoc(
-        doc(actorDb, 'analyticsEvents', 'export-bad-format'),
-        prideExportAnalyticsEventData({
-          parameters: {
-            ...prideExportAnalyticsEventData().parameters,
-            format: 'portrait',
-          },
-        }),
-      ),
-    );
-    await assertFails(
-      setDoc(
-        doc(actorDb, 'analyticsEvents', 'export-bad-media'),
-        prideExportAnalyticsEventData({
-          parameters: {
-            ...prideExportAnalyticsEventData().parameters,
-            mediaType: 'gif',
-          },
-        }),
-      ),
-    );
-    await assertFails(
-      setDoc(
-        doc(actorDb, 'analyticsEvents', 'export-bad-duration-type'),
-        prideExportAnalyticsEventData({
-          parameters: {
-            ...prideExportAnalyticsEventData().parameters,
-            exportDurationMs: '11800',
-          },
-        }),
-      ),
-    );
-    await assertFails(
-      setDoc(
-        doc(actorDb, 'analyticsEvents', 'export-bad-fallback-type'),
-        prideExportAnalyticsEventData({
-          parameters: {
-            ...prideExportAnalyticsEventData().parameters,
-            fallbackUsed: 'false',
-          },
-        }),
-      ),
-    );
-    await assertFails(
-      setDoc(
-        doc(actorDb, 'analyticsEvents', 'export-bad-failure-code'),
-        prideExportAnalyticsEventData({
-          parameters: {
-            ...prideExportAnalyticsEventData().parameters,
-            failureCode: 'encoder failed: player@example.com',
-          },
-        }),
-      ),
-    );
-    await assertFails(
-      setDoc(
-        doc(actorDb, 'analyticsEvents', 'legacy-bad-type'),
-        analyticsEventData({
-          parameters: {
-            ...analyticsEventData().parameters,
-            type: 'guestPlayer',
-          },
-        }),
-      ),
-    );
-    await assertFails(
-      setDoc(
-        doc(actorDb, 'analyticsEvents', 'export-bad-duration-range'),
-        prideExportAnalyticsEventData({
-          parameters: {
-            ...prideExportAnalyticsEventData().parameters,
-            exportDurationMs: 600001,
-          },
-        }),
-      ),
-    );
-  });
-
-  it('rejects analytics actor spoofing and unsupported events', async () => {
-    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
-
-    await assertFails(
-      setDoc(
-        doc(actorDb, 'analyticsEvents', 'spoofed-top-level-actor'),
-        analyticsEventData({ actorId: 'attacker-1' }),
-      ),
-    );
-    await assertFails(
-      setDoc(
-        doc(actorDb, 'analyticsEvents', 'spoofed-parameter-actor'),
-        analyticsEventData({
-          parameters: {
-            ...analyticsEventData().parameters,
-            actorId: 'attacker-1',
-          },
-        }),
-      ),
-    );
-    await assertFails(
-      setDoc(doc(actorDb, 'analyticsEvents', 'unsupported-event'), {
-        eventName: 'player_profile_viewed',
-        parameters: {},
-        createdAt: now,
-      }),
+      deleteDoc(doc(actorDb, 'analyticsEvents', 'existing-event')),
     );
   });
 
@@ -635,6 +441,551 @@ describe('backend security Firestore rules', () => {
     );
     await assertFails(deleteDoc(doc(organizerDb, 'auditEvents', 'event-1')));
     await assertSucceeds(getDoc(doc(organizerDb, 'auditEvents', 'event-1')));
+  });
+
+  it('keeps moderation audit events private to their authenticated actor', async () => {
+    await seed('auditEvents/report-event', auditEventData({
+      entityType: 'moderationReport',
+      entityId: 'opaque-report-id',
+      action: 'profileReported',
+      actorId: 'reporter-1',
+      metadata: null,
+    }));
+    const reporterDb = testEnv.authenticatedContext('reporter-1').firestore();
+    const targetDb = testEnv.authenticatedContext('target-1').firestore();
+    const unrelatedDb = testEnv.authenticatedContext('other-1').firestore();
+
+    await assertSucceeds(
+      getDoc(doc(reporterDb, 'auditEvents', 'report-event')),
+    );
+    await assertFails(getDoc(doc(targetDb, 'auditEvents', 'report-event')));
+    await assertFails(getDoc(doc(unrelatedDb, 'auditEvents', 'report-event')));
+    await assertSucceeds(
+      getDocs(query(
+        collection(reporterDb, 'auditEvents'),
+        where('actorId', '==', 'reporter-1'),
+      )),
+    );
+    await assertFails(
+      getDocs(query(
+        collection(targetDb, 'auditEvents'),
+        where('actorId', '==', 'reporter-1'),
+      )),
+    );
+  });
+
+  it('denies every direct client read and write to private user reports', async () => {
+    await seed('userReports/report-1', {
+      reporterId: 'actor-1',
+      targetKind: 'registeredPlayer',
+      targetId: 'target-1',
+      contentType: 'profile',
+      reason: 'spam',
+      details: 'private evidence',
+      status: 'open',
+      createdAt: now,
+      updatedAt: now,
+    });
+    const anonymousDb = testEnv.unauthenticatedContext().firestore();
+    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
+
+    await assertFails(getDoc(doc(anonymousDb, 'userReports', 'report-1')));
+    await assertFails(getDoc(doc(actorDb, 'userReports', 'report-1')));
+    await assertFails(getDocs(collection(actorDb, 'userReports')));
+    await assertFails(
+      setDoc(doc(actorDb, 'userReports', 'forged-report'), {
+        reporterId: 'actor-1',
+        targetId: 'target-1',
+        status: 'open',
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(actorDb, 'userReports', 'report-1'), {status: 'closed'}),
+    );
+    await assertFails(deleteDoc(doc(actorDb, 'userReports', 'report-1')));
+  });
+
+  it('keeps safety action quota counters backend-only', async () => {
+    await seed('safetyActionQuotas/actor-1', {
+      reportWindow: '2026-07-30',
+      reportCount: 1,
+      relationshipWindow: '2026-07-30T12',
+      relationshipCount: 2,
+    });
+    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
+
+    await assertFails(
+      getDoc(doc(actorDb, 'safetyActionQuotas', 'actor-1')),
+    );
+    await assertFails(getDocs(collection(actorDb, 'safetyActionQuotas')));
+    await assertFails(
+      setDoc(doc(actorDb, 'safetyActionQuotas', 'forged'), {
+        reportWindow: '2026-07-30',
+        reportCount: 0,
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(actorDb, 'safetyActionQuotas', 'actor-1'), {
+        relationshipCount: 0,
+      }),
+    );
+    await assertFails(
+      deleteDoc(doc(actorDb, 'safetyActionQuotas', 'actor-1')),
+    );
+  });
+
+  it('keeps account deletion tombstones backend-only', async () => {
+    await seed('accountDeletionRequests/deleted-opaque', {
+      status: 'completed',
+      updatedAt: now,
+    });
+    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
+
+    await assertFails(
+      getDoc(doc(actorDb, 'accountDeletionRequests', 'deleted-opaque')),
+    );
+    await assertFails(
+      getDocs(collection(actorDb, 'accountDeletionRequests')),
+    );
+    await assertFails(
+      setDoc(doc(actorDb, 'accountDeletionRequests', 'forged'), {
+        status: 'completed',
+        updatedAt: now,
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(actorDb, 'accountDeletionRequests', 'deleted-opaque'), {
+        status: 'failed',
+      }),
+    );
+    await assertFails(
+      deleteDoc(doc(actorDb, 'accountDeletionRequests', 'deleted-opaque')),
+    );
+  });
+
+  it('forces every block state change through backend callables', async () => {
+    await seed('players/actor-1', initialPlayerData('actor-1', {
+      friendIds: ['target-1'],
+    }));
+    await seed('players/target-1', initialPlayerData('target-1', {
+      friendIds: ['actor-1'],
+    }));
+    await seed('players/peer-1', initialPlayerData('peer-1'));
+    await seed(
+      'friendships/actor-1_target-1',
+      friendshipData('actor-1', 'target-1', {status: 'accepted'}),
+    );
+    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
+    const targetDb = testEnv.authenticatedContext('target-1').firestore();
+    const outsiderDb = testEnv.authenticatedContext('other-1').firestore();
+
+    await assertSucceeds(
+      getDoc(doc(actorDb, 'friendships', 'actor-1_target-1')),
+    );
+    await assertSucceeds(
+      getDoc(doc(targetDb, 'friendships', 'actor-1_target-1')),
+    );
+    await assertFails(
+      getDoc(doc(outsiderDb, 'friendships', 'actor-1_target-1')),
+    );
+
+    await assertFails(
+      updateDoc(doc(actorDb, 'players', 'actor-1'), {
+        blockedIds: ['target-1'],
+      }),
+    );
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'friendships', 'actor-1_peer-1'),
+        friendshipData('actor-1', 'peer-1', {status: 'blocked'}),
+      ),
+    );
+    await assertFails(
+      updateDoc(doc(actorDb, 'friendships', 'actor-1_target-1'), {
+        status: 'blocked',
+        lastActionBy: 'actor-1',
+        updatedAt: Timestamp.fromMillis(now + 1),
+      }),
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(actorDb, 'friendships', 'actor-1_peer-1'),
+        friendshipData('actor-1', 'peer-1'),
+      ),
+    );
+
+    await seed('players/actor-1', initialPlayerData('actor-1', {
+      blockedIds: ['target-1'],
+    }));
+    await seed(
+      'friendships/actor-1_target-1',
+      friendshipData('actor-1', 'target-1', {
+        status: 'blocked',
+        lastActionBy: 'actor-1',
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(actorDb, 'players', 'actor-1'), {blockedIds: []}),
+    );
+    await assertFails(
+      updateDoc(doc(actorDb, 'friendships', 'actor-1_target-1'), {
+        status: 'accepted',
+        lastActionBy: 'actor-1',
+        updatedAt: Timestamp.fromMillis(now + 2),
+      }),
+    );
+    await assertFails(
+      deleteDoc(doc(actorDb, 'friendships', 'actor-1_target-1')),
+    );
+  });
+
+  it('binds friendship creates to the canonical pair and authenticated actor', async () => {
+    await seed('players/actor-1', initialPlayerData('actor-1'));
+    await seed('players/target-1', initialPlayerData('target-1'));
+    await seed('players/peer-1', initialPlayerData('peer-1'));
+    await seed('players/attacker-1', initialPlayerData('attacker-1'));
+    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
+    const attackerDb = testEnv.authenticatedContext('attacker-1').firestore();
+
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'friendships', 'arbitrary-document'),
+        friendshipData('actor-1', 'target-1'),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(attackerDb, 'friendships', 'actor-1_target-1'),
+        friendshipData('attacker-1', 'target-1'),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'friendships', 'actor-1_target-1'),
+        friendshipData('actor-1', 'target-1', {
+          participants: ['target-1', 'actor-1'],
+        }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'friendships', 'target-1_actor-1'),
+        friendshipData('target-1', 'actor-1'),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'friendships', 'actor-1_target-1'),
+        friendshipData('actor-1', 'target-1', {status: 'accepted'}),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'friendships', 'actor-1_target-1'),
+        friendshipData('actor-1', 'target-1', {
+          lastActionBy: 'target-1',
+        }),
+      ),
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(actorDb, 'friendships', 'actor-1_target-1'),
+        friendshipData('actor-1', 'target-1'),
+      ),
+    );
+  });
+
+  it('allows only the request receiver to accept an unblocked friendship', async () => {
+    await seed('players/actor-1', initialPlayerData('actor-1'));
+    await seed('players/target-1', initialPlayerData('target-1'));
+    await seed('players/peer-1', initialPlayerData('peer-1'));
+    await seed(
+      'friendships/actor-1_target-1',
+      friendshipData('actor-1', 'target-1'),
+    );
+    await seed(
+      'friendships/actor-1_peer-1',
+      friendshipData('actor-1', 'peer-1'),
+    );
+    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
+    const targetDb = testEnv.authenticatedContext('target-1').firestore();
+
+    await assertFails(
+      updateDoc(doc(actorDb, 'friendships', 'actor-1_peer-1'), {
+        status: 'accepted',
+        lastActionBy: 'actor-1',
+        updatedAt: Timestamp.fromMillis(now + 1),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(targetDb, 'friendships', 'actor-1_target-1'), {
+        status: 'accepted',
+        lastActionBy: 'target-1',
+        updatedAt: Timestamp.fromMillis(now + 1),
+      }),
+    );
+  });
+
+  it('rejects friendship creates and updates when either player blocks the other', async () => {
+    await seed('players/actor-1', initialPlayerData('actor-1', {
+      blockedIds: ['target-1'],
+    }));
+    await seed('players/target-1', initialPlayerData('target-1'));
+    await seed('players/peer-1', initialPlayerData('peer-1', {
+      blockedIds: ['actor-1'],
+    }));
+    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
+    const targetDb = testEnv.authenticatedContext('target-1').firestore();
+    const peerDb = testEnv.authenticatedContext('peer-1').firestore();
+
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'friendships', 'actor-1_target-1'),
+        friendshipData('actor-1', 'target-1'),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(actorDb, 'friendships', 'actor-1_peer-1'),
+        friendshipData('actor-1', 'peer-1'),
+      ),
+    );
+
+    await seed(
+      'friendships/actor-1_target-1',
+      friendshipData('actor-1', 'target-1'),
+    );
+    await seed(
+      'friendships/actor-1_peer-1',
+      friendshipData('actor-1', 'peer-1'),
+    );
+    await assertFails(
+      updateDoc(doc(targetDb, 'friendships', 'actor-1_target-1'), {
+        status: 'accepted',
+        lastActionBy: 'target-1',
+        updatedAt: Timestamp.fromMillis(now + 1),
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(peerDb, 'friendships', 'actor-1_peer-1'), {
+        status: 'accepted',
+        lastActionBy: 'peer-1',
+        updatedAt: Timestamp.fromMillis(now + 1),
+      }),
+    );
+  });
+
+  it('rejects new malformed relationship arrays without locking legacy profiles', async () => {
+    const ownerDb = testEnv.authenticatedContext('owner-1').firestore();
+
+    await assertFails(
+      setDoc(
+        doc(ownerDb, 'players', 'owner-1'),
+        initialPlayerData('owner-1', {friendIds: 'target-1'}),
+      ),
+    );
+    await seed('players/owner-1', initialPlayerData('owner-1'));
+    await assertFails(
+      updateDoc(doc(ownerDb, 'players', 'owner-1'), {
+        friendIds: 'target-1',
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(ownerDb, 'players', 'owner-1'), {
+        friendIds: Array.from({length: 1001}, (_, index) => `friend-${index}`),
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(ownerDb, 'players', 'owner-1'), {
+        followingIds: 'target-1',
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(ownerDb, 'players', 'owner-1'), {
+        friendIds: ['target-1'],
+        followingIds: ['target-1'],
+      }),
+    );
+
+    const legacyProfile = initialPlayerData('legacy-1');
+    delete legacyProfile.friendIds;
+    delete legacyProfile.followingIds;
+    delete legacyProfile.blockedIds;
+    await seed('players/legacy-1', legacyProfile);
+    await seed(
+      'players/legacy-peer-1',
+      initialPlayerData('legacy-peer-1'),
+    );
+    const legacyDb = testEnv.authenticatedContext('legacy-1').firestore();
+    await assertSucceeds(
+      updateDoc(doc(legacyDb, 'players', 'legacy-1'), {
+        name: 'ملف قديم صالح للتحديث',
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(legacyDb, 'players', 'legacy-1'), {
+        friendIds: {target: true},
+      }),
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(legacyDb, 'friendships', 'legacy-1_legacy-peer-1'),
+        friendshipData('legacy-1', 'legacy-peer-1'),
+      ),
+    );
+  });
+
+  it('allows only participant-scoped friendship list queries', async () => {
+    await seed(
+      'friendships/actor-1_target-1',
+      friendshipData('actor-1', 'target-1', {status: 'accepted'}),
+    );
+    await seed(
+      'friendships/actor-1_peer-1',
+      friendshipData('actor-1', 'peer-1', {status: 'pending'}),
+    );
+    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
+    const targetDb = testEnv.authenticatedContext('target-1').firestore();
+    const outsiderDb = testEnv.authenticatedContext('other-1').firestore();
+
+    await assertSucceeds(
+      getDocs(query(
+        collection(actorDb, 'friendships'),
+        where('participants', 'array-contains', 'actor-1'),
+        where('status', '==', 'accepted'),
+      )),
+    );
+    await assertSucceeds(
+      getDocs(query(
+        collection(actorDb, 'friendships'),
+        where('participants', 'array-contains', 'actor-1'),
+        where('status', '==', 'pending'),
+      )),
+    );
+    await assertSucceeds(
+      getDocs(query(
+        collection(targetDb, 'friendships'),
+        where('participants', 'array-contains', 'target-1'),
+        where('status', '==', 'accepted'),
+      )),
+    );
+    await assertFails(getDocs(collection(actorDb, 'friendships')));
+    await assertFails(
+      getDocs(query(
+        collection(actorDb, 'friendships'),
+        where('status', '==', 'accepted'),
+      )),
+    );
+    await assertFails(
+      getDocs(query(
+        collection(outsiderDb, 'friendships'),
+        where('participants', 'array-contains', 'actor-1'),
+        where('status', '==', 'accepted'),
+      )),
+    );
+  });
+
+  it('allows the current strict auth profile bootstrap for its owner', async () => {
+    const ownerDb = testEnv.authenticatedContext('new-player').firestore();
+
+    await assertSucceeds(
+      setDoc(
+        doc(ownerDb, 'players', 'new-player'),
+        initialPlayerData('new-player'),
+      ),
+    );
+  });
+
+  it('denies forged initial player authority, history, time, and schema', async () => {
+    const ownerDb = testEnv.authenticatedContext('new-player').firestore();
+    const attempts = [
+      initialPlayerData('new-player', {role: 'organizer'}),
+      initialPlayerData('new-player', {rating: 9999}),
+      initialPlayerData('new-player', {wins: 10}),
+      initialPlayerData('new-player', {trustLevel: 'trusted'}),
+      initialPlayerData('new-player', {
+        createdAt: 1,
+        lastActiveAt: 1,
+      }),
+      initialPlayerData('new-player', {admin: true}),
+    ];
+
+    for (const payload of attempts) {
+      await assertFails(
+        setDoc(doc(ownerDb, 'players', 'new-player'), payload),
+      );
+    }
+
+    const attackerDb = testEnv.authenticatedContext('attacker').firestore();
+    await assertFails(
+      setDoc(
+        doc(attackerDb, 'players', 'new-player'),
+        initialPlayerData('new-player'),
+      ),
+    );
+  });
+
+  it('denies every direct client vote, session, and dispute write', async () => {
+    await seed('fanVotingSessions/session-1', {
+      matchId: 'match-1',
+      status: 'open',
+    });
+    await seed('userVotes/vote-1', {
+      matchId: 'match-1',
+      userId: 'actor-1',
+      candidateId: 'player-1',
+    });
+    await seed('disputes/dispute-1', {
+      matchId: 'match-1',
+      raisedBy: 'actor-1',
+      status: 'open',
+      createdAt: now,
+    });
+    const actorDb = testEnv.authenticatedContext('actor-1').firestore();
+
+    await assertFails(
+      setDoc(doc(actorDb, 'fanVotingSessions', 'session-2'), {
+        matchId: 'match-1',
+        status: 'open',
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(actorDb, 'fanVotingSessions', 'session-1'), {
+        status: 'closed',
+      }),
+    );
+    await assertFails(
+      deleteDoc(doc(actorDb, 'fanVotingSessions', 'session-1')),
+    );
+
+    await assertFails(
+      setDoc(doc(actorDb, 'userVotes', 'vote-2'), {
+        matchId: 'match-1',
+        userId: 'actor-1',
+        candidateId: 'player-1',
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(actorDb, 'userVotes', 'vote-1'), {
+        candidateId: 'player-2',
+      }),
+    );
+    await assertFails(deleteDoc(doc(actorDb, 'userVotes', 'vote-1')));
+
+    await assertFails(
+      setDoc(doc(actorDb, 'disputes', 'dispute-2'), {
+        matchId: 'match-1',
+        raisedBy: 'actor-1',
+        status: 'open',
+        createdAt: now,
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(actorDb, 'disputes', 'dispute-1'), {
+        status: 'resolved',
+      }),
+    );
+    await assertFails(deleteDoc(doc(actorDb, 'disputes', 'dispute-1')));
   });
 
   it('denies deletes for challenges and match invitations', async () => {

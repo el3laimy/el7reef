@@ -55,6 +55,15 @@ enum AuditAction {
   memberRemoved,
   memberRoleChanged,
 
+  // ── Safety ──
+  profileReported,
+  playerBlocked,
+  playerUnblocked,
+  accountDeletionRequested,
+  accountDeletionProcessing,
+  accountDeletionCompleted,
+  accountDeletionFailed,
+
   // ── Dispute ──
   disputeOpened,
   disputeResolved,
@@ -81,4 +90,7 @@ enum AuditEntityType {
   membership,
   claimCode,
   dispute,
+  moderationReport,
+  safetyRelationship,
+  accountDeletion,
 }

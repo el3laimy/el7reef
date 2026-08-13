@@ -23,24 +23,24 @@
 - <bdi dir="ltr">GuestClaimTokenPolicy</bdi> يملك قواعد نوع الرابط والصلاحية والحالات المسموح بها.
 - <bdi dir="ltr">GuestClaimMergePolicy</bdi> يملك دمج القوائم ومقارنة المجموعات دون الاعتماد على Firestore.
 - تبقى كل كتابات الدمج الحساسة داخل transaction واحدة يملكها <bdi dir="ltr">GuestClaimService</bdi>.
-- تسجيل analytics يحدث بعد نجاح transaction، لأن Firestore قد يعيد تشغيل callback أكثر من مرة.
+- تمرير إشارة analytics إلى حد الخدمة يحدث بعد نجاح transaction، لأن Firestore قد يعيد تشغيل callback أكثر من مرة. تحت `ELR-SEC-105` هذا الحد `no-op` ولا يكتب أو يسجل parameters حتى تنفيذ `ELR-OPS-405`&rlm;.
 - لا يتغير <bdi dir="ltr">claim code schema</bdi> ولا أسماء collections ضمن هذا التفكيك.
 
 ## ملكية الكتابات الحساسة
 
 - استلام اللاعب: <bdi dir="ltr">teamMemberships</bdi> ثم نسخة التوافق في <bdi dir="ltr">teams.playerIds</bdi> عند وجود صلاحية، ثم <bdi dir="ltr">players</bdi> و<bdi dir="ltr">guestPlayers</bdi> و<bdi dir="ltr">claimCodes</bdi> داخل transaction واحدة.
 - استلام الفريق: <bdi dir="ltr">teams.tournamentIds</bdi> و<bdi dir="ltr">guestTeams</bdi> و<bdi dir="ltr">claimCodes</bdi> داخل transaction واحدة.
-- analytics أثر لاحق غير حاكم لنجاح الاستلام، ولا يُنفذ من داخل transaction.
+- حد analytics أثر لاحق غير حاكم لنجاح الاستلام، ولا يُنفذ من داخل transaction ولا يملك حاليًا أي persistence عميلة.
 
 ## ضمانات الفشل وإعادة المحاولة
 
 - تعارض roster لا يترك guest أو membership أو claim code في حالة جزئية.
 - إعادة نفس الاستلام ترجع <bdi dir="ltr">alreadyClaimed</bdi> ولا تعيد كتابة الربط.
-- حدث اكتمال analytics يُسجل مرة واحدة عند الانتقال الفعلي إلى <bdi dir="ltr">claimed</bdi>، وليس عند retry مطابق.
+- تمرر إشارة اكتمال analytics مرة واحدة عند الانتقال الفعلي إلى <bdi dir="ltr">claimed</bdi>، وليس عند retry مطابق؛ ولا تصبح حدثًا محفوظًا قبل تنفيذ القياس الموثوق.
 
 ## التحقق
 
 - <bdi dir="ltr">test/core/services/guest_claim_service_test.dart</bdi> يغطي الاستلام المباشر، الموافقة، انتهاء الصلاحية، تعارضات الاسم والهاتف والـroster، retry، والهوية المرتبطة بعد claim.
-- اختبار تعارض roster يثبت عدم وجود كتابات جزئية وعدم تسجيل analytics.
+- اختبار تعارض roster يثبت عدم وجود كتابات جزئية وعدم تمرير إشارة analytics.
 
 </div>

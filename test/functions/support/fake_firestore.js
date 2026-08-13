@@ -1,8 +1,9 @@
 const assert = require('assert');
 
 class FakeFirestore {
-  constructor(seed = {}) {
+  constructor(seed = {}, options = {}) {
     this.store = new Map();
+    this.failWrite = options.failWrite || null;
     for (const [path, document] of Object.entries(seed)) {
       this.store.set(path, cloneWithoutId(document));
     }
@@ -106,21 +107,45 @@ class FakeTransaction {
     this.writes.push({type: 'set', path: ref.path, document: clone(document)});
   }
 
+  create(ref, document) {
+    this.writes.push({type: 'create', path: ref.path, document: clone(document)});
+  }
+
+  delete(ref) {
+    this.writes.push({type: 'delete', path: ref.path});
+  }
+
   commit() {
+    const nextStore = new Map(
+      [...this.db.store.entries()].map(([path, document]) => [path, clone(document)]),
+    );
     for (const write of this.writes) {
-      if (write.type === 'set') {
-        this.db.store.set(write.path, cloneWithoutId(write.document));
+      if (this.db.failWrite && this.db.failWrite(write)) {
+        throw new Error(`Injected write failure: ${write.path}`);
+      }
+      if (write.type === 'create' && nextStore.has(write.path)) {
+        const error = new Error(`Document already exists: ${write.path}`);
+        error.code = 'already-exists';
+        throw error;
+      }
+      if (write.type === 'set' || write.type === 'create') {
+        nextStore.set(write.path, cloneWithoutId(write.document));
         continue;
       }
-      const existing = this.db.store.get(write.path);
+      if (write.type === 'delete') {
+        nextStore.delete(write.path);
+        continue;
+      }
+      const existing = nextStore.get(write.path);
       if (!existing) {
         throw new Error(`Missing document for update: ${write.path}`);
       }
-      this.db.store.set(write.path, {
+      nextStore.set(write.path, {
         ...existing,
         ...cloneWithoutId(write.document),
       });
     }
+    this.db.store = nextStore;
   }
 }
 

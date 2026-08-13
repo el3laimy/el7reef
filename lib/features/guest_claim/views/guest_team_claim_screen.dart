@@ -128,7 +128,9 @@ class GuestTeamClaimScreen extends GetView<GuestTeamClaimController> {
                   ),
                 ] else if (canCompletePendingApproval) ...[
                   FilledButton(
-                    onPressed: controller.isSubmitting.value
+                    onPressed:
+                        controller.isSubmitting.value ||
+                            !controller.hasUsableInspection
                         ? null
                         : controller.submitClaim,
                     child: Text(
@@ -171,7 +173,9 @@ class GuestTeamClaimScreen extends GetView<GuestTeamClaimController> {
                   ),
                   const SizedBox(height: 16),
                   FilledButton(
-                    onPressed: controller.isSubmitting.value
+                    onPressed:
+                        controller.isSubmitting.value ||
+                            !controller.hasUsableInspection
                         ? null
                         : controller.submitClaim,
                     child: Text(

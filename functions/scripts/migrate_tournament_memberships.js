@@ -1,6 +1,7 @@
 "use strict";
 
-const admin = require("firebase-admin");
+const {initializeApp} = require("firebase-admin/app");
+const {FieldPath, getFirestore} = require("firebase-admin/firestore");
 
 const {
   DEFAULT_PAGE_SIZE,
@@ -103,7 +104,7 @@ function createFirestoreStore(db) {
   return {
     async listTournaments({after, limit}) {
       let query = tournaments
-        .orderBy(admin.firestore.FieldPath.documentId())
+        .orderBy(FieldPath.documentId())
         .limit(limit);
       if (after != null) {
         query = query.startAfter(after);
@@ -162,9 +163,9 @@ async function main() {
     return;
   }
 
-  admin.initializeApp({projectId: options.projectId});
+  const app = initializeApp({projectId: options.projectId});
   const summary = await runTournamentMembershipMigration({
-    store: createFirestoreStore(admin.firestore()),
+    store: createFirestoreStore(getFirestore(app)),
     dryRun: options.dryRun,
     pageSize: options.pageSize,
     maxDocuments: options.maxDocuments,

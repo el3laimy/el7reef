@@ -51,25 +51,32 @@ async function seedTournament(id, data = {}) {
   });
 }
 
+function guestPlayerData(data = {}) {
+  return {
+    displayName: 'ضيف سريع',
+    normalizedName: 'ضيف سريع',
+    phoneNumber: '01000000000',
+    jerseyNumber: null,
+    preferredPosition: null,
+    teamId: 'team-1',
+    tournamentId: 'tournament-1',
+    createdBy: 'creator-1',
+    createdAt: now,
+    updatedAt: now,
+    claimCode: null,
+    notes: null,
+    claimStatus: 'guest',
+    linkedPlayerId: null,
+    ...data,
+  };
+}
+
 async function seedGuestPlayer(id, data = {}) {
   await testEnv.withSecurityRulesDisabled(async (context) => {
-    await setDoc(doc(context.firestore(), 'guestPlayers', id), {
-      displayName: 'ضيف سريع',
-      normalizedName: 'ضيف سريع',
-      phoneNumber: '01000000000',
-      jerseyNumber: null,
-      preferredPosition: null,
-      teamId: 'team-1',
-      tournamentId: 'tournament-1',
-      createdBy: 'creator-1',
-      createdAt: now,
-      updatedAt: now,
-      claimCode: 'PLAYER-CODE-1',
-      notes: null,
-      claimStatus: 'invited',
-      linkedPlayerId: null,
-      ...data,
-    });
+    await setDoc(
+      doc(context.firestore(), 'guestPlayers', id),
+      guestPlayerData(data),
+    );
   });
 }
 
@@ -83,10 +90,10 @@ function guestTeamData(data = {}) {
     logoUrl: null,
     tournamentIds: ['tournament-1'],
     captainGuestPlayerId: null,
-    claimCode: 'TEAM-CODE-1',
+    claimCode: null,
     createdAt: now,
     updatedAt: now,
-    claimStatus: 'invited',
+    claimStatus: 'guest',
     linkedTeamId: null,
     ...data,
   };
@@ -199,39 +206,131 @@ describe('guest PII Firestore rules', () => {
     );
   });
 
-  it('denies create and update bypasses that spoof linkedPlayerId', async () => {
+  it('denies guest player claim-field and extra-field create bypasses', async () => {
+    await seedTeam('team-1', {ownerId: 'owner-1'});
+    const ownerDb = testEnv.authenticatedContext('owner-1').firestore();
+
+    const attacks = [
+      {claimStatus: 'invited'},
+      {claimCode: 'CLIENT-CONTROLLED-CODE'},
+      {activeClaimTokenHash: 'client-controlled-hash'},
+      {linkedPlayerId: 'victim-1'},
+      {extraData: 'malicious'},
+    ];
+    for (const [index, attack] of attacks.entries()) {
+      await assertFails(
+        setDoc(
+          doc(ownerDb, 'guestPlayers', `guest-player-attack-${index}`),
+          guestPlayerData({
+            createdBy: 'owner-1',
+            ...attack,
+          }),
+        ),
+      );
+    }
+  });
+
+  it('denies guest player claim-field update bypasses', async () => {
     await seedTeam('team-1', {ownerId: 'owner-1'});
     await seedGuestPlayer('guest-player-unlinked', {
       createdBy: 'owner-1',
-      linkedPlayerId: null,
+    });
+    const ownerDb = testEnv.authenticatedContext('owner-1').firestore();
+
+    const attacks = [
+      {claimStatus: 'invited'},
+      {claimCode: 'CLIENT-CONTROLLED-CODE'},
+      {activeClaimTokenHash: 'client-controlled-hash'},
+      {linkedPlayerId: 'victim-1'},
+    ];
+    for (const attack of attacks) {
+      await assertFails(
+        updateDoc(doc(ownerDb, 'guestPlayers', 'guest-player-unlinked'), {
+          ...attack,
+          updatedAt: now + 1,
+        }),
+      );
+    }
+  });
+
+  it('denies guest player update schema pollution', async () => {
+    await seedTeam('team-1', {ownerId: 'owner-1'});
+    await seedGuestPlayer('guest-player-unlinked', {
+      createdBy: 'owner-1',
     });
     const ownerDb = testEnv.authenticatedContext('owner-1').firestore();
 
     await assertFails(
-      setDoc(doc(ownerDb, 'guestPlayers', 'guest-player-spoofed'), {
-        displayName: 'ضيف مزيف الربط',
-        normalizedName: 'ضيف مزيف الربط',
-        phoneNumber: null,
-        jerseyNumber: null,
-        preferredPosition: null,
-        teamId: 'team-1',
-        tournamentId: 'tournament-1',
-        createdBy: 'owner-1',
-        createdAt: now,
-        updatedAt: now,
-        claimCode: null,
-        notes: null,
-        claimStatus: 'guest',
-        linkedPlayerId: 'victim-1',
-      }),
-    );
-    await assertFails(
       updateDoc(doc(ownerDb, 'guestPlayers', 'guest-player-unlinked'), {
-        linkedPlayerId: 'victim-1',
-        claimStatus: 'claimed',
+        extraData: 'malicious',
         updatedAt: now + 1,
       }),
     );
+  });
+
+  it('allows a team manager to create, edit, and archive an unclaimed guest player', async () => {
+    await seedTeam('team-1', {ownerId: 'owner-1'});
+    const ownerDb = testEnv.authenticatedContext('owner-1').firestore();
+    const guestPlayerRef = doc(ownerDb, 'guestPlayers', 'guest-player-valid');
+
+    await assertSucceeds(
+      setDoc(guestPlayerRef, guestPlayerData({createdBy: 'owner-1'})),
+    );
+    await assertSucceeds(
+      updateDoc(guestPlayerRef, {
+        displayName: 'ضيف محدّث',
+        normalizedName: 'ضيف محدث',
+        updatedAt: now + 1,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(guestPlayerRef, {
+        claimStatus: 'archived',
+        updatedAt: now + 2,
+      }),
+    );
+  });
+
+  it('denies malformed guest player creates and update bypasses', async () => {
+    await seedTeam('team-1', {ownerId: 'owner-1'});
+    await seedGuestPlayer('guest-player-valid', {createdBy: 'owner-1'});
+    const ownerDb = testEnv.authenticatedContext('owner-1').firestore();
+    const missingName = guestPlayerData({createdBy: 'owner-1'});
+    delete missingName.normalizedName;
+    const malformedCreates = [
+      missingName,
+      guestPlayerData({createdBy: 'owner-1', displayName: 'x'.repeat(121)}),
+      guestPlayerData({createdBy: 'owner-1', phoneNumber: 123}),
+      guestPlayerData({createdBy: 'owner-1', jerseyNumber: -1}),
+      guestPlayerData({createdBy: 'owner-1', notes: 'x'.repeat(501)}),
+      guestPlayerData({createdBy: 'owner-1', createdAt: 'not-a-time'}),
+      guestPlayerData({createdBy: 'owner-1', teamId: 'x'.repeat(129)}),
+    ];
+    for (const [index, malformedPlayer] of malformedCreates.entries()) {
+      await assertFails(
+        setDoc(
+          doc(ownerDb, 'guestPlayers', `guest-player-malformed-${index}`),
+          malformedPlayer,
+        ),
+      );
+    }
+
+    const malformedUpdates = [
+      {displayName: 'x'.repeat(121), updatedAt: now + 1},
+      {jerseyNumber: '7', updatedAt: now + 1},
+      {notes: 'x'.repeat(501), updatedAt: now + 1},
+      {teamId: 'team-2', updatedAt: now + 1},
+      {createdAt: now - 1, updatedAt: now + 1},
+      {updatedAt: 'not-a-time'},
+    ];
+    for (const malformedUpdate of malformedUpdates) {
+      await assertFails(
+        updateDoc(
+          doc(ownerDb, 'guestPlayers', 'guest-player-valid'),
+          malformedUpdate,
+        ),
+      );
+    }
   });
 
   it('denies guest team reads to unrelated users', async () => {
@@ -297,11 +396,125 @@ describe('guest PII Firestore rules', () => {
     );
   });
 
+  it('denies guest team claim-field and extra-field create bypasses', async () => {
+    const creatorDb = testEnv.authenticatedContext('creator-1').firestore();
+
+    const attacks = [
+      {claimStatus: 'invited'},
+      {claimCode: 'CLIENT-CONTROLLED-CODE'},
+      {activeClaimTokenHash: 'client-controlled-hash'},
+      {linkedTeamId: 'team-victim'},
+      {extraData: 'malicious'},
+    ];
+    for (const [index, attack] of attacks.entries()) {
+      await assertFails(
+        setDoc(
+          doc(creatorDb, 'guestTeams', `guest-team-attack-${index}`),
+          guestTeamData(attack),
+        ),
+      );
+    }
+  });
+
+  it('denies guest team claim-field update bypasses', async () => {
+    await seedGuestTeam('guest-team-1', {creatorId: 'creator-1'});
+    const creatorDb = testEnv.authenticatedContext('creator-1').firestore();
+
+    const attacks = [
+      {claimStatus: 'invited'},
+      {claimCode: 'CLIENT-CONTROLLED-CODE'},
+      {activeClaimTokenHash: 'client-controlled-hash'},
+      {linkedTeamId: 'team-victim'},
+    ];
+    for (const attack of attacks) {
+      await assertFails(
+        updateDoc(doc(creatorDb, 'guestTeams', 'guest-team-1'), {
+          ...attack,
+          updatedAt: now + 1,
+        }),
+      );
+    }
+  });
+
+  it('denies guest team update schema pollution', async () => {
+    await seedGuestTeam('guest-team-1', {creatorId: 'creator-1'});
+    const creatorDb = testEnv.authenticatedContext('creator-1').firestore();
+
+    await assertFails(
+      updateDoc(doc(creatorDb, 'guestTeams', 'guest-team-1'), {
+        extraData: 'malicious',
+        updatedAt: now + 1,
+      }),
+    );
+  });
+
+  it('allows a creator to create, edit, and archive an unclaimed guest team', async () => {
+    const creatorDb = testEnv.authenticatedContext('creator-1').firestore();
+    const guestTeamRef = doc(creatorDb, 'guestTeams', 'guest-team-valid');
+
+    await assertSucceeds(setDoc(guestTeamRef, guestTeamData()));
+    await assertSucceeds(
+      updateDoc(guestTeamRef, {
+        contactName: 'قائد محدّث',
+        updatedAt: now + 1,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(guestTeamRef, {
+        claimStatus: 'archived',
+        updatedAt: now + 2,
+      }),
+    );
+  });
+
+  it('denies malformed guest team creates and update bypasses', async () => {
+    await seedGuestTeam('guest-team-valid', {creatorId: 'creator-1'});
+    const creatorDb = testEnv.authenticatedContext('creator-1').firestore();
+    const missingName = guestTeamData();
+    delete missingName.normalizedName;
+    const malformedCreates = [
+      missingName,
+      guestTeamData({name: 'x'.repeat(121)}),
+      guestTeamData({contactPhone: 11111111111}),
+      guestTeamData({tournamentIds: ['1', '2', '3', '4', '5', '6']}),
+      guestTeamData({tournamentIds: ['tournament-1', 2]}),
+      guestTeamData({createdAt: 'not-a-time'}),
+      guestTeamData({captainGuestPlayerId: 'guest-player-unverified'}),
+    ];
+    for (const [index, malformedTeam] of malformedCreates.entries()) {
+      await assertFails(
+        setDoc(
+          doc(creatorDb, 'guestTeams', `guest-team-malformed-${index}`),
+          malformedTeam,
+        ),
+      );
+    }
+
+    const malformedUpdates = [
+      {contactName: 'x'.repeat(121), updatedAt: now + 1},
+      {tournamentIds: ['tournament-1', 2], updatedAt: now + 1},
+      {creatorId: 'attacker-1', updatedAt: now + 1},
+      {createdAt: now - 1, updatedAt: now + 1},
+      {claimStatus: 'pending', updatedAt: now + 1},
+      {captainGuestPlayerId: 'guest-player-missing', updatedAt: now + 1},
+      {updatedAt: 'not-a-time'},
+    ];
+    for (const malformedUpdate of malformedUpdates) {
+      await assertFails(
+        updateDoc(
+          doc(creatorDb, 'guestTeams', 'guest-team-valid'),
+          malformedUpdate,
+        ),
+      );
+    }
+  });
+
   it('allows tournament organizer to update only guest team roster captain', async () => {
     await seedTournament('tournament-1', {organizerId: 'organizer-1'});
+    await seedTournament('tournament-2', {organizerId: 'organizer-2'});
     await seedGuestTeam('guest-team-1', {
       creatorId: 'guest-creator-1',
-      tournamentIds: ['tournament-1'],
+      tournamentIds: ['tournament-1', 'tournament-2'],
     });
     await seedGuestPlayer('guest-player-1', {
       teamId: null,
@@ -312,6 +525,9 @@ describe('guest PII Firestore rules', () => {
     });
 
     const organizerDb = testEnv.authenticatedContext('organizer-1').firestore();
+    const secondaryOrganizerDb = testEnv
+      .authenticatedContext('organizer-2')
+      .firestore();
     const attackerDb = testEnv.authenticatedContext('attacker-1').firestore();
 
     await assertSucceeds(
@@ -322,6 +538,12 @@ describe('guest PII Firestore rules', () => {
     );
     await assertFails(
       updateDoc(doc(attackerDb, 'guestTeams', 'guest-team-1'), {
+        captainGuestPlayerId: null,
+        updatedAt: now + 2,
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(secondaryOrganizerDb, 'guestTeams', 'guest-team-1'), {
         captainGuestPlayerId: null,
         updatedAt: now + 2,
       }),

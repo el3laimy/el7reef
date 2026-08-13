@@ -8,10 +8,18 @@
     "COLLECTION|matches|teamAPlayerIds:CONTAINS,createdAt:DESCENDING",
     "COLLECTION|matches|teamBPlayerIds:CONTAINS,createdAt:DESCENDING",
     "COLLECTION|matchInvitations|matchId:ASCENDING,createdAt:DESCENDING",
+    "COLLECTION|friendships|participants:CONTAINS,status:ASCENDING",
     "COLLECTION|teamFormationTemplates|teamId:ASCENDING,updatedAt:DESCENDING",
     "COLLECTION|teamMemberships|teamId:ASCENDING,joinedAt:ASCENDING",
     "COLLECTION|teamRosterSnapshots|teamId:ASCENDING,createdAt:DESCENDING",
     "COLLECTION|tournaments|organizerId:ASCENDING,createdAt:DESCENDING",
-    "COLLECTION|tournaments|status:ASCENDING,createdAt:DESCENDING"
+    "COLLECTION|tournaments|status:ASCENDING,createdAt:DESCENDING",
+    "COLLECTION|tournaments|registeredTeamIds:CONTAINS,discoverable:ASCENDING,visibility:ASCENDING,createdAt:DESCENDING",
+    "COLLECTION|auditEvents|entityType:ASCENDING,entityId:ASCENDING,createdAt:DESCENDING",
+    "COLLECTION|auditEvents|entityType:ASCENDING,createdAt:DESCENDING",
+    "COLLECTION|auditEvents|actorId:ASCENDING,createdAt:DESCENDING"
+  ],
+  "requiredFieldOverrideSignatures": [
+    "followers|userId|COLLECTION_GROUP:ASCENDING"
   ]
 }

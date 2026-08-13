@@ -164,9 +164,10 @@ class MatchCard extends StatelessWidget {
                   ),
                 ),
 
-              if (match.status == MatchStatus.completed ||
-                  match.status == MatchStatus.pendingReview ||
-                  match.status == MatchStatus.settled)
+              if (FeatureFlags.fanVotingEnabled &&
+                  (match.status == MatchStatus.completed ||
+                      match.status == MatchStatus.pendingReview ||
+                      match.status == MatchStatus.settled))
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.only(bottom: AppDimensions.md),

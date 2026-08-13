@@ -115,6 +115,10 @@ class ProfileController extends GetxController {
       }
       await _authService.signOut();
       Get.offAllNamed(AppRoutes.login);
+      Get.snackbar(
+        'تم قبول طلب الحذف',
+        'سيستكمل الحريف حذف البيانات بأمان حتى إذا انقطع الاتصال.',
+      );
       return true;
     } catch (error, stackTrace) {
       AppLogger.error('ProfileController.deleteAccount', error, stackTrace);
@@ -129,9 +133,9 @@ class ProfileController extends GetxController {
     if (error is AuthDisplayException) return error.message;
     final normalized = error.toString().toLowerCase();
     if (normalized.contains('network') || normalized.contains('unavailable')) {
-      return 'الاتصال غير مستقر. بياناتك لم تُحذف، ويمكنك المحاولة مرة أخرى.';
+      return 'الاتصال غير مستقر ولم نتأكد من قبول الطلب. حاول مرة أخرى.';
     }
-    return 'بياناتك لم تُحذف. حاول مرة أخرى أو استخدم صفحة طلب الحذف على الويب.';
+    return 'تعذر قبول طلب الحذف. حاول مرة أخرى أو استخدم صفحة طلب الحذف على الويب.';
   }
 
   @override

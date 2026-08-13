@@ -2,18 +2,25 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/errors/firebase_error_handler.dart';
 import '../../core/constants/firebase_paths.dart';
 import '../../core/enums/friendship_status.dart';
+import '../../core/services/cloud_sensitive_ops_service.dart';
 import '../../domain/entities/friendship.dart';
 import '../../domain/repositories/friend_repository.dart';
 import '../models/friendship_model.dart';
 
 class FriendRepositoryImpl implements FriendRepository {
   final FirebaseFirestore _firestore;
+  final CloudSensitiveOpsService _cloudSensitiveOps;
 
-  FriendRepositoryImpl({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  FriendRepositoryImpl({
+    FirebaseFirestore? firestore,
+    CloudSensitiveOpsService? cloudSensitiveOps,
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _cloudSensitiveOps = cloudSensitiveOps ?? CloudSensitiveOpsService();
 
-  CollectionReference get _friendshipsRef => _firestore.collection(FirebasePaths.friendships);
-  CollectionReference get _playersRef => _firestore.collection(FirebasePaths.players);
+  CollectionReference get _friendshipsRef =>
+      _firestore.collection(FirebasePaths.friendships);
+  CollectionReference get _playersRef =>
+      _firestore.collection(FirebasePaths.players);
 
   @override
   Future<Friendship?> getFriendship(String userId1, String userId2) async {
@@ -22,7 +29,10 @@ class FriendRepositoryImpl implements FriendRepository {
       final doc = await _friendshipsRef.doc(docId).get();
 
       if (doc.exists) {
-        return FriendshipModel.fromJson(doc.data() as Map<String, dynamic>, doc.id);
+        return FriendshipModel.fromJson(
+          doc.data() as Map<String, dynamic>,
+          doc.id,
+        );
       }
       return null;
     });
@@ -32,7 +42,7 @@ class FriendRepositoryImpl implements FriendRepository {
   Future<void> sendFriendRequest(String senderId, String receiverId) async {
     return FirebaseErrorHandler.guard(() async {
       final docId = FriendshipModel.generateId(senderId, receiverId);
-      
+
       final friendship = FriendshipModel(
         id: docId,
         userId1: senderId.compareTo(receiverId) < 0 ? senderId : receiverId,
@@ -43,18 +53,24 @@ class FriendRepositoryImpl implements FriendRepository {
         updatedAt: DateTime.now(),
       );
 
-      await _friendshipsRef.doc(docId).set(friendship.toJson(), SetOptions(merge: true));
+      await _friendshipsRef
+          .doc(docId)
+          .set(friendship.toJson(), SetOptions(merge: true));
     });
   }
 
   @override
-  Future<void> acceptFriendRequest(String idA, String idB, String actionUserId) async {
+  Future<void> acceptFriendRequest(
+    String idA,
+    String idB,
+    String actionUserId,
+  ) async {
     return FirebaseErrorHandler.guard(() async {
       final docId = FriendshipModel.generateId(idA, idB);
-      
+
       // Batch update لضمان تناسق البيانات
       final batch = _firestore.batch();
-      
+
       // 1. تحديث الصداقة
       batch.update(_friendshipsRef.doc(docId), {
         'status': FriendshipStatus.accepted.name,
@@ -64,10 +80,10 @@ class FriendRepositoryImpl implements FriendRepository {
 
       // 2. تحديث قائمة الأصدقاء للاعبين
       batch.update(_playersRef.doc(idA), {
-        'friendIds': FieldValue.arrayUnion([idB])
+        'friendIds': FieldValue.arrayUnion([idB]),
       });
       batch.update(_playersRef.doc(idB), {
-        'friendIds': FieldValue.arrayUnion([idA])
+        'friendIds': FieldValue.arrayUnion([idA]),
       });
 
       await batch.commit();
@@ -78,16 +94,16 @@ class FriendRepositoryImpl implements FriendRepository {
   Future<void> removeFriendship(String idA, String idB) async {
     return FirebaseErrorHandler.guard(() async {
       final docId = FriendshipModel.generateId(idA, idB);
-      
+
       final batch = _firestore.batch();
-      
+
       batch.delete(_friendshipsRef.doc(docId));
-      
+
       batch.update(_playersRef.doc(idA), {
-        'friendIds': FieldValue.arrayRemove([idB])
+        'friendIds': FieldValue.arrayRemove([idB]),
       });
       batch.update(_playersRef.doc(idB), {
-        'friendIds': FieldValue.arrayRemove([idA])
+        'friendIds': FieldValue.arrayRemove([idA]),
       });
 
       await batch.commit();
@@ -95,50 +111,22 @@ class FriendRepositoryImpl implements FriendRepository {
   }
 
   @override
-  Future<void> blockUser(String blockerId, String blockedId) async {
+  Future<void> blockUser(String blockedId) async {
     return FirebaseErrorHandler.guard(() async {
-      final docId = FriendshipModel.generateId(blockerId, blockedId);
-      
-      final batch = _firestore.batch();
-
-      // 1. تحديث أو إنشاء وثيقة Friendship كـ blocked
-      final friendship = FriendshipModel(
-        id: docId,
-        userId1: blockerId.compareTo(blockedId) < 0 ? blockerId : blockedId,
-        userId2: blockerId.compareTo(blockedId) < 0 ? blockedId : blockerId,
-        status: FriendshipStatus.blocked,
-        lastActionBy: blockerId,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-      batch.set(_friendshipsRef.doc(docId), friendship.toJson());
-
-      // 2. إزالة من قوائم الأصدقاء إن كانوا أصدقاء
-      batch.update(_playersRef.doc(blockerId), {
-        'friendIds': FieldValue.arrayRemove([blockedId]),
-        'blockedIds': FieldValue.arrayUnion([blockedId])
-      });
-      batch.update(_playersRef.doc(blockedId), {
-        'friendIds': FieldValue.arrayRemove([blockerId])
-      });
-
-      await batch.commit();
+      final blocked = await _cloudSensitiveOps.blockUser(blockedId);
+      if (!blocked) {
+        throw StateError('تعذر إكمال الحظر عبر الخادم');
+      }
     });
   }
 
   @override
-  Future<void> unblockUser(String blockerId, String blockedId) async {
+  Future<void> unblockUser(String blockedId) async {
     return FirebaseErrorHandler.guard(() async {
-      final docId = FriendshipModel.generateId(blockerId, blockedId);
-      
-      final batch = _firestore.batch();
-      batch.delete(_friendshipsRef.doc(docId));
-      
-      batch.update(_playersRef.doc(blockerId), {
-        'blockedIds': FieldValue.arrayRemove([blockedId])
-      });
-
-      await batch.commit();
+      final unblocked = await _cloudSensitiveOps.unblockUser(blockedId);
+      if (!unblocked) {
+        throw StateError('تعذر إكمال فك الحظر عبر الخادم');
+      }
     });
   }
 
@@ -146,7 +134,7 @@ class FriendRepositoryImpl implements FriendRepository {
   Future<void> followUser(String followerId, String followedId) async {
     return FirebaseErrorHandler.guard(() async {
       await _playersRef.doc(followerId).update({
-        'followingIds': FieldValue.arrayUnion([followedId])
+        'followingIds': FieldValue.arrayUnion([followedId]),
       });
     });
   }
@@ -155,7 +143,7 @@ class FriendRepositoryImpl implements FriendRepository {
   Future<void> unfollowUser(String followerId, String followedId) async {
     return FirebaseErrorHandler.guard(() async {
       await _playersRef.doc(followerId).update({
-        'followingIds': FieldValue.arrayRemove([followedId])
+        'followingIds': FieldValue.arrayRemove([followedId]),
       });
     });
   }
@@ -170,7 +158,12 @@ class FriendRepositoryImpl implements FriendRepository {
           .get();
 
       return snapshot.docs
-          .map((doc) => FriendshipModel.fromJson(doc.data() as Map<String, dynamic>, doc.id))
+          .map(
+            (doc) => FriendshipModel.fromJson(
+              doc.data() as Map<String, dynamic>,
+              doc.id,
+            ),
+          )
           .toList();
     });
   }
@@ -186,8 +179,15 @@ class FriendRepositoryImpl implements FriendRepository {
           .get();
 
       return snapshot.docs
-          .map((doc) => FriendshipModel.fromJson(doc.data() as Map<String, dynamic>, doc.id))
-          .where((friendship) => friendship.lastActionBy != userId) // من قام بالفعل (الإرسال) ليس أنا
+          .map(
+            (doc) => FriendshipModel.fromJson(
+              doc.data() as Map<String, dynamic>,
+              doc.id,
+            ),
+          )
+          .where(
+            (friendship) => friendship.lastActionBy != userId,
+          ) // من قام بالفعل (الإرسال) ليس أنا
           .toList();
     });
   }

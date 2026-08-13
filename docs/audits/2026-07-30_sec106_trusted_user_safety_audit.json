@@ -1,0 +1,242 @@
+{
+  "score": 5,
+  "maximumScore": 5,
+  "scope": "ELR-SEC-106 only: trusted report, block, and unblock operations; their atomic audit events; per-actor quotas; and the directly related Firestore read/write boundaries.",
+  "scopeLimit": "This is not an application-wide security or Android V1 release score. Server-side Claim, resumable account deletion, fan voting, disputes, public/private player profile separation, App Check rollout, deployment, and Android device release gates remain open under later tickets.",
+  "date": "2026-07-30",
+  "lastVerifiedAt": "2026-08-01",
+  "candidate": {
+    "baseGitRevision": "297b87d",
+    "workingTree": "dirty-uncommitted",
+    "note": "Verification applies to the current local candidate layered on this base revision; it is not evidence of a committed or deployed release."
+  },
+  "target": {
+    "firebaseProject": "el7reef-app",
+    "database": "(default)",
+    "edition": "STANDARD",
+    "location": "nam5",
+    "verificationSource": "Repository configuration and local Firebase Functions, Auth, Firestore, and Storage emulators. No production mutation or deployment was attempted."
+  },
+  "verdict": "pass-local-not-deployed",
+  "summary": "Report, block, and unblock are authenticated callables with no client write fallback. Each successful state transition, its bounded opaque audit event, and its per-actor quota update are staged in one Firestore transaction. Directional mutual blocks remain independent, duplicate retries are neutral and do not consume quota, deleted-account tombstones invalidate still-cached tokens, canonical friendship paths resist client poisoning, and legacy relationship arrays are repaired without discarding valid mutual blocks. Functions unit, final Functions/Auth/Firestore/Storage Emulator smoke, Rules Emulator, focused Flutter, analysis, architecture and index gates pass on the local candidate.",
+  "controls": [
+    {
+      "id": "ELR-SEC-106-A",
+      "status": "pass",
+      "evidence": [
+        "reportUserContent derives reporterId from Auth, validates the target and payload, and creates the private report plus trusted audit in one transaction",
+        "the transaction requires an active reporter profile and no account-deletion tombstone, so a cached token cannot report after deletion starts",
+        "report audit uses moderationReport plus an opaque report ID and excludes targetId, reason, details, names, and relationship arrays",
+        "repeating the same daily report returns a neutral duplicate result without another report, audit event, or quota operation"
+      ]
+    },
+    {
+      "id": "ELR-SEC-106-B",
+      "status": "pass",
+      "evidence": [
+        "blockUser and unblockUser derive the actor from Auth and transact both player documents, the friendship, the quota, and the audit event together",
+        "each direction has independent blockedIds state, so one user's unblock cannot erase the opposite user's block",
+        "the stored friendship participants must match the canonical actor-target pair before mutation, preventing underscore-ID collisions from overwriting or deleting another relationship",
+        "legacy friendIds and blockedIds are normalized for both players in the transaction while every valid bounded ID and the opposite directional block are preserved",
+        "duplicate block and unblock calls repair legacy state without consuming quota or creating an audit event; an audit failure rolls every transition repair back",
+        "an actor-scoped window revision makes block, unblock, then block in the same millisecond produce three unique immutable audit events"
+      ]
+    },
+    {
+      "id": "ELR-SEC-106-C",
+      "status": "pass",
+      "evidence": [
+        "new profile reports are capped at 20 per actor per UTC day",
+        "block and unblock transitions share a cap of 30 per actor per hour",
+        "quota counters are backend-only, live at safetyActionQuotas/{uid}, are removed by the current account-deletion cleanup, and duplicate no-op calls consume no quota"
+      ]
+    },
+    {
+      "id": "ELR-SEC-106-D",
+      "status": "pass",
+      "evidence": [
+        "Firestore Rules deny every client read and write to userReports, safetyActionQuotas, and accountDeletionRequests and deny direct auditEvents writes",
+        "clients cannot change blockedIds or create, update, or delete a blocked friendship",
+        "client friendship creation is pending-only on the canonical pair path, acceptance belongs to the receiver, and create or acceptance fails while either participant blocks the other",
+        "new non-list or oversized relationship arrays are rejected without preventing unrelated updates to legacy profiles",
+        "friendships are readable only by their participants; the production accepted and pending participant queries pass, broad or other-user queries are denied, and safety audit events are readable only by their authenticated actor"
+      ]
+    },
+    {
+      "id": "ELR-SEC-106-E",
+      "status": "pass",
+      "evidence": [
+        "Flutter block and unblock paths call CloudSensitiveOpsService and have no local Firestore fallback",
+        "Flutter and Functions share the friendships, userReports, safetyActionQuotas, accountDeletionRequests, and auditEvents collection contract",
+        "required actor and audit query indexes are present and preserved by the index guard"
+      ]
+    }
+  ],
+  "attackMatrix": [
+    {
+      "attack": "unauthenticated caller invokes report, block, or unblock",
+      "expected": "reject before any write",
+      "result": "pass"
+    },
+    {
+      "attack": "authenticated client forges or edits userReports, auditEvents, safetyActionQuotas, blockedIds, or a blocked friendship",
+      "expected": "deny",
+      "result": "pass"
+    },
+    {
+      "attack": "authenticated caller submits forged reporterId, actorId, or blockerId fields, or targets itself",
+      "expected": "derive identity from Auth and reject every self-targeted operation without writes",
+      "result": "pass"
+    },
+    {
+      "attack": "deleted actor reuses a still-valid token after its player profile is removed or an account-deletion tombstone exists",
+      "expected": "permission-denied before report, relationship, quota, or audit writes",
+      "result": "pass"
+    },
+    {
+      "attack": "report or block targets a missing profile",
+      "expected": "reject without report, relationship, quota, or audit writes",
+      "result": "pass"
+    },
+    {
+      "attack": "free-form report evidence, reason, raw target ID, or relationship arrays leak into Audit",
+      "expected": "absent from the stored event",
+      "result": "pass"
+    },
+    {
+      "attack": "opposite users block each other, retry, and independently unblock",
+      "expected": "one event per real directional transition and no erased opposite block",
+      "result": "pass"
+    },
+    {
+      "attack": "block, unblock, and block occur with the same millisecond timestamp",
+      "expected": "three unique audit IDs and final blocked state",
+      "result": "pass"
+    },
+    {
+      "attack": "two different participant pairs collapse to the same underscore-joined friendship document ID",
+      "expected": "reject the mismatched stored pair without overwrite, delete, quota, or audit writes",
+      "result": "pass"
+    },
+    {
+      "attack": "client creates a friendship under an arbitrary or reversed path, creates it accepted, forges lastActionBy, self-accepts, or creates or accepts while either player blocks the other",
+      "expected": "deny while the canonical sender-created pending request and receiver acceptance remain usable",
+      "result": "pass-rules-emulator"
+    },
+    {
+      "attack": "legacy player data contains missing, scalar, duplicate, mixed, or otherwise malformed friendIds or blockedIds",
+      "expected": "preserve every valid bounded ID and mutual block, repair both players atomically, and never let malformed arrays make the target permanently unblockable",
+      "result": "pass-functions-unit-and-final-emulator"
+    },
+    {
+      "attack": "actor exceeds 20 new reports per day or 30 relationship transitions per hour",
+      "expected": "resource-exhausted with no partial state or audit write",
+      "result": "pass"
+    },
+    {
+      "attack": "outsider reads a friendship or target reads the reporter's safety audit event",
+      "expected": "deny",
+      "result": "pass"
+    },
+    {
+      "attack": "client lists friendships without a participant constraint or queries another user's participant scope",
+      "expected": "deny while the production accepted and pending participant-scoped queries remain usable",
+      "result": "pass"
+    },
+    {
+      "attack": "trusted audit creation fails after domain and quota writes are staged",
+      "expected": "roll back the complete transaction",
+      "result": "pass"
+    }
+  ],
+  "verification": {
+    "functionsUnit": {
+      "command": "npm run test:functions",
+      "result": "pass",
+      "testsPassed": 105,
+      "focusedSafetyTestsPassed": 24
+    },
+    "functionsEmulatorSmoke": {
+      "command": "npm run test:functions:emulator",
+      "result": "pass",
+      "exportedCallables": 6,
+      "coverage": "All six auth gates, settlement roster guards, forged identity fields, self-target rejection, concurrent safety retries, opaque audit events, directional unblock, deleted-actor tombstones, quota persistence and cleanup, and the final legacy friendIds/blockedIds repair scenarios passed with exit code 0. Duplicate legacy repairs are asserted to consume no quota and create no audit event."
+    },
+    "firestoreRulesEmulator": {
+      "command": "npm run test:rules:emulator",
+      "result": "pass",
+      "testsPassed": 207
+    },
+    "focusedFlutter": {
+      "command": "flutter test --no-pub test/core/constants/firebase_paths_contract_test.dart test/core/services/cloud_sensitive_ops_service_test.dart test/data/repositories/friend_repository_impl_test.dart test/data/models/audit_event_model_test.dart test/features/organizer/audit_timeline_screen_test.dart",
+      "result": "pass",
+      "testsPassed": 12
+    },
+    "dartAnalysis": {
+      "command": "dart analyze lib/",
+      "result": "pass"
+    },
+    "guards": {
+      "result": "pass",
+      "architectureFilesChecked": 572,
+      "productionCompositeIndexesPreserved": 16,
+      "productionFieldOverridesPreserved": 1
+    },
+    "hotspotGuard": {
+      "command": "npm run check:hotspots",
+      "result": "out-of-scope-known-failures",
+      "filesOverBudget": 7,
+      "scopeNote": "No ELR-SEC-106 file is listed; the seven existing Flutter hotspots remain owned by ELR-OPS-402."
+    },
+    "fullFlutterSuite": {
+      "command": "flutter test --no-pub",
+      "result": "out-of-scope-known-failures",
+      "evidenceAge": "historical-2026-07-30-not-rerun-for-final-sec106-verification",
+      "testsPassed": 754,
+      "testsFailed": 2,
+      "failure": "Both failures expect bracket-screen-summary-bar in tournament bracket UI tests and remain tracked by ELR-UX-302..303; no safety test failed."
+    }
+  },
+  "findings": [
+    {
+      "id": "ELR-SEC-106-VERIFY-001",
+      "severity": "verification-gate",
+      "status": "CLOSED",
+      "finding": "The final blockedIds legacy-repair candidate passed npm run test:functions:emulator with exit code 0 on 2026-08-01."
+    }
+  ],
+  "remainingRisks": [
+    {
+      "id": "ELR-SEC-107..108",
+      "status": "READY",
+      "risk": "Guest Claim remains client-side and account deletion still needs the planned resumable saga before release."
+    },
+    {
+      "id": "ELR-SEC-102..104",
+      "status": "READY",
+      "risk": "Fan voting and disputes still need trusted callables, atomic transitions, and relationship-scoped reads."
+    },
+    {
+      "id": "ELR-IDN-201..205",
+      "status": "BLOCKED",
+      "risk": "Private player account data still requires migration to a separate public profile projection."
+    },
+    {
+      "id": "ELR-SEC-701",
+      "status": "INBOX",
+      "risk": "App Check remains later defense in depth under the V1.1 ticket ELR-SEC-701, alongside broader abuse monitoring, moderation SLA, appeals, UGC consent, and youth-safety policy. It is not represented as a current V1 Pilot gate."
+    },
+    {
+      "id": "ELR-OPS-402",
+      "status": "READY",
+      "risk": "The hotspot guard still reports seven existing Flutter production files over budget; none belongs to ELR-SEC-106."
+    }
+  ],
+  "recommendations": [
+    "Keep all safety state transitions callable-only and preserve the shared quota transaction when extending moderation actions.",
+    "Treat App Check as later defense in depth for broader V1.1 social expansion unless Product explicitly reprioritizes it into V1; never treat it as a replacement for authorization or quotas.",
+    "Do not expose report text, raw targets, block relationships, quota state, claim tokens, or personal data through audit, analytics, or share links.",
+    "Use this 5/5 audit and the reviewed scoped diff as the SEC-106 checkpoint; keep ELR-SEC-107 isolated and do not deploy it before its own independent AppSec and Emulator gates."
+  ],
+  "releaseDecision": "ELR-SEC-106 is DONE locally with a 5/5 scope-limited result: Functions 105/105, final Functions Emulator smoke with six exported callables, Rules 207/207, focused Flutter 12/12, and architecture/index guards passed. Android V1 remains open, the repository candidate is not deployed, and this audit authorizes no Firebase, Remote Config, Hosting, Android, or iOS release."
+}

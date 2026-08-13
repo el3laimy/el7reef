@@ -106,6 +106,125 @@ void main() {
       expect(controller.selectedLineupPlayerKey, isNull);
       expect(controller.isLineupDirty.value, isTrue);
     });
+
+    test(
+      'keeps a legacy duplicate registered membership out of the bench before save for 5v5, 7v7, and 11v11',
+      () {
+        for (final playerCount in [5, 7, 11]) {
+          final controller = _teamLineupController();
+          final starter = _registeredPlayer(
+            id: 'membership-starter-$playerCount',
+            name: 'محمد السيد',
+          );
+          final duplicate = _registeredPlayer(
+            id: 'membership-legacy-copy-$playerCount',
+            name: 'محمد السيد',
+          );
+          final bench = _registeredPlayer(
+            id: 'membership-bench-$playerCount',
+            name: 'رامي',
+          );
+
+          controller.members.assignAll([
+            _teamMember(
+              player: starter,
+              status: TeamMembershipStatus.starter,
+              participantId: 'player-mohamed',
+            ),
+            _teamMember(
+              player: duplicate,
+              status: TeamMembershipStatus.bench,
+              participantId: 'player-mohamed',
+            ),
+            _teamMember(
+              player: bench,
+              status: TeamMembershipStatus.bench,
+              participantId: 'player-ramy',
+            ),
+          ]);
+          controller.slots.assignAll(
+            _slotsWithStarters([starter], playerCount: playerCount),
+          );
+
+          expect(
+            controller.benchPlayers.map((player) => player.key),
+            equals([bench.key]),
+            reason: '${playerCount}v$playerCount',
+          );
+          expect(
+            controller.benchMembershipIds,
+            equals([bench.id]),
+            reason: '${playerCount}v$playerCount',
+          );
+        }
+      },
+    );
+
+    test(
+      'normalizes legacy duplicate guest members when the formation changes for 5v5, 7v7, and 11v11',
+      () {
+        for (final playerCount in [5, 7, 11]) {
+          final controller = _teamLineupController();
+          final firstGuest = _guestPlayer(
+            id: 'membership-guest-starter-$playerCount',
+            name: 'محمود الضيف',
+          );
+          final duplicateGuest = _guestPlayer(
+            id: 'membership-guest-copy-$playerCount',
+            name: 'محمود الضيف',
+          );
+          final bench = _guestPlayer(
+            id: 'membership-guest-bench-$playerCount',
+            name: 'علي',
+          );
+
+          controller.match.value = _match(teamSize: playerCount);
+          controller.playerCount.value = playerCount;
+          controller.formationCode.value = getDefaultFormation(playerCount);
+          controller.members.assignAll([
+            _teamMember(
+              player: firstGuest,
+              status: TeamMembershipStatus.starter,
+              participantId: 'guest-mahmoud',
+            ),
+            _teamMember(
+              player: duplicateGuest,
+              status: TeamMembershipStatus.starter,
+              participantId: 'guest-mahmoud',
+            ),
+            _teamMember(
+              player: bench,
+              status: TeamMembershipStatus.bench,
+              participantId: 'guest-ali',
+            ),
+          ]);
+          controller.slots.assignAll(
+            _slotsWithStarters([
+              firstGuest,
+              duplicateGuest,
+            ], playerCount: playerCount),
+          );
+
+          controller.changeFormation(getDefaultFormation(playerCount));
+
+          expect(
+            controller.slots.where((slot) => !slot.isEmpty),
+            hasLength(1),
+            reason: '${playerCount}v$playerCount',
+          );
+          expect(
+            controller.starterMembershipIds,
+            hasLength(1),
+            reason: '${playerCount}v$playerCount',
+          );
+          expect(
+            controller.benchPlayers.map((player) => player.key),
+            equals([bench.key]),
+            reason: '${playerCount}v$playerCount',
+          );
+        }
+      },
+    );
   });
 
   group('MatchSideLineupEditorController tap-select lineup editing', () {
@@ -219,12 +338,12 @@ MatchSideLineupEditorController _matchSideLineupController() {
   );
 }
 
-Match _match() {
+Match _match({int teamSize = 5}) {
   return Match(
     id: 'match-1',
     organizerId: 'owner-1',
     status: MatchStatus.open,
-    teamSize: 5,
+    teamSize: teamSize,
     createdAt: DateTime(2026, 7, 10, 12),
   );
 }
@@ -246,14 +365,15 @@ MatchSide _temporarySide() {
 TeamLineupEditorMember _teamMember({
   required LineupPlayer player,
   required TeamMembershipStatus status,
+  String? participantId,
 }) {
   final now = DateTime(2026, 7, 10, 12);
   return TeamLineupEditorMember(
     membership: TeamMembership(
       id: player.id,
       teamId: 'team-1',
-      playerId: player.isRegistered ? player.id : null,
-      guestPlayerId: player.isGuest ? player.id : null,
+      playerId: player.isRegistered ? (participantId ?? player.id) : null,
+      guestPlayerId: player.isGuest ? (participantId ?? player.id) : null,
       status: status,
       joinedAt: now,
       updatedAt: now,
@@ -262,10 +382,13 @@ TeamLineupEditorMember _teamMember({
   );
 }
 
-List<FormationSlot> _slotsWithStarters(List<LineupPlayer> starters) {
+List<FormationSlot> _slotsWithStarters(
+  List<LineupPlayer> starters, {
+  int playerCount = 5,
+}) {
   final slots = FormationEngine.generateFormationSlots(
-    playerCount: 5,
-    formationCode: getDefaultFormation(5),
+    playerCount: playerCount,
+    formationCode: getDefaultFormation(playerCount),
   );
   return LineupUtils.assignPlayersToGeneratedSlots(
     slots: slots,

@@ -1,0 +1,100 @@
+{
+  "score": 5,
+  "maximumScore": 5,
+  "scope": "ELR-SEC-105 only: fail-closed client access to analyticsEvents, removal of Flutter Firestore persistence and parameter logging, compatibility of existing invite/claim/share call sites, and correction of current privacy disclosures.",
+  "scopeLimit": "This is not an application-wide privacy, analytics, Firebase, or Android release score. Historical analytics retention and deletion, trusted aggregate ingestion, quotas, deduplication, data dictionary approval, and pilot reporting remain blocked under ELR-OPS-405.",
+  "date": "2026-07-29",
+  "target": {
+    "firebaseProject": "el7reef-app",
+    "database": "(default)",
+    "edition": "STANDARD",
+    "location": "nam5"
+  },
+  "verdict": "pass",
+  "summary": "The candidate tree denies every client read and write to analyticsEvents, and Android no longer persists telemetry or logs analytics parameters. Existing domain call sites remain non-blocking no-op boundaries. No Firebase, Hosting, Remote Config, or Android release deployment was performed.",
+  "controls": [
+    {
+      "id": "ELR-SEC-105-A",
+      "status": "pass",
+      "evidence": [
+        "firestore.rules uses allow read, write: if false for analyticsEvents",
+        "emulator attacks deny anonymous and authenticated get and list",
+        "historical documents seeded through the Admin test context remain inaccessible to clients"
+      ]
+    },
+    {
+      "id": "ELR-SEC-105-B",
+      "status": "pass",
+      "evidence": [
+        "emulator attacks deny create, update, and delete even for formerly accepted schemas",
+        "forgeable analytics schema validators were removed from Firestore rules",
+        "Admin SDK account-deletion access remains outside client rules"
+      ]
+    },
+    {
+      "id": "ELR-SEC-105-C",
+      "status": "pass",
+      "evidence": [
+        "AnalyticsService has no Cloud Firestore, FirebasePaths, UUID, or developer.log dependency",
+        "invite, claim, join, Pride, export, and share callbacks retain their public signatures without persistence",
+        "AnalyticsService is an explicit no-op compatibility boundary with no observer or alternate production sink"
+      ]
+    },
+    {
+      "id": "ELR-SEC-105-D",
+      "status": "pass",
+      "evidence": [
+        "the in-app and Hosting privacy text disclose the temporary analytics pause and possible historical records",
+        "the data inventory records blocked client access and the open retention gap",
+        "ADR-002 no longer claims a persisted analytics event"
+      ]
+    }
+  ],
+  "verification": {
+    "firestoreRulesEmulator": {
+      "command": "npm run test:rules:emulator",
+      "result": "pass",
+      "testsPassed": 196
+    },
+    "focusedFlutter": {
+      "command": "flutter test --no-pub test/core/services/guest_claim_service_test.dart test/features/shareables/share_card_capture_service_test.dart",
+      "result": "pass",
+      "testsPassed": 28
+    },
+    "staticAnalysis": {
+      "command": "dart analyze lib/",
+      "result": "pass",
+      "issues": 0
+    },
+    "sourceGuard": {
+      "command": "npm run check:architecture",
+      "result": "pass",
+      "contract": "clientAnalyticsAccess rejects FirebasePaths.analyticsEvents and raw analyticsEvents collection access from every Flutter file"
+    }
+  },
+  "findings": [],
+  "remainingRisks": [
+    {
+      "id": "ELR-OPS-405",
+      "status": "blocked",
+      "risk": "Historical documents may retain nested stable identifiers and have no approved TTL or purge process; trusted aggregate measurement is not implemented."
+    },
+    {
+      "id": "ELR-SEC-101..104",
+      "status": "ready",
+      "risk": "Trusted audit, voting, and atomic dispute operations remain the next backend critical path."
+    },
+    {
+      "id": "ELR-IDN-201..205",
+      "status": "blocked-by-wave1",
+      "risk": "Private and public player data are not yet separated by the final projection model."
+    }
+  ],
+  "recommendations": [
+    "Keep analyticsEvents denied until ELR-OPS-405 passes its own privacy, abuse, deletion, and reporting gate.",
+    "Do not turn the no-op compatibility boundary into a client measurement backend.",
+    "Review and approve historical retention and deletion before the staged market pilot.",
+    "Review these prototype rules before any production deployment."
+  ],
+  "releaseDecision": "ELR-SEC-105 containment passes locally. Android V1 release remains blocked by Waves 1 through 5 and no deployment is authorized by this audit."
+}

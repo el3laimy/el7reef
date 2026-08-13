@@ -1,6 +1,13 @@
 {
   "players": "players",
   "guestPlayers": "guestPlayers",
+  "guestTeams": "guestTeams",
+  "teams": "teams",
+  "claimCodes": "claimCodes",
+  "friendships": "friendships",
+  "userReports": "userReports",
+  "safetyActionQuotas": "safetyActionQuotas",
+  "accountDeletionRequests": "accountDeletionRequests",
   "teamMemberships": "teamMemberships",
   "matches": "matches",
   "matchEvents": "matchEvents",

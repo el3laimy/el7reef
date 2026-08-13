@@ -12,6 +12,7 @@ const {
   registeredPlayerIdsForSide,
 } = require("./match_roster");
 const {SettlementError} = require("./settlement_error");
+const {appendAuditEvent} = require("./trusted_audit");
 const {
   SettlementPayloadError,
   assertSettlementParticipantsInRoster,
@@ -382,6 +383,39 @@ function writeSettlement({
     matchId: request.matchId,
     eligiblePlayerIds,
     openedAt: submittedAt,
+  });
+  appendAuditEvent({
+    transaction: tx,
+    db,
+    entityType: "match",
+    entityId: request.matchId,
+    action: "matchScoreSubmitted",
+    actorId,
+    beforePayload: {
+      status: match.status,
+      scoreTeamA: match.scoreTeamA == null ? null : match.scoreTeamA,
+      scoreTeamB: match.scoreTeamB == null ? null : match.scoreTeamB,
+      penaltyScoreTeamA: match.penaltyScoreTeamA == null
+        ? null
+        : match.penaltyScoreTeamA,
+      penaltyScoreTeamB: match.penaltyScoreTeamB == null
+        ? null
+        : match.penaltyScoreTeamB,
+    },
+    afterPayload: {
+      status,
+      scoreTeamA: request.scoreA,
+      scoreTeamB: request.scoreB,
+      penaltyScoreTeamA: request.penaltyScoreTeamA,
+      penaltyScoreTeamB: request.penaltyScoreTeamB,
+      knockoutDecision,
+    },
+    metadata: {
+      tournamentId: match.tournamentId || null,
+      stageType: match.stageType || null,
+    },
+    requestId: `match-settlement:${fingerprint}`,
+    createdAt: submittedAt,
   });
 }
 

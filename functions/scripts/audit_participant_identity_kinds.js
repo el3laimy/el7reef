@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 
-const admin = require('firebase-admin');
+const {getApps, initializeApp} = require('firebase-admin/app');
+const {getFirestore} = require('firebase-admin/firestore');
 
 const VALID_KINDS = new Set(['player', 'guestPlayer', 'matchSidePlayer']);
 
@@ -50,11 +51,11 @@ async function main() {
   const projectId = process.env.GCLOUD_PROJECT ||
     process.env.GOOGLE_CLOUD_PROJECT ||
     process.argv[2];
-  if (!admin.apps.length) {
-    admin.initializeApp(projectId ? {projectId} : undefined);
+  if (getApps().length === 0) {
+    initializeApp(projectId ? {projectId} : undefined);
   }
   const report = await auditParticipantIdentityKinds({
-    db: admin.firestore(),
+    db: getFirestore(),
   });
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   const invalidCount = report.counts.total - report.counts.valid;

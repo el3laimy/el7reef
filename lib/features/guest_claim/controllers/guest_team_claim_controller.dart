@@ -2,37 +2,33 @@ import 'package:get/get.dart';
 
 import '../../../core/auth/auth_session.dart';
 import '../../../core/enums/claim_code_status.dart';
+import '../../../core/enums/claim_target_type.dart';
 import '../../../core/enums/guest_claim_status.dart';
 import '../../../core/services/guest_claim_service.dart';
 import '../../../core/utils/app_logger.dart';
-import '../../../domain/entities/claim_code.dart';
 import '../../../domain/entities/guest_team.dart';
 import '../../../domain/entities/player.dart';
 import '../../../domain/entities/team.dart';
-import '../../../domain/repositories/claim_code_repository.dart';
 import '../../../domain/repositories/guest_team_repository.dart';
 import '../../../domain/repositories/team_repository.dart';
 
 class GuestTeamClaimController extends GetxController {
   final AuthSession _authSession;
-  final ClaimCodeRepository _claimCodeRepository;
   final GuestTeamRepository _guestTeamRepository;
   final TeamRepository _teamRepository;
   final GuestClaimService _guestClaimService;
 
   GuestTeamClaimController({
     required AuthSession authSession,
-    required ClaimCodeRepository claimCodeRepository,
     required GuestTeamRepository guestTeamRepository,
     required TeamRepository teamRepository,
     required GuestClaimService guestClaimService,
   }) : _authSession = authSession,
-       _claimCodeRepository = claimCodeRepository,
        _guestTeamRepository = guestTeamRepository,
        _teamRepository = teamRepository,
        _guestClaimService = guestClaimService;
 
-  final claimDetails = Rxn<ClaimCode>();
+  final claimDetails = Rxn<GuestClaimInspection>();
   final guestTeam = Rxn<GuestTeam>();
   final pendingRequestedTeam = Rxn<Team>();
   final ownedTeams = <Team>[].obs;
@@ -54,6 +50,16 @@ class GuestTeamClaimController extends GetxController {
   bool get isAuthenticated =>
       currentUserId != null && currentUserId!.isNotEmpty;
 
+  bool get hasUsableInspection {
+    final inspection = claimDetails.value;
+    return isAuthenticated &&
+        inspection != null &&
+        inspection.targetType == ClaimTargetType.guestTeam &&
+        inspection.targetId == guestTeamId &&
+        inspection.status != ClaimCodeStatus.expired &&
+        inspection.status != ClaimCodeStatus.cancelled;
+  }
+
   String? get pendingRequestedTeamId {
     final teamId = claimDetails.value?.teamId;
     if (teamId == null || teamId.isEmpty) {
@@ -64,19 +70,17 @@ class GuestTeamClaimController extends GetxController {
 
   bool get hasPendingApprovalRequest {
     final details = claimDetails.value;
-    final requestedByPlayerId = details?.claimedByPlayerId;
     return details != null &&
         details.requiresApproval &&
         details.status == ClaimCodeStatus.active &&
         pendingRequestedTeamId != null &&
-        requestedByPlayerId != null &&
-        requestedByPlayerId.isNotEmpty;
+        details.pendingApproval;
   }
 
   bool get canCompletePendingApproval =>
       isAuthenticated &&
-      guestTeam.value?.creatorId == currentUserId &&
-      hasPendingApprovalRequest;
+      hasPendingApprovalRequest &&
+      claimDetails.value?.canApprovePendingTeamClaim == true;
 
   @override
   void onInit() {
@@ -141,28 +145,23 @@ class GuestTeamClaimController extends GetxController {
       return;
     }
 
-    final loadedClaim = await _claimCodeRepository.getClaimCode(code);
-    if (loadedClaim == null) {
-      errorMessage.value = 'لم نتمكن من تحميل بيانات رابط الاستلام.';
+    final loadedClaim = await _guestClaimService.inspectGuestClaim(
+      claimCode: code,
+    );
+    if (loadedClaim.targetType != ClaimTargetType.guestTeam ||
+        loadedClaim.targetId != expectedGuestTeamId) {
+      errorMessage.value = 'رابط الاستلام لا يطابق هذا الفريق الضيف.';
       return;
     }
-    if (loadedClaim.targetId != expectedGuestTeamId) {
-      errorMessage.value = 'رابط الاستلام لا يطابق هذا الفريق الضيف.';
+    if (loadedClaim.isExpired) {
+      errorMessage.value = 'انتهت صلاحية رابط استلام الفريق.';
       return;
     }
 
     claimDetails.value = loadedClaim;
-    guestTeam.value = guestTeam.value?.copyWith(
-      creatorId: loadedClaim.createdBy,
-      claimCode: loadedClaim.code,
-      claimStatus: loadedClaim.status == ClaimCodeStatus.claimed
-          ? GuestClaimStatus.claimed
-          : GuestClaimStatus.invited,
-      tournamentIds: [
-        if (loadedClaim.tournamentId != null &&
-            loadedClaim.tournamentId!.isNotEmpty)
-          loadedClaim.tournamentId!,
-      ],
+    guestTeam.value = _buildInspectedGuestTeam(
+      expectedGuestTeamId,
+      loadedClaim,
     );
 
     final requestedTeamId = loadedClaim.teamId;
@@ -218,6 +217,10 @@ class GuestTeamClaimController extends GetxController {
       errorMessage.value = 'رابط الاستلام لا يحتوي على code صالح.';
       return;
     }
+    if (!hasUsableInspection) {
+      errorMessage.value = 'تعذر التحقق من رابط استلام الفريق بأمان.';
+      return;
+    }
     final chosenTeamId = canCompletePendingApproval
         ? pendingRequestedTeamId
         : selectedTeamId.value;
@@ -234,7 +237,6 @@ class GuestTeamClaimController extends GetxController {
       claimResult.value = await _guestClaimService.claimGuestTeam(
         claimCode: code,
         teamId: chosenTeamId,
-        actorId: userId,
       );
       await loadClaimTarget();
       selectedTeamId.value = chosenTeamId;
@@ -262,6 +264,30 @@ class GuestTeamClaimController extends GetxController {
       updatedAt: DateTime.fromMillisecondsSinceEpoch(0),
       claimStatus: GuestClaimStatus.invited,
       claimCode: claimCode,
+    );
+  }
+
+  GuestTeam _buildInspectedGuestTeam(
+    String id,
+    GuestClaimInspection inspection,
+  ) {
+    final name = inspection.subjectName ?? 'فريق ضيف';
+    final epoch = DateTime.fromMillisecondsSinceEpoch(0);
+    return GuestTeam(
+      id: id,
+      name: name,
+      normalizedName: name.toLowerCase(),
+      creatorId: '',
+      tournamentIds: [
+        if (inspection.tournamentId != null &&
+            inspection.tournamentId!.isNotEmpty)
+          inspection.tournamentId!,
+      ],
+      createdAt: epoch,
+      updatedAt: epoch,
+      claimStatus: inspection.status == ClaimCodeStatus.claimed
+          ? GuestClaimStatus.claimed
+          : GuestClaimStatus.invited,
     );
   }
 

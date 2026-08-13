@@ -1,6 +1,7 @@
 "use strict";
 
-const admin = require("firebase-admin");
+const {initializeApp} = require("firebase-admin/app");
+const {getFirestore} = require("firebase-admin/firestore");
 const {
   BRACKET_ID,
   TOURNAMENT_ID,
@@ -106,8 +107,8 @@ async function main() {
     throw new Error("Usage: node verify_world_cup_2026_import.js <organizer-id> <project-id>");
   }
   assertLocalFirestoreEmulator(process.env);
-  admin.initializeApp({projectId});
-  console.log(JSON.stringify(await verify(admin.firestore(), organizerId), null, 2));
+  const app = initializeApp({projectId});
+  console.log(JSON.stringify(await verify(getFirestore(app), organizerId), null, 2));
 }
 
 if (require.main === module) {

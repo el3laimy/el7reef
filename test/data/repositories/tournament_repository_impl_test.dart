@@ -304,7 +304,7 @@ void main() {
     );
 
     test(
-      'getPlayerTournaments falls back to legacy registeredTeamIds',
+      'getPlayerTournaments uses only public discoverable legacy registrations',
       () async {
         await repository.createTournament(
           Tournament(
@@ -317,6 +317,21 @@ void main() {
             status: TournamentStatus.registration,
             registeredTeamIds: const ['team-legacy'],
             createdAt: now,
+          ),
+        );
+        await repository.createTournament(
+          Tournament(
+            id: 'private-legacy',
+            organizerId: 'organizer-2',
+            name: 'Private Legacy Cup',
+            format: TournamentFormat.groupsOnly,
+            teamSize: TournamentTeamSize.fiveVsFive,
+            maxTeams: 8,
+            visibility: TournamentVisibility.private,
+            discoverable: false,
+            status: TournamentStatus.registration,
+            registeredTeamIds: const ['team-legacy'],
+            createdAt: now.add(const Duration(minutes: 1)),
           ),
         );
 
@@ -399,6 +414,50 @@ void main() {
           await repository.isFollowingTournament('followed-cup', 'player-1'),
           isFalse,
         );
+      },
+    );
+
+    test(
+      'getFollowedTournaments trusts the tournament path over legacy follower payloads',
+      () async {
+        await repository.createTournament(
+          Tournament(
+            id: 'followed-legacy-cup',
+            organizerId: 'organizer-1',
+            name: 'Followed Legacy Cup',
+            format: TournamentFormat.groupsOnly,
+            teamSize: TournamentTeamSize.fiveVsFive,
+            maxTeams: 8,
+            status: TournamentStatus.registration,
+            createdAt: now,
+          ),
+        );
+        await firestore
+            .collection('tournaments')
+            .doc('followed-legacy-cup')
+            .collection('followers')
+            .doc('player-1')
+            .set({
+              'tournamentId': 404,
+              'userId': 'player-1',
+              'createdAt': now.millisecondsSinceEpoch,
+            });
+        await firestore
+            .collection('players')
+            .doc('someone-else')
+            .collection('followers')
+            .doc('player-1')
+            .set({
+              'tournamentId': 'followed-legacy-cup',
+              'userId': 'player-1',
+              'createdAt': now.millisecondsSinceEpoch,
+            });
+
+        final followed = await repository.getFollowedTournaments('player-1');
+
+        expect(followed.map((tournament) => tournament.id), [
+          'followed-legacy-cup',
+        ]);
       },
     );
   });

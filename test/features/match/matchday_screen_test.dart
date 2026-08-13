@@ -120,7 +120,6 @@ void main() {
         guestPlayerRepository: guestPlayerRepository,
         guestTeamRepository: guestTeamRepository,
         teamRepository: teamRepository,
-        tournamentRepository: tournamentRepository,
       ),
       permanent: true,
     );

@@ -2,6 +2,8 @@ import 'package:get/get.dart';
 
 import '../../../app/routes/app_routes.dart';
 import '../../../core/auth/auth_session.dart';
+import '../../../core/enums/claim_code_status.dart';
+import '../../../core/enums/claim_target_type.dart';
 import '../../../core/enums/guest_claim_status.dart';
 import '../../../core/navigation/app_link_route_parser.dart';
 import '../../../core/services/analytics_service.dart';
@@ -36,6 +38,7 @@ class GuestPlayerClaimController extends GetxController {
        _analyticsService = analyticsService ?? AnalyticsService();
 
   final guestPlayer = Rxn<GuestPlayer>();
+  final claimInspection = Rxn<GuestClaimInspection>();
   final linkedTeam = Rxn<Team>();
   final claimResult = Rxn<GuestPlayerClaimResult>();
   final isLoading = true.obs;
@@ -79,6 +82,16 @@ class GuestPlayerClaimController extends GetxController {
   bool get isAuthenticated =>
       currentUserId != null && currentUserId!.isNotEmpty;
 
+  bool get canSubmitClaim {
+    final inspection = claimInspection.value;
+    return isAuthenticated &&
+        inspection != null &&
+        inspection.targetType == ClaimTargetType.guestPlayer &&
+        inspection.targetId == guestPlayerId &&
+        inspection.status != ClaimCodeStatus.expired &&
+        inspection.status != ClaimCodeStatus.cancelled;
+  }
+
   @override
   void onInit() {
     super.onInit();
@@ -102,6 +115,26 @@ class GuestPlayerClaimController extends GetxController {
       guestPlayer.value = _buildFallbackGuestPlayer(id);
       if (claimTeamId != null && claimTeamId!.isNotEmpty) {
         await _loadLinkedTeam(claimTeamId!);
+      }
+
+      if (isAuthenticated) {
+        final inspection = await _guestClaimService.inspectGuestClaim(
+          claimCode: claimCode!,
+        );
+        if (inspection.targetType != ClaimTargetType.guestPlayer ||
+            inspection.targetId != id) {
+          errorMessage.value = 'رابط الاستلام لا يطابق هذا اللاعب الضيف.';
+          return;
+        }
+        claimInspection.value = inspection;
+        if (inspection.isExpired) {
+          errorMessage.value = 'انتهت صلاحية رابط الاستلام.';
+          return;
+        }
+        guestPlayer.value = _buildInspectedGuestPlayer(id, inspection);
+        if (inspection.teamId != null && inspection.teamId!.isNotEmpty) {
+          await _loadLinkedTeam(inspection.teamId!);
+        }
       }
 
       final canEnrichFromFirestore =
@@ -144,6 +177,10 @@ class GuestPlayerClaimController extends GetxController {
       errorMessage.value = 'رابط الاستلام لا يحتوي على code صالح.';
       return;
     }
+    if (!canSubmitClaim) {
+      errorMessage.value = 'تعذر التحقق من رابط الاستلام بأمان.';
+      return;
+    }
 
     isSubmitting.value = true;
     errorMessage.value = '';
@@ -154,7 +191,6 @@ class GuestPlayerClaimController extends GetxController {
     try {
       claimResult.value = await _guestClaimService.claimGuestPlayer(
         claimCode: code,
-        playerId: userId,
       );
       if (claimResult.value?.outcome == GuestPlayerClaimOutcome.claimed &&
           sourcePayload != null) {
@@ -185,6 +221,27 @@ class GuestPlayerClaimController extends GetxController {
       updatedAt: DateTime.fromMillisecondsSinceEpoch(0),
       claimStatus: GuestClaimStatus.invited,
       claimCode: claimCode,
+    );
+  }
+
+  GuestPlayer _buildInspectedGuestPlayer(
+    String id,
+    GuestClaimInspection inspection,
+  ) {
+    final displayName = inspection.subjectName ?? 'لاعب ضيف';
+    final epoch = DateTime.fromMillisecondsSinceEpoch(0);
+    return GuestPlayer(
+      id: id,
+      displayName: displayName,
+      normalizedName: displayName.toLowerCase(),
+      teamId: inspection.teamId,
+      tournamentId: inspection.tournamentId,
+      createdBy: '',
+      createdAt: epoch,
+      updatedAt: epoch,
+      claimStatus: inspection.status == ClaimCodeStatus.claimed
+          ? GuestClaimStatus.claimed
+          : GuestClaimStatus.invited,
     );
   }
 

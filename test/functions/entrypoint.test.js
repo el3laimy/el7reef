@@ -1,19 +1,28 @@
 const assert = require('assert');
 
 describe('Cloud Functions entrypoint', () => {
-  it('loads every V1 callable with the installed Functions SDK', () => {
+  it('loads V1 callables and the private deletion worker', () => {
     const entrypoint = require('../../functions');
     const callableNames = [
       'submitMatchSettlement',
       'approveMatchScore',
-      'recordAuditEvent',
       'deleteAccountData',
       'reportUserContent',
       'blockUser',
+      'unblockUser',
+      'issueGuestClaimCode',
+      'inspectGuestClaim',
+      'claimGuestPlayer',
+      'claimGuestTeam',
     ];
 
     for (const callableName of callableNames) {
       assert.strictEqual(typeof entrypoint[callableName], 'function');
     }
+    assert.strictEqual(
+      typeof entrypoint.processAccountDeletionRequest,
+      'function',
+    );
+    assert.strictEqual(entrypoint.recordAuditEvent, undefined);
   });
 });

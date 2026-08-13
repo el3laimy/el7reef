@@ -488,110 +488,6 @@ class _ProfessionalPitchCardState extends State<ProfessionalPitchCard> {
                   ),
                 );
               }),
-
-              // ── LAYER 6: PRESENTATIONAL BOTTOM PANELS ──
-              if (widget.presentationMode) ...[
-                Positioned(
-                  bottom: 16,
-                  left: 16,
-                  child: Container(
-                    width: (width * 0.38).clamp(110.0, 160.0),
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xE60A0E0B),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: const Color(0xFFF5A623).withValues(alpha: 0.45),
-                        width: 1.0,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 8,
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'ملاحظات تكتيكية',
-                          style: TextStyle(
-                            fontFamily: 'Cairo',
-                            color: Color(0xFFF5A623),
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _getTacticalNotesText(),
-                          style: const TextStyle(
-                            fontFamily: 'Cairo',
-                            color: Color(0xFFF4F7EE),
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w600,
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  bottom: 16,
-                  right: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xE60A0E0B),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: const Color(0xFFF5A623).withValues(alpha: 0.45),
-                        width: 1.0,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 8,
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 22,
-                          height: 22,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: AppMediaColors.pitchAchievementGradient,
-                          ),
-                          child: const Icon(
-                            Icons.sports_soccer_rounded,
-                            size: 14,
-                            color: Colors.black,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'روح واحدة .. هدف واحد',
-                          style: TextStyle(
-                            fontFamily: 'Cairo',
-                            color: Color(0xFFFFCB57),
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
             ],
           ),
         );
@@ -626,21 +522,6 @@ class _ProfessionalPitchCardState extends State<ProfessionalPitchCard> {
         ),
       ),
     );
-  }
-
-  String _getTacticalNotesText() {
-    return switch (widget.formationCode) {
-      '3-2-3' =>
-        '• التمرير السريع من المحاور\n• استغلال انطلاقات الأطراف الهجومية\n• الحارس يوجه قلوب الدفاع لبدء الهجمة',
-      '4-3-3' =>
-        '• الضغط العالي من المهاجمين\n• أطراف الملعب تفتح مسافات الاختراق\n• المحور يغطي المساحات الخلفية',
-      '4-4-2' =>
-        '• التمركز المتوازي للاعبي الوسط\n• ثنائي الهجوم يعتمد على الكرات العرضية\n• الدفاع يحافظ على التماسك الدفاعي',
-      '3-5-2' =>
-        '• كثافة عددية بمنتصف الملعب\n• انطلاقات الأجنحة تزيد الدعم الهجومي\n• ثلاثي الدفاع يمنع المرتدات السريعة',
-      _ =>
-        '• تنظيم متناسق ومتكامل للخطوط\n• مبادلة تفاعلية ومستمرة للمراكز\n• روح المسؤولية والأداء الجماعي الحاسم',
-    };
   }
 
   List<Widget> _buildZoneLabels(double height) {

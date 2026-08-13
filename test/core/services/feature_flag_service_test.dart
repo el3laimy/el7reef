@@ -12,6 +12,8 @@ void main() {
     () {
       expect(FeatureFlags.socialUiEnabled, isFalse);
       expect(FeatureFlags.guestIdentityEnabled, isTrue);
+      expect(FeatureFlags.fanVotingEnabled, isFalse);
+      expect(FeatureFlags.disputesEnabled, isFalse);
       expect(FeatureFlags.prideGrowthLinksEnabled, isFalse);
       expect(FeatureFlags.postMatchPrideHubEnabled, isFalse);
       expect(FeatureFlags.functionalGlassEnabled, isFalse);
@@ -43,6 +45,14 @@ void main() {
     expect(
       FeatureFlagService.remoteDefaults,
       containsPair('guest_identity_enabled', true),
+    );
+    expect(
+      FeatureFlagService.remoteDefaults,
+      containsPair('fan_voting_enabled', false),
+    );
+    expect(
+      FeatureFlagService.remoteDefaults,
+      containsPair('disputes_enabled', false),
     );
     expect(
       FeatureFlagService.remoteDefaults,

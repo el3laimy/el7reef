@@ -18,11 +18,26 @@ import '../controllers/tournament_operations_controller.dart';
 import '../widgets/knockout_bracket_view.dart';
 import '../widgets/tournament_stage_components.dart';
 
-class TournamentBracketScreen extends GetView<TournamentOperationsController> {
+class TournamentBracketScreen extends StatefulWidget {
   const TournamentBracketScreen({super.key});
+
+  @override
+  State<TournamentBracketScreen> createState() =>
+      _TournamentBracketScreenState();
+}
+
+class _TournamentBracketScreenState extends State<TournamentBracketScreen> {
+  late final TournamentOperationsController controller;
+  KnockoutBracketViewMode _viewMode = KnockoutBracketViewMode.round;
 
   static const _captureService = ShareCardCaptureService();
   static const _payloadBuilder = PrideSharePayloadBuilder();
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.find<TournamentOperationsController>();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,24 +86,27 @@ class TournamentBracketScreen extends GetView<TournamentOperationsController> {
           return participantsById[participantId]?.displayName ?? 'فريق متأهل';
         }
 
-        return Column(
-          children: [
-            if (controller.errorMessage.value.isNotEmpty) ...[
-              TournamentStageDataNotice.cachedError(
-                onRetry: controller.refreshAll,
-              ),
-              const SizedBox(height: AppDimensions.md),
-            ] else if (controller.isLoading.value) ...[
-              const TournamentStageDataNotice.refreshing(),
-              const SizedBox(height: AppDimensions.md),
-            ],
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: controller.refreshAll,
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    if (controller.knockoutTies.isEmpty)
+        final dataNotices = <Widget>[
+          if (controller.errorMessage.value.isNotEmpty) ...[
+            TournamentStageDataNotice.cachedError(
+              onRetry: controller.refreshAll,
+            ),
+            const SizedBox(height: AppDimensions.md),
+          ] else if (controller.isLoading.value) ...[
+            const TournamentStageDataNotice.refreshing(),
+            const SizedBox(height: AppDimensions.md),
+          ],
+        ];
+        if (controller.knockoutTies.isEmpty) {
+          return Column(
+            children: [
+              ...dataNotices,
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: controller.refreshAll,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
                       TournamentStageStateView(
                         title: 'جارٍ تجهيز المواجهات',
                         message: controller.canManageTournament
@@ -102,42 +120,78 @@ class TournamentBracketScreen extends GetView<TournamentOperationsController> {
                         onAction: controller.canManageTournament
                             ? controller.refreshAll
                             : null,
-                      )
-                    else
-                      KnockoutBracketView(
-                        ties: controller.knockoutTies.toList(growable: false),
-                        matchesById: matchesById,
-                        participantLabel: participantLabel,
-                        hideUnpublishedParticipants:
-                            !controller.canManageTournament,
-                        onOpenMatch: (match) =>
-                            Get.toNamed(AppRoutes.matchDetailsById(match.id)),
-                        canReviewMatch: controller.canManageTournament
-                            ? _canOpenScoreFlow
-                            : null,
-                        onReviewMatch: controller.canManageTournament
-                            ? (match) => Get.toNamed(
-                                AppRoutes.scoreApprovalForMatch(match.id),
-                              )
-                            : null,
-                        headerData: KnockoutBracketHeaderData(
-                          teamCount: bracket.qualifierParticipantIds.length,
-                          byeCount: bracket.byeParticipantIds.length,
-                          onShare: FeatureFlags.prideShareCatalogV2Enabled
-                              ? () => _shareBracket(
-                                  context,
-                                  matchesById: matchesById,
-                                  participantsById: participantsById,
-                                )
-                              : null,
-                        ),
                       ),
-                    const SizedBox(height: AppDimensions.xl),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          );
+        }
+
+        return LayoutBuilder(
+          builder: (context, _) {
+            final viewMode = _viewMode;
+            final fullTreeMode = viewMode == KnockoutBracketViewMode.fullTree;
+            final bracketView = KnockoutBracketView(
+              ties: controller.knockoutTies.toList(growable: false),
+              matchesById: matchesById,
+              participantLabel: participantLabel,
+              hideUnpublishedParticipants: !controller.canManageTournament,
+              onOpenMatch: (match) =>
+                  Get.toNamed(AppRoutes.matchDetailsById(match.id)),
+              canReviewMatch: controller.canManageTournament
+                  ? _canOpenScoreFlow
+                  : null,
+              onReviewMatch: controller.canManageTournament
+                  ? (match) =>
+                        Get.toNamed(AppRoutes.scoreApprovalForMatch(match.id))
+                  : null,
+              headerData: KnockoutBracketHeaderData(
+                teamCount: bracket.qualifierParticipantIds.length,
+                byeCount: bracket.byeParticipantIds.length,
+                onShare: FeatureFlags.prideShareCatalogV2Enabled
+                    ? () => _shareBracket(
+                        context,
+                        matchesById: matchesById,
+                        participantsById: participantsById,
+                      )
+                    : null,
+              ),
+              viewMode: viewMode,
+              expandFullTree: fullTreeMode,
+              onViewModeChanged: (nextMode) {
+                if (_viewMode == nextMode) return;
+                setState(() => _viewMode = nextMode);
+              },
+            );
+
+            if (fullTreeMode) {
+              return Column(
+                children: [
+                  ...dataNotices,
+                  Expanded(child: bracketView),
+                ],
+              );
+            }
+            return Column(
+              children: [
+                ...dataNotices,
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: controller.refreshAll,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        bracketView,
+                        const SizedBox(height: AppDimensions.xl),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         );
       }),
     );

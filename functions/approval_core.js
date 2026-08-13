@@ -4,6 +4,7 @@ const {
   registeredPlayerIdsForSide,
 } = require("./match_roster");
 const {SettlementError} = require("./settlement_error");
+const {appendAuditEvent} = require("./trusted_audit");
 
 const DEFAULT_TIEBREAKERS = [
   "points",
@@ -104,7 +105,7 @@ async function approveMatchScoreCore({db, actorId, matchId, now}) {
       writeApprovalAudit({
         tx,
         db,
-        match: settledMatch,
+        match,
         actorId: normalizedActorId,
         nowMs,
         knockoutResolution,
@@ -221,15 +222,25 @@ function writeApprovalAudit({
   nowMs,
   knockoutResolution,
 }) {
-  const auditRef = db
-    .collection(COLLECTIONS.auditEvents)
-    .doc(`match-score-approved::${match.id}::${nowMs}`);
-  tx.set(auditRef, {
+  appendAuditEvent({
+    transaction: tx,
+    db,
     entityType: "match",
     entityId: match.id,
     action: "matchScoreApproved",
     actorId,
-    beforePayload: null,
+    beforePayload: {
+      status: match.status,
+      scoreTeamA: match.scoreTeamA,
+      scoreTeamB: match.scoreTeamB,
+      penaltyScoreTeamA: match.penaltyScoreTeamA != null
+        ? match.penaltyScoreTeamA
+        : null,
+      penaltyScoreTeamB: match.penaltyScoreTeamB != null
+        ? match.penaltyScoreTeamB
+        : null,
+      knockoutDecision: match.knockoutDecision ?? null,
+    },
     afterPayload: {
       status: MATCH_STATUS.settled,
       scoreTeamA: match.scoreTeamA,
@@ -251,8 +262,21 @@ function writeApprovalAudit({
         ? knockoutResolution.resolutionType
         : null,
     },
+    requestId: approvalRequestId(match, nowMs),
     createdAt: nowMs,
   });
+}
+
+function approvalRequestId(match, nowMs) {
+  const revision = match.settlementSubmittedAt ?? match.completedAt ?? nowMs;
+  const fingerprint = nonEmpty(match.settlementSubmissionFingerprint) ||
+    [
+      match.scoreTeamA,
+      match.scoreTeamB,
+      match.penaltyScoreTeamA == null ? "none" : match.penaltyScoreTeamA,
+      match.penaltyScoreTeamB == null ? "none" : match.penaltyScoreTeamB,
+    ].join(":");
+  return `match-approval:${revision}:${fingerprint}`;
 }
 
 function assertCanManageScore({match, tournament, assistant, actorId, permissions}) {

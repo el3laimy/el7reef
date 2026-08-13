@@ -1,0 +1,158 @@
+{
+  "score": 5,
+  "maximumScore": 5,
+  "scope": "ELR-SEC-101 only: the internal trusted audit writer and its atomic integration with submitMatchSettlement and approveMatchScore.",
+  "scopeLimit": "This is not an application-wide security or Android V1 release score. Moderation audit, server-side Claim, resumable account deletion, fan voting, disputes, player privacy separation, deployment, and device release gates remain open under ELR-SEC-102..104 and ELR-SEC-106..108 plus later waves.",
+  "date": "2026-07-29",
+  "target": {
+    "firebaseProject": "el7reef-app",
+    "database": "(default)",
+    "edition": "STANDARD",
+    "location": "nam5",
+    "verificationSource": "Repository configuration, prior verified audit evidence, and local Firebase emulators. A live CLI database-list refresh timed out and no production mutation was attempted."
+  },
+  "verdict": "pass",
+  "summary": "The candidate tree has one non-callable, allowlisted audit writer. Match settlement and approval stage immutable audit events in the same Firestore transaction as their domain writes; malformed, unauthorized, failed, and idempotent retry paths cannot leave duplicate or partial audit state. No Firebase, Remote Config, Hosting, Android, or iOS deployment was performed.",
+  "controls": [
+    {
+      "id": "ELR-SEC-101-A",
+      "status": "pass",
+      "evidence": [
+        "functions/trusted_audit.js is an internal module and functions/index.js does not export an audit callable",
+        "the writer accepts only match plus matchScoreSubmitted or matchScoreApproved",
+        "actorId is supplied by authenticated operation cores rather than a client-selected audit payload"
+      ]
+    },
+    {
+      "id": "ELR-SEC-101-B",
+      "status": "pass",
+      "evidence": [
+        "source is always trustedOperation and verificationVersion is always 1",
+        "beforePayload, afterPayload, and metadata are operation-curated and bounded by type, depth, key count, string length, and encoded size",
+        "the event ID is a deterministic SHA-256 fingerprint of entity type, entity ID, action, and operation request ID"
+      ]
+    },
+    {
+      "id": "ELR-SEC-101-C",
+      "status": "pass",
+      "evidence": [
+        "submitMatchSettlement stages matchScoreSubmitted inside the settlement transaction",
+        "approveMatchScore stages matchScoreApproved inside the approval transaction with true pre-approval state",
+        "transaction create semantics prevent replacing an existing immutable event"
+      ]
+    },
+    {
+      "id": "ELR-SEC-101-D",
+      "status": "pass",
+      "evidence": [
+        "failure injection proves an audit failure rolls back match, event, voting-session, standings, and audit writes",
+        "idempotent settlement and approval retries keep exactly one event per successful operation",
+        "unauthorized and invalid operations create no audit event"
+      ]
+    },
+    {
+      "id": "ELR-SEC-101-E",
+      "status": "pass",
+      "evidence": [
+        "Firestore Rules deny direct client create, update, and delete for auditEvents",
+        "Rules emulator attacks pass for anonymous and authenticated direct-write attempts",
+        "Functions emulator smoke verifies real settlement and approval audit documents and retry behavior"
+      ]
+    }
+  ],
+  "attackMatrix": [
+    {
+      "attack": "authenticated client creates or edits an official audit event directly",
+      "expected": "deny",
+      "result": "pass"
+    },
+    {
+      "attack": "client chooses an unknown entity type or action through the internal writer contract",
+      "expected": "reject before commit",
+      "result": "pass"
+    },
+    {
+      "attack": "operation supplies an oversized or unsupported nested audit payload",
+      "expected": "reject before commit",
+      "result": "pass"
+    },
+    {
+      "attack": "audit document creation fails after domain writes are staged",
+      "expected": "roll back the complete Firestore transaction",
+      "result": "pass"
+    },
+    {
+      "attack": "settlement or approval request is retried",
+      "expected": "one immutable event for the successful operation",
+      "result": "pass"
+    },
+    {
+      "attack": "unauthorized or invalid match operation is attempted",
+      "expected": "no domain write and no audit write",
+      "result": "pass"
+    }
+  ],
+  "verification": {
+    "functionsUnit": {
+      "command": "npm run test:functions",
+      "result": "pass",
+      "testsPassed": 85
+    },
+    "focusedFunctions": {
+      "result": "pass",
+      "testsPassed": 35,
+      "coverage": "trusted writer, settlement, approval, entrypoint, idempotency, and failure injection"
+    },
+    "functionsEmulatorSmoke": {
+      "command": "npm run test:functions:emulator",
+      "result": "pass",
+      "exportedCallables": 5,
+      "genericAuditCallableExported": false,
+      "concurrentSettlementAuditCount": 1,
+      "trustedMatchActionsVerified": [
+        "matchScoreSubmitted",
+        "matchScoreApproved"
+      ]
+    },
+    "firestoreRulesEmulator": {
+      "command": "npm run test:rules:emulator",
+      "result": "pass",
+      "testsPassed": 196
+    }
+  },
+  "findings": [],
+  "remainingRisks": [
+    {
+      "id": "ELR-SEC-102..104",
+      "status": "ready",
+      "risk": "Fan voting and disputes still require trusted callables, atomic state transitions, and relationship-scoped reads."
+    },
+    {
+      "id": "ELR-SEC-106",
+      "status": "ready",
+      "risk": "Report and block operations do not yet use the trusted audit contract atomically."
+    },
+    {
+      "id": "ELR-SEC-107",
+      "status": "ready",
+      "risk": "Guest player and team Claim still run client-side and cannot yet produce trusted audit events."
+    },
+    {
+      "id": "ELR-SEC-108",
+      "status": "ready",
+      "risk": "Account deletion crosses Storage, Firestore, and Auth and still needs a resumable audited saga."
+    },
+    {
+      "id": "ELR-REL-504",
+      "status": "blocked",
+      "risk": "The full Android device regression from result approval through Pride sharing and Claim remains a release gate."
+    }
+  ],
+  "recommendations": [
+    "Keep the audit writer internal and extend its action allowlist only inside the ticket that owns the corresponding trusted operation.",
+    "Do not copy free-form moderation details, phone numbers, claim tokens, relationship arrays, or full domain documents into audit payloads.",
+    "Publish the future Claim callable before locking the old client path, preserving SharePayload schema 1, pending login intent, and old shared links.",
+    "Run ELR-REL-504 on Android before release to prove settlement, approval, Pride Hub, sharing, and Claim still form one recoverable path."
+  ],
+  "releaseDecision": "ELR-SEC-101 passes locally within its narrowed match-audit scope. Wave 1 and Android V1 remain open, and this audit authorizes no deployment."
+}

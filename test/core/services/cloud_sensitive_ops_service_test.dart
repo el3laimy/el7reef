@@ -11,7 +11,7 @@ void main() {
       );
       expect(
         CloudSensitiveOpsService.shouldFallbackForFunctionCode('not-found'),
-        isTrue,
+        isFalse,
       );
       expect(
         CloudSensitiveOpsService.shouldFallbackForFunctionCode(

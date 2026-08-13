@@ -5,12 +5,11 @@ import '../utils/app_logger.dart';
 
 /// بوابة خفيفة لنداءات Cloud Functions الخاصة بالعمليات الحساسة.
 ///
-/// إذا كانت الدالة غير متاحة أو لم يتم نشرها بعد، تُرجع `null` بهدوء
-/// كي يستمر المسار المحلي القديم كخطة احتياطية.
+/// قد تعيد `null` لأخطاء التوفر المحددة فقط عندما يسمح المستدعي بذلك.
+/// عمليات السلامة تعيد الخطأ ولا تنفذ أي كتابة عميلة بديلة.
 class CloudSensitiveOpsService {
   static const Set<String> fallbackableFunctionErrorCodes = {
     'unavailable',
-    'not-found',
     'deadline-exceeded',
   };
 
@@ -23,15 +22,6 @@ class CloudSensitiveOpsService {
       return null;
     }
     return FirebaseFunctions.instance;
-  }
-
-  Future<bool> recordAuditEvent(Map<String, dynamic> payload) async {
-    final result = await _invokeMap(
-      functionName: 'recordAuditEvent',
-      payload: payload,
-      fallbackForAnyFunctionError: true,
-    );
-    return result != null;
   }
 
   Future<Map<String, dynamic>?> submitMatchSettlement(
@@ -56,12 +46,56 @@ class CloudSensitiveOpsService {
     return _invokeMap(functionName: 'settleFantasyRound', payload: payload);
   }
 
+  Future<Map<String, dynamic>> issueGuestClaimCode({
+    required String targetType,
+    required String targetId,
+    required String requestId,
+    required int ttlMs,
+    required bool requiresApproval,
+  }) {
+    return _invokeRequiredMap(
+      functionName: 'issueGuestClaimCode',
+      payload: {
+        'targetType': targetType,
+        'targetId': targetId,
+        'requestId': requestId,
+        'ttlMs': ttlMs,
+        'requiresApproval': requiresApproval,
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> inspectGuestClaim({required String claimCode}) {
+    return _invokeRequiredMap(
+      functionName: 'inspectGuestClaim',
+      payload: {'claimCode': claimCode},
+    );
+  }
+
+  Future<Map<String, dynamic>> claimGuestPlayer({required String claimCode}) {
+    return _invokeRequiredMap(
+      functionName: 'claimGuestPlayer',
+      payload: {'claimCode': claimCode},
+    );
+  }
+
+  Future<Map<String, dynamic>> claimGuestTeam({
+    required String claimCode,
+    required String teamId,
+  }) {
+    return _invokeRequiredMap(
+      functionName: 'claimGuestTeam',
+      payload: {'claimCode': claimCode, 'teamId': teamId},
+    );
+  }
+
   Future<bool> deleteAccountData() async {
     final result = await _invokeMap(
       functionName: 'deleteAccountData',
+      allowAvailabilityFallback: false,
       payload: const <String, dynamic>{},
     );
-    return result?['deleted'] == true;
+    return result?['accepted'] == true || result?['deleted'] == true;
   }
 
   Future<bool> reportUserContent({
@@ -72,6 +106,7 @@ class CloudSensitiveOpsService {
   }) async {
     final result = await _invokeMap(
       functionName: 'reportUserContent',
+      allowAvailabilityFallback: false,
       payload: {
         'targetKind': targetKind,
         'targetId': targetId,
@@ -85,15 +120,43 @@ class CloudSensitiveOpsService {
   Future<bool> blockUser(String blockedId) async {
     final result = await _invokeMap(
       functionName: 'blockUser',
+      allowAvailabilityFallback: false,
       payload: {'blockedId': blockedId},
     );
     return result?['blocked'] == true;
   }
 
+  Future<bool> unblockUser(String blockedId) async {
+    final result = await _invokeMap(
+      functionName: 'unblockUser',
+      allowAvailabilityFallback: false,
+      payload: {'blockedId': blockedId},
+    );
+    return result?['unblocked'] == true;
+  }
+
+  Future<Map<String, dynamic>> _invokeRequiredMap({
+    required String functionName,
+    required Map<String, dynamic> payload,
+  }) async {
+    final result = await _invokeMap(
+      functionName: functionName,
+      payload: payload,
+      allowAvailabilityFallback: false,
+    );
+    if (result == null) {
+      throw StateError(
+        'Cloud Function $functionName is unavailable; the sensitive '
+        'operation was not executed.',
+      );
+    }
+    return result;
+  }
+
   Future<Map<String, dynamic>?> _invokeMap({
     required String functionName,
     required Map<String, dynamic> payload,
-    bool fallbackForAnyFunctionError = false,
+    bool allowAvailabilityFallback = true,
   }) async {
     final functions = _functions;
     if (functions == null) {
@@ -114,7 +177,7 @@ class CloudSensitiveOpsService {
         error,
         stackTrace,
       );
-      if (fallbackForAnyFunctionError ||
+      if (allowAvailabilityFallback &&
           shouldFallbackForFunctionCode(error.code)) {
         return null;
       }
@@ -126,7 +189,7 @@ class CloudSensitiveOpsService {
         error,
         stackTrace,
       );
-      return null;
+      rethrow;
     }
   }
 }

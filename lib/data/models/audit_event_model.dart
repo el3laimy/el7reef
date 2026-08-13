@@ -10,6 +10,9 @@ class AuditEventModel {
   final Map<String, dynamic>? beforePayload;
   final Map<String, dynamic>? afterPayload;
   final Map<String, dynamic>? metadata;
+  final String? source;
+  final int? verificationVersion;
+  final String? requestId;
   final DateTime createdAt;
 
   const AuditEventModel({
@@ -21,6 +24,9 @@ class AuditEventModel {
     this.beforePayload,
     this.afterPayload,
     this.metadata,
+    this.source,
+    this.verificationVersion,
+    this.requestId,
     required this.createdAt,
   });
 
@@ -34,6 +40,9 @@ class AuditEventModel {
       beforePayload: json['beforePayload'] as Map<String, dynamic>?,
       afterPayload: json['afterPayload'] as Map<String, dynamic>?,
       metadata: json['metadata'] as Map<String, dynamic>?,
+      source: json['source'] as String?,
+      verificationVersion: (json['verificationVersion'] as num?)?.toInt(),
+      requestId: json['requestId'] as String?,
       createdAt: json['createdAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(
               (json['createdAt'] as num).toInt(),
@@ -43,7 +52,7 @@ class AuditEventModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
+    return <String, dynamic>{
       'entityType': entityType,
       'entityId': entityId,
       'action': action,
@@ -51,6 +60,10 @@ class AuditEventModel {
       'beforePayload': beforePayload,
       'afterPayload': afterPayload,
       'metadata': metadata,
+      if (source != null) 'source': source,
+      if (verificationVersion != null)
+        'verificationVersion': verificationVersion,
+      if (requestId != null) 'requestId': requestId,
       'createdAt': createdAt.millisecondsSinceEpoch,
     };
   }
@@ -65,6 +78,9 @@ class AuditEventModel {
       beforePayload: beforePayload,
       afterPayload: afterPayload,
       metadata: metadata,
+      source: source,
+      verificationVersion: verificationVersion,
+      requestId: requestId,
       createdAt: createdAt,
     );
   }
@@ -79,6 +95,9 @@ class AuditEventModel {
       beforePayload: event.beforePayload,
       afterPayload: event.afterPayload,
       metadata: event.metadata,
+      source: event.source,
+      verificationVersion: event.verificationVersion,
+      requestId: event.requestId,
       createdAt: event.createdAt,
     );
   }

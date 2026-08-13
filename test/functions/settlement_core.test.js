@@ -55,6 +55,13 @@ describe('submitMatchSettlementCore', () => {
       db.docData('fanVotingSessions/match-1').eligiblePlayerIds,
       ['p1', 'p2'],
     );
+    const audit = db.collectionData('auditEvents');
+    assert.strictEqual(audit.length, 1);
+    assert.strictEqual(audit[0].action, 'matchScoreSubmitted');
+    assert.strictEqual(audit[0].actorId, 'organizer-1');
+    assert.strictEqual(audit[0].source, 'trustedOperation');
+    assert.strictEqual(audit[0].verificationVersion, 1);
+    assert.ok(audit[0].requestId.startsWith('match-settlement:'));
   });
 
   it('returns an idempotent retry without duplicating settlement writes', async () => {
@@ -71,6 +78,7 @@ describe('submitMatchSettlementCore', () => {
       db.collectionData('matches/match-1/player_stats').length,
       1,
     );
+    assert.strictEqual(db.collectionData('auditEvents').length, 1);
   });
 
   it('stores a decisive knockout penalty result separately from match goals', async () => {
@@ -193,8 +201,26 @@ describe('submitMatchSettlementCore', () => {
       assert.strictEqual(db.docData('matches/match-1').status, 'live');
       assert.strictEqual(db.docData('matches/match-1').scoreTeamA, undefined);
       assert.deepStrictEqual(db.collectionData('matchEvents'), []);
+      assert.deepStrictEqual(db.collectionData('auditEvents'), []);
     });
   }
+
+  it('rolls back every settlement write when the audit write fails', async () => {
+    const db = new FakeFirestore(
+      settlementSeed(),
+      {failWrite: ({path}) => path.startsWith('auditEvents/')},
+    );
+
+    await assert.rejects(
+      () => submit(db, validPayload()),
+      /Injected write failure/,
+    );
+
+    assert.strictEqual(db.docData('matches/match-1').status, 'live');
+    assert.deepStrictEqual(db.collectionData('matchEvents'), []);
+    assert.deepStrictEqual(db.collectionData('fanVotingSessions'), []);
+    assert.deepStrictEqual(db.collectionData('auditEvents'), []);
+  });
 
   it('uses the same registered roster contract for submit and approve', async () => {
     const db = settlementDatabase({}, {
@@ -242,7 +268,11 @@ describe('submitMatchSettlementCore', () => {
 });
 
 function settlementDatabase(matchOverrides = {}, additionalSeed = {}) {
-  return new FakeFirestore({
+  return new FakeFirestore(settlementSeed(matchOverrides, additionalSeed));
+}
+
+function settlementSeed(matchOverrides = {}, additionalSeed = {}) {
+  return {
     'matches/match-1': {
       organizerId: 'organizer-1',
       teamAId: null,
@@ -258,7 +288,7 @@ function settlementDatabase(matchOverrides = {}, additionalSeed = {}) {
       ...matchOverrides,
     },
     ...additionalSeed,
-  });
+  };
 }
 
 function submit(db, payload, actorId = 'organizer-1') {

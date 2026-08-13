@@ -1,324 +1,241 @@
-import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:el7reef/core/enums/claim_code_status.dart';
 import 'package:el7reef/core/enums/claim_merge_conflict_type.dart';
-import 'package:el7reef/core/services/analytics_service.dart';
+import 'package:el7reef/core/enums/claim_payload_scope.dart';
+import 'package:el7reef/core/enums/claim_target_type.dart';
+import 'package:el7reef/core/services/cloud_sensitive_ops_service.dart';
 import 'package:el7reef/core/services/guest_claim_service.dart';
-import 'package:el7reef/core/services/share_link_service.dart';
-import 'package:el7reef/core/services/team_roster_service.dart';
-import 'package:el7reef/data/repositories/claim_code_repository_impl.dart';
-import 'package:el7reef/data/repositories/guest_player_repository_impl.dart';
-import 'package:el7reef/data/repositories/guest_team_repository_impl.dart';
-import 'package:el7reef/data/repositories/player_repository_impl.dart';
-import 'package:el7reef/data/repositories/team_membership_repository_impl.dart';
-import 'package:el7reef/data/repositories/team_repository_impl.dart';
-import 'package:el7reef/domain/entities/guest_player.dart';
-import 'package:el7reef/domain/entities/guest_team.dart';
-import 'package:el7reef/domain/entities/player.dart';
-import 'package:el7reef/domain/entities/team.dart';
 
 void main() {
-  group('GuestClaimService', () {
-    late FakeFirebaseFirestore firestore;
-    late ClaimCodeRepositoryImpl claimCodeRepository;
-    late GuestPlayerRepositoryImpl guestPlayerRepository;
-    late GuestTeamRepositoryImpl guestTeamRepository;
-    late PlayerRepositoryImpl playerRepository;
-    late TeamMembershipRepositoryImpl membershipRepository;
-    late TeamRepositoryImpl teamRepository;
-    late TeamRosterService teamRosterService;
-    late ShareLinkService shareLinkService;
-    late GuestClaimService guestClaimService;
-    late _RecordingAnalyticsService analyticsService;
-    late DateTime now;
+  group('GuestClaimService callable contract', () {
+    late _FakeCloudSensitiveOpsService cloudOps;
+    late GuestClaimService service;
 
-    setUp(() async {
-      firestore = FakeFirebaseFirestore();
-      claimCodeRepository = ClaimCodeRepositoryImpl(firestore: firestore);
-      guestPlayerRepository = GuestPlayerRepositoryImpl(firestore: firestore);
-      guestTeamRepository = GuestTeamRepositoryImpl(firestore: firestore);
-      playerRepository = PlayerRepositoryImpl(firestore: firestore);
-      membershipRepository = TeamMembershipRepositoryImpl(firestore: firestore);
-      teamRepository = TeamRepositoryImpl(firestore: firestore);
-      teamRosterService = TeamRosterService(
-        teamRepository: teamRepository,
-        membershipRepository: membershipRepository,
-        guestPlayerRepository: guestPlayerRepository,
-      );
-      analyticsService = _RecordingAnalyticsService();
-      shareLinkService = ShareLinkService(
-        claimCodeRepository: claimCodeRepository,
-        guestPlayerRepository: guestPlayerRepository,
-        guestTeamRepository: guestTeamRepository,
-        teamRepository: teamRepository,
-        analyticsService: analyticsService,
-      );
-      guestClaimService = GuestClaimService(
-        firestore: firestore,
-        analyticsService: analyticsService,
-      );
-      now = DateTime(2026, 4, 15, 12);
+    setUp(() {
+      cloudOps = _FakeCloudSensitiveOpsService();
+      service = GuestClaimService(cloudOps: cloudOps);
+    });
 
-      await teamRepository.createTeam(
-        Team(
-          id: 'team-1',
-          name: 'Street Kings',
-          ownerId: 'owner-1',
-          playerIds: const ['owner-1'],
-          viceCaptainIds: const ['vice-1'],
-          createdAt: now,
-        ),
+    test('inspection uses the server target instead of a route hint', () async {
+      cloudOps.inspectResponse = {
+        'targetType': 'guestTeam',
+        'targetId': 'server-guest-team',
+        'subjectName': 'نسور الحارة',
+        'scope': 'tournament',
+        'teamId': 'pending-team',
+        'tournamentId': 'tournament-1',
+        'requiresApproval': true,
+        'pendingApproval': true,
+        'canApprovePendingTeamClaim': true,
+        'status': 'active',
+        'expiresAt': 1785628800000,
+      };
+
+      final inspection = await service.inspectGuestClaim(
+        claimCode: ' bearer-code ',
       );
-      await playerRepository.createPlayer(
-        Player(
-          id: 'owner-1',
-          name: 'Owner One',
-          createdAt: now,
-          lastActiveAt: now,
-        ),
-      );
-      await playerRepository.createPlayer(
-        Player(
-          id: 'player-1',
-          name: 'Mahmoud Salem',
-          createdAt: now,
-          lastActiveAt: now,
-        ),
-      );
-      await playerRepository.createPlayer(
-        Player(
-          id: 'player-2',
-          name: 'Kareem Adel',
-          createdAt: now,
-          lastActiveAt: now,
-        ),
-      );
-      await playerRepository.createPlayer(
-        Player(
-          id: 'owner-2',
-          name: 'Captain Two',
-          createdAt: now,
-          lastActiveAt: now,
-        ),
-      );
-      await playerRepository.createPlayer(
-        Player(
-          id: 'owner-3',
-          name: 'Captain Three',
-          createdAt: now,
-          lastActiveAt: now,
-        ),
-      );
-      await teamRepository.createTeam(
-        Team(
-          id: 'team-2',
-          name: 'Blue Sharks',
-          ownerId: 'owner-2',
-          playerIds: const ['owner-2'],
-          tournamentIds: const ['legacy-cup'],
-          createdAt: now,
-        ),
-      );
-      await teamRepository.createTeam(
-        Team(
-          id: 'team-3',
-          name: 'Golden Boys',
-          ownerId: 'owner-3',
-          playerIds: const ['owner-3'],
-          createdAt: now,
-        ),
-      );
-      await guestPlayerRepository.createGuestPlayer(
-        GuestPlayer(
-          id: 'guest-1',
-          displayName: 'Mahmoud Guest',
-          normalizedName: 'mahmoud guest',
+
+      expect(cloudOps.inspectedClaimCodes, ['bearer-code']);
+      expect(inspection.targetType, ClaimTargetType.guestTeam);
+      expect(inspection.targetId, 'server-guest-team');
+      expect(inspection.subjectName, 'نسور الحارة');
+      expect(inspection.scope, ClaimPayloadScope.tournament);
+      expect(inspection.teamId, 'pending-team');
+      expect(inspection.tournamentId, 'tournament-1');
+      expect(inspection.requiresApproval, isTrue);
+      expect(inspection.pendingApproval, isTrue);
+      expect(inspection.canApprovePendingTeamClaim, isTrue);
+      expect(inspection.status, ClaimCodeStatus.active);
+      expect(inspection.expiresAt.millisecondsSinceEpoch, 1785628800000);
+    });
+
+    final playerScenarios = <_PlayerScenario>[
+      const _PlayerScenario(
+        name: 'claimed player response maps roster changes',
+        response: {
+          'outcome': 'claimed',
+          'guestPlayerId': 'guest-player-1',
+          'playerId': 'player-1',
+          'relinkedMembershipIds': ['membership-1'],
+          'linkedTeamIds': ['team-1', 'team-1'],
+          'syncedLegacyTeamIds': ['legacy-team-1'],
+        },
+        outcome: GuestPlayerClaimOutcome.claimed,
+      ),
+      const _PlayerScenario(
+        name: 'already claimed player response remains idempotent',
+        response: {
+          'outcome': 'alreadyClaimed',
+          'guestPlayerId': 'guest-player-1',
+          'playerId': 'player-1',
+          'relinkedMembershipIds': <String>[],
+          'linkedTeamIds': ['team-1'],
+          'syncedLegacyTeamIds': <String>[],
+        },
+        outcome: GuestPlayerClaimOutcome.alreadyClaimed,
+      ),
+      const _PlayerScenario(
+        name: 'player conflict response maps its safe conflict details',
+        response: {
+          'outcome': 'conflict',
+          'guestPlayerId': 'guest-player-1',
+          'playerId': 'player-1',
+          'relinkedMembershipIds': <String>[],
+          'linkedTeamIds': <String>[],
+          'syncedLegacyTeamIds': <String>[],
+          'conflict': {
+            'type': 'rosterAlreadyContainsPlayer',
+            'conflictingEntityId': 'team-1',
+          },
+        },
+        outcome: GuestPlayerClaimOutcome.conflict,
+        conflictType: ClaimMergeConflictType.rosterAlreadyContainsPlayer,
+      ),
+    ];
+
+    for (final scenario in playerScenarios) {
+      test(scenario.name, () async {
+        cloudOps.playerResponse = scenario.response;
+
+        final result = await service.claimGuestPlayer(
+          claimCode: 'player-bearer-code',
+        );
+
+        expect(cloudOps.playerClaimCodes, ['player-bearer-code']);
+        expect(result.outcome, scenario.outcome);
+        expect(result.claimCode, 'player-bearer-code');
+        expect(result.guestPlayerId, 'guest-player-1');
+        expect(result.playerId, 'player-1');
+        expect(result.conflict?.type, scenario.conflictType);
+        if (scenario.outcome == GuestPlayerClaimOutcome.claimed) {
+          expect(result.relinkedMembershipIds, ['membership-1']);
+          expect(result.linkedTeamIds, ['team-1']);
+          expect(result.syncedLegacyTeamIds, ['legacy-team-1']);
+        }
+        if (scenario.outcome == GuestPlayerClaimOutcome.alreadyClaimed) {
+          expect(result.isIdempotent, isTrue);
+        }
+        if (scenario.conflictType != null) {
+          expect(result.hasConflict, isTrue);
+          expect(result.conflict?.conflictingEntityId, 'team-1');
+        }
+      });
+    }
+
+    final teamScenarios = <_TeamScenario>[
+      const _TeamScenario(
+        name: 'claimed team response maps merged tournaments',
+        response: {
+          'outcome': 'claimed',
+          'guestTeamId': 'guest-team-1',
+          'teamId': 'team-1',
+          'mergedTournamentIds': ['tournament-1', 'tournament-2'],
+          'requestedByPlayerId': 'owner-1',
+        },
+        outcome: GuestTeamClaimOutcome.claimed,
+      ),
+      const _TeamScenario(
+        name: 'already claimed team response remains idempotent',
+        response: {
+          'outcome': 'alreadyClaimed',
+          'guestTeamId': 'guest-team-1',
+          'teamId': 'team-1',
+          'mergedTournamentIds': ['tournament-1'],
+          'requestedByPlayerId': 'owner-1',
+        },
+        outcome: GuestTeamClaimOutcome.alreadyClaimed,
+      ),
+      const _TeamScenario(
+        name: 'approval response keeps the pending requester',
+        response: {
+          'outcome': 'approvalRequired',
+          'guestTeamId': 'guest-team-1',
+          'teamId': 'team-1',
+          'mergedTournamentIds': ['tournament-1'],
+          'requestedByPlayerId': 'owner-1',
+        },
+        outcome: GuestTeamClaimOutcome.approvalRequired,
+      ),
+      const _TeamScenario(
+        name: 'team conflict response maps the server conflict',
+        response: {
+          'outcome': 'conflict',
+          'guestTeamId': 'guest-team-1',
+          'teamId': 'team-1',
+          'mergedTournamentIds': <String>[],
+          'requestedByPlayerId': null,
+          'conflict': {
+            'type': 'pendingTargetLink',
+            'conflictingEntityId': 'other-team',
+          },
+        },
+        outcome: GuestTeamClaimOutcome.conflict,
+        conflictType: ClaimMergeConflictType.pendingTargetLink,
+      ),
+    ];
+
+    for (final scenario in teamScenarios) {
+      test(scenario.name, () async {
+        cloudOps.teamResponse = scenario.response;
+
+        final result = await service.claimGuestTeam(
+          claimCode: 'team-bearer-code',
           teamId: 'team-1',
-          createdBy: 'owner-1',
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      await guestTeamRepository.createGuestTeam(
-        GuestTeam(
-          id: 'guest-team-1',
-          name: 'Guest Falcons',
-          normalizedName: 'guest falcons',
-          creatorId: 'owner-1',
-          contactName: 'Organizer Omar',
-          contactPhone: '01000000000',
-          tournamentIds: const ['street-cup', 'ramadan-league'],
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      await teamRosterService.addGuestPlayer(
-        teamId: 'team-1',
-        actorId: 'owner-1',
-        guestPlayerId: 'guest-1',
-        now: now,
-      );
-    });
+        );
+
+        expect(cloudOps.teamClaimCodes, ['team-bearer-code']);
+        expect(cloudOps.teamIds, ['team-1']);
+        expect(result.outcome, scenario.outcome);
+        expect(result.claimCode, 'team-bearer-code');
+        expect(result.guestTeamId, 'guest-team-1');
+        expect(result.teamId, 'team-1');
+        expect(result.conflict?.type, scenario.conflictType);
+        if (scenario.outcome == GuestTeamClaimOutcome.claimed) {
+          expect(result.mergedTournamentIds, ['tournament-1', 'tournament-2']);
+        }
+        if (scenario.outcome == GuestTeamClaimOutcome.alreadyClaimed) {
+          expect(result.isIdempotent, isTrue);
+        }
+        if (scenario.outcome == GuestTeamClaimOutcome.approvalRequired) {
+          expect(result.isPendingApproval, isTrue);
+          expect(result.requestedByPlayerId, 'owner-1');
+        }
+        if (scenario.conflictType != null) {
+          expect(result.hasConflict, isTrue);
+          expect(result.conflict?.conflictingEntityId, 'other-team');
+        }
+      });
+    }
 
     test(
-      'claims guest team directly into a registered team and preserves history',
+      'expired callable outcomes are surfaced without a local retry',
       () async {
-        final generated = await shareLinkService.createGuestTeamClaimLink(
-          guestTeamId: 'guest-team-1',
-          actorId: 'owner-1',
-          requiresApproval: false,
-        );
-
-        final result = await guestClaimService.claimGuestTeam(
-          claimCode: generated.claimCode.code,
-          teamId: 'team-2',
-          actorId: 'owner-2',
-          now: now.add(const Duration(hours: 1)),
-        );
-
-        final updatedGuestTeam = await guestTeamRepository.getGuestTeam(
-          'guest-team-1',
-        );
-        final updatedTeam = await teamRepository.getTeam('team-2');
-        final updatedClaimCode = await claimCodeRepository.getClaimCode(
-          generated.claimCode.code,
-        );
-
-        expect(result.outcome, GuestTeamClaimOutcome.claimed);
-        expect(
-          result.mergedTournamentIds,
-          containsAll(['legacy-cup', 'street-cup']),
-        );
-        expect(updatedGuestTeam?.isClaimed, isTrue);
-        expect(updatedGuestTeam?.linkedTeamId, 'team-2');
-        expect(
-          updatedTeam?.tournamentIds,
-          containsAll(['legacy-cup', 'street-cup', 'ramadan-league']),
-        );
-        expect(updatedClaimCode?.status.name, 'claimed');
-        expect(updatedClaimCode?.teamId, 'team-2');
-        expect(updatedClaimCode?.claimedByPlayerId, 'owner-2');
-      },
-    );
-
-    test(
-      'returns approvalRequired when a guest team claim needs organizer approval',
-      () async {
-        final generated = await shareLinkService.createGuestTeamClaimLink(
-          guestTeamId: 'guest-team-1',
-          actorId: 'owner-1',
-        );
-
-        final result = await guestClaimService.claimGuestTeam(
-          claimCode: generated.claimCode.code,
-          teamId: 'team-2',
-          actorId: 'owner-2',
-          now: now.add(const Duration(hours: 1)),
-        );
-
-        final updatedGuestTeam = await guestTeamRepository.getGuestTeam(
-          'guest-team-1',
-        );
-        final updatedTeam = await teamRepository.getTeam('team-2');
-        final updatedClaimCode = await claimCodeRepository.getClaimCode(
-          generated.claimCode.code,
-        );
-
-        expect(result.outcome, GuestTeamClaimOutcome.approvalRequired);
-        expect(result.isPendingApproval, isTrue);
-        expect(updatedGuestTeam?.isClaimed, isFalse);
-        expect(updatedGuestTeam?.linkedTeamId, isNull);
-        expect(
-          updatedTeam?.tournamentIds,
-          containsAll(['legacy-cup', 'street-cup', 'ramadan-league']),
-        );
-        expect(updatedClaimCode?.status.name, 'active');
-        expect(updatedClaimCode?.teamId, 'team-2');
-        expect(updatedClaimCode?.claimedByPlayerId, 'owner-2');
-      },
-    );
-
-    test('guest team creator can approve a pending claim request', () async {
-      final generated = await shareLinkService.createGuestTeamClaimLink(
-        guestTeamId: 'guest-team-1',
-        actorId: 'owner-1',
-      );
-
-      await guestClaimService.claimGuestTeam(
-        claimCode: generated.claimCode.code,
-        teamId: 'team-2',
-        actorId: 'owner-2',
-        now: now.add(const Duration(minutes: 30)),
-      );
-
-      final result = await guestClaimService.claimGuestTeam(
-        claimCode: generated.claimCode.code,
-        teamId: 'team-2',
-        actorId: 'owner-1',
-        now: now.add(const Duration(hours: 1)),
-      );
-
-      final updatedGuestTeam = await guestTeamRepository.getGuestTeam(
-        'guest-team-1',
-      );
-      final updatedClaimCode = await claimCodeRepository.getClaimCode(
-        generated.claimCode.code,
-      );
-
-      expect(result.outcome, GuestTeamClaimOutcome.claimed);
-      expect(updatedGuestTeam?.isClaimed, isTrue);
-      expect(updatedGuestTeam?.linkedTeamId, 'team-2');
-      expect(updatedClaimCode?.status.name, 'claimed');
-      expect(updatedClaimCode?.claimedByPlayerId, 'owner-2');
-    });
-
-    test('re-running the same guest team claim is idempotent', () async {
-      final generated = await shareLinkService.createGuestTeamClaimLink(
-        guestTeamId: 'guest-team-1',
-        actorId: 'owner-1',
-        requiresApproval: false,
-      );
-
-      await guestClaimService.claimGuestTeam(
-        claimCode: generated.claimCode.code,
-        teamId: 'team-2',
-        actorId: 'owner-2',
-        now: now.add(const Duration(minutes: 30)),
-      );
-
-      final second = await guestClaimService.claimGuestTeam(
-        claimCode: generated.claimCode.code,
-        teamId: 'team-2',
-        actorId: 'owner-2',
-        now: now.add(const Duration(hours: 1)),
-      );
-
-      expect(second.outcome, GuestTeamClaimOutcome.alreadyClaimed);
-      expect(second.isIdempotent, isTrue);
-      expect(analyticsService.completions, ['guest_team:guest-team-1:owner-2']);
-    });
-
-    test(
-      'marks guest team claim links as expired when used after expiry',
-      () async {
-        final generated = await shareLinkService.createGuestTeamClaimLink(
-          guestTeamId: 'guest-team-1',
-          actorId: 'owner-1',
-          requiresApproval: false,
-        );
-        await claimCodeRepository.updateClaimCode(
-          generated.claimCode.copyWith(
-            expiresAt: now.subtract(const Duration(minutes: 1)),
-            updatedAt: now,
-          ),
-        );
+        cloudOps.playerResponse = {
+          'outcome': 'expired',
+          'targetType': 'guestPlayer',
+          'targetId': 'guest-player-1',
+        };
+        cloudOps.teamResponse = {
+          'outcome': 'expired',
+          'targetType': 'guestTeam',
+          'targetId': 'guest-team-1',
+        };
 
         await expectLater(
-          () => guestClaimService.claimGuestTeam(
-            claimCode: generated.claimCode.code,
-            teamId: 'team-2',
-            actorId: 'owner-2',
-            now: now.add(const Duration(hours: 1)),
+          () => service.claimGuestPlayer(claimCode: 'expired-player-code'),
+          throwsA(
+            isA<Exception>().having(
+              (error) => error.toString(),
+              'message',
+              contains('انتهت صلاحية رابط الاستلام.'),
+            ),
+          ),
+        );
+        await expectLater(
+          () => service.claimGuestTeam(
+            claimCode: 'expired-team-code',
+            teamId: 'team-1',
           ),
           throwsA(
             isA<Exception>().having(
@@ -329,367 +246,130 @@ void main() {
           ),
         );
 
-        final updatedClaimCode = await claimCodeRepository.getClaimCode(
-          generated.claimCode.code,
-        );
-        expect(updatedClaimCode?.status.name, 'expired');
+        expect(cloudOps.playerClaimCodes, ['expired-player-code']);
+        expect(cloudOps.teamClaimCodes, ['expired-team-code']);
       },
     );
 
-    test(
-      'returns a target-link conflict when a different team tries to claim the same guest team',
-      () async {
-        final generated = await shareLinkService.createGuestTeamClaimLink(
-          guestTeamId: 'guest-team-1',
-          actorId: 'owner-1',
-          requiresApproval: false,
-        );
+    test('malformed inspection response is rejected', () async {
+      cloudOps.inspectResponse = {
+        'targetType': 'guestPlayer',
+        'targetId': 'guest-player-1',
+        'scope': 'not-a-scope',
+        'requiresApproval': false,
+        'pendingApproval': false,
+        'canApprovePendingTeamClaim': false,
+        'status': 'active',
+        'expiresAt': 1785628800000,
+      };
 
-        await guestClaimService.claimGuestTeam(
-          claimCode: generated.claimCode.code,
-          teamId: 'team-2',
-          actorId: 'owner-2',
-          now: now.add(const Duration(minutes: 30)),
-        );
-
-        final result = await guestClaimService.claimGuestTeam(
-          claimCode: generated.claimCode.code,
-          teamId: 'team-3',
-          actorId: 'owner-3',
-          now: now.add(const Duration(hours: 1)),
-        );
-
-        expect(result.outcome, GuestTeamClaimOutcome.conflict);
-        expect(result.hasConflict, isTrue);
-        expect(
-          result.conflict?.type,
-          ClaimMergeConflictType.targetAlreadyLinked,
-        );
-        expect(result.conflict?.conflictingEntityId, 'team-2');
-      },
-    );
-
-    test(
-      'returns a duplicate-name conflict when another registered team already matches the guest team',
-      () async {
-        await teamRepository.createTeam(
-          Team(
-            id: 'team-4',
-            name: 'Guest Falcons',
-            ownerId: 'owner-3',
-            playerIds: const ['owner-3'],
-            createdAt: now,
-          ),
-        );
-        final generated = await shareLinkService.createGuestTeamClaimLink(
-          guestTeamId: 'guest-team-1',
-          actorId: 'owner-1',
-          requiresApproval: false,
-        );
-
-        final result = await guestClaimService.claimGuestTeam(
-          claimCode: generated.claimCode.code,
-          teamId: 'team-2',
-          actorId: 'owner-2',
-          now: now.add(const Duration(hours: 1)),
-        );
-
-        expect(result.outcome, GuestTeamClaimOutcome.conflict);
-        expect(result.hasConflict, isTrue);
-        expect(result.conflict?.type, ClaimMergeConflictType.duplicateName);
-        expect(result.conflict?.conflictingEntityId, 'team-4');
-      },
-    );
-
-    test(
-      'claims guest player into registered identity and relinks memberships',
-      () async {
-        final generated = await shareLinkService.createGuestPlayerClaimLink(
-          guestPlayerId: 'guest-1',
-          actorId: 'owner-1',
-        );
-
-        final result = await guestClaimService.claimGuestPlayer(
-          claimCode: generated.claimCode.code,
-          playerId: 'player-1',
-          now: now.add(const Duration(hours: 1)),
-        );
-
-        final updatedGuest = await guestPlayerRepository.getGuestPlayer(
-          'guest-1',
-        );
-        final updatedPlayer = await playerRepository.getPlayer('player-1');
-        final updatedMembership = await membershipRepository
-            .getMembershipByPlayerId(teamId: 'team-1', playerId: 'player-1');
-        final updatedClaimCode = await claimCodeRepository.getClaimCode(
-          generated.claimCode.code,
-        );
-        final updatedTeam = await teamRepository.getTeam('team-1');
-
-        expect(result.outcome, GuestPlayerClaimOutcome.claimed);
-        expect(result.relinkedMembershipIds, hasLength(1));
-        expect(result.linkedTeamIds, contains('team-1'));
-        expect(result.syncedLegacyTeamIds, isEmpty);
-        expect(updatedGuest?.isClaimed, isTrue);
-        expect(updatedGuest?.linkedPlayerId, 'player-1');
-        expect(updatedPlayer?.teamIds, contains('team-1'));
-        expect(updatedMembership?.guestPlayerId, isNull);
-        expect(updatedMembership?.claimedFromGuestPlayerId, 'guest-1');
-        expect(updatedClaimCode?.claimedByPlayerId, 'player-1');
-        expect(updatedTeam?.playerIds, isNot(contains('player-1')));
-      },
-    );
-
-    test('re-running the same claim is idempotent', () async {
-      final generated = await shareLinkService.createGuestPlayerClaimLink(
-        guestPlayerId: 'guest-1',
-        actorId: 'owner-1',
+      await expectLater(
+        () => service.inspectGuestClaim(claimCode: 'bad-inspection-code'),
+        throwsA(isA<FormatException>()),
       );
-
-      await guestClaimService.claimGuestPlayer(
-        claimCode: generated.claimCode.code,
-        playerId: 'player-1',
-        now: now.add(const Duration(minutes: 30)),
-      );
-
-      final second = await guestClaimService.claimGuestPlayer(
-        claimCode: generated.claimCode.code,
-        playerId: 'player-1',
-        now: now.add(const Duration(hours: 1)),
-      );
-
-      final roster = await teamRosterService.getTeamRoster(
-        'team-1',
-        includeInactive: true,
-      );
-
-      expect(second.outcome, GuestPlayerClaimOutcome.alreadyClaimed);
-      expect(
-        roster.where((membership) => membership.playerId == 'player-1'),
-        hasLength(1),
-      );
-      expect(analyticsService.completions, ['guest_player:guest-1:player-1']);
     });
 
-    test(
-      'marks guest player claim links as expired when used after expiry',
-      () async {
-        final generated = await shareLinkService.createGuestPlayerClaimLink(
-          guestPlayerId: 'guest-1',
-          actorId: 'owner-1',
-        );
-        await claimCodeRepository.updateClaimCode(
-          generated.claimCode.copyWith(
-            expiresAt: now.subtract(const Duration(minutes: 1)),
-            updatedAt: now,
+    test('malformed claim response is rejected', () async {
+      cloudOps.playerResponse = {
+        'outcome': 'claimed',
+        'guestPlayerId': 'guest-player-1',
+        'relinkedMembershipIds': <String>[],
+        'linkedTeamIds': <String>[],
+        'syncedLegacyTeamIds': <String>[],
+      };
+
+      await expectLater(
+        () => service.claimGuestPlayer(claimCode: 'bad-player-response'),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('callable failure is closed without a client fallback', () async {
+      cloudOps.playerError = StateError('function unavailable');
+
+      await expectLater(
+        () => service.claimGuestPlayer(claimCode: 'unavailable-code'),
+        throwsA(
+          isA<Exception>().having(
+            (error) => error.toString(),
+            'message',
+            contains('خدمة الاستلام غير متاحة الآن'),
           ),
-        );
+        ),
+      );
 
-        await expectLater(
-          () => guestClaimService.claimGuestPlayer(
-            claimCode: generated.claimCode.code,
-            playerId: 'player-1',
-            now: now.add(const Duration(hours: 1)),
-          ),
-          throwsA(
-            isA<Exception>().having(
-              (error) => error.toString(),
-              'message',
-              contains('انتهت صلاحية رابط الاستلام.'),
-            ),
-          ),
-        );
-
-        final updatedClaimCode = await claimCodeRepository.getClaimCode(
-          generated.claimCode.code,
-        );
-        expect(updatedClaimCode?.status.name, 'expired');
-      },
-    );
-
-    test(
-      'manager-assisted claim syncs legacy team arrays for compatibility',
-      () async {
-        final generated = await shareLinkService.createGuestPlayerClaimLink(
-          guestPlayerId: 'guest-1',
-          actorId: 'owner-1',
-        );
-
-        final result = await guestClaimService.claimGuestPlayer(
-          claimCode: generated.claimCode.code,
-          playerId: 'player-2',
-          actorId: 'owner-1',
-          now: now.add(const Duration(hours: 1)),
-        );
-
-        final updatedTeam = await teamRepository.getTeam('team-1');
-
-        expect(result.syncedLegacyTeamIds, contains('team-1'));
-        expect(updatedTeam?.playerIds, contains('player-2'));
-      },
-    );
-
-    test(
-      'returns a roster conflict when the player is already active in the same team',
-      () async {
-        await teamRosterService.addRegisteredPlayer(
-          teamId: 'team-1',
-          actorId: 'owner-1',
-          playerId: 'player-1',
-          now: now.add(const Duration(minutes: 5)),
-        );
-        final generated = await shareLinkService.createGuestPlayerClaimLink(
-          guestPlayerId: 'guest-1',
-          actorId: 'owner-1',
-        );
-
-        final result = await guestClaimService.claimGuestPlayer(
-          claimCode: generated.claimCode.code,
-          playerId: 'player-1',
-          now: now.add(const Duration(hours: 1)),
-        );
-
-        expect(result.outcome, GuestPlayerClaimOutcome.conflict);
-        expect(result.hasConflict, isTrue);
-        expect(
-          result.conflict?.type,
-          ClaimMergeConflictType.rosterAlreadyContainsPlayer,
-        );
-        expect(result.conflict?.conflictingEntityId, 'team-1');
-        final unchangedGuest = await guestPlayerRepository.getGuestPlayer(
-          'guest-1',
-        );
-        final unchangedClaim = await claimCodeRepository.getClaimCode(
-          generated.claimCode.code,
-        );
-        final unchangedMemberships = await teamRosterService.getTeamRoster(
-          'team-1',
-          includeInactive: true,
-        );
-        expect(unchangedGuest?.isClaimed, isFalse);
-        expect(unchangedGuest?.linkedPlayerId, isNull);
-        expect(unchangedClaim?.status.name, 'active');
-        expect(
-          unchangedMemberships
-              .singleWhere(
-                (membership) => membership.guestPlayerId == 'guest-1',
-              )
-              .playerId,
-          isNull,
-        );
-        expect(analyticsService.completions, isEmpty);
-      },
-    );
-
-    test(
-      'returns a duplicate-phone conflict when another registered player matches the guest record',
-      () async {
-        await playerRepository.createPlayer(
-          Player(
-            id: 'player-phone-dup',
-            name: 'Phone Duplicate',
-            phone: '01012345678',
-            createdAt: now,
-            lastActiveAt: now,
-          ),
-        );
-        await guestPlayerRepository.createGuestPlayer(
-          GuestPlayer(
-            id: 'guest-phone-1',
-            displayName: 'Phone Guest',
-            normalizedName: 'phone guest',
-            phoneNumber: '01012345678',
-            teamId: 'team-1',
-            createdBy: 'owner-1',
-            createdAt: now,
-            updatedAt: now,
-          ),
-        );
-        await teamRosterService.addGuestPlayer(
-          teamId: 'team-1',
-          actorId: 'owner-1',
-          guestPlayerId: 'guest-phone-1',
-          now: now,
-        );
-
-        final generated = await shareLinkService.createGuestPlayerClaimLink(
-          guestPlayerId: 'guest-phone-1',
-          actorId: 'owner-1',
-        );
-
-        final result = await guestClaimService.claimGuestPlayer(
-          claimCode: generated.claimCode.code,
-          playerId: 'player-1',
-          now: now.add(const Duration(hours: 1)),
-        );
-
-        expect(result.outcome, GuestPlayerClaimOutcome.conflict);
-        expect(result.hasConflict, isTrue);
-        expect(result.conflict?.type, ClaimMergeConflictType.duplicatePhone);
-        expect(result.conflict?.conflictingEntityId, 'player-phone-dup');
-      },
-    );
-
-    test(
-      'returns a duplicate-name conflict when another registered player matches the guest record',
-      () async {
-        await playerRepository.createPlayer(
-          Player(
-            id: 'player-name-dup',
-            name: 'Alias Guest',
-            createdAt: now,
-            lastActiveAt: now,
-          ),
-        );
-        await guestPlayerRepository.createGuestPlayer(
-          GuestPlayer(
-            id: 'guest-name-1',
-            displayName: 'Alias Guest',
-            normalizedName: 'alias guest',
-            teamId: 'team-1',
-            createdBy: 'owner-1',
-            createdAt: now,
-            updatedAt: now,
-          ),
-        );
-        await teamRosterService.addGuestPlayer(
-          teamId: 'team-1',
-          actorId: 'owner-1',
-          guestPlayerId: 'guest-name-1',
-          now: now,
-        );
-
-        final generated = await shareLinkService.createGuestPlayerClaimLink(
-          guestPlayerId: 'guest-name-1',
-          actorId: 'owner-1',
-        );
-
-        final result = await guestClaimService.claimGuestPlayer(
-          claimCode: generated.claimCode.code,
-          playerId: 'player-1',
-          now: now.add(const Duration(hours: 1)),
-        );
-
-        expect(result.outcome, GuestPlayerClaimOutcome.conflict);
-        expect(result.hasConflict, isTrue);
-        expect(result.conflict?.type, ClaimMergeConflictType.duplicateName);
-        expect(result.conflict?.conflictingEntityId, 'player-name-dup');
-      },
-    );
+      expect(cloudOps.playerClaimCodes, ['unavailable-code']);
+    });
   });
 }
 
-class _RecordingAnalyticsService extends AnalyticsService {
-  final List<String> completions = <String>[];
+class _PlayerScenario {
+  final String name;
+  final Map<String, dynamic> response;
+  final GuestPlayerClaimOutcome outcome;
+  final ClaimMergeConflictType? conflictType;
 
-  _RecordingAnalyticsService() : super(firestore: FakeFirebaseFirestore());
+  const _PlayerScenario({
+    required this.name,
+    required this.response,
+    required this.outcome,
+    this.conflictType,
+  });
+}
+
+class _TeamScenario {
+  final String name;
+  final Map<String, dynamic> response;
+  final GuestTeamClaimOutcome outcome;
+  final ClaimMergeConflictType? conflictType;
+
+  const _TeamScenario({
+    required this.name,
+    required this.response,
+    required this.outcome,
+    this.conflictType,
+  });
+}
+
+class _FakeCloudSensitiveOpsService extends CloudSensitiveOpsService {
+  Map<String, dynamic> inspectResponse = const {};
+  Map<String, dynamic> playerResponse = const {};
+  Map<String, dynamic> teamResponse = const {};
+  Object? inspectError;
+  Object? playerError;
+  Object? teamError;
+
+  final List<String> inspectedClaimCodes = [];
+  final List<String> playerClaimCodes = [];
+  final List<String> teamClaimCodes = [];
+  final List<String> teamIds = [];
 
   @override
-  void trackClaimCompletion({
-    required String type,
-    required String targetId,
-    required String actorId,
-  }) {
-    completions.add('$type:$targetId:$actorId');
+  Future<Map<String, dynamic>> inspectGuestClaim({
+    required String claimCode,
+  }) async {
+    inspectedClaimCodes.add(claimCode);
+    if (inspectError case final Object error) throw error;
+    return Map<String, dynamic>.from(inspectResponse);
+  }
+
+  @override
+  Future<Map<String, dynamic>> claimGuestPlayer({
+    required String claimCode,
+  }) async {
+    playerClaimCodes.add(claimCode);
+    if (playerError case final Object error) throw error;
+    return Map<String, dynamic>.from(playerResponse);
+  }
+
+  @override
+  Future<Map<String, dynamic>> claimGuestTeam({
+    required String claimCode,
+    required String teamId,
+  }) async {
+    teamClaimCodes.add(claimCode);
+    teamIds.add(teamId);
+    if (teamError case final Object error) throw error;
+    return Map<String, dynamic>.from(teamResponse);
   }
 }

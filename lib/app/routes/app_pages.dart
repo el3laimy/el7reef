@@ -261,7 +261,13 @@ class AppPages {
     // ── Fan Voting ──
     GetPage(
       name: AppRoutes.mvpVote,
-      page: () => const FanVotingScreen(),
+      page: () => FeatureFlags.fanVotingEnabled
+          ? const FanVotingScreen()
+          : const FeatureUnavailableScreen(
+              title: 'تصويت الجماهير متوقف مؤقتًا',
+              message:
+                  'أوقفنا التصويت مؤقتًا لحماية نزاهة النتيجة حتى يكتمل التحقق الآمن من كل صوت.',
+            ),
       binding: FanVotingBinding(),
       transition: Transition.rightToLeftWithFade,
     ),
@@ -407,7 +413,13 @@ class AppPages {
     // ── Dispute Viewer ──
     GetPage(
       name: AppRoutes.disputeViewer,
-      page: () => const DisputeViewerScreen(),
+      page: () => FeatureFlags.disputesEnabled
+          ? const DisputeViewerScreen()
+          : const FeatureUnavailableScreen(
+              title: 'النزاعات متوقفة مؤقتًا',
+              message:
+                  'أوقفنا هذا المسار مؤقتًا حتى تصبح كل خطوات الاعتراض والحسم ذرية وآمنة.',
+            ),
       binding: DisputeViewerBinding(),
       transition: Transition.rightToLeftWithFade,
     ),

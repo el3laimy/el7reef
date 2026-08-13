@@ -1,6 +1,7 @@
 "use strict";
 
-const admin = require("firebase-admin");
+const {initializeApp} = require("firebase-admin/app");
+const {getFirestore} = require("firebase-admin/firestore");
 const {TOURNAMENT_ID} = require("../imports/world_cup_2026");
 const {verify} = require("./verify_world_cup_2026_import");
 const {
@@ -37,8 +38,8 @@ function parseOptions(argumentsList) {
 async function main() {
   const options = parseOptions(process.argv.slice(2));
   assertProductionEnvironment(process.env);
-  admin.initializeApp({projectId: options.projectId});
-  const db = admin.firestore();
+  const app = initializeApp({projectId: options.projectId});
+  const db = getFirestore(app);
   const baseVerification = await verify(db, PLATFORM_ORGANIZER_UID);
   const [tournament, assistant] = await Promise.all([
     db.doc(`tournaments/${TOURNAMENT_ID}`).get(),

@@ -1,0 +1,54 @@
+{
+  "auditId": "ELR-UX-302-304-ANDROID-2026-08-01",
+  "documentType": "historical_evidence_not_active_plan",
+  "scope": [
+    "ELR-UX-302",
+    "ELR-UX-303",
+    "ELR-UX-304"
+  ],
+  "platform": "Android only",
+  "device": {
+    "name": "Pixel_4a_API_35_Lite",
+    "serial": "emulator-5554",
+    "api": 35,
+    "viewportDp": "360x780"
+  },
+  "result": {
+    "passedGates": 4,
+    "totalGates": 5,
+    "ux302": "done",
+    "ux303": "done",
+    "ux304": "active"
+  },
+  "automatedEvidence": [
+    {
+      "command": "flutter test --no-pub test/features/tournament/tournament_stage_widgets_test.dart",
+      "result": "17/17 passed"
+    },
+    {
+      "command": "flutter test --no-pub test/features/tournament/knockout_bracket_golden_test.dart",
+      "result": "2/2 passed"
+    }
+  ],
+  "durableVisualEvidence": [
+    "test/features/tournament/goldens/knockout_round_360_text_200.png",
+    "test/features/tournament/goldens/knockout_full_tree_600_text_200.png"
+  ],
+  "manualAndroidEvidence": [
+    "The screen opened in round mode rather than the full map.",
+    "The full map occupied a dedicated route; horizontal panning moved the bracket without moving the page header.",
+    "Current, overview and cup controls restored readable focus for a 32-team bracket.",
+    "Selecting a tie highlighted its road to the cup and opened a compact details sheet before navigation.",
+    "TalkBack was enabled temporarily and caused the full tree to switch visibly to the round-first linear list; the package, notification permission and accessibility settings were restored afterward."
+  ],
+  "openGate": {
+    "ticket": "ELR-UX-304",
+    "reason": "The visible TalkBack fallback and widget semantics order are proven, but spoken traversal order was not independently verified because UIAutomator returned stale map semantics while TalkBack was bound.",
+    "requiredEvidence": "A human TalkBack pass that hears round, teams, score and status in order through the cup."
+  },
+  "outOfScope": [
+    "Profile-mode frame timing remains ELR-REL-506.",
+    "No iOS build, test or file change.",
+    "No Firebase deployment or Remote Config publication."
+  ]
+}

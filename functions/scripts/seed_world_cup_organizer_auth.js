@@ -1,6 +1,7 @@
 "use strict";
 
-const admin = require("firebase-admin");
+const {initializeApp} = require("firebase-admin/app");
+const {getAuth} = require("firebase-admin/auth");
 
 const ORGANIZER_UID = "organizer-1";
 const ORGANIZER_EMAIL = "world-cup-organizer@example.test";
@@ -46,8 +47,8 @@ async function main() {
     throw new Error("Usage: node seed_world_cup_organizer_auth.js <project-id>");
   }
   assertLocalAuthEmulator(process.env);
-  admin.initializeApp({projectId});
-  const result = await seedOrganizer(admin.auth());
+  const app = initializeApp({projectId});
+  const result = await seedOrganizer(getAuth(app));
   console.log(`World Cup organizer auth user ${result}: ${ORGANIZER_UID}`);
 }
 

@@ -1,0 +1,116 @@
+{
+  "score": 5,
+  "maximumScore": 5,
+  "scope": "Wave 0 containment only: disabled fan-voting and dispute entry points, removal of the generic audit callable, denial of direct client writes to protected collections, strict temporary player bootstrap defaults, and legacy audit provenance labeling.",
+  "scopeLimit": "This is not a whole-application or Android V1 release security score. Wave 1 trusted operations and dispute authorization, Wave 2 private/public player separation, CI, dependency, device, and release gates remain open.",
+  "date": "2026-07-29",
+  "target": {
+    "firebaseProject": "el7reef-app",
+    "database": "(default)",
+    "edition": "STANDARD",
+    "location": "nam5"
+  },
+  "verdict": "pass",
+  "summary": "All Wave 0 containment controls are present in the candidate tree and their scoped attack and authentication tests pass. No Firebase deployment or Remote Config publication was performed.",
+  "controls": [
+    {
+      "id": "ELR-SEC-001",
+      "status": "pass",
+      "evidence": [
+        "fan_voting_enabled and disputes_enabled default to false",
+        "match cards hide the fan-voting entrance by default",
+        "direct fan-voting and dispute routes fail closed unless explicitly enabled"
+      ]
+    },
+    {
+      "id": "ELR-SEC-002",
+      "status": "pass",
+      "evidence": [
+        "functions/index.js does not export recordAuditEvent",
+        "the generic callable implementation was removed",
+        "Firestore rules deny direct client create, update, and delete for auditEvents"
+      ]
+    },
+    {
+      "id": "ELR-SEC-003",
+      "status": "pass",
+      "evidence": [
+        "Firestore rules deny direct vote, voting-session, and dispute writes",
+        "temporary players/{uid} creation uses an exact field allowlist and trusted bootstrap defaults",
+        "rules attacks reject forged role, rating, wins, trust level, createdAt, extra fields, and cross-UID creation",
+        "current authentication tests remain green"
+      ]
+    },
+    {
+      "id": "ELR-SEC-004",
+      "status": "pass",
+      "evidence": [
+        "audit events require trustedOperation provenance version 1 and a non-empty requestId to be treated as trusted",
+        "events without complete provenance are labeled قديم غير موثق in the organizer timeline"
+      ]
+    }
+  ],
+  "verification": {
+    "firestoreRulesEmulator": {
+      "command": "npm run test:rules:emulator",
+      "result": "pass",
+      "testsPassed": 201
+    },
+    "functionsUnit": {
+      "command": "npm run test:functions",
+      "result": "pass",
+      "testsPassed": 79
+    },
+    "functionsEmulatorSmoke": {
+      "command": "npm run test:functions:emulator",
+      "result": "pass",
+      "exportedCallables": 5,
+      "genericAuditCallableExported": false
+    },
+    "authentication": {
+      "command": "flutter test --no-pub test/core/auth test/features/auth",
+      "result": "pass",
+      "testsPassed": 25
+    },
+    "focusedFlutter": {
+      "result": "pass",
+      "testsPassed": 23
+    },
+    "staticAnalysis": {
+      "command": "dart analyze lib/",
+      "result": "pass",
+      "issues": 0
+    },
+    "fullFlutterSuite": {
+      "command": "flutter test --no-pub",
+      "result": "fail-outside-scope",
+      "failedTests": 2,
+      "note": "Both failures expect bracket-screen-summary-bar in tournament_operations_dashboard_test.dart and are tracked by ELR-UX-302 and ELR-UX-303; no Wave 0 file caused either failure."
+    }
+  },
+  "findings": [],
+  "remainingRisks": [
+    {
+      "id": "ELR-SEC-101..104",
+      "status": "ready",
+      "risk": "Trusted server-side audit, voting, and atomic dispute operations plus relationship-scoped reads are not implemented yet."
+    },
+    {
+      "id": "ELR-IDN-201..205",
+      "status": "blocked-by-wave1",
+      "risk": "Private player documents are still readable more broadly than the final privacy model permits; public-profile projection and cutover remain required."
+    },
+    {
+      "id": "ELR-UX-302..303",
+      "status": "ready",
+      "risk": "Two existing knockout-bracket widget tests remain red outside this security scope."
+    }
+  ],
+  "recommendations": [
+    "Do not deploy the contained voting or dispute flows as finished features; keep both flags false until Wave 1 passes its own gate.",
+    "Implement audit creation only inside trusted backend operations and remove the temporary denied client attempt in Wave 1.",
+    "Complete the private/public player-profile cutover before claiming application-wide security readiness.",
+    "Review the Firestore rules and this scoped result before any production deployment."
+  ],
+  "releaseDecision": "Wave 0 containment gate passes locally. Android V1 release remains blocked by Waves 1, 2, 3, 4, and 5."
+}

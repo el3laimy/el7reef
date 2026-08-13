@@ -2,7 +2,6 @@ import 'package:uuid/uuid.dart';
 
 import '../errors/app_exceptions.dart';
 import '../utils/app_logger.dart';
-import 'cloud_sensitive_ops_service.dart';
 import '../../core/enums/audit_action.dart';
 import '../../domain/entities/audit_event.dart';
 import '../../domain/repositories/audit_repository.dart';
@@ -14,15 +13,10 @@ import '../../domain/repositories/audit_repository.dart';
 class AuditService {
   final AuditRepository _repository;
   final Uuid _uuid;
-  final CloudSensitiveOpsService _cloudSensitiveOps;
 
-  AuditService({
-    required AuditRepository repository,
-    Uuid? uuid,
-    CloudSensitiveOpsService? cloudSensitiveOps,
-  }) : _repository = repository,
-       _uuid = uuid ?? const Uuid(),
-       _cloudSensitiveOps = cloudSensitiveOps ?? CloudSensitiveOpsService();
+  AuditService({required AuditRepository repository, Uuid? uuid})
+    : _repository = repository,
+      _uuid = uuid ?? const Uuid();
 
   /// تسجيل حدث تدقيق عام
   Future<AuditEvent> record({
@@ -46,13 +40,6 @@ class AuditService {
       metadata: metadata,
       createdAt: now ?? DateTime.now(),
     );
-
-    final remoteHandled = await _cloudSensitiveOps.recordAuditEvent(
-      _toCloudPayload(event),
-    );
-    if (remoteHandled) {
-      return event;
-    }
 
     try {
       await _repository.createAuditEvent(event);
@@ -164,19 +151,5 @@ class AuditService {
   /// جلب سجل تدقيق ممثل (actor) محدد
   Future<List<AuditEvent>> getActorHistory(String actorId, {int limit = 50}) {
     return _repository.getActorAuditEvents(actorId, limit: limit);
-  }
-
-  Map<String, dynamic> _toCloudPayload(AuditEvent event) {
-    return {
-      'id': event.id,
-      'entityType': event.entityType.name,
-      'entityId': event.entityId,
-      'action': event.action.name,
-      'actorId': event.actorId,
-      'beforePayload': event.beforePayload,
-      'afterPayload': event.afterPayload,
-      'metadata': event.metadata,
-      'createdAt': event.createdAt.millisecondsSinceEpoch,
-    };
   }
 }

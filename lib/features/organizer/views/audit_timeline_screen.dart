@@ -112,7 +112,10 @@ class _AuditEventTile extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: _dotColor(event.action),
-                    border: Border.all(color: AppColors.surfaceBorder, width: 2),
+                    border: Border.all(
+                      color: AppColors.surfaceBorder,
+                      width: 2,
+                    ),
                   ),
                 ),
                 if (!isLast)
@@ -136,13 +139,20 @@ class _AuditEventTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          label,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (!event.isTrusted) const _LegacyAuditBadge(),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -194,5 +204,29 @@ class _AuditEventTile extends StatelessWidget {
   String _formatTimestamp(DateTime dateTime) {
     final formatter = intl.DateFormat('yyyy/MM/dd – HH:mm', 'ar');
     return formatter.format(dateTime);
+  }
+}
+
+class _LegacyAuditBadge extends StatelessWidget {
+  const _LegacyAuditBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.45)),
+      ),
+      child: const Text(
+        'قديم غير موثق',
+        style: TextStyle(
+          color: AppColors.warning,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
   }
 }

@@ -183,8 +183,14 @@ class TournamentRepositoryImpl implements TournamentRepository {
         return tournaments;
       }
 
+      // Legacy registrations have no participant document. Keep their fallback
+      // query constrained to the exact public catalogue contract in the rules;
+      // an unconstrained list is rejected before Firestore can return an empty
+      // result for teams that have no legacy registration.
       final legacySnap = await _col
           .where('registeredTeamIds', arrayContains: teamId)
+          .where('discoverable', isEqualTo: true)
+          .where('visibility', isEqualTo: TournamentVisibility.public.name)
           .orderBy('createdAt', descending: true)
           .get();
       return _mapTournamentDocs(legacySnap.docs);
@@ -199,11 +205,7 @@ class TournamentRepositoryImpl implements TournamentRepository {
           .where('userId', isEqualTo: userId)
           .get();
       final tournamentIds = snap.docs
-          .map(
-            (doc) =>
-                doc.data()['tournamentId'] as String? ??
-                doc.reference.parent.parent?.id,
-          )
+          .map(_tournamentIdForFollowerDocument)
           .whereType<String>()
           .toSet()
           .toList(growable: false);
@@ -222,6 +224,17 @@ class TournamentRepositoryImpl implements TournamentRepository {
       );
       return tournaments;
     });
+  }
+
+  String? _tournamentIdForFollowerDocument(
+    QueryDocumentSnapshot<Map<String, dynamic>> followerDocument,
+  ) {
+    final tournamentDocument = followerDocument.reference.parent.parent;
+    if (tournamentDocument == null ||
+        tournamentDocument.parent.id != FirebasePaths.tournaments) {
+      return null;
+    }
+    return tournamentDocument.id;
   }
 
   @override

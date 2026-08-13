@@ -136,6 +136,20 @@ class AuditTimelineController extends GetxController {
         return 'تم إزالة عضو';
       case AuditAction.memberRoleChanged:
         return 'تم تغيير دور العضو';
+      case AuditAction.profileReported:
+        return 'تم إرسال بلاغ عن بروفايل';
+      case AuditAction.playerBlocked:
+        return 'تم حظر لاعب';
+      case AuditAction.playerUnblocked:
+        return 'تم فك حظر لاعب';
+      case AuditAction.accountDeletionRequested:
+        return 'تم طلب حذف الحساب';
+      case AuditAction.accountDeletionProcessing:
+        return 'جارٍ حذف الحساب';
+      case AuditAction.accountDeletionCompleted:
+        return 'اكتمل حذف الحساب';
+      case AuditAction.accountDeletionFailed:
+        return 'تعذر استكمال حذف الحساب';
       case AuditAction.disputeOpened:
         return 'تم فتح نزاع';
       case AuditAction.disputeResolved:

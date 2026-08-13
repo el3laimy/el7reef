@@ -2,6 +2,9 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const {initializeApp} = require("firebase-admin/app");
+const {getAuth} = require("firebase-admin/auth");
+const {getFirestore} = require("firebase-admin/firestore");
 
 const {
   TOURNAMENT_ID,
@@ -181,13 +184,17 @@ async function main() {
   }
 
   assertProductionEnvironment(process.env);
-  const admin = require("firebase-admin");
-  admin.initializeApp({projectId: options.projectId});
+  const app = initializeApp({projectId: options.projectId});
+  const db = getFirestore(app);
   if (options.catalogOnly) {
-    await updateCatalogOnly(admin.firestore());
+    await updateCatalogOnly(db);
     return;
   }
-  await publishNewTournament(admin, documents);
+  await publishNewTournament({
+    auth: getAuth(app),
+    db,
+    documents,
+  });
 }
 
 function printDryRun(options, documentCount) {
@@ -210,13 +217,12 @@ async function updateCatalogOnly(db) {
   console.log(JSON.stringify({mode: "catalog-only", updated: 1}, null, 2));
 }
 
-async function publishNewTournament(admin, documents) {
-  const db = admin.firestore();
+async function publishNewTournament({auth, db, documents}) {
   const collisions = await findDocumentCollisions(db, documents);
   if (collisions.length > 0) {
     throw new Error(`Publication aborted; existing documents: ${collisions.slice(0, 10).join(", ")}`);
   }
-  const authUser = await ensurePlatformAuthUser(admin.auth());
+  const authUser = await ensurePlatformAuthUser(auth);
   const written = await writeImportDocuments(db, documents);
   console.log(JSON.stringify({mode: "published", written, authUser}, null, 2));
 }

@@ -48,6 +48,8 @@ abstract class FirebasePaths {
   static const String fantasyRoundSettlements = 'fantasyRoundSettlements';
   // Phase 7 — Audit & Disputes
   static const String auditEvents = 'auditEvents';
+  static const String userReports = 'userReports';
+  static const String safetyActionQuotas = 'safetyActionQuotas';
+  static const String accountDeletionRequests = 'accountDeletionRequests';
   static const String disputes = 'disputes';
-  static const String analyticsEvents = 'analyticsEvents';
 }

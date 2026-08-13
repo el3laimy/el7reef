@@ -6,6 +6,10 @@ const indexConfig = readJson(path.join(root, 'firestore.indexes.json'));
 const baseline = readJson(path.join(__dirname, 'firestore_index_baseline.json'));
 const signatures = indexConfig.indexes.map(indexSignature);
 const signatureSet = new Set(signatures);
+const fieldOverrideSignatures = (indexConfig.fieldOverrides ?? []).map(
+  fieldOverrideSignature,
+);
+const fieldOverrideSignatureSet = new Set(fieldOverrideSignatures);
 const violations = [];
 
 if (signatureSet.size !== signatures.length) {
@@ -16,13 +20,21 @@ for (const requiredSignature of baseline.requiredSignatures) {
     violations.push(`missing production index: ${requiredSignature}`);
   }
 }
+if (fieldOverrideSignatureSet.size !== fieldOverrideSignatures.length) {
+  violations.push('firestore.indexes.json contains duplicate field overrides');
+}
+for (const requiredSignature of baseline.requiredFieldOverrideSignatures ?? []) {
+  if (!fieldOverrideSignatureSet.has(requiredSignature)) {
+    violations.push(`missing production field override: ${requiredSignature}`);
+  }
+}
 
 if (violations.length > 0) {
   process.stderr.write(`Firestore index guard failed:\n${violations.join('\n')}\n`);
   process.exitCode = 1;
 } else {
   process.stdout.write(
-    `Firestore index guard passed (${baseline.requiredSignatures.length} production indexes preserved).\n`,
+    `Firestore index guard passed (${baseline.requiredSignatures.length} composite indexes and ${(baseline.requiredFieldOverrideSignatures ?? []).length} field overrides preserved).\n`,
   );
 }
 
@@ -35,4 +47,11 @@ function indexSignature(index) {
     .map((field) => `${field.fieldPath}:${field.order ?? field.arrayConfig}`)
     .join(',');
   return `${index.queryScope}|${index.collectionGroup}|${fields}`;
+}
+
+function fieldOverrideSignature(fieldOverride) {
+  const indexes = (fieldOverride.indexes ?? [])
+    .map((index) => `${index.queryScope}:${index.order ?? index.arrayConfig}`)
+    .join(',');
+  return `${fieldOverride.collectionGroup}|${fieldOverride.fieldPath}|${indexes}`;
 }

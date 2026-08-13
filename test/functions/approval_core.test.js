@@ -80,6 +80,19 @@ describe('approveMatchScoreCore', () => {
       db.collectionData('auditEvents')[0].action,
       'matchScoreApproved',
     );
+    assert.strictEqual(
+      db.collectionData('auditEvents')[0].source,
+      'trustedOperation',
+    );
+    assert.strictEqual(
+      db.collectionData('auditEvents')[0].verificationVersion,
+      1,
+    );
+    assert.ok(db.collectionData('auditEvents')[0].requestId);
+    assert.strictEqual(
+      db.collectionData('auditEvents')[0].beforePayload.status,
+      'completed',
+    );
 
     const standing = db.docData(
       'groupStandingSnapshots/standing::group-stage::tournament-1::group-1',
@@ -237,6 +250,64 @@ describe('approveMatchScoreCore', () => {
     );
     assert.strictEqual(standing.entries[0].participantId, 'part-a');
     assert.strictEqual(standing.entries[0].played, 1);
+    assert.deepStrictEqual(db.collectionData('auditEvents'), []);
+  });
+
+  it('keeps one approval audit event across an idempotent retry', async () => {
+    const db = new FakeFirestore({
+      'matches/match-1': match({
+        status: 'completed',
+        scoreTeamA: 1,
+        scoreTeamB: 0,
+        settlementSubmittedAt: NOW - 500,
+        settlementSubmissionFingerprint: 'fingerprint-1',
+      }),
+    });
+
+    await approveMatchScoreCore({
+      db,
+      actorId: 'organizer-1',
+      matchId: 'match-1',
+      now: NOW,
+    });
+    await approveMatchScoreCore({
+      db,
+      actorId: 'organizer-1',
+      matchId: 'match-1',
+      now: NOW + 1000,
+    });
+
+    assert.strictEqual(db.collectionData('auditEvents').length, 1);
+    assert.strictEqual(
+      db.collectionData('auditEvents')[0].requestId,
+      `match-approval:${NOW - 500}:fingerprint-1`,
+    );
+  });
+
+  it('rolls back approval when the audit write fails', async () => {
+    const db = new FakeFirestore(
+      {
+        'matches/match-1': match({
+          status: 'completed',
+          scoreTeamA: 1,
+          scoreTeamB: 0,
+        }),
+      },
+      {failWrite: ({path}) => path.startsWith('auditEvents/')},
+    );
+
+    await assert.rejects(
+      () => approveMatchScoreCore({
+        db,
+        actorId: 'organizer-1',
+        matchId: 'match-1',
+        now: NOW,
+      }),
+      /Injected write failure/,
+    );
+
+    assert.strictEqual(db.docData('matches/match-1').status, 'completed');
+    assert.deepStrictEqual(db.collectionData('auditEvents'), []);
   });
 
   it('advances knockout winners and marks champion after final approval', async () => {
@@ -460,6 +531,7 @@ describe('approveMatchScoreCore', () => {
         (error) => error instanceof SettlementError && error.code === 'failed-precondition',
       );
       assert.strictEqual(db.docData('matches/match-1').status, overrides.status);
+      assert.deepStrictEqual(db.collectionData('auditEvents'), []);
     });
   }
 });

@@ -8,9 +8,8 @@ import 'package:el7reef/app/routes/app_routes.dart';
 import 'package:el7reef/core/auth/auth_session.dart';
 import 'package:el7reef/core/auth/auth_service.dart';
 import 'package:el7reef/core/navigation/pending_deep_link_service.dart';
+import 'package:el7reef/core/services/cloud_sensitive_ops_service.dart';
 import 'package:el7reef/core/services/guest_claim_service.dart';
-import 'package:el7reef/core/services/share_link_service.dart';
-import 'package:el7reef/data/repositories/claim_code_repository_impl.dart';
 import 'package:el7reef/data/repositories/guest_player_repository_impl.dart';
 import 'package:el7reef/data/repositories/guest_team_repository_impl.dart';
 import 'package:el7reef/data/repositories/player_repository_impl.dart';
@@ -19,15 +18,15 @@ import 'package:el7reef/domain/entities/guest_player.dart';
 import 'package:el7reef/domain/entities/guest_team.dart';
 import 'package:el7reef/domain/entities/player.dart';
 import 'package:el7reef/domain/entities/team.dart';
-import 'package:el7reef/domain/entities/generated_share_link.dart';
 import 'package:el7reef/features/guest_claim/views/guest_player_claim_screen.dart';
 import 'package:el7reef/features/guest_claim/views/guest_team_claim_screen.dart';
 
+const _playerClaimCode = 'PLAYER-CLAIM-CODE';
+const _teamClaimCode = 'TEAM-CLAIM-CODE';
+
 void main() {
   late FakeFirebaseFirestore firestore;
-  late ShareLinkService shareLinkService;
-  late GeneratedShareLink playerClaimLink;
-  late GeneratedShareLink teamClaimLink;
+  late _FakeCloudSensitiveOpsService cloudOps;
 
   setUp(() async {
     Get.testMode = true;
@@ -49,20 +48,11 @@ void main() {
       GuestTeamRepositoryImpl(firestore: firestore),
       permanent: true,
     );
-    Get.put<ClaimCodeRepositoryImpl>(
-      ClaimCodeRepositoryImpl(firestore: firestore),
-      permanent: true,
-    );
+    cloudOps = _FakeCloudSensitiveOpsService();
+    Get.put<CloudSensitiveOpsService>(cloudOps, permanent: true);
     Get.put<GuestClaimService>(
-      GuestClaimService(firestore: firestore),
+      GuestClaimService(cloudOps: cloudOps),
       permanent: true,
-    );
-
-    shareLinkService = ShareLinkService(
-      claimCodeRepository: Get.find<ClaimCodeRepositoryImpl>(),
-      guestPlayerRepository: Get.find<GuestPlayerRepositoryImpl>(),
-      guestTeamRepository: Get.find<GuestTeamRepositoryImpl>(),
-      teamRepository: Get.find<TeamRepositoryImpl>(),
     );
 
     final now = DateTime(2026, 4, 16, 10);
@@ -128,15 +118,6 @@ void main() {
         updatedAt: now,
       ),
     );
-
-    playerClaimLink = await shareLinkService.createGuestPlayerClaimLink(
-      guestPlayerId: 'guest-1',
-      actorId: 'owner-1',
-    );
-    teamClaimLink = await shareLinkService.createGuestTeamClaimLink(
-      guestTeamId: 'guest-team-1',
-      actorId: 'owner-1',
-    );
   });
 
   tearDown(Get.reset);
@@ -147,7 +128,7 @@ void main() {
     await tester.pumpWidget(
       _buildApp(
         initialRoute: AppRoutes.claimEntryWithQuery({
-          'code': playerClaimLink.claimCode.code,
+          'code': _playerClaimCode,
           'type': 'guestPlayer',
           'targetId': 'guest-1',
           'requiresApproval': '0',
@@ -161,13 +142,45 @@ void main() {
     expect(find.text('سجّل الدخول أولاً حتى تستلم مكانك.'), findsOneWidget);
   });
 
+  testWidgets(
+    'SEC-107 route target mismatch is surfaced from callable inspection',
+    (WidgetTester tester) async {
+      Get.put<AuthSession>(
+        _FakeAuthSession(
+          currentUserId: 'player-1',
+          currentPlayer: Player(
+            id: 'player-1',
+            name: 'Mahmoud Salem',
+            createdAt: DateTime(2026, 4, 16, 10),
+            lastActiveAt: DateTime(2026, 4, 16, 10),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          initialRoute: AppRoutes.guestPlayerClaimById(
+            'forged-route-target',
+            queryParameters: {'code': _playerClaimCode},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('رابط الاستلام لا يطابق هذا اللاعب الضيف.'),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('guest player login action preserves the claim route', (
     WidgetTester tester,
   ) async {
     final pendingDeepLinkService = Get.put(PendingDeepLinkService());
     final route = AppRoutes.guestPlayerClaimById(
       'guest-1',
-      queryParameters: {'code': playerClaimLink.claimCode.code},
+      queryParameters: {'code': _playerClaimCode},
     );
 
     await tester.pumpWidget(_buildApp(initialRoute: route));
@@ -195,7 +208,7 @@ void main() {
     await tester.pumpWidget(
       _buildApp(
         initialRoute: AppRoutes.claimEntryWithQuery({
-          'code': playerClaimLink.claimCode.code,
+          'code': _playerClaimCode,
           'type': 'guestPlayer',
           'targetId': 'guest-1',
           'requiresApproval': '0',
@@ -240,7 +253,7 @@ void main() {
         _buildApp(
           initialRoute: AppRoutes.guestPlayerClaimById(
             'guest-1',
-            queryParameters: {'code': playerClaimLink.claimCode.code},
+            queryParameters: {'code': _playerClaimCode},
           ),
         ),
       );
@@ -263,12 +276,7 @@ void main() {
   testWidgets('expired guest player claim links are blocked in the UI', (
     WidgetTester tester,
   ) async {
-    await Get.find<ClaimCodeRepositoryImpl>().updateClaimCode(
-      playerClaimLink.claimCode.copyWith(
-        expiresAt: DateTime(2000, 1, 1),
-        updatedAt: DateTime(2000, 1, 1),
-      ),
-    );
+    cloudOps.expirePlayerClaim();
     Get.put<AuthSession>(
       _FakeAuthSession(
         currentUserId: 'player-1',
@@ -285,7 +293,7 @@ void main() {
       _buildApp(
         initialRoute: AppRoutes.guestPlayerClaimById(
           'guest-1',
-          queryParameters: {'code': playerClaimLink.claimCode.code},
+          queryParameters: {'code': _playerClaimCode},
         ),
       ),
     );
@@ -301,14 +309,7 @@ void main() {
   testWidgets('player claim conflicts are surfaced in the claim screen', (
     WidgetTester tester,
   ) async {
-    await Get.find<PlayerRepositoryImpl>().createPlayer(
-      Player(
-        id: 'player-name-dup',
-        name: 'Mahmoud Guest',
-        createdAt: DateTime(2026, 4, 16, 10),
-        lastActiveAt: DateTime(2026, 4, 16, 10),
-      ),
-    );
+    cloudOps.returnPlayerNameConflict();
     Get.put<AuthSession>(
       _FakeAuthSession(
         currentUserId: 'player-1',
@@ -325,7 +326,7 @@ void main() {
       _buildApp(
         initialRoute: AppRoutes.guestPlayerClaimById(
           'guest-1',
-          queryParameters: {'code': playerClaimLink.claimCode.code},
+          queryParameters: {'code': _playerClaimCode},
         ),
       ),
     );
@@ -336,7 +337,7 @@ void main() {
 
     expect(find.text('يوجد تعارض يحتاج مراجعة'), findsOneWidget);
     expect(
-      find.text('يوجد لاعب مسجل آخر يطابق اسم هذا اللاعب الضيف.'),
+      find.text('توجد هوية أخرى بالاسم نفسه وتحتاج إلى مراجعة.'),
       findsOneWidget,
     );
   });
@@ -359,7 +360,7 @@ void main() {
       await tester.pumpWidget(
         _buildApp(
           initialRoute: AppRoutes.claimEntryWithQuery({
-            'code': teamClaimLink.claimCode.code,
+            'code': _teamClaimCode,
             'type': 'guestTeam',
             'targetId': 'guest-team-1',
             'requiresApproval': '1',
@@ -390,10 +391,7 @@ void main() {
     final pendingDeepLinkService = Get.put(PendingDeepLinkService());
     final route = AppRoutes.guestTeamClaimById(
       'guest-team-1',
-      queryParameters: {
-        'code': teamClaimLink.claimCode.code,
-        'requiresApproval': '1',
-      },
+      queryParameters: {'code': _teamClaimCode, 'requiresApproval': '1'},
     );
 
     await tester.pumpWidget(_buildApp(initialRoute: route));
@@ -421,7 +419,7 @@ void main() {
     await tester.pumpWidget(
       _buildApp(
         initialRoute: AppRoutes.claimEntryWithQuery({
-          'code': teamClaimLink.claimCode.code,
+          'code': _teamClaimCode,
           'type': 'guestTeam',
           'targetId': 'guest-team-1',
           'requiresApproval': '1',
@@ -454,12 +452,7 @@ void main() {
   testWidgets(
     'guest team creator can complete a pending approval request from the screen',
     (WidgetTester tester) async {
-      await Get.find<GuestClaimService>().claimGuestTeam(
-        claimCode: teamClaimLink.claimCode.code,
-        teamId: 'team-2',
-        actorId: 'owner-2',
-        now: DateTime(2026, 4, 16, 11),
-      );
+      cloudOps.seedPendingTeamClaim(canApprove: true);
       Get.put<AuthSession>(
         _FakeAuthSession(
           currentUserId: 'owner-1',
@@ -476,10 +469,7 @@ void main() {
         _buildApp(
           initialRoute: AppRoutes.guestTeamClaimById(
             'guest-team-1',
-            queryParameters: {
-              'code': teamClaimLink.claimCode.code,
-              'requiresApproval': '1',
-            },
+            queryParameters: {'code': _teamClaimCode, 'requiresApproval': '1'},
           ),
         ),
       );
@@ -503,6 +493,131 @@ void main() {
       );
     },
   );
+}
+
+class _FakeCloudSensitiveOpsService extends CloudSensitiveOpsService {
+  bool _playerExpired = false;
+  bool _playerClaimed = false;
+  bool _returnPlayerNameConflict = false;
+  bool _teamPendingApproval = false;
+  bool _teamClaimed = false;
+  bool _canApprovePendingTeamClaim = false;
+
+  void expirePlayerClaim() {
+    _playerExpired = true;
+  }
+
+  void returnPlayerNameConflict() {
+    _returnPlayerNameConflict = true;
+  }
+
+  void seedPendingTeamClaim({required bool canApprove}) {
+    _teamPendingApproval = true;
+    _canApprovePendingTeamClaim = canApprove;
+  }
+
+  @override
+  Future<Map<String, dynamic>> inspectGuestClaim({
+    required String claimCode,
+  }) async {
+    switch (claimCode) {
+      case _playerClaimCode:
+        return {
+          'targetType': 'guestPlayer',
+          'targetId': 'guest-1',
+          'subjectName': 'Mahmoud Guest',
+          'scope': 'team',
+          'teamId': 'team-2',
+          'requiresApproval': false,
+          'pendingApproval': false,
+          'canApprovePendingTeamClaim': false,
+          'status': _playerExpired
+              ? 'expired'
+              : _playerClaimed
+              ? 'claimed'
+              : 'active',
+          'expiresAt': _playerExpired
+              ? DateTime(2000, 1, 1).millisecondsSinceEpoch
+              : DateTime(2100, 1, 1).millisecondsSinceEpoch,
+        };
+      case _teamClaimCode:
+        return {
+          'targetType': 'guestTeam',
+          'targetId': 'guest-team-1',
+          'subjectName': 'Guest Falcons',
+          'scope': 'tournament',
+          'teamId': _teamPendingApproval || _teamClaimed ? 'team-2' : null,
+          'tournamentId': 'street-cup',
+          'requiresApproval': true,
+          'pendingApproval': _teamPendingApproval,
+          'canApprovePendingTeamClaim': _canApprovePendingTeamClaim,
+          'status': _teamClaimed ? 'claimed' : 'active',
+          'expiresAt': DateTime(2100, 1, 1).millisecondsSinceEpoch,
+        };
+      default:
+        throw StateError('Unexpected claim code in screen test.');
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> claimGuestPlayer({
+    required String claimCode,
+  }) async {
+    if (claimCode != _playerClaimCode) {
+      throw StateError('Unexpected player claim code in screen test.');
+    }
+    if (_playerExpired) {
+      return const {'outcome': 'expired'};
+    }
+    if (_returnPlayerNameConflict) {
+      return const {
+        'outcome': 'conflict',
+        'guestPlayerId': 'guest-1',
+        'playerId': 'player-1',
+        'conflict': {
+          'type': 'duplicateName',
+          'conflictingEntityId': 'player-name-dup',
+        },
+      };
+    }
+    _playerClaimed = true;
+    return const {
+      'outcome': 'claimed',
+      'guestPlayerId': 'guest-1',
+      'playerId': 'player-1',
+      'relinkedMembershipIds': <String>[],
+      'linkedTeamIds': <String>['team-2'],
+      'syncedLegacyTeamIds': <String>['team-2'],
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> claimGuestTeam({
+    required String claimCode,
+    required String teamId,
+  }) async {
+    if (claimCode != _teamClaimCode || teamId != 'team-2') {
+      throw StateError('Unexpected team claim input in screen test.');
+    }
+    if (_teamPendingApproval && _canApprovePendingTeamClaim) {
+      _teamPendingApproval = false;
+      _teamClaimed = true;
+      return const {
+        'outcome': 'claimed',
+        'guestTeamId': 'guest-team-1',
+        'teamId': 'team-2',
+        'mergedTournamentIds': <String>['street-cup'],
+      };
+    }
+    _teamPendingApproval = true;
+    return const {
+      'outcome': 'approvalRequired',
+      'guestTeamId': 'guest-team-1',
+      'teamId': 'team-2',
+      'mergedTournamentIds': <String>[],
+      'requestedByPlayerId': 'owner-2',
+    };
+  }
 }
 
 class _FakeAuthSession implements AuthSession {

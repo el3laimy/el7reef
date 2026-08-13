@@ -788,6 +788,46 @@ describe('tournament permission Firestore rules', () => {
       );
     });
 
+    it('allows legacy team lookups only when they keep the public catalogue predicate', async () => {
+      await seed(
+        'tournaments/public-legacy-team-cup',
+        tournamentData({
+          registeredTeamIds: ['team-legacy-1'],
+          visibility: 'public',
+          discoverable: true,
+        }),
+      );
+      await seed(
+        'tournaments/private-legacy-team-cup',
+        tournamentData({
+          organizerId: 'organizer-2',
+          registeredTeamIds: ['team-legacy-1'],
+          visibility: 'private',
+          discoverable: false,
+        }),
+      );
+      const db = authedDb('player-1');
+
+      await assertSucceeds(
+        getDocs(
+          query(
+            collection(db, 'tournaments'),
+            where('registeredTeamIds', 'array-contains', 'team-legacy-1'),
+            where('discoverable', '==', true),
+            where('visibility', '==', 'public'),
+          ),
+        ),
+      );
+      await assertFails(
+        getDocs(
+          query(
+            collection(db, 'tournaments'),
+            where('registeredTeamIds', 'array-contains', 'team-legacy-1'),
+          ),
+        ),
+      );
+    });
+
     it('allows signed-in featured discovery and denies the same query when signed out', async () => {
       await seed(
         'tournaments/world-cup',

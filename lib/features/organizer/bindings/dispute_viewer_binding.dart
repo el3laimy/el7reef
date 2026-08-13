@@ -3,22 +3,22 @@ import 'package:get/get.dart';
 import '../../../core/auth/auth_service_session.dart';
 import '../../../core/auth/auth_session.dart';
 import '../../../core/auth/auth_service.dart';
+import '../../../core/constants/feature_flags.dart';
 import '../controllers/dispute_viewer_controller.dart';
 
 class DisputeViewerBinding extends Bindings {
   @override
   void dependencies() {
+    if (!FeatureFlags.disputesEnabled) return;
+
     final matchId = Get.parameters['matchId'] ?? '';
     final authSession = Get.isRegistered<AuthSession>()
         ? Get.find<AuthSession>()
         : Get.isRegistered<AuthService>()
-            ? AuthServiceSession(Get.find<AuthService>())
-            : const _AnonymousAuthSession();
+        ? AuthServiceSession(Get.find<AuthService>())
+        : const _AnonymousAuthSession();
     Get.lazyPut<DisputeViewerController>(
-      () => DisputeViewerController(
-        matchId: matchId,
-        authSession: authSession,
-      ),
+      () => DisputeViewerController(matchId: matchId, authSession: authSession),
     );
   }
 }

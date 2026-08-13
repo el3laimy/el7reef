@@ -21,6 +21,8 @@ enum FeatureFlagKey {
     true,
   ),
   matchdayUiEnabled('matchday_ui_enabled', true),
+  fanVotingEnabled('fan_voting_enabled', false),
+  disputesEnabled('disputes_enabled', false),
   prideGrowthLinksEnabled('pride_growth_links_enabled', false),
   postMatchPrideHubEnabled('post_match_pride_hub_enabled', false),
   functionalGlassEnabled('functional_glass_enabled', false),

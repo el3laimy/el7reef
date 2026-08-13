@@ -3,26 +3,22 @@ import 'package:uuid/uuid.dart';
 import '../../core/enums/claim_code_status.dart';
 import '../../core/enums/claim_payload_scope.dart';
 import '../../core/enums/claim_target_type.dart';
-import '../../core/enums/guest_claim_status.dart';
 import '../../data/repositories/claim_code_repository_impl.dart';
 import '../../data/repositories/guest_player_repository_impl.dart';
 import '../../data/repositories/guest_team_repository_impl.dart';
 import '../../data/repositories/team_repository_impl.dart';
-import '../../data/repositories/tournament_repository_impl.dart';
 import '../../domain/entities/claim_code.dart';
 import '../../domain/entities/claim_payload.dart';
 import '../../domain/entities/generated_share_link.dart';
-import '../../domain/entities/guest_player.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/repositories/claim_code_repository.dart';
 import '../../domain/repositories/guest_player_repository.dart';
 import '../../domain/repositories/guest_team_repository.dart';
 import '../../domain/repositories/team_repository.dart';
-import '../../domain/repositories/tournament_repository.dart';
 import 'analytics_service.dart';
+import 'cloud_sensitive_ops_service.dart';
 import 'guest_player_claim_link_issuer.dart';
 import 'team_roster_policy.dart';
-import 'tournament_permission_service.dart';
 import '../navigation/app_link_route_parser.dart';
 
 class ShareLinkService implements GuestPlayerClaimLinkIssuer {
@@ -30,10 +26,9 @@ class ShareLinkService implements GuestPlayerClaimLinkIssuer {
   final GuestPlayerRepository _guestPlayerRepository;
   final GuestTeamRepository _guestTeamRepository;
   final TeamRepository _teamRepository;
-  TournamentRepository? _tournamentRepository;
   final TeamRosterPolicy _teamRosterPolicy;
-  final TournamentPermissionService _tournamentPermissionService;
   final AnalyticsService _analyticsService;
+  final CloudSensitiveOpsService _cloudOps;
   final Uuid _uuid;
 
   static const String appScheme = 'el7reef';
@@ -44,25 +39,19 @@ class ShareLinkService implements GuestPlayerClaimLinkIssuer {
     GuestPlayerRepository? guestPlayerRepository,
     GuestTeamRepository? guestTeamRepository,
     TeamRepository? teamRepository,
-    TournamentRepository? tournamentRepository,
     TeamRosterPolicy? teamRosterPolicy,
-    TournamentPermissionService? tournamentPermissionService,
     AnalyticsService? analyticsService,
+    CloudSensitiveOpsService? cloudOps,
     Uuid? uuid,
   }) : _claimCodeRepository = claimCodeRepository ?? ClaimCodeRepositoryImpl(),
        _guestPlayerRepository =
            guestPlayerRepository ?? GuestPlayerRepositoryImpl(),
        _guestTeamRepository = guestTeamRepository ?? GuestTeamRepositoryImpl(),
        _teamRepository = teamRepository ?? TeamRepositoryImpl(),
-       _tournamentRepository = tournamentRepository,
        _teamRosterPolicy = teamRosterPolicy ?? const TeamRosterPolicy(),
-       _tournamentPermissionService =
-           tournamentPermissionService ?? TournamentPermissionService(),
        _analyticsService = analyticsService ?? AnalyticsService(),
+       _cloudOps = cloudOps ?? CloudSensitiveOpsService(),
        _uuid = uuid ?? const Uuid();
-
-  TournamentRepository get _resolvedTournamentRepository =>
-      _tournamentRepository ??= TournamentRepositoryImpl();
 
   Future<GeneratedShareLink> createGuestPlayerClaimLink({
     required String guestPlayerId,
@@ -79,32 +68,14 @@ class ShareLinkService implements GuestPlayerClaimLinkIssuer {
     if (guestPlayer.isClaimed) {
       throw Exception('تم استلام هذا اللاعب بالفعل ولا يمكن إصدار رابط جديد.');
     }
-    await _assertCanManageGuestPlayer(guestPlayer, actorId);
 
-    final claimCode = await _reuseOrCreateClaimCode(
+    final claimCode = await _issueGuestClaimCode(
       targetType: ClaimTargetType.guestPlayer,
       targetId: guestPlayer.id,
-      scope: _inferScope(
-        teamId: guestPlayer.teamId,
-        tournamentId: guestPlayer.tournamentId,
-      ),
-      teamId: guestPlayer.teamId,
-      tournamentId: guestPlayer.tournamentId,
       actorId: actorId,
       ttl: ttl,
       requiresApproval: requiresApproval,
     );
-
-    if (guestPlayer.claimCode != claimCode.code ||
-        guestPlayer.claimStatus != GuestClaimStatus.invited) {
-      await _guestPlayerRepository.updateGuestPlayer(
-        guestPlayer.copyWith(
-          claimStatus: GuestClaimStatus.invited,
-          claimCode: claimCode.code,
-          updatedAt: claimCode.updatedAt,
-        ),
-      );
-    }
 
     final link = _buildShareLink(
       claimCode: claimCode,
@@ -151,33 +122,13 @@ class ShareLinkService implements GuestPlayerClaimLinkIssuer {
       throw Exception('لا تملك صلاحية إصدار رابط claim لهذا الفريق.');
     }
 
-    final claimCode = await _reuseOrCreateClaimCode(
+    final claimCode = await _issueGuestClaimCode(
       targetType: ClaimTargetType.guestTeam,
       targetId: guestTeam.id,
-      scope: _inferScope(
-        teamId: null,
-        tournamentId: guestTeam.tournamentIds.isNotEmpty
-            ? guestTeam.tournamentIds.first
-            : null,
-      ),
-      tournamentId: guestTeam.tournamentIds.isNotEmpty
-          ? guestTeam.tournamentIds.first
-          : null,
       actorId: actorId,
       ttl: ttl,
       requiresApproval: requiresApproval,
     );
-
-    if (guestTeam.claimCode != claimCode.code ||
-        guestTeam.claimStatus != GuestClaimStatus.invited) {
-      await _guestTeamRepository.updateGuestTeam(
-        guestTeam.copyWith(
-          claimStatus: GuestClaimStatus.invited,
-          claimCode: claimCode.code,
-          updatedAt: claimCode.updatedAt,
-        ),
-      );
-    }
 
     final link = _buildShareLink(
       claimCode: claimCode,
@@ -318,6 +269,57 @@ class ShareLinkService implements GuestPlayerClaimLinkIssuer {
     return claimCode;
   }
 
+  Future<ClaimCode> _issueGuestClaimCode({
+    required ClaimTargetType targetType,
+    required String targetId,
+    required String actorId,
+    required Duration ttl,
+    required bool requiresApproval,
+  }) async {
+    final requestedAt = DateTime.now();
+    final response = await _cloudOps.issueGuestClaimCode(
+      targetType: targetType.name,
+      targetId: targetId,
+      requestId: _uuid.v4(),
+      ttlMs: ttl.inMilliseconds,
+      requiresApproval: requiresApproval,
+    );
+    final responseType = _enumFromName(
+      ClaimTargetType.values,
+      response['targetType'],
+      'targetType',
+    );
+    if (responseType != targetType || response['targetId'] != targetId) {
+      throw const FormatException(
+        'Guest claim issuance response does not match its request.',
+      );
+    }
+    return ClaimCode(
+      code: _requiredResponseString(response, 'code'),
+      targetType: responseType,
+      targetId: targetId,
+      scope: _enumFromName(
+        ClaimPayloadScope.values,
+        response['scope'],
+        'scope',
+      ),
+      teamId: _optionalResponseString(response['teamId']),
+      tournamentId: _optionalResponseString(response['tournamentId']),
+      createdBy: actorId,
+      requiresApproval: response['requiresApproval'] == true,
+      status: _enumFromName(
+        ClaimCodeStatus.values,
+        response['status'],
+        'status',
+      ),
+      createdAt: requestedAt,
+      updatedAt: requestedAt,
+      expiresAt: DateTime.fromMillisecondsSinceEpoch(
+        _requiredResponseInt(response, 'expiresAt'),
+      ),
+    );
+  }
+
   Future<String> _generateUniqueCode() async {
     for (var attempt = 0; attempt < 6; attempt += 1) {
       final candidate = _uuid
@@ -331,64 +333,6 @@ class ShareLinkService implements GuestPlayerClaimLinkIssuer {
       }
     }
     throw Exception('تعذر توليد claim code فريد حالياً.');
-  }
-
-  ClaimPayloadScope _inferScope({String? teamId, String? tournamentId}) {
-    final hasTeam = teamId != null && teamId.isNotEmpty;
-    final hasTournament = tournamentId != null && tournamentId.isNotEmpty;
-
-    if (hasTeam && hasTournament) {
-      return ClaimPayloadScope.hybrid;
-    }
-    if (hasTournament) {
-      return ClaimPayloadScope.tournament;
-    }
-    if (hasTeam) {
-      return ClaimPayloadScope.team;
-    }
-    return ClaimPayloadScope.publicShare;
-  }
-
-  Future<void> _assertCanManageGuestPlayer(
-    GuestPlayer guestPlayer,
-    String actorId,
-  ) async {
-    if (guestPlayer.createdBy == actorId) {
-      return;
-    }
-
-    final teamId = guestPlayer.teamId;
-    if (teamId != null && teamId.isNotEmpty) {
-      final team = await _teamRepository.getTeam(teamId);
-      if (team != null &&
-          _teamRosterPolicy.canManageRoster(team: team, actorId: actorId)) {
-        return;
-      }
-    }
-
-    final guestTeamId = guestPlayer.guestTeamId;
-    if (guestTeamId != null && guestTeamId.isNotEmpty) {
-      final guestTeam = await _guestTeamRepository.getGuestTeam(guestTeamId);
-      if (guestTeam != null && guestTeam.creatorId == actorId) {
-        return;
-      }
-    }
-
-    final tournamentId = guestPlayer.tournamentId;
-    if (tournamentId != null && tournamentId.isNotEmpty) {
-      final tournament = await _resolvedTournamentRepository.getTournament(
-        tournamentId,
-      );
-      if (tournament != null &&
-          _tournamentPermissionService.canIssueGuestClaims(
-            tournament,
-            actorId,
-          )) {
-        return;
-      }
-    }
-
-    throw Exception('لا تملك صلاحية إصدار رابط claim لهذا اللاعب.');
   }
 
   Future<Team> _requireTeam(String teamId) async {
@@ -410,4 +354,40 @@ class ShareLinkService implements GuestPlayerClaimLinkIssuer {
     final month = expiresAt.month.toString().padLeft(2, '0');
     return '$day/$month/${expiresAt.year}';
   }
+}
+
+T _enumFromName<T extends Enum>(
+  Iterable<T> values,
+  Object? candidate,
+  String fieldName,
+) {
+  if (candidate is String) {
+    for (final value in values) {
+      if (value.name == candidate) return value;
+    }
+  }
+  throw FormatException('Invalid $fieldName in guest claim response.');
+}
+
+String _requiredResponseString(
+  Map<String, dynamic> response,
+  String fieldName,
+) {
+  final value = _optionalResponseString(response[fieldName]);
+  if (value == null) {
+    throw FormatException('Missing $fieldName in guest claim response.');
+  }
+  return value;
+}
+
+String? _optionalResponseString(Object? candidate) {
+  if (candidate is! String) return null;
+  final normalized = candidate.trim();
+  return normalized.isEmpty ? null : normalized;
+}
+
+int _requiredResponseInt(Map<String, dynamic> response, String fieldName) {
+  final value = response[fieldName];
+  if (value is num && value.isFinite) return value.toInt();
+  throw FormatException('Missing $fieldName in guest claim response.');
 }

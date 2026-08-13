@@ -56,6 +56,38 @@ void main() {
     expect(find.byType(El7reefGlassSurface), findsNothing);
   });
 
+  testWidgets('ProfessionalPitchCard presentation never invents tactics', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ProfessionalPitchCard(
+            slots: const [
+              FormationSlot(
+                id: 'mid-1',
+                role: SlotRole.mid,
+                lineIndex: 1,
+                slotIndex: 0,
+                x: 50,
+                y: 50,
+                playerId: 'p1',
+              ),
+            ],
+            playersByKey: {player.key: player},
+            formationCode: '4-3-3',
+            playerCount: 5,
+            presentationMode: true,
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('ملاحظات تكتيكية'), findsNothing);
+    expect(find.text('روح واحدة .. هدف واحد'), findsNothing);
+  });
+
   testWidgets('ProfessionalPitchCard marks tap-select move targets clearly', (
     tester,
   ) async {

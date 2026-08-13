@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:el7reef/core/enums/match_status.dart';
 import 'package:el7reef/core/enums/tournament_ops_enums.dart';
 import 'package:el7reef/domain/entities/group_standing_snapshot.dart';
@@ -9,6 +11,7 @@ import 'package:el7reef/features/tournament/widgets/knockout_bracket_view.dart';
 import 'package:el7reef/features/tournament/widgets/tournament_group_stage_overview.dart';
 import 'package:el7reef/features/tournament/widgets/tournament_standings_table.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -385,7 +388,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('الحالي'), findsOneWidget);
-      expect(find.text('نظرة'), findsOneWidget);
+      expect(find.text('نظرة عامة'), findsOneWidget);
       expect(find.text('الكأس'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('bracket-back-to-rounds')),
@@ -476,6 +479,124 @@ void main() {
     },
   );
 
+  testWidgets(
+    'expanded full tree fills the route height with its interactive canvas',
+    (tester) async {
+      final bracket = _bracketScenario();
+
+      await _pumpAtSize(
+        tester,
+        size: const Size(360, 800),
+        child: KnockoutBracketView(
+          ties: bracket.ties,
+          matchesById: bracket.matchesById,
+          participantLabel: (participantId) =>
+              bracket.participantLabels[participantId] ?? 'لم يتحدد',
+          hideUnpublishedParticipants: true,
+          viewMode: KnockoutBracketViewMode.fullTree,
+          expandFullTree: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final treeRect = tester.getRect(
+        find.byKey(const ValueKey('knockout-interactive-tree')),
+      );
+      expect(find.byType(InteractiveViewer), findsOneWidget);
+      expect(
+        treeRect.height,
+        greaterThan(600),
+        reason: 'Map mode must own the route workspace on a phone.',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('full tree selects the road to the cup before opening a match', (
+    tester,
+  ) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final bracket = _bracketScenario();
+    Match? openedMatch;
+
+    await _pumpAtSize(
+      tester,
+      size: const Size(600, 1000),
+      child: KnockoutBracketView(
+        ties: bracket.ties,
+        matchesById: bracket.matchesById,
+        participantLabel: (participantId) =>
+            bracket.participantLabels[participantId] ?? 'لم يتحدد',
+        hideUnpublishedParticipants: false,
+        viewMode: KnockoutBracketViewMode.fullTree,
+        expandFullTree: true,
+        onOpenMatch: (match) => openedMatch = match,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('bracket-reset-view')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('knockout-tie-semi-b')));
+    await tester.pumpAndSettle();
+
+    expect(openedMatch, isNull);
+    expect(
+      find.byKey(const ValueKey('bracket-tie-sheet-semi-b')),
+      findsOneWidget,
+    );
+    final sheet = find.byKey(const ValueKey('bracket-tie-sheet-semi-b'));
+    expect(
+      find.descendant(of: sheet, matching: find.text('الفرسان')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: sheet, matching: find.text('النسور')),
+      findsOneWidget,
+    );
+    expect(find.text('افتح المباراة'), findsOneWidget);
+
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('knockout-semantics-semi-b')))
+          .flagsCollection
+          .isSelected,
+      ui.Tristate.isTrue,
+    );
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('knockout-semantics-final')))
+          .flagsCollection
+          .isSelected,
+      ui.Tristate.isFalse,
+    );
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('knockout-semantics-semi-a')))
+          .flagsCollection
+          .isSelected,
+      ui.Tristate.isFalse,
+    );
+    expect(
+      find.descendant(
+        of: sheet,
+        matching: find.byKey(const ValueKey('team-initials-فر')),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('bracket-sheet-open-match')));
+    await tester.pumpAndSettle();
+
+    expect(openedMatch?.id, 'semi-b-match');
+    expect(
+      find.byKey(const ValueKey('bracket-tie-sheet-semi-b')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+    semanticsHandle.dispose();
+  });
+
   testWidgets('bracket stays navigable at 200 percent text scale', (
     tester,
   ) async {
@@ -510,6 +631,155 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(InteractiveViewer), findsOne);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'full tree and match sheet stay usable at 600dp and 200 percent text',
+    (tester) async {
+      final bracket = _bracketScenario();
+      Match? openedMatch;
+      await _pumpAtSize(
+        tester,
+        size: const Size(600, 900),
+        textScaler: const TextScaler.linear(2),
+        child: KnockoutBracketView(
+          ties: bracket.ties,
+          matchesById: bracket.matchesById,
+          participantLabel: (participantId) =>
+              bracket.participantLabels[participantId] ?? 'لم يتحدد',
+          hideUnpublishedParticipants: false,
+          viewMode: KnockoutBracketViewMode.fullTree,
+          expandFullTree: true,
+          onOpenMatch: (match) => openedMatch = match,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('bracket-map-toolbar')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('bracket-reset-view')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('knockout-tie-semi-b')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('bracket-tie-sheet-semi-b')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('bracket-sheet-open-match')),
+        findsOneWidget,
+      );
+      final ctaRect = tester.getRect(
+        find.byKey(const ValueKey('bracket-sheet-open-match')),
+      );
+      expect(ctaRect.top, greaterThanOrEqualTo(0));
+      expect(ctaRect.bottom, lessThanOrEqualTo(900));
+      expect(
+        find.byKey(const ValueKey('bracket-sheet-open-match')).hitTestable(),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('bracket-sheet-open-match')));
+      await tester.pumpAndSettle();
+
+      expect(openedMatch?.id, 'semi-b-match');
+      expect(
+        find.byKey(const ValueKey('bracket-tie-sheet-semi-b')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'match sheet stays actionable at 360dp with long Arabic names and 200 percent text',
+    (tester) async {
+      final bracket = _bracketScenario();
+      Match? openedMatch;
+      await _pumpAtSize(
+        tester,
+        size: const Size(360, 800),
+        textScaler: const TextScaler.linear(2),
+        child: KnockoutBracketView(
+          ties: bracket.ties,
+          matchesById: bracket.matchesById,
+          participantLabel: (participantId) {
+            if (participantId == 'team-b') {
+              return 'فرسان الحارة الشرقية أبطال الملعب الشعبي';
+            }
+            if (participantId == 'team-c') {
+              return 'نسور شارع البطولة لكرة القدم الخماسية';
+            }
+            return bracket.participantLabels[participantId] ?? 'لم يتحدد';
+          },
+          hideUnpublishedParticipants: false,
+          viewMode: KnockoutBracketViewMode.fullTree,
+          expandFullTree: true,
+          onOpenMatch: (match) => openedMatch = match,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('bracket-reset-view')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('knockout-tie-semi-b')));
+      await tester.pumpAndSettle();
+
+      final cta = find.byKey(const ValueKey('bracket-sheet-open-match'));
+      expect(cta, findsOneWidget);
+      final ctaRect = tester.getRect(cta);
+      expect(ctaRect.top, greaterThanOrEqualTo(0));
+      expect(ctaRect.bottom, lessThanOrEqualTo(800));
+      await tester.tap(cta);
+      await tester.pumpAndSettle();
+
+      expect(openedMatch?.id, 'semi-b-match');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('pending empty slots are not styled as winners', (tester) async {
+    final now = DateTime.utc(2026, 8, 1);
+    final tie = KnockoutTie(
+      id: 'pending-final',
+      tournamentId: 'tournament',
+      bracketId: 'bracket',
+      roundIndex: 0,
+      slotNumber: 0,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await _pumpAtSize(
+      tester,
+      size: const Size(360, 800),
+      child: KnockoutBracketView(
+        ties: [tie],
+        matchesById: const {},
+        participantLabel: (_) => 'لم يتحدد',
+        hideUnpublishedParticipants: false,
+        viewMode: KnockoutBracketViewMode.fullTree,
+        expandFullTree: true,
+      ),
+      accessibleNavigation: true,
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('bracket-accessible-linear-tree')),
+      findsOneWidget,
+    );
+    expect(find.byType(InteractiveViewer), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('knockout-tie-pending-final')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('bracket-tie-sheet-pending-final')),
+        matching: find.byIcon(Icons.check_circle_rounded),
+      ),
+      findsNothing,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -605,6 +875,77 @@ void main() {
       semanticsHandle.dispose();
     },
   );
+
+  testWidgets('full tree assigns a round-first TalkBack traversal order', (
+    tester,
+  ) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final bracket = _bracketScenario();
+    await _pumpAtSize(
+      tester,
+      size: const Size(600, 1000),
+      child: KnockoutBracketView(
+        ties: bracket.ties,
+        matchesById: bracket.matchesById,
+        participantLabel: (participantId) =>
+            bracket.participantLabels[participantId] ?? 'لم يتحدد',
+        hideUnpublishedParticipants: false,
+        viewMode: KnockoutBracketViewMode.fullTree,
+        expandFullTree: true,
+      ),
+      accessibleNavigation: true,
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('bracket-accessible-linear-tree')),
+      findsOneWidget,
+    );
+    expect(find.byType(InteractiveViewer), findsNothing);
+
+    final expectedTraversal = [
+      tester
+          .getSemantics(find.byKey(const ValueKey('knockout-semantics-semi-a')))
+          .id,
+      tester
+          .getSemantics(find.byKey(const ValueKey('knockout-semantics-semi-b')))
+          .id,
+      tester
+          .getSemantics(find.byKey(const ValueKey('knockout-semantics-final')))
+          .id,
+      tester
+          .getSemantics(
+            find.byKey(const ValueKey('bracket-champion-semantics')),
+          )
+          .id,
+    ];
+    final traversal = <int>[];
+
+    void visitInTraversalOrder(SemanticsNode node) {
+      traversal.add(node.id);
+      for (final child in node.debugListChildrenInOrder(
+        DebugSemanticsDumpOrder.traversalOrder,
+      )) {
+        visitInTraversalOrder(child);
+      }
+    }
+
+    visitInTraversalOrder(
+      RendererBinding
+          .instance
+          .renderViews
+          .first
+          .owner!
+          .semanticsOwner!
+          .rootSemanticsNode!,
+    );
+    expect(
+      traversal.where(expectedTraversal.contains),
+      orderedEquals(expectedTraversal),
+    );
+    expect(tester.takeException(), isNull);
+    semanticsHandle.dispose();
+  });
 }
 
 Future<void> _pumpAtSize(
@@ -612,6 +953,7 @@ Future<void> _pumpAtSize(
   required Size size,
   required Widget child,
   TextScaler textScaler = TextScaler.noScaling,
+  bool accessibleNavigation = false,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -622,7 +964,10 @@ Future<void> _pumpAtSize(
       locale: const Locale('ar'),
       theme: ThemeData.dark(useMaterial3: true),
       builder: (context, appChild) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+        data: MediaQuery.of(context).copyWith(
+          textScaler: textScaler,
+          accessibleNavigation: accessibleNavigation,
+        ),
         child: appChild!,
       ),
       home: Directionality(
